@@ -69,24 +69,6 @@ export class BillingService {
     }>(`/billing/deposits/${encodeURIComponent(publicReference)}/status`)
   }
 
-  withdraw(data: {
-    walletId: string
-    amount: number
-    idempotencyKey?: string
-  }) {
-    return this.client.post<WalletResponse>(
-      `/billing/wallet/${data.walletId}/withdraw`,
-      {
-        json: {
-          amount: data.amount,
-          ...(data.idempotencyKey
-            ? { idempotencyKey: data.idempotencyKey }
-            : {}),
-        },
-      },
-    )
-  }
-
   listTransactions() {
     return this.client.get<TransactionResponse[]>("/billing/transactions")
   }

@@ -1,7 +1,14 @@
+import {
+  type FinanceOperationKind,
+  type FinanceRuntimeMode,
+  isFinanceOperationAllowed,
+} from "@guestpost/shared"
+
 export const MAINTENANCE_DISPATCH_TASK = "maintenance-dispatch"
 
 export const MAINTENANCE_TASK_NAMES = [
   "payout-reconcile",
+  "payment-dispute-inbox",
   "settlement-auto-approve",
   "settlement-auto-release",
   "cancellation-timeouts",
@@ -15,6 +22,33 @@ export const MAINTENANCE_TASK_NAMES = [
 ] as const
 
 export type MaintenanceTaskName = (typeof MAINTENANCE_TASK_NAMES)[number]
+
+const MAINTENANCE_FINANCE_OPERATION: Record<
+  MaintenanceTaskName,
+  FinanceOperationKind
+> = {
+  "payout-reconcile": "recovery",
+  "payment-dispute-inbox": "recovery",
+  "settlement-auto-approve": "operator_decision",
+  "settlement-auto-release": "new_liability",
+  "cancellation-timeouts": "operator_decision",
+  "acceptance-timeouts": "operator_decision",
+  "auto-accept": "operator_decision",
+  "review-reminders": "read",
+  reconciliation: "reconciliation",
+  "settlement-link-check": "reconciliation",
+  "website-reverify": "read",
+  "domain-metrics-refresh": "read",
+}
+
+export function maintenanceTasksAllowedForFinanceMode(
+  tasks: readonly MaintenanceTaskName[],
+  mode: FinanceRuntimeMode,
+): MaintenanceTaskName[] {
+  return tasks.filter((task) =>
+    isFinanceOperationAllowed(mode, MAINTENANCE_FINANCE_OPERATION[task]),
+  )
+}
 
 /**
  * Resolve the maintenance tasks due in the current five-minute UTC slot.
@@ -37,6 +71,9 @@ export function maintenanceTasksDueAt(now: Date): MaintenanceTaskName[] {
   const day = slot.getUTCDate()
   const tasks: MaintenanceTaskName[] = []
 
+  // A failed opening event leaves disputed funds spendable until its hold is
+  // applied. Drain every dispatcher slot (five minutes).
+  tasks.push("payment-dispute-inbox")
   if (minute % 10 === 0) tasks.push("payout-reconcile")
   if (minute % 15 === 0) {
     tasks.push("settlement-auto-approve", "cancellation-timeouts")

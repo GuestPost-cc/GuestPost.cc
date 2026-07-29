@@ -4,7 +4,8 @@
  * -> approval -> withdrawal -> payout -> reconciliation.
  *
  * Exit 0 = every step and every invariant held. Run: pnpm tsx scripts/integration-test.ts
- * Requires: API on :4000, seeded users (pnpm seed), publisher tier VERIFIED.
+ * Requires: API on :4000, seeded users (pnpm seed), publisher tier VERIFIED,
+ * and manual payouts enabled in this development/test environment.
  */
 import { prisma } from "../packages/database/src"
 import { fundExistingWalletForTest } from "./test-wallet-funding"
@@ -60,11 +61,59 @@ async function signIn(email: string, password: string) {
   return r.data.token as string
 }
 
+async function ensureManualPayoutMethod(publisherToken: string) {
+  const listed = await call(
+    "GET",
+    "/publisher-payouts/payout-methods",
+    publisherToken,
+  )
+  if (listed.status !== 200 || !Array.isArray(listed.data)) {
+    throw new Error(
+      `Unable to list payout methods: ${JSON.stringify(listed.data)}`,
+    )
+  }
+  const existing = listed.data.find(
+    (method: any) =>
+      method.type === "bank_transfer" &&
+      method.label === "Integration Test Bank",
+  )
+  if (existing) return existing
+
+  const created = await call(
+    "POST",
+    "/publisher-payouts/payout-methods",
+    publisherToken,
+    {
+      type: "bank_transfer",
+      label: "Integration Test Bank",
+      details: {
+        bankName: "Integration Test Bank",
+        accountHolderName: "Integration Test Publisher",
+        accountNumber: "000012345678",
+      },
+      isDefault: true,
+    },
+  )
+  if (created.status >= 400) {
+    throw new Error(
+      `Unable to create the manual payout method required by this test. ` +
+        `Run the API in development/test mode or explicitly enable certified ` +
+        `legacy payout methods. Response: ${JSON.stringify(created.data)}`,
+    )
+  }
+  return created.data
+}
+
 async function main() {
   console.log("── Integration: full money loop")
   const client = await signIn("client@guestpost.local", "Client123!")
   const publisher = await signIn("publisher@guestpost.local", "Publisher123!")
   const admin = await signIn("admin@guestpost.local", "Admin123!")
+  const finance = await signIn("finance@guestpost.local", "Finance123!")
+  const financeChecker = await signIn(
+    "finance-checker@guestpost.local",
+    "FinanceChecker123!",
+  )
 
   // Snapshot starting balances
   const wallet0 = (await call("GET", "/billing/wallet", client)).data
@@ -83,18 +132,26 @@ async function main() {
   const seedPublisher = await prisma.publisher.findFirstOrThrow({
     where: { email: "publisher@guestpost.local" },
   })
-  const seedWebsite = await prisma.website.findFirstOrThrow({
+  const listingService = await prisma.listingService.findFirstOrThrow({
     where: {
-      publisherId: seedPublisher.id,
-      marketplaceListings: { some: { status: "APPROVED" } },
+      serviceType: "GUEST_POST",
+      availability: "AVAILABLE",
+      listing: {
+        status: "APPROVED",
+        website: { publisherId: seedPublisher.id },
+      },
     },
     include: {
-      marketplaceListings: { where: { status: "APPROVED" }, take: 1 },
+      listing: { select: { websiteId: true } },
     },
   })
+  if (!listingService.listing.websiteId) {
+    throw new Error("Seed guest-post listing service has no website")
+  }
   const listing = {
-    websiteId: seedWebsite.id,
-    price: Number(seedWebsite.marketplaceListings[0].price),
+    websiteId: listingService.listing.websiteId,
+    listingServiceId: listingService.id,
+    price: Number(listingService.price),
   }
   check(
     "seed publisher has a website-backed approved listing",
@@ -117,9 +174,21 @@ async function main() {
     await call("POST", "/orders", client, {
       type: "GUEST_POST",
       title: `itest order ${Date.now()}`,
+      listingServiceId: listing.listingServiceId,
+      expectedListingServiceVersion: listingService.version,
+      expectedPrice: listingService.price.toString(),
+      expectedCurrency: listingService.currency,
+      briefData: {
+        kind: "GUEST_POST",
+        title: "Integration test article",
+        topic: "Integration test coverage for the complete order money loop",
+        targetUrl: "https://example.com/x",
+        anchorText: "itest",
+        notes: "Created by the full-loop integration test.",
+      },
       items: [
         {
-          websiteId: listing.websiteId ?? listing.website?.id,
+          websiteId: listing.websiteId,
           targetUrl: "https://example.com/x",
           anchorText: "itest",
         },
@@ -253,12 +322,14 @@ async function main() {
     { credited, expected: settlement.publisherAmount },
   )
 
-  // Withdrawal -> manual payout -> completion
+  // Withdrawal -> manual payout -> evidence-backed completion
+  const payoutMethod = await ensureManualPayoutMethod(publisher)
   const wd = (
     await call("POST", "/publisher-payouts/withdrawals", publisher, {
       amount: credited,
       method: "bank_transfer",
       idempotencyKey: `itest-${order.id}`,
+      payoutMethodId: payoutMethod.id,
     })
   ).data
   check("withdrawal created PENDING", wd.status === "PENDING", wd)
@@ -268,6 +339,7 @@ async function main() {
       amount: credited,
       method: "bank_transfer",
       idempotencyKey: `itest-${order.id}`,
+      payoutMethodId: payoutMethod.id,
     })
   ).data
   check(
@@ -304,29 +376,92 @@ async function main() {
     wdApproved,
   )
 
-  const exec = (
-    await call("POST", `/admin/withdrawals/${wd.id}/execute`, admin, {
+  const executeResponse = await call(
+    "POST",
+    `/admin/withdrawals/${wd.id}/execute`,
+    finance,
+    {
       providerName: "manual",
-    })
-  ).data
-  check("manual execution started", !!exec.executionId, exec)
+    },
+  )
+  check(
+    "manual execution started by a checker distinct from the approver",
+    executeResponse.status < 400 &&
+      typeof executeResponse.data?.executionId === "string",
+    executeResponse,
+  )
+  if (
+    executeResponse.status >= 400 ||
+    typeof executeResponse.data?.executionId !== "string"
+  ) {
+    throw new Error(
+      `Manual payout execution did not start: ${JSON.stringify(executeResponse)}`,
+    )
+  }
+  const exec = executeResponse.data
 
+  const retiredMarkPaid = await call(
+    "PATCH",
+    `/admin/withdrawals/${wd.id}/mark-paid`,
+    admin,
+  )
+  check(
+    "legacy mark-paid is retired",
+    retiredMarkPaid.status === 410 &&
+      retiredMarkPaid.data.code === "LEGACY_MARK_PAID_RETIRED",
+    retiredMarkPaid,
+  )
+
+  const manualEvidence = {
+    executionId: exec.executionId,
+    bankReference: `ITEST-BANK-${order.id}`.toUpperCase(),
+    paidAt: new Date().toISOString(),
+    reason: "Verified integration-test bank settlement receipt",
+  }
   const completed = (
-    await call("PATCH", `/admin/withdrawals/${wd.id}/mark-paid`, admin)
+    await call(
+      "POST",
+      `/publisher-payouts/withdrawals/${wd.id}/manual-complete`,
+      financeChecker,
+      manualEvidence,
+    )
   ).data
   check(
-    "mark-paid completes withdrawal",
+    "bank evidence completes the manual withdrawal",
     completed.status === "COMPLETED",
     completed,
+  )
+
+  const completedReplay = await call(
+    "POST",
+    `/publisher-payouts/withdrawals/${wd.id}/manual-complete`,
+    financeChecker,
+    manualEvidence,
+  )
+  check(
+    "exact manual evidence replay is idempotent",
+    completedReplay.status === 201 &&
+      completedReplay.data.status === "COMPLETED",
+    completedReplay,
   )
 
   const executions = (
     await call("GET", `/admin/withdrawals/${wd.id}/executions`, admin)
   ).data
+  const completedExecutions = executions.filter(
+    (e: any) => e.status === "COMPLETED",
+  )
   check(
     "exactly one COMPLETED execution",
-    executions.filter((e: any) => e.status === "COMPLETED").length === 1,
+    completedExecutions.length === 1,
     executions.map((e: any) => e.status),
+  )
+  check(
+    "completed execution retains manual bank evidence",
+    completedExecutions[0]?.completionSource === "MANUAL_BANK_CONFIRMATION" &&
+      completedExecutions[0]?.completionEvidenceRef ===
+        manualEvidence.bankReference,
+    completedExecutions[0],
   )
 
   // Final referee

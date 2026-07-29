@@ -46,15 +46,30 @@ double-pay the publisher.
 
 ### Webhook receipt
 
-`POST /payout-webhooks/:provider` performs this sequence:
+Wise uses `POST /payout-webhooks/wise`. Stripe uses two non-interchangeable
+trust-domain routes:
+`POST /payout-webhooks/stripe_connect/platform` for platform Transfer events
+and `POST /payout-webhooks/stripe_connect/connected` for connected-account
+Payout/account events. The retired shared Stripe route returns 400 without an
+inbox write. Each active route performs this sequence:
 
 1. Reject unsupported providers.
-2. Verify the Stripe HMAC or Wise RSA signature against the raw body.
+2. Verify exactly that route's Stripe HMAC secret or the Wise RSA signature
+   against the raw body; payout secrets are never tried as fallbacks.
 3. Enforce the five-minute replay timestamp window.
-4. Parse and normalize the provider payload.
-5. Persist an allow-listed `PayoutWebhookEvent` row.
-6. Return success only after the Postgres commit.
-7. Send a best-effort Northflank wake-up with no payout/customer identifiers.
+4. Parse, topology-check, and normalize the provider payload. Platform events
+   must have a `tr_*` object and no top-level account; connected events require
+   the exact `acct_*` account and a matching `po_*`/Account object.
+5. Persist an allow-listed `PayoutWebhookEvent` row. Stripe object snapshots
+   on `transfer.updated`/`payout.updated` are observational; only exact typed
+   `payout.paid`, `payout.failed`, or `payout.canceled` events are terminal.
+6. For payout-object evidence, return success after the Postgres commit and
+   send a best-effort Northflank wake-up with no payout/customer identifiers.
+7. For Stripe `account.updated`, claim the committed row under the finance
+   recovery gate, retrieve/configure the exact account, atomically persist the
+   sanitized account/method state plus audit, then mark the inbox row
+   processed. A lock or processing failure returns non-2xx for Stripe
+   redelivery.
 
 Raw provider payloads, signature headers, bank details, and provider error
 bodies are not stored in the inbox. Event deduplication is permanent and uses
@@ -63,7 +78,12 @@ available. It never deduplicates solely by transfer ID because one transfer can
 emit `processing`, `failed`, and `completed` events.
 
 The inbox processor claims rows with conditional updates. Stale claims recover
-after 15 minutes. A webhook that arrives before the API saves
+after 15 minutes. Every payout-object and Stripe account-sync path carries the
+exact inbox attempt and lease timestamp through its provider/local work and
+terminal update. Canonical payout completion also records that token and the
+database verifies it against the locked event before releasing liability; a
+stalled attempt cannot resume after a newer claimant, borrow its lease, or
+overwrite/complete that claim. A webhook that arrives before the API saves
 `providerExecutionId` remains retryable for up to 72 hours instead of being
 discarded. The 432-attempt ceiling is a secondary corruption/clock guard and
 does not shorten that age window under the capped ten-minute backoff.
@@ -71,6 +91,14 @@ Completion is version-guarded and locks `PublisherBalance` before incrementing
 `lifetimePaid`. A provider-completed transfer whose local execution is in an
 unsafe state is not mutated silently; it creates a
 `PAYOUT_WEBHOOK_STATE_CONFLICT` audit event for Finance review.
+
+The generic payout-completion worker deliberately excludes Stripe
+`account.updated`: it is routing eligibility, not proof that a payout
+completed. The API owns that event's durable lease and exact account sync.
+Provider refreshes never silently reactivate a publisher-disabled payout
+method; reactivation is a separate owner-authorized, audited command. Pending
+or failed account events remain visible in the incident query and require an
+exact signature-verified redelivery while recovery is allowed.
 
 ### Scheduled reconciliation
 
@@ -81,6 +109,15 @@ incident recovery and processes up to
 `PAYOUT_STATUS_BATCH_SIZE` provider transfers that remain `PROCESSING`. Run it
 every 10 minutes; successive runs bound larger backlogs. Webhooks are the
 prompt signal, and polling is the independent recovery path.
+
+The dispatcher and every financial processor enforce
+`FINANCE_RUNTIME_MODE`. In `recovery_only`, payout/dispute recovery and
+reconciliation remain eligible while settlement approval/release,
+auto-acceptance, cancellation/acceptance deadlines, and delivery-driven
+liability work fail closed. In `locked`, financial recovery processors also
+pause; signed API webhook handlers continue recording durable inbox evidence.
+Non-financial reminder, website-verification, and domain-metric work is
+unaffected.
 
 ## Scheduled task catalog
 
@@ -163,6 +200,14 @@ Create one cron job using the same command and image with
 Keep payout provider credentials on this dispatcher only when provider polling
 is enabled; the realtime worker never receives payout initiation or payout
 method decryption keys.
+
+Provider status reads use a ten-second abort deadline, a 64 KiB response cap,
+JSON content checks, and strict amount/currency/reference/mode schemas. A
+timeout or malformed provider response skips that execution with a sanitized
+category; it cannot block the remaining reconciliation sweep. Stripe mode is
+re-read at both status-poll and terminal-failure mutation boundaries. Delayed
+test/live evidence or a disabled live gate performs no execution mutation; a
+verified failure webhook is exact-lease quarantined and alerts Finance.
 
 ## Redis configuration and command budget
 

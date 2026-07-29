@@ -1,7 +1,7 @@
 ---
 note_type: decisions-log
 project: guestpost-platform
-updated: 2026-06-22
+updated: 2026-07-29
 ---
 
 # Decisions
@@ -19,6 +19,34 @@ Use this file for important project decisions.
 **Impact:** What this changes.
 
 **Related files:** Links to relevant Memory or Work items.
+
+---
+
+### 2026-07-29, Financial state requires normalized authority and exact evidence
+
+**Decision:** Adopt `docs/FINANCIAL_INVARIANTS.md` and ADR 0007 as the
+repository-wide money contract. `PayoutExecutionClaim` is the sole send
+authority; JSON is informational. PostgreSQL enforces complete payout state
+graphs, actor separation, immutable evidence, and exact versions. Deposits
+retain their credited fact across refund/dispute states and persist Stripe
+`livemode`. Production finance work is explicitly gated by `normal`,
+`recovery_only`, or fail-closed `locked`.
+
+**Why:** Internal state or privileged UI action cannot prove external money
+moved. The reported approval, chargeback identity, synthetic payout completion,
+and wallet cash-out defects shared this evidence/authority gap.
+
+**Impact:** Finance migrations require a hard drain, populated-clone rehearsal,
+validated constraints, signed provider staging, incident queries, and
+forward-fix rollback. Corruption preflights take stable, short-timeout SHARE
+lock barriers rather than trusting a READ-COMMITTED snapshot while old writers
+can still commit. Approval checks the request-time reservation; automated
+completion needs exact provider evidence; manual completion is bound to the
+locked withdrawal reference; customer wallets remain closed-loop.
+
+**Related files:** `docs/adr/0007-financial-state-evidence-and-recovery.md`;
+`docs/FINANCIAL_INVARIANTS.md`; [[publisher-payouts]];
+[[billing-payments]].
 
 ---
 

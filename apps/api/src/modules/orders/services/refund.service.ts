@@ -16,6 +16,7 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
 import { PrismaService } from "../../../common/prisma.service"
 import { checkPublisherBalanceInvariant } from "../../../common/publisher-balance-invariants"
 import { lockPublisherBalanceForUpdate } from "../../../common/publisher-balance-lock"
@@ -70,6 +71,7 @@ export class RefundService {
       if (existing)
         return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
     }
+    assertApiFinanceOperationAllowed("new_liability")
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -154,6 +156,7 @@ export class RefundService {
     if (existingRefund) {
       throw new BadRequestException("Order already refunded")
     }
+    assertApiFinanceOperationAllowed("new_liability")
 
     if (
       !(REFUNDABLE_ORDER_STATUSES as readonly string[]).includes(order.status)

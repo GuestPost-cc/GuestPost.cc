@@ -2,93 +2,99 @@
 note_type: domain-memory
 domain: publisher-payouts
 project: guestpost-platform
-updated: 2026-07-16
+updated: 2026-07-29
 ---
 
 # Publisher Payouts
 
-## Publisher Balance
+`docs/FINANCIAL_INVARIANTS.md` is canonical when this summary is incomplete.
 
-`PublisherBalance` tracks: `pendingBalance`, `approvedBalance`, `withdrawableBalance`, `debtBalance`, `lifetimeEarnings`, `lifetimePaid`. Version-based optimistic concurrency.
+## Liability and withdrawal
 
-## Withdrawals
+`PublisherBalance` tracks pending, approved, withdrawable, debt, lifetime
+earnings, and lifetime paid with optimistic versioning. A withdrawal request
+subtracts withdrawable liability once and creates immutable
+`WithdrawalAllocation` rows. Approval proves that reservation and eligibility;
+it never checks the already-reserved amount against available balance again.
 
-Tier-based holds enforced at approval:
-- **NEW**: 30-day hold (availableAt set 30d from approve)
-- **TRUSTED**: 14-day hold
-- **VERIFIED**: 7-day hold
+The effective withdrawal graph is
+`PENDING -> APPROVED|REJECTED -> PROCESSING`, with
+`PROCESSING -> APPROVED|FAILED|COMPLETED` and
+`FAILED -> APPROVED|COMPLETED`. Reopening requires the latest execution to
+carry typed cancellation. Completion requires exactly one evidence-backed
+completed execution. Runtime reversal remains disabled.
 
-Idempotency via `@@unique([publisherId, idempotencyKey])`. Ledger rows: `WITHDRAWAL` at request, `WITHDRAWAL_REVERSAL` at reject.
+Requester, decision actors, immutable command fields, allocations, status
+edges, exact version increments, and terminal state are protected in
+PostgreSQL. Approval/rejection require a current unbanned Finance/Super Admin.
 
-Approval is a single transaction, not a pre-check followed by a mutation. It re-validates the pending status, tier hold, publisher ban, active membership, withdrawable balance, active payout method, and absence of an in-flight execution before a version-guarded transition. Every rejected precondition creates a `WITHDRAWAL_APPROVAL_BLOCKED` audit event with a structured reason code.
+## Provider execution and send authority
 
-## Payout Methods
+`PayoutExecution` records the immutable route command, destination/provider
+snapshots, provider references, execution stage, completion/cancellation
+evidence, and actor provenance. Stripe Connect persists separate Transfer and
+connected-account bank-Payout IDs; only paid bank-Payout evidence with exact
+amount, currency, and account scope may complete.
 
-Stored encrypted (AES-256-GCM) via `PayoutEncryptionService`. Types: bank_transfer, paypal, wise. Decrypt endpoint is permission-gated (`FINANCIAL_DATA_DECRYPT` permission + reason required).
+`PayoutExecutionClaim` is the sole send authority. One append-only
+`PROVIDER_SEND` and one `BANK_PAYOUT_SEND` claim may exist per execution. Each
+stores the exact idempotency key, SHA-256 fingerprint, first claimant/time, and
+monotonic replay lease time. Claim and claimed stage commit atomically.
+`providerMetadata` is informational; `externalClaims` is forbidden.
 
-Decrypt audit context uses the server-resolved request IP and user agent; it does not trust a caller-supplied forwarding header.
+Claims lease for 15 minutes. From 15 minutes through 23 hours, exact-key
+recovery may advance only `lastClaimedAt` after locked revalidation. At 23
+hours the claim becomes review-only; provider lookup and Finance adjudication
+replace blind replay. A locked no-send check may abort only
+`CREATED`/`DESTINATION_VALIDATED` with no provider ID and no normalized claim.
 
-## Payout Providers
+Legacy direct payout-method entry is disabled outside an explicit rollout.
+When enabled, each rail has a bounded allowlisted schema; unknown or
+cross-rail secret fields are rejected. Current publisher-owner membership,
+user eligibility, and publisher identity are locked and revalidated inside the
+same serializable transaction as encryption, default-method serialization,
+creation, and audit.
 
-Three adapter implementations via `PayoutProviderAdapter` interface:
-- **Manual** — operator manually processes, then marks paid
-- **Wise** — real API integration with idempotency via `customerTransactionId` (deterministic UUID)
-- **Stripe Connect** — Stripe Connect transfers
+## Completion and maker-checker
 
-Provider config stored encrypted. Missing API key → throws in production; fake COMPLETED in mock mode only.
+Automated completion belongs to verified provider response, authenticated
+status retrieval, or verified terminal webhook evidence for the persisted
+provider object. Generic Mark Paid cannot create a synthetic manual execution
+or complete an automated route.
 
-## Payout Execution
+The execution initiator and first provider-send claimant must be current
+eligible staff and each differs from the approver. Manual bank completion is
+limited to an existing sent manual execution and requires immutable payment
+evidence plus a current Finance/Super Admin checker distinct from requester,
+approver, and execution initiator. The operator sees publisher, amount,
+currency, withdrawal reference, and execution identity, must type the exact
+canonical withdrawal reference, and the finalizer compares it with the locked
+Withdrawal row before any liability mutation. A missing or mismatched reference
+is an audited conflict.
 
-Each payout attempt tracked in `PayoutExecution` with provider reference, idempotency key, status. `retryExecution` checks provider status of prior execution before re-sending.
+Historical `LEGACY_UNVERIFIED` completion/cancellation and
+`LEGACY_PROVIDER_OUTCOME_UNKNOWN` stages are classifications, not proof.
+Wise automated sends, completion, and claimed-send replay remain disabled
+pending certification.
 
-Payout initiation is synchronous in the authenticated API; the worker never
-creates or sends a new payout. If a provider accepted a transfer but local
-finalization fails, the returned provider transfer ID is persisted for
-reconciliation. A failed execution without a provider ID is treated as
-ambiguous and cannot be automatically resent with a new idempotency key.
-Finance must reconcile the original provider idempotency key first.
+## Runtime and operations
 
-Provider execution references are unique within each payout provider, and
-webhook/status reconciliation also scopes every lookup by provider. Completion
-locks the publisher balance row before moving withdrawal and balance state;
-missing or conflicting balance state fails closed rather than silently
-recording a partial completion.
+`FINANCE_RUNTIME_MODE=normal` permits classified finance operations;
+`recovery_only` permits reads, signed inbound evidence, recovery, and
+reconciliation; `locked` permits only reads and inbound evidence. Missing or
+invalid production configuration resolves to `locked`.
+`PAYOUT_EXECUTION_ENABLED=false` blocks new send claims but not exact recovery
+of an existing claim. Financial-guard migrations require a hard drain,
+populated-clone rehearsal, validated constraints, signed sandbox evidence, and
+forward-fix rollback. The payout and aggregate migrations take stable,
+fail-fast SHARE lock barriers before their corruption preflights so old
+READ-COMMITTED writers cannot race a successful snapshot.
 
-### Webhooks
-
-- Stripe: HMAC verification via `STRIPE_PAYOUT_WEBHOOK_SECRET` (falls back to `STRIPE_WEBHOOK_SECRET`)
-- Wise: RSA-SHA256 verification via `WISE_WEBHOOK_PUBLIC_KEY` (PEM)
-- Webhook controller is `@Public()` — signature verification IS the authentication
-- After signature and timestamp verification, an allowlisted normalized event
-  is durably inserted into `PayoutWebhookEvent` before the API returns 2xx.
-  Redis is not part of the acknowledgement boundary.
-- Deduplication uses the provider event ID when present, otherwise a SHA-256
-  hash of the verified payload. The transfer ID alone is not an event identity,
-  because one transfer can legitimately emit processing and terminal events.
-- Unmatched provider references retry for up to 72 hours to cover the race where
-  a webhook arrives before the provider transfer ID is committed locally.
-
-### Status Poller
-
-Northflank's five-minute maintenance dispatcher invokes the allowlisted
-`payout-reconcile` task every 10 minutes. It drains the PostgreSQL webhook inbox
-first, then polls PROCESSING executions. The task payload remains HMAC-signed
-and the one-shot worker exits after completion. Legacy BullMQ repeatables
-remain available only in `all` mode for rollout and rollback compatibility.
-
-## Key Models
-
-- `PublisherBalance` — balance tracking (versioned)
-- `Withdrawal` — withdrawal request with hold tier
-- `PayoutMethod` — encrypted payout details
-- `PayoutProvider` — provider config (encrypted)
-- `PayoutExecution` — individual payout attempt
-- `PayoutWebhookEvent` — durable, deduplicated provider-event inbox
-- `PayoutBatch` — batch grouping
-
-## Key Files
+## Key files
 
 - `apps/api/src/modules/publisher-payouts/`
-- `apps/api/src/modules/publisher-payouts/__tests__/`
-- `apps/api/src/modules/publisher-payouts/providers/` — adapter implementations
-- `packages/shared/src/payout-status.ts` — provider status fetchers
+- `packages/database/prisma/schema.prisma`
+- `packages/shared/src/payout-status.ts`
+- `packages/shared/src/finance-runtime-mode.ts`
+- `docs/PAYMENTS_ARCHITECTURE.md`
+- `docs/FINANCIAL_INCIDENT_QUERIES.md`

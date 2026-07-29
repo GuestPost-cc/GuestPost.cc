@@ -16,6 +16,8 @@
 // All keys bounded ≤ 256 chars (the DB column is VARCHAR(256)). Throws on
 // overlong inputs so silent truncation can't lose dedup uniqueness.
 
+import { isPrismaUniqueConstraintError } from "./prisma-transaction-retry"
+
 const MAX_KEY_LEN = 256
 
 function check(key: string): string {
@@ -170,9 +172,10 @@ export function __resetDedupHitsTotal(): void {
 }
 
 /**
- * Type guard for Prisma's P2002 unique-violation error code. Callers wrap
- * `notification.create` in try/catch and use this to identify the
- * "already-exists" success case.
+ * Type guard for Prisma/PostgreSQL unique violations. Prisma 7 driver adapters
+ * may expose SQLSTATE 23505 under a structured nested cause instead of
+ * top-level P2002, so callers use the shared classifier rather than inspecting
+ * free-form messages.
  *
  *   try {
  *     await prisma.notification.create({ data: { ..., dedupKey: k } })
@@ -185,7 +188,5 @@ export function __resetDedupHitsTotal(): void {
  *   }
  */
 export function isUniqueViolation(err: unknown): boolean {
-  if (!err || typeof err !== "object") return false
-  const code = (err as { code?: unknown }).code
-  return code === "P2002"
+  return isPrismaUniqueConstraintError(err)
 }

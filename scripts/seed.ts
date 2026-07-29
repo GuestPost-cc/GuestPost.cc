@@ -38,6 +38,13 @@ const USERS = [
     role: "FINANCE",
   },
   {
+    email: "finance-checker@guestpost.local",
+    password: "FinanceChecker123!",
+    name: "Fiona Finance Checker",
+    type: "STAFF",
+    role: "FINANCE",
+  },
+  {
     email: "staff@guestpost.local",
     password: "Staff123!",
     name: "Ophelia Ops",
@@ -133,7 +140,7 @@ async function main() {
         data: { emailVerified: true },
       })
     }
-    console.log("  verified 6 users")
+    console.log(`  verified ${USERS.length} users`)
 
     console.log(
       "── Phase 2: staff bootstrap via DB (no self-promotion API exists, by design)",

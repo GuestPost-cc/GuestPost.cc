@@ -1,6 +1,15 @@
 # GuestPost.cc Repository Contract
 
-This document is the **constitution** of the GuestPost.cc repository. Every change — whether made by a human contributor or an automated agent — must comply with the rules defined here.
+This document is the engineering contract of the GuestPost.cc repository.
+Every change—whether made by a human contributor or an automated agent—must
+comply with it.
+
+The original version of this document described a time-bounded repository
+normalization freeze. Its blanket ban on runtime, security, schema, test, and
+API changes is no longer a valid global rule: it would prohibit necessary
+security and correctness fixes. Authorized product work may change those
+surfaces when the change is scoped, reviewed, tested, documented, and
+operationally reversible.
 
 ---
 
@@ -16,14 +25,14 @@ These invariants **must never** be violated:
 
 | Invariant | Enforcement |
 |-----------|-------------|
-| Runtime behavior is identical before and after every commit | Commit Gate + review |
-| Business logic is never modified | Commit Gate + review |
-| Financial calculations are never modified | Commit Gate + review |
-| Security, auth, RBAC are never modified | Commit Gate + review |
-| Database schema and migrations are never modified | Commit Gate + review |
-| API contracts (endpoints, DTOs, response shapes) are never modified | Commit Gate + review |
-| Test assertions are never modified | Review |
-| Every commit is independently revertible | Review |
+| Runtime changes are intentional, scoped, and covered by tests | CI + review |
+| Business behavior has one documented source of truth | Tests + domain docs |
+| Financial changes satisfy `docs/FINANCIAL_INVARIANTS.md` | PostgreSQL/provider evidence + Finance/Security review |
+| Security, auth, and RBAC changes fail closed and never rely on client-only controls | Security tests + review |
+| Schema changes are additive or use a two-release expand/contract plan | Migration replay + review |
+| API contract changes preserve compatibility or have an explicit version/deprecation plan | Contract tests + review |
+| Tests describe intended behavior and are never weakened merely to obtain a pass | Review |
+| Application rollback remains possible after additive schema deployment | Release review |
 | Every commit leaves the repository in a green state | Commit Gate |
 
 ---
@@ -32,6 +41,8 @@ These invariants **must never** be violated:
 
 ### Allowed
 
+- Authorized runtime, business, financial, security, schema, and API fixes that
+  satisfy their domain contracts and release gates
 - Documentation (`.md` files)
 - Developer tooling (scripts, configs)
 - Formatting configuration (Biome, Prettier-compatible rules)
@@ -45,17 +56,18 @@ These invariants **must never** be violated:
 
 ### Forbidden
 
-- Runtime application code (controllers, services, guards, interceptors, modules, providers)
-- Business logic (order, marketplace, publisher, settlement, payout, verification workflows)
-- Financial logic (wallet, fees, commissions, accounting, reconciliation, refunds, version locking, idempotency)
-- Security logic (auth, RBAC, permissions, encryption, JWT, Better Auth, audit logging, secrets)
-- Database schema (Prisma models, migrations, indexes, constraints)
-- API contracts (endpoints, DTOs, response/request structures)
-- Test assertions or business expectations
-- Source file moves, renames, or reorganization
-- Dependency upgrades outside the approved freeze
-- Performance optimization
-- Architecture refactors
+- Unrequested or unrelated behavior changes
+- Weakening authentication, authorization, tenant isolation, auditability,
+  idempotency, financial evidence, or reconciliation
+- Destructive financial-data migrations without an approved expand/contract
+  and recovery plan
+- Direct production balance edits presented as a normal repair workflow
+- Removing or relaxing test assertions merely to make a change pass
+- Exposing credentials, private provider payloads, payout details, or personal
+  data in source, logs, fixtures, screenshots, or public responses
+- Repository-wide formatting, file moves, or refactors bundled into a
+  functional fix without explicit scope
+- Dependency changes that bypass `docs/DEPENDENCY_POLICY.md`
 
 ---
 
@@ -77,14 +89,13 @@ When considering a change, check this table:
 | Run Biome format across the repository | ✅ (once, in Commit 2.5) |
 | Add a pre-commit hook | ✅ |
 | Add a CI repository check | ✅ |
-| Change a NestJS service | ❌ |
-| Modify a Prisma model | ❌ |
-| Add a new API endpoint | ❌ |
-| Fix a lint warning in application code | ❌ |
-| Rename a package | ❌ |
-| Move source files to a different directory | ❌ |
-| Upgrade Next.js or NestJS | ❌ |
-| Modify test assertions | ❌ |
+| Fix a NestJS money-state bug with evidence-backed tests | ✅ |
+| Add an additive Prisma model/migration for an authorized feature | ✅ |
+| Add or retire an API endpoint with contract and rollout coverage | ✅ |
+| Change financial behavior without PostgreSQL regression tests | ❌ |
+| Weaken an assertion to conceal a regression | ❌ |
+| Rename or move unrelated source during a bug fix | ❌ |
+| Upgrade dependencies outside the dependency policy | ❌ |
 
 ---
 
@@ -118,17 +129,11 @@ Every new script or tool **must** work on:
 
 ---
 
-## 7. Dependency Freeze
+## 7. Dependency policy
 
-During the Repository Hardening phase, **no dependency upgrades** are permitted except:
-
-- Biome
-- Husky
-- lint-staged
-- dependency-cruiser
-- Editor tooling (`.editorconfig`, `.gitattributes`, etc.)
-
-All other dependency changes are out of scope.
+The historical Repository Hardening dependency freeze is complete. Dependency
+changes now follow `docs/DEPENDENCY_POLICY.md`, the lockfile policy above, CI
+advisory floors, compatibility cohorts, and code-owner review.
 
 ---
 

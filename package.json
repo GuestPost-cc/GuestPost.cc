@@ -34,6 +34,7 @@
     "seed:users": "pnpm tsx scripts/seed.ts",
     "test:integration": "pnpm tsx scripts/integration-test.ts",
     "test:concurrency": "pnpm tsx scripts/concurrency-test.ts",
+    "test:migrations:finance": "bash scripts/verify-financial-migration-upgrade.sh",
     "test:load": "pnpm tsx scripts/load-test.ts",
     "setup:integration-test-db": "bash scripts/setup-integration-test-db.sh",
     "prepare": "husky"

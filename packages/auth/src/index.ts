@@ -335,6 +335,13 @@ async function provisionCustomerAccount(user: {
         slug: `cust-${user.id.slice(0, 12)}`,
       },
     })
+    await tx.wallet.create({
+      data: {
+        organizationId: org.id,
+        userId: user.id,
+        currency: "USD",
+      },
+    })
     await tx.membership.create({
       data: {
         userId: user.id,
@@ -364,6 +371,13 @@ async function provisionPublisherAccount(user: {
         slug: `pub-${user.id.slice(0, 12)}`,
       },
     })
+    await tx.wallet.create({
+      data: {
+        organizationId: org.id,
+        userId: user.id,
+        currency: "USD",
+      },
+    })
     const publisher = await tx.publisher.create({
       data: {
         name,
@@ -371,6 +385,9 @@ async function provisionPublisherAccount(user: {
         organizationId: org.id,
         tier: "NEW",
       },
+    })
+    await tx.publisherBalance.create({
+      data: { publisherId: publisher.id },
     })
     await tx.publisherMembership.create({
       data: {

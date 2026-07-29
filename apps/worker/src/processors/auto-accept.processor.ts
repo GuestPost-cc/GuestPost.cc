@@ -1,6 +1,7 @@
 import { prisma } from "@guestpost/database"
 import {
   ACTIVE_CANCELLATION_REQUEST_STATUSES,
+  assertFinanceOperationAllowed,
   defaultWorkflowConfig,
   getSettlementReviewDays,
   QUEUE_JOBS,
@@ -52,6 +53,7 @@ export function createAutoAcceptWorker() {
       }
 
       if (job.name === QUEUE_JOBS[QUEUES.AUTO_ACCEPT].SWEEP) {
+        assertFinanceOperationAllowed("operator_decision")
         return runAutoAcceptSweep()
       }
 
@@ -62,12 +64,14 @@ export function createAutoAcceptWorker() {
       if (
         job.name === QUEUE_JOBS[QUEUES.AUTO_ACCEPT].CANCELLATION_TIMEOUT_SWEEP
       ) {
+        assertFinanceOperationAllowed("operator_decision")
         return runCancellationResponseTimeoutSweep()
       }
 
       if (
         job.name === QUEUE_JOBS[QUEUES.AUTO_ACCEPT].ACCEPTANCE_TIMEOUT_SWEEP
       ) {
+        assertFinanceOperationAllowed("operator_decision")
         return runOrderAcceptanceTimeoutSweep()
       }
 

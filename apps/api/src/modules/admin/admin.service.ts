@@ -81,7 +81,7 @@ function financialUnits(value: unknown): bigint | null {
   const [whole, fraction = ""] = (negative ? text.slice(1) : text).split(".")
   const units =
     BigInt(whole) * 1_000_000_000_000n +
-    BigInt((fraction + "000000000000").slice(0, 12))
+    BigInt(`${fraction}000000000000`.slice(0, 12))
   return negative ? -units : units
 }
 
@@ -871,6 +871,12 @@ export class AdminService {
             name: orgName,
             slug: orgSlug,
             memberships: { create: { userId, role: "OWNER" } },
+            wallets: {
+              create: {
+                userId,
+                currency: "USD",
+              },
+            },
           },
         })
         membership = await this.prisma.membership.findFirstOrThrow({
@@ -920,6 +926,12 @@ export class AdminService {
             data: {
               name: `Org for ${u.email}`,
               slug: `org-${userId.slice(0, 8)}`,
+              wallets: {
+                create: {
+                  userId,
+                  currency: "USD",
+                },
+              },
             },
           })
           orgId = org.id
@@ -929,6 +941,7 @@ export class AdminService {
             name: u.name ?? `${u.email}'s Publisher`,
             email: u.email,
             organizationId: orgId,
+            balance: { create: {} },
           },
         })
         pubMembership = await this.prisma.publisherMembership.create({

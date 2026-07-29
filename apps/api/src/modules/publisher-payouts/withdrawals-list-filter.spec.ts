@@ -41,6 +41,7 @@ describe("PublisherPayoutsService withdrawal list filtering", () => {
         netAmount: true,
         feePolicyVersion: true,
         status: true,
+        method: true,
         availableAt: true,
         createdAt: true,
         publisher: true,

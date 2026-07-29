@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto"
 import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  ServiceUnavailableException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { BillingService } from "../billing.service"
@@ -45,10 +47,32 @@ describe("BillingService", () => {
       },
       depositAttempt: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      paymentProviderEvent: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      staffMembership: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      notification: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      auditLog: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+      },
+      paymentDispute: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      $queryRawUnsafe: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn(),
     }
 
@@ -134,121 +158,60 @@ describe("BillingService", () => {
   })
 
   describe("getWallet", () => {
-    it("uses organization upsert when an active organization is present", async () => {
-      prismaMock.wallet.upsert.mockResolvedValue(mockWallet)
+    it("returns an existing organization wallet without writing", async () => {
+      prismaMock.wallet.findUnique.mockResolvedValue(mockWallet)
 
       await expect(service.getWallet("org-1", "user-1")).resolves.toBe(
         mockWallet,
       )
-      expect(prismaMock.wallet.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { organizationId: "org-1" } }),
-      )
-      expect(prismaMock.wallet.findFirst).not.toHaveBeenCalled()
+      expect(prismaMock.wallet.upsert).not.toHaveBeenCalled()
+      expect(prismaMock.wallet.create).not.toHaveBeenCalled()
     })
 
-    it("creates one personal wallet scoped to organizationId null", async () => {
-      prismaMock.wallet.findFirst.mockResolvedValue(null)
-      prismaMock.wallet.create.mockResolvedValue({
-        ...mockWallet,
-        organizationId: null,
-      })
+    it("404s without mutating when an organization wallet is missing", async () => {
+      prismaMock.wallet.findUnique.mockResolvedValue(null)
 
-      await service.getWallet(null, "user-1")
+      await expect(service.getWallet("org-1", "user-1")).rejects.toThrow(
+        "Wallet is not provisioned",
+      )
+      expect(prismaMock.wallet.upsert).not.toHaveBeenCalled()
+      expect(prismaMock.wallet.create).not.toHaveBeenCalled()
+    })
 
+    it("returns an existing legacy personal wallet without writing", async () => {
+      const personalWallet = { ...mockWallet, organizationId: null }
+      prismaMock.wallet.findFirst.mockResolvedValue(personalWallet)
+
+      await expect(service.getWallet(null, "user-1")).resolves.toBe(
+        personalWallet,
+      )
       expect(prismaMock.wallet.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userId: "user-1", organizationId: null },
           orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         }),
       )
-      expect(prismaMock.wallet.create).toHaveBeenCalledTimes(1)
+      expect(prismaMock.wallet.create).not.toHaveBeenCalled()
     })
 
-    it("recovers from a concurrent personal-wallet unique violation", async () => {
-      const winner = { ...mockWallet, organizationId: null }
-      prismaMock.wallet.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(winner)
-      prismaMock.wallet.create.mockRejectedValue({ code: "P2002" })
-
-      await expect(service.getWallet(null, "user-1")).resolves.toBe(winner)
-      expect(prismaMock.wallet.findFirst).toHaveBeenCalledTimes(2)
-    })
-
-    it("does not swallow unrelated personal-wallet create failures", async () => {
+    it("404s without mutating when a legacy personal wallet is missing", async () => {
       prismaMock.wallet.findFirst.mockResolvedValue(null)
-      prismaMock.wallet.create.mockRejectedValue(new Error("database offline"))
 
       await expect(service.getWallet(null, "user-1")).rejects.toThrow(
-        "database offline",
+        "Wallet is not provisioned",
       )
       expect(prismaMock.wallet.findFirst).toHaveBeenCalledTimes(1)
+      expect(prismaMock.wallet.create).not.toHaveBeenCalled()
     })
   })
 
-  describe("withdraw", () => {
-    it("decrements available balance", async () => {
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        prismaMock.wallet.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.wallet.findUniqueOrThrow
-          .mockResolvedValueOnce(mockWallet)
-          .mockResolvedValueOnce({
-            ...mockWallet,
-            availableBalance: new Decimal(800),
-            version: 2,
-          })
-        return cb(prismaMock)
-      })
-
-      const result = await service.withdraw("wallet-1", 200, mockUser)
-
-      expect(Number(result.availableBalance)).toBe(800)
-      expect(prismaMock.wallet.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: "wallet-1", version: 1 },
-          data: expect.objectContaining({
-            availableBalance: { decrement: 200 },
-            version: { increment: 1 },
-          }),
-        }),
-      )
-    })
-
-    it("rejects insufficient balance", async () => {
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        return cb(prismaMock)
-      })
-
-      await expect(
-        service.withdraw("wallet-1", 2000, mockUser),
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it("rejects duplicate idempotency key", async () => {
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.transaction.findFirst.mockResolvedValue({
-          id: "existing-tx",
-        })
-        return cb(prismaMock)
-      })
-
-      await expect(
-        service.withdraw("wallet-1", 200, mockUser, "idem-1"),
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it("rejects unowned wallet", async () => {
-      const otherUser = { id: "user-2", organizationId: "org-2" }
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        return cb(prismaMock)
-      })
-
-      await expect(
-        service.withdraw("wallet-1", 200, otherUser),
-      ).rejects.toThrow(ForbiddenException)
+  describe("buyer wallet cash-out containment", () => {
+    it("does not expose an internal withdrawal money mutation", () => {
+      expect((service as any).withdraw).toBeUndefined()
+      expect(prismaMock.$transaction).not.toHaveBeenCalled()
+      expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+      expect(auditMock.log).not.toHaveBeenCalled()
     })
   })
 
@@ -280,6 +243,50 @@ describe("BillingService", () => {
           }),
         }),
       )
+    })
+
+    it("returns a stable 409 and moves no money when dispute exposure is uncovered", async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
+        prismaMock.paymentDispute.findFirst.mockResolvedValue({
+          id: "dispute-1",
+        })
+        return cb(prismaMock)
+      })
+
+      let blocked: unknown
+      try {
+        await service.reserve("wallet-1", 200, "order-1", mockUser)
+      } catch (error) {
+        blocked = error
+      }
+      expect(blocked).toBeInstanceOf(ConflictException)
+      const conflict = blocked as ConflictException
+      expect(conflict.getStatus()).toBe(409)
+      expect(conflict.getResponse()).toMatchObject({
+        code: "WALLET_SPEND_BLOCKED_BY_DISPUTE",
+        message:
+          "Wallet spending is unavailable while a payment dispute has uncovered exposure",
+      })
+      expect(prismaMock.$queryRawUnsafe).toHaveBeenCalledWith(
+        'SELECT "id" FROM "Wallet" WHERE "id" = $1 FOR UPDATE',
+        "wallet-1",
+      )
+      expect(prismaMock.paymentDispute.findFirst).toHaveBeenCalledWith({
+        where: {
+          walletId: "wallet-1",
+          status: { in: ["OPEN", "LOST"] },
+          currentExposureAmount: { gt: 0 },
+        },
+        select: { id: true },
+      })
+      expect(
+        prismaMock.$queryRawUnsafe.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        prismaMock.paymentDispute.findFirst.mock.invocationCallOrder[0],
+      )
+      expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
     })
 
     it("rejects insufficient available balance", async () => {
@@ -329,6 +336,34 @@ describe("BillingService", () => {
       )
 
       expect(Number(result.reservedBalance)).toBe(100)
+    })
+
+    it("locks and blocks capture when dispute exposure is uncovered", async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
+        prismaMock.paymentDispute.findFirst.mockResolvedValue({
+          id: "dispute-1",
+        })
+        return cb(prismaMock)
+      })
+
+      let blocked: unknown
+      try {
+        await service.payFromReserved("wallet-1", 100, "order-1", mockUser)
+      } catch (error) {
+        blocked = error
+      }
+
+      expect(blocked).toBeInstanceOf(ConflictException)
+      expect((blocked as ConflictException).getResponse()).toMatchObject({
+        code: "WALLET_SPEND_BLOCKED_BY_DISPUTE",
+      })
+      expect(prismaMock.$queryRawUnsafe).toHaveBeenCalledWith(
+        'SELECT "id" FROM "Wallet" WHERE "id" = $1 FOR UPDATE',
+        "wallet-1",
+      )
+      expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
     })
 
     it("rejects insufficient reserved balance", async () => {
@@ -411,6 +446,60 @@ describe("BillingService", () => {
   })
 
   describe("handleWebhook", () => {
+    it.each([
+      ["missing", undefined],
+      ["malformed", "definitely-not-a-stripe-key"],
+    ])("rejects a signed test-mode event with a %s Stripe key before inbox or money processing", async (_label, key) => {
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      if (key === undefined) delete process.env.STRIPE_SECRET_KEY
+      else process.env.STRIPE_SECRET_KEY = key
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue({
+          id: "evt_mode_without_valid_key",
+          type: "checkout.session.completed",
+          livemode: false,
+          data: {
+            object: {
+              id: "cs_mode_without_valid_key",
+              payment_intent: "pi_mode_without_valid_key",
+              amount_total: 1000,
+              currency: "usd",
+              payment_status: "paid",
+              metadata: { depositAttemptId: "attempt-1" },
+            },
+          },
+        }),
+      }
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", Buffer.from("{}")),
+        ).rejects.toThrow(BadRequestException)
+        expect(prismaMock.paymentProviderEvent.create).not.toHaveBeenCalled()
+        expect(
+          prismaMock.paymentProviderEvent.updateMany,
+        ).not.toHaveBeenCalled()
+        expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+        expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+        if (key === undefined) {
+          expect(adapter.verifyWebhook).not.toHaveBeenCalled()
+        } else {
+          expect(adapter.verifyWebhook).toHaveBeenCalledTimes(1)
+        }
+      } finally {
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
     it("rejects webhook in production without Stripe configured", async () => {
       const originalEnv = process.env.NODE_ENV
       process.env.NODE_ENV = "production"
@@ -433,6 +522,1133 @@ describe("BillingService", () => {
       await expect(
         service.handleWebhook("dummy", Buffer.from("{}")),
       ).rejects.toThrow(BadRequestException)
+    })
+
+    it("durably quarantines a malformed signed dispute without trusting metadata as an FK", async () => {
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const event = {
+        id: "evt_bad_dispute",
+        type: "charge.dispute.created",
+        livemode: false,
+        data: {
+          object: {
+            id: "dp_bad",
+            payment_intent: null,
+            amount: 1000,
+            currency: "usd",
+            status: "needs_response",
+            metadata: { depositAttemptId: "nonexistent-fk" },
+          },
+        },
+      }
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      prismaMock.paymentProviderEvent.create.mockImplementation(
+        ({ data }: any) => Promise.resolve({ id: "inbox-1", ...data }),
+      )
+      prismaMock.paymentProviderEvent.findUnique.mockResolvedValue({
+        id: "inbox-1",
+        provider: "stripe",
+        providerEventId: event.id,
+        eventType: event.type,
+        status: "QUARANTINED",
+        attempts: 0,
+        lockedAt: null,
+        processedAt: new Date(),
+      })
+      prismaMock.$transaction.mockImplementation((callback: any) =>
+        callback(prismaMock),
+      )
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", Buffer.from("{}")),
+        ).resolves.toEqual(
+          expect.objectContaining({ received: true, quarantined: true }),
+        )
+        expect(prismaMock.paymentProviderEvent.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            status: "QUARANTINED",
+            depositAttemptId: null,
+            providerPaymentId: null,
+            lastError: "INVALID_DISPUTE_ENVELOPE",
+          }),
+        })
+        expect(auditMock.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "PAYMENT_PROVIDER_EVENT_QUARANTINED",
+          }),
+          prismaMock,
+        )
+        expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+      } finally {
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it("quarantines a reused provider event id when its signed financial envelope differs", async () => {
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const processedAt = new Date("2026-07-29T00:00:00Z")
+      const event = {
+        id: "evt_collision",
+        type: "charge.dispute.created",
+        livemode: false,
+        data: {
+          object: {
+            id: "dp_collision",
+            payment_intent: "pi_expected",
+            charge: "ch_expected",
+            amount: 1000,
+            currency: "usd",
+            status: "needs_response",
+          },
+        },
+      }
+      const conflictingRow = {
+        id: "inbox-collision",
+        provider: "stripe",
+        providerEventId: event.id,
+        eventType: event.type,
+        objectId: "dp_collision",
+        providerPaymentId: "pi_different",
+        providerChargeId: "ch_expected",
+        disputeAmountMinor: 1000n,
+        disputeCurrency: "USD",
+        providerStatus: "needs_response",
+        livemode: false,
+        eventFingerprint: "0".repeat(64),
+        status: "PROCESSED",
+        attempts: 1,
+        lockedAt: null,
+        processedAt,
+        openedPaymentDispute: null,
+        resolvedPaymentDispute: null,
+      }
+      prismaMock.paymentProviderEvent.create.mockRejectedValue(
+        Object.assign(new Error("unique"), { code: "P2002" }),
+      )
+      prismaMock.paymentProviderEvent.findUnique.mockResolvedValue(
+        conflictingRow,
+      )
+      prismaMock.paymentProviderEvent.updateMany.mockResolvedValue({ count: 1 })
+      prismaMock.$transaction.mockImplementation((callback: any) =>
+        callback(prismaMock),
+      )
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", Buffer.from("{}")),
+        ).resolves.toEqual({
+          received: true,
+          duplicate: true,
+          identityConflict: true,
+          quarantined: true,
+          canonicalEvidenceRetained: false,
+        })
+        expect(prismaMock.paymentProviderEvent.updateMany).toHaveBeenCalledWith(
+          {
+            where: expect.objectContaining({
+              id: "inbox-collision",
+              status: "PROCESSED",
+              attempts: 1,
+              lockedAt: null,
+              processedAt,
+            }),
+            data: expect.objectContaining({
+              status: "QUARANTINED",
+              processedAt,
+              lastError: "DUPLICATE_EVENT_ENVELOPE_MISMATCH",
+            }),
+          },
+        )
+        expect(auditMock.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "PAYMENT_PROVIDER_EVENT_IDENTITY_CONFLICT_QUARANTINED",
+            entityId: "inbox-collision",
+          }),
+          prismaMock,
+        )
+      } finally {
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it("retains canonical dispute-role evidence and deduplicates repeated identity-conflict incidents", async () => {
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const processedAt = new Date("2026-07-29T00:00:00Z")
+      const event = {
+        id: "evt_canonical_collision",
+        type: "charge.dispute.created",
+        livemode: false,
+        data: {
+          object: {
+            id: "dp_canonical_collision",
+            payment_intent: "pi_expected",
+            charge: "ch_expected",
+            amount: 1000,
+            currency: "usd",
+            status: "needs_response",
+          },
+        },
+      }
+      const canonicalRow = {
+        id: "inbox-canonical-collision",
+        provider: "stripe",
+        providerEventId: event.id,
+        eventType: event.type,
+        objectId: "dp_canonical_collision",
+        providerPaymentId: "pi_different",
+        providerChargeId: "ch_expected",
+        disputeAmountMinor: 1000n,
+        disputeCurrency: "USD",
+        providerStatus: "needs_response",
+        livemode: false,
+        eventFingerprint: "0".repeat(64),
+        status: "PROCESSED",
+        attempts: 1,
+        lockedAt: null,
+        processedAt,
+        paymentDisputeId: "case-canonical-collision",
+        openedPaymentDispute: { id: "case-canonical-collision" },
+        resolvedPaymentDispute: null,
+      }
+      prismaMock.paymentProviderEvent.create.mockRejectedValue(
+        Object.assign(new Error("unique"), { code: "P2002" }),
+      )
+      prismaMock.paymentProviderEvent.findUnique.mockResolvedValue(canonicalRow)
+      prismaMock.auditLog.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: "audit-conflict" })
+      prismaMock.staffMembership.findMany.mockResolvedValue([
+        { userId: "finance-1" },
+      ])
+      prismaMock.notification.createMany.mockResolvedValue({ count: 1 })
+      prismaMock.$transaction.mockImplementation((callback: any) =>
+        callback(prismaMock),
+      )
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      const expected = {
+        received: true,
+        duplicate: true,
+        identityConflict: true,
+        quarantined: false,
+        canonicalEvidenceRetained: true,
+      }
+      try {
+        await expect(
+          service.handleWebhook("signed", Buffer.from("{}")),
+        ).resolves.toEqual(expected)
+        await expect(
+          service.handleWebhook("signed", Buffer.from("{}")),
+        ).resolves.toEqual(expected)
+
+        expect(
+          prismaMock.paymentProviderEvent.updateMany,
+        ).not.toHaveBeenCalled()
+        expect(auditMock.log).toHaveBeenCalledTimes(1)
+        expect(auditMock.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "PAYMENT_PROVIDER_EVENT_IDENTITY_CONFLICT_DETECTED",
+            entityId: "inbox-canonical-collision",
+            metadata: expect.objectContaining({
+              canonicalEvidenceRetained: true,
+              openedPaymentDisputeId: "case-canonical-collision",
+              resolvedPaymentDisputeId: null,
+            }),
+          }),
+          prismaMock,
+        )
+        expect(prismaMock.notification.createMany).toHaveBeenCalledWith({
+          data: [
+            expect.objectContaining({
+              type: "PAYMENT_PROVIDER_EVENT_IDENTITY_CONFLICT",
+              dedupKey:
+                "payment-provider-event-identity-conflict:inbox-canonical-collision:finance-1",
+            }),
+          ],
+          skipDuplicates: true,
+        })
+      } finally {
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it("hashes an overlong signed provider event id instead of truncating its unique identity", async () => {
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const rawProviderEventId = `evt_${"shared-prefix".repeat(20)}_tail`
+      const expectedProviderEventId = `sha256:${createHash("sha256")
+        .update(rawProviderEventId)
+        .digest("hex")}`
+      const event = {
+        id: rawProviderEventId,
+        type: "customer.updated",
+        livemode: false,
+        data: { object: { id: "cus_unit" } },
+      }
+      prismaMock.paymentProviderEvent.create.mockImplementation(
+        ({ data }: any) => Promise.resolve({ id: "inbox-long-id", ...data }),
+      )
+      prismaMock.paymentProviderEvent.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 })
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", Buffer.from("{}")),
+        ).resolves.toEqual({ received: true, ignored: true })
+        expect(prismaMock.paymentProviderEvent.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            providerEventId: expectedProviderEventId,
+          }),
+        })
+        expect(expectedProviderEventId).toHaveLength(71)
+      } finally {
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it("cannot ignore or fail an event after a newer inbox lease takes ownership", async () => {
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const event = {
+        id: "evt_stale_generic_owner",
+        type: "customer.updated",
+        livemode: false,
+        data: { object: { id: "cus_stale_generic_owner" } },
+      }
+      prismaMock.paymentProviderEvent.create.mockImplementation(
+        ({ data }: any) =>
+          Promise.resolve({ id: "inbox-stale-generic", ...data }),
+      )
+      prismaMock.paymentProviderEvent.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 })
+        // A newer claimant recovered the event before this owner could finish.
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 0 })
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", Buffer.from("{}")),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException)
+
+        const ignoredWhere =
+          prismaMock.paymentProviderEvent.updateMany.mock.calls[2][0].where
+        const failedWhere =
+          prismaMock.paymentProviderEvent.updateMany.mock.calls[3][0].where
+        expect(ignoredWhere).toEqual({
+          id: "inbox-stale-generic",
+          status: "PROCESSING",
+          attempts: 1,
+          lockedAt: expect.any(Date),
+        })
+        expect(failedWhere).toEqual(ignoredWhere)
+        expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+        expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+      } finally {
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it("does not acknowledge a terminal replay after its exact snapshot changes", async () => {
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const payload = Buffer.from('{"terminal":"snapshot"}')
+      const event = {
+        id: "evt_terminal_snapshot_changed",
+        type: "customer.updated",
+        livemode: false,
+        data: { object: { id: "cus_terminal_snapshot_changed" } },
+      }
+      const ignoredAt = new Date("2026-07-29T00:00:00.000Z")
+      const storedEvent = {
+        id: "inbox-terminal-snapshot-changed",
+        provider: "stripe",
+        providerEventId: event.id,
+        eventType: event.type,
+        objectId: event.data.object.id,
+        providerPaymentId: null,
+        providerChargeId: null,
+        disputeAmountMinor: null,
+        disputeCurrency: null,
+        providerStatus: null,
+        livemode: false,
+        eventFingerprint: createHash("sha256").update(payload).digest("hex"),
+        status: "IGNORED",
+        attempts: 1,
+        lockedAt: null,
+        processedAt: ignoredAt,
+      }
+      prismaMock.paymentProviderEvent.create.mockRejectedValue(
+        Object.assign(new Error("unique"), { code: "P2002" }),
+      )
+      prismaMock.paymentProviderEvent.findUnique
+        .mockResolvedValueOnce(storedEvent)
+        .mockResolvedValueOnce({
+          ...storedEvent,
+          status: "QUARANTINED",
+          processedAt: new Date("2026-07-29T00:01:00.000Z"),
+        })
+      prismaMock.$transaction.mockImplementation((callback: any) =>
+        callback(prismaMock),
+      )
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", payload),
+        ).rejects.toMatchObject({
+          code: "PAYMENT_PROVIDER_EVENT_LEASE_LOST",
+        })
+        expect(
+          prismaMock.paymentProviderEvent.updateMany,
+        ).not.toHaveBeenCalled()
+        expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+      } finally {
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it("cannot quarantine an event through a stale inbox lease", async () => {
+      const staleLockedAt = new Date("2026-07-29T00:00:00.000Z")
+      prismaMock.paymentProviderEvent.findUnique.mockResolvedValue({
+        id: "inbox-recovered-before-quarantine",
+        provider: "stripe",
+        providerEventId: "evt_recovered_before_quarantine",
+        eventType: "charge.dispute.created",
+        status: "PROCESSING",
+        attempts: 2,
+        lockedAt: new Date("2026-07-29T00:20:00.000Z"),
+        processedAt: null,
+      })
+      prismaMock.$transaction.mockImplementation((callback: any) =>
+        callback(prismaMock),
+      )
+
+      await expect(
+        (service as any).quarantinePaymentProviderEvent(
+          "inbox-recovered-before-quarantine",
+          "EVENT_ENVELOPE_MISMATCH",
+          {
+            kind: "lease",
+            attempt: 1,
+            lockedAt: staleLockedAt,
+          },
+        ),
+      ).rejects.toMatchObject({
+        code: "PAYMENT_PROVIDER_EVENT_LEASE_LOST",
+      })
+      expect(prismaMock.paymentProviderEvent.updateMany).not.toHaveBeenCalled()
+      expect(auditMock.log).not.toHaveBeenCalled()
+      expect(prismaMock.notification.createMany).not.toHaveBeenCalled()
+    })
+
+    it("cannot credit a checkout session through a stale inbox lease", async () => {
+      const staleLockedAt = new Date("2026-07-29T00:00:00.000Z")
+      prismaMock.depositAttempt.findFirst.mockResolvedValue({
+        id: "attempt-stale-checkout",
+        publicReference: "DP-STALE-CHECKOUT",
+        walletId: "wallet-1",
+        organizationId: "org-1",
+        provider: "stripe",
+        providerSessionId: "cs_stale_checkout",
+        providerPaymentId: null,
+        amount: new Decimal(10),
+        walletCredit: new Decimal(10),
+        currency: "USD",
+        status: "PROCESSING",
+        ledgerTransactionId: null,
+      })
+      prismaMock.paymentProviderEvent.findUnique.mockResolvedValue({
+        id: "inbox-stale-checkout",
+        status: "PROCESSING",
+        attempts: 2,
+        lockedAt: new Date("2026-07-29T00:20:00.000Z"),
+      })
+      prismaMock.$transaction.mockImplementation((callback: any) =>
+        callback(prismaMock),
+      )
+
+      await expect(
+        (service as any).processSuccessfulPayment(
+          {
+            id: "cs_stale_checkout",
+            payment_intent: "pi_stale_checkout",
+            amount_total: 1000,
+            currency: "usd",
+            payment_status: "paid",
+            metadata: { depositAttemptId: "attempt-stale-checkout" },
+          },
+          "inbox-stale-checkout",
+          {
+            kind: "lease",
+            attempt: 1,
+            lockedAt: staleLockedAt,
+          },
+        ),
+      ).rejects.toMatchObject({
+        code: "PAYMENT_PROVIDER_EVENT_LEASE_LOST",
+      })
+      expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+      expect(prismaMock.depositAttempt.updateMany).not.toHaveBeenCalled()
+    })
+
+    it("cannot expire a deposit attempt through a stale inbox lease", async () => {
+      const staleLockedAt = new Date("2026-07-29T00:00:00.000Z")
+      prismaMock.paymentProviderEvent.findUnique.mockResolvedValue({
+        id: "inbox-stale-expiry",
+        status: "PROCESSING",
+        attempts: 2,
+        lockedAt: new Date("2026-07-29T00:20:00.000Z"),
+      })
+      prismaMock.$transaction.mockImplementation((callback: any) =>
+        callback(prismaMock),
+      )
+
+      await expect(
+        (service as any).markDepositAttemptFromSession(
+          {
+            id: "cs_stale_expiry",
+            metadata: { depositAttemptId: "attempt-stale-expiry" },
+          },
+          "EXPIRED",
+          "inbox-stale-expiry",
+          {
+            kind: "lease",
+            attempt: 1,
+            lockedAt: staleLockedAt,
+          },
+        ),
+      ).rejects.toMatchObject({
+        code: "PAYMENT_PROVIDER_EVENT_LEASE_LOST",
+      })
+      expect(prismaMock.depositAttempt.updateMany).not.toHaveBeenCalled()
+    })
+
+    it("cannot audit or complete fraud evidence through a stale inbox lease", async () => {
+      const staleLockedAt = new Date("2026-07-29T00:00:00.000Z")
+      prismaMock.paymentProviderEvent.findUnique.mockResolvedValue({
+        id: "inbox-stale-fraud",
+        status: "PROCESSING",
+        attempts: 2,
+        lockedAt: new Date("2026-07-29T00:20:00.000Z"),
+      })
+      prismaMock.$transaction.mockImplementation((callback: any) =>
+        callback(prismaMock),
+      )
+
+      await expect(
+        (service as any).handleEarlyFraudWarning(
+          {
+            id: "evt_stale_fraud",
+            type: "radar.early_fraud_warning.created",
+            data: {
+              object: {
+                payment_intent: "pi_stale_fraud",
+                charge: "ch_stale_fraud",
+                amount: 1000,
+                currency: "usd",
+              },
+            },
+          },
+          "inbox-stale-fraud",
+          {
+            kind: "lease",
+            attempt: 1,
+            lockedAt: staleLockedAt,
+          },
+        ),
+      ).rejects.toMatchObject({
+        code: "PAYMENT_PROVIDER_EVENT_LEASE_LOST",
+      })
+      expect(prismaMock.auditLog.findFirst).not.toHaveBeenCalled()
+      expect(auditMock.log).not.toHaveBeenCalled()
+      expect(prismaMock.notification.createMany).not.toHaveBeenCalled()
+    })
+
+    it("returns non-2xx when an early checkout-success redelivery finds a fresh processing lease", async () => {
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const payload = Buffer.from("{}")
+      const event = {
+        id: "evt_checkout_crash_replay",
+        type: "checkout.session.completed",
+        livemode: false,
+        data: {
+          object: {
+            id: "cs_checkout_crash_replay",
+            payment_intent: "pi_checkout_crash_replay",
+            amount_total: 1000,
+            currency: "usd",
+            payment_status: "paid",
+            metadata: { depositAttemptId: "attempt-1" },
+          },
+        },
+      }
+      const processingRow = {
+        id: "inbox-checkout-crash",
+        provider: "stripe",
+        providerEventId: event.id,
+        eventType: event.type,
+        objectId: event.data.object.id,
+        providerPaymentId: null,
+        providerChargeId: null,
+        disputeAmountMinor: null,
+        disputeCurrency: null,
+        providerStatus: null,
+        livemode: false,
+        eventFingerprint: createHash("sha256").update(payload).digest("hex"),
+        status: "PROCESSING",
+        attempts: 1,
+        lockedAt: new Date(),
+      }
+      prismaMock.paymentProviderEvent.create.mockRejectedValue(
+        Object.assign(new Error("unique"), { code: "P2002" }),
+      )
+      prismaMock.paymentProviderEvent.findUnique.mockResolvedValue(
+        processingRow,
+      )
+      prismaMock.paymentProviderEvent.updateMany.mockResolvedValue({
+        count: 0,
+      })
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", payload),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException)
+        expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+        expect(prismaMock.paymentProviderEvent.update).not.toHaveBeenCalled()
+      } finally {
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it("persists locked checkout success, returns non-2xx, then processes the same signed delivery once", async () => {
+      const previousMode = process.env.FINANCE_RUNTIME_MODE
+      const previousEnv = process.env.NODE_ENV
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.FINANCE_RUNTIME_MODE = "locked"
+      process.env.NODE_ENV = "production"
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const payload = Buffer.from('{"signed":"evidence"}')
+      const event = {
+        id: "evt_locked_evidence",
+        type: "checkout.session.completed",
+        livemode: false,
+        data: {
+          object: {
+            id: "cs_locked_evidence",
+            payment_intent: "pi_locked_evidence",
+            amount_total: 1000,
+            currency: "usd",
+            payment_status: "paid",
+            metadata: { depositAttemptId: "attempt-locked" },
+          },
+        },
+      }
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      let storedEvent: any
+      prismaMock.paymentProviderEvent.create.mockImplementation(
+        ({ data }: any) => {
+          storedEvent = { id: "inbox-locked", ...data }
+          return Promise.resolve(storedEvent)
+        },
+      )
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+      const processSuccess = jest
+        .spyOn(service as any, "processSuccessfulPayment")
+        .mockResolvedValue(undefined)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", payload),
+        ).rejects.toMatchObject({
+          response: {
+            code: "FINANCE_OPERATION_BLOCKED",
+            message:
+              "Deposit evidence was persisted while finance processing is locked; retry delivery",
+          },
+        })
+        expect(prismaMock.paymentProviderEvent.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            providerEventId: event.id,
+            livemode: false,
+            status: "PENDING",
+          }),
+        })
+        expect(
+          prismaMock.paymentProviderEvent.updateMany,
+        ).not.toHaveBeenCalled()
+        expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+        expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+        expect(processSuccess).not.toHaveBeenCalled()
+
+        process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+        prismaMock.paymentProviderEvent.create.mockRejectedValueOnce(
+          Object.assign(new Error("unique"), { code: "P2002" }),
+        )
+        prismaMock.paymentProviderEvent.findUnique.mockResolvedValue(
+          storedEvent,
+        )
+        prismaMock.paymentProviderEvent.updateMany
+          .mockResolvedValueOnce({ count: 0 })
+          .mockResolvedValueOnce({ count: 1 })
+
+        await expect(service.handleWebhook("signed", payload)).resolves.toEqual(
+          { received: true },
+        )
+        expect(processSuccess).toHaveBeenCalledTimes(1)
+      } finally {
+        if (previousMode == null) delete process.env.FINANCE_RUNTIME_MODE
+        else process.env.FINANCE_RUNTIME_MODE = previousMode
+        if (previousEnv == null) delete process.env.NODE_ENV
+        else process.env.NODE_ENV = previousEnv
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it.each([
+      [
+        "checkout expiry",
+        {
+          id: "evt_locked_expiry",
+          type: "checkout.session.expired",
+          livemode: false,
+          data: {
+            object: {
+              id: "cs_locked_expiry",
+              metadata: { depositAttemptId: "attempt-locked-expiry" },
+            },
+          },
+        },
+        "markDepositAttemptFromSession",
+      ],
+      [
+        "early fraud warning",
+        {
+          id: "evt_locked_fraud",
+          type: "radar.early_fraud_warning.created",
+          livemode: false,
+          data: {
+            object: {
+              id: "ifw_locked_fraud",
+              payment_intent: "pi_locked_fraud",
+              charge: "ch_locked_fraud",
+              amount: 1000,
+              currency: "usd",
+            },
+          },
+        },
+        "handleEarlyFraudWarning",
+      ],
+    ])("keeps locked %s evidence retryable, then processes its signed recovery redelivery", async (_label, event, handlerName) => {
+      const previousMode = process.env.FINANCE_RUNTIME_MODE
+      const previousEnv = process.env.NODE_ENV
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.FINANCE_RUNTIME_MODE = "locked"
+      process.env.NODE_ENV = "production"
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const payload = Buffer.from(JSON.stringify({ id: event.id }))
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      let storedEvent: any
+      prismaMock.paymentProviderEvent.create.mockImplementation(
+        ({ data }: any) => {
+          storedEvent = { id: `inbox-${event.id}`, ...data }
+          return Promise.resolve(storedEvent)
+        },
+      )
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+      const handler = jest
+        .spyOn(service as any, handlerName)
+        .mockResolvedValue(undefined)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", payload),
+        ).rejects.toMatchObject({
+          response: expect.objectContaining({
+            code: "FINANCE_OPERATION_BLOCKED",
+          }),
+        })
+        expect(storedEvent.status).toBe("PENDING")
+        expect(handler).not.toHaveBeenCalled()
+        expect(
+          prismaMock.paymentProviderEvent.updateMany,
+        ).not.toHaveBeenCalled()
+
+        process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+        prismaMock.paymentProviderEvent.create.mockRejectedValueOnce(
+          Object.assign(new Error("unique"), { code: "P2002" }),
+        )
+        prismaMock.paymentProviderEvent.findUnique.mockResolvedValue(
+          storedEvent,
+        )
+        prismaMock.paymentProviderEvent.updateMany
+          .mockResolvedValueOnce({ count: 0 })
+          .mockResolvedValueOnce({ count: 1 })
+
+        await expect(service.handleWebhook("signed", payload)).resolves.toEqual(
+          { received: true },
+        )
+        expect(handler).toHaveBeenCalledTimes(1)
+        const call = handler.mock.calls[0]
+        const lease = call[call.length - 1]
+        expect(lease).toEqual({
+          kind: "lease",
+          attempt: 1,
+          lockedAt: expect.any(Date),
+        })
+      } finally {
+        if (previousMode == null) delete process.env.FINANCE_RUNTIME_MODE
+        else process.env.FINANCE_RUNTIME_MODE = previousMode
+        if (previousEnv == null) delete process.env.NODE_ENV
+        else process.env.NODE_ENV = previousEnv
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it("terminalizes unsupported signed events as IGNORED while finance is locked", async () => {
+      const previousMode = process.env.FINANCE_RUNTIME_MODE
+      const previousEnv = process.env.NODE_ENV
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.FINANCE_RUNTIME_MODE = "locked"
+      process.env.NODE_ENV = "production"
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const event = {
+        id: "evt_locked_unsupported",
+        type: "customer.updated",
+        livemode: false,
+        data: { object: { id: "cus_locked_unsupported" } },
+      }
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      let storedEvent: any
+      prismaMock.paymentProviderEvent.create.mockImplementation(
+        ({ data }: any) => {
+          storedEvent = { id: "inbox-locked-unsupported", ...data }
+          return Promise.resolve(storedEvent)
+        },
+      )
+      prismaMock.paymentProviderEvent.findUnique.mockImplementation(() =>
+        Promise.resolve(storedEvent),
+      )
+      prismaMock.paymentProviderEvent.updateMany.mockResolvedValue({ count: 1 })
+      prismaMock.$transaction.mockImplementation((callback: any) =>
+        callback(prismaMock),
+      )
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      try {
+        await expect(
+          service.handleWebhook("signed", Buffer.from("{}")),
+        ).resolves.toEqual({
+          received: true,
+          duplicate: false,
+          ignored: true,
+        })
+        expect(
+          prismaMock.paymentProviderEvent.updateMany,
+        ).toHaveBeenNthCalledWith(1, {
+          where: {
+            id: "inbox-locked-unsupported",
+            status: "PENDING",
+            attempts: 0,
+            lockedAt: null,
+          },
+          data: {
+            status: "PROCESSING",
+            attempts: { increment: 1 },
+            lockedAt: expect.any(Date),
+            lastError: null,
+          },
+        })
+        expect(
+          prismaMock.paymentProviderEvent.updateMany,
+        ).toHaveBeenNthCalledWith(2, {
+          where: {
+            id: "inbox-locked-unsupported",
+            status: "PROCESSING",
+            attempts: 1,
+            lockedAt: expect.any(Date),
+          },
+          data: expect.objectContaining({
+            status: "IGNORED",
+            lockedAt: null,
+            lastError: "UNSUPPORTED_EVENT_TYPE",
+          }),
+        })
+        expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+        expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+      } finally {
+        if (previousMode == null) delete process.env.FINANCE_RUNTIME_MODE
+        else process.env.FINANCE_RUNTIME_MODE = previousMode
+        if (previousEnv == null) delete process.env.NODE_ENV
+        else process.env.NODE_ENV = previousEnv
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+
+    it("defers normalized disputes while locked but never acknowledges another active lease", async () => {
+      const previousMode = process.env.FINANCE_RUNTIME_MODE
+      const previousEnv = process.env.NODE_ENV
+      const previousKey = process.env.STRIPE_SECRET_KEY
+      const previousSecret = process.env.STRIPE_WEBHOOK_SECRET
+      process.env.FINANCE_RUNTIME_MODE = "locked"
+      process.env.NODE_ENV = "production"
+      process.env.STRIPE_SECRET_KEY = "rk_test_unit"
+      process.env.STRIPE_WEBHOOK_SECRET = "whsec_unit"
+      const payload = Buffer.from('{"locked":"dispute"}')
+      const event = {
+        id: "evt_locked_dispute",
+        type: "charge.dispute.created",
+        livemode: false,
+        data: {
+          object: {
+            id: "dp_locked_dispute",
+            payment_intent: "pi_locked_dispute",
+            charge: "ch_locked_dispute",
+            amount: 1000,
+            currency: "usd",
+            status: "needs_response",
+          },
+        },
+      }
+      const adapter = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        verifyWebhook: jest.fn().mockReturnValue(event),
+      }
+      let storedEvent: any
+      prismaMock.paymentProviderEvent.create.mockImplementation(
+        ({ data }: any) => {
+          storedEvent = { id: "inbox-locked-dispute", ...data }
+          return Promise.resolve(storedEvent)
+        },
+      )
+      service = new BillingService(prismaMock, auditMock, {
+        getAdapter: () => adapter,
+      } as any)
+
+      try {
+        await expect(service.handleWebhook("signed", payload)).resolves.toEqual(
+          {
+            received: true,
+            duplicate: false,
+            deferred: true,
+          },
+        )
+        expect(
+          prismaMock.paymentProviderEvent.updateMany,
+        ).not.toHaveBeenCalled()
+
+        storedEvent = {
+          ...storedEvent,
+          status: "PROCESSING",
+          attempts: 1,
+          lockedAt: new Date(),
+        }
+        prismaMock.paymentProviderEvent.create.mockRejectedValueOnce(
+          Object.assign(new Error("unique"), { code: "P2002" }),
+        )
+        prismaMock.paymentProviderEvent.findUnique.mockResolvedValue(
+          storedEvent,
+        )
+
+        await expect(
+          service.handleWebhook("signed", payload),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException)
+        expect(
+          prismaMock.paymentProviderEvent.updateMany,
+        ).not.toHaveBeenCalled()
+      } finally {
+        if (previousMode == null) delete process.env.FINANCE_RUNTIME_MODE
+        else process.env.FINANCE_RUNTIME_MODE = previousMode
+        if (previousEnv == null) delete process.env.NODE_ENV
+        else process.env.NODE_ENV = previousEnv
+        if (previousKey == null) delete process.env.STRIPE_SECRET_KEY
+        else process.env.STRIPE_SECRET_KEY = previousKey
+        if (previousSecret == null) delete process.env.STRIPE_WEBHOOK_SECRET
+        else process.env.STRIPE_WEBHOOK_SECRET = previousSecret
+      }
+    })
+  })
+
+  describe("finance runtime controls", () => {
+    it("blocks every new-liability billing boundary before database mutation", async () => {
+      const previousMode = process.env.FINANCE_RUNTIME_MODE
+      const previousEnv = process.env.NODE_ENV
+      process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+      process.env.NODE_ENV = "production"
+
+      try {
+        const operations = [
+          () =>
+            service.createCheckoutSession("wallet-1", 10, mockUser, "blocked"),
+          () => service.reserve("wallet-1", 10, "order-1", mockUser),
+          () => service.payFromReserved("wallet-1", 10, "order-1", mockUser),
+          () => service.refund("wallet-1", 10, "order-1", mockUser),
+        ]
+        for (const operation of operations) {
+          await expect(operation()).rejects.toMatchObject({
+            response: expect.objectContaining({
+              code: "FINANCE_OPERATION_BLOCKED",
+            }),
+          })
+        }
+        expect(prismaMock.wallet.findUnique).not.toHaveBeenCalled()
+        expect(prismaMock.$transaction).not.toHaveBeenCalled()
+        expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+        expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+      } finally {
+        if (previousMode == null) delete process.env.FINANCE_RUNTIME_MODE
+        else process.env.FINANCE_RUNTIME_MODE = previousMode
+        if (previousEnv == null) delete process.env.NODE_ENV
+        else process.env.NODE_ENV = previousEnv
+      }
+    })
+  })
+
+  describe("checkDepositStatus", () => {
+    it.each([
+      ["SUCCEEDED", "COMPLETED", true],
+      ["PARTIALLY_REFUNDED", "REFUNDED", false],
+      ["REFUNDED", "REFUNDED", false],
+      ["DISPUTED", "DISPUTED", false],
+      ["CHARGEBACK", "DISPUTED", false],
+    ])("maps %s to %s without treating derivative evidence as checkout success", async (attemptStatus, expectedStatus, processed) => {
+      prismaMock.depositAttempt.findUnique.mockResolvedValue({
+        publicReference: "GP-DP-STATUS",
+        status: attemptStatus,
+        amount: new Decimal(25),
+        walletCredit: new Decimal(25),
+        customerFee: new Decimal(0),
+        currency: "USD",
+        completedAt: new Date("2026-07-29T00:00:00.000Z"),
+        wallet: mockWallet,
+      })
+
+      await expect(
+        service.checkDepositStatus("GP-DP-STATUS", mockUser),
+      ).resolves.toMatchObject({
+        publicReference: "GP-DP-STATUS",
+        status: expectedStatus,
+        processed,
+      })
     })
   })
 

@@ -1,29 +1,26 @@
 // Lock ordering policy
 // =====================
-// All financial transactions MUST acquire locks in this order to prevent
-// deadlocks. Violation introduces a cycle risk.
+// Existing-withdrawal payout transactions MUST acquire aggregate locks in
+// this order to prevent deadlocks. A verified provider-inbox row, when
+// present, is locked first.
 //
-//   1. PublisherBalance
+//   1. PayoutWebhookEvent (webhook path only)
 //   2. Withdrawal
-//   3. Settlement
-//   4. Wallet
-//   5. Order
+//   3. PayoutExecution
+//   4. PublisherBalance
+//   5. PayoutProvider (execution/send paths)
+//   6. PublisherProviderAccount (managed routes)
+//   7. PayoutMethod
 //
-// Current acquisition points:
-//   - executeWithdrawal Tx1:             1 → 2
-//   - refundOrder clawback section:      1 → 3
-//   - adminApprove/forceApprove tx:      3 → (releaseFundsInternal: 1)
-//   - adminApprove/forceApprove tx:      3 → (releaseFundsInternal: 4 → 5)
+// A new withdrawal reservation has no Withdrawal row to lock yet. It starts
+// with any Settlement/Transaction allocation parents, updates
+// PublisherBalance, and only then lets the deferred liability trigger take
+// PublisherProviderAccount -> PayoutMethod at commit. Thus every managed path
+// shares the same routing suffix without inverting settlement release's
+// Settlement -> PublisherBalance order.
 //
-// Analysis: adminApprove acquires Settlement (3) then PublisherBalance (1).
-// executeWithdrawal acquires PublisherBalance (1) then Withdrawal (2).
-//      Path A: 3 → 1
-//      Path B: 1 → 2
-//      No cycle: A and B share only resource 1, and both lock it. The
-//      second resource differs (2 vs 3), so no circular wait exists.
-//
-// All paths are consistent with the canonical order above. If a new
-// path touches multiple resources, verify it follows this order.
+// Settlement/refund flows have separate aggregate roots; any new transaction
+// that crosses those domains needs an explicit deadlock-order review.
 //
 // SAFETY: This helper MUST be called inside an existing Prisma interactive
 // transaction (i.e., within a $transaction(async (tx) => { ... }) callback).

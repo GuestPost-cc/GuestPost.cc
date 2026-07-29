@@ -18,6 +18,7 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
 import {
   resolvePlatformFeeFraction,
   splitPlatformFee,
@@ -54,6 +55,7 @@ export class SettlementsService {
     organizationId: string | null,
     userId: string,
   ) {
+    assertApiFinanceOperationAllowed("new_liability")
     const order = await this.prisma.order.findFirst({
       where: organizationId ? { id: orderId, organizationId } : { id: orderId },
     })
@@ -309,6 +311,7 @@ export class SettlementsService {
     role: string,
     actorCustomerRole?: string | null,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -502,6 +505,7 @@ export class SettlementsService {
     userId: string,
     staffRole: string,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -606,6 +610,7 @@ export class SettlementsService {
     userId: string,
     staffRole: string,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -710,6 +715,7 @@ export class SettlementsService {
   }
 
   async cancelSettlement(id: string, userId: string, reason: string) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true, publisher: true },
@@ -756,6 +762,7 @@ export class SettlementsService {
   }
 
   async returnToReview(id: string, userId: string, reason: string) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },

@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
 import { ModuleRef } from "@nestjs/core"
 import { PrismaService } from "../../common/prisma.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
+import { decodePayoutProviderConfig } from "./payout-provider-config"
 import { ManualPayoutAdapter } from "./providers/manual-payout.adapter"
 import { PayoutProviderAdapter } from "./providers/payout-provider.interface"
 import { StripeConnectPayoutAdapter } from "./providers/stripe-connect-payout.adapter"
@@ -55,18 +56,11 @@ export class PayoutProviderService implements OnModuleInit {
         `Payout provider "${providerName}" is not active or not found`,
       )
     }
-    // Providers without secrets (manual) store an empty/plain JSON config —
-    // only string payloads are encrypted ciphertext.
-    const rawConfig = provider.config as unknown
-    let config: Record<string, unknown>
-    if (typeof rawConfig === "string" && rawConfig.length > 0) {
-      const configVersion = (provider as any).configEncryptionKeyVersion ?? 0
-      config = this.encryption.decrypt(rawConfig, configVersion as number)
-    } else if (rawConfig && typeof rawConfig === "object") {
-      config = rawConfig as Record<string, unknown>
-    } else {
-      config = {}
-    }
+    const config = decodePayoutProviderConfig(
+      provider.config,
+      provider.configEncryptionKeyVersion,
+      (ciphertext, version) => this.encryption.decrypt(ciphertext, version),
+    )
     return { ...provider, decryptedConfig: config }
   }
 }

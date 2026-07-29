@@ -188,9 +188,13 @@ export default function BillingPage() {
       } else if (["FAILED", "REFUNDED", "DISPUTED"].includes(result.status)) {
         clearInterval(pollTimer.current)
         setProcessingPayment(false)
-        toast.error(
-          `Deposit ${result.publicReference} is ${result.status.toLowerCase()}. No new wallet credit was added.`,
-        )
+        const message =
+          result.status === "FAILED"
+            ? `Deposit ${result.publicReference} failed. No wallet credit was added.`
+            : result.status === "REFUNDED"
+              ? `Deposit ${result.publicReference} was refunded. Its original wallet credit is no longer fully available.`
+              : `Deposit ${result.publicReference} is under dispute. Its original wallet credit is under review.`
+        toast.error(message)
       }
       // If not processed yet, just wait for the next poll cycle.
     } catch {

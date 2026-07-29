@@ -1,4 +1,6 @@
+import crypto from "node:crypto"
 import { BadRequestException } from "@nestjs/common"
+import { makeUser } from "./factories"
 import { setupFinancialTest } from "./factories/financial-fixture"
 import { createTestApp } from "./helpers/create-test-app"
 
@@ -81,17 +83,36 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         require("../../modules/publisher-payouts/publisher-payouts.service") as any
       const payouts: any = app.get(PublisherPayoutsService)
 
-      // Add user as a publisher member so assertPublisherMember passes
+      // Use a real, eligible publisher user and a real encrypted payout
+      // method so the request reaches the debt gate rather than failing an
+      // earlier requester/method precondition.
+      const publisherOwner = await makeUser(prisma, {
+        userType: "PUBLISHER",
+      })
       await prisma.publisherMembership.create({
         data: {
-          userId: ctx.customer.user.id,
+          userId: publisherOwner.id,
           publisherId: ctx.publisher.publisher.id,
           role: "PUBLISHER_OWNER",
         },
       })
+      const payoutMethod = await payouts.createPayoutMethod(
+        ctx.publisher.publisher.id,
+        publisherOwner.id,
+        {
+          type: "bank_transfer",
+          label: "Debt-gate request test",
+          details: {
+            bankName: "Test Bank",
+            accountHolderName: "Debt Gate Publisher",
+            accountNumber: "000012345678",
+          },
+          isDefault: true,
+        },
+      )
 
       // Seed debtBalance directly
-      await prisma.publisherBalance.upsert({
+      const balanceBefore = await prisma.publisherBalance.upsert({
         where: { publisherId: ctx.publisher.publisher.id },
         create: {
           publisherId: ctx.publisher.publisher.id,
@@ -104,14 +125,52 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         },
       })
 
-      await expect(
-        payouts.requestWithdrawal(
+      const withdrawalCountBefore = await prisma.withdrawal.count({
+        where: { publisherId: ctx.publisher.publisher.id },
+      })
+      const transactionCountBefore = await prisma.transaction.count({
+        where: { publisherId: ctx.publisher.publisher.id },
+      })
+
+      let caught: unknown
+      try {
+        await payouts.requestWithdrawal(
           ctx.publisher.publisher.id,
           50,
           "bank_transfer",
-          ctx.customer.user.id,
-        ),
-      ).rejects.toThrow(BadRequestException)
+          publisherOwner.id,
+          "debt-gate-request-1",
+          payoutMethod.id,
+        )
+      } catch (error) {
+        caught = error
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException)
+      expect((caught as Error).message).toBe(
+        "Cannot withdraw while outstanding debt of 50.00 exists. Repay through future settlements.",
+      )
+
+      const balanceAfter = await prisma.publisherBalance.findUniqueOrThrow({
+        where: { publisherId: ctx.publisher.publisher.id },
+      })
+      expect(Number(balanceAfter.withdrawableBalance)).toBe(
+        Number(balanceBefore.withdrawableBalance),
+      )
+      expect(Number(balanceAfter.debtBalance)).toBe(
+        Number(balanceBefore.debtBalance),
+      )
+      expect(balanceAfter.version).toBe(balanceBefore.version)
+      await expect(
+        prisma.withdrawal.count({
+          where: { publisherId: ctx.publisher.publisher.id },
+        }),
+      ).resolves.toBe(withdrawalCountBefore)
+      await expect(
+        prisma.transaction.count({
+          where: { publisherId: ctx.publisher.publisher.id },
+        }),
+      ).resolves.toBe(transactionCountBefore)
     } finally {
       await cleanup()
     }
@@ -129,17 +188,60 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         require("../../modules/publisher-payouts/payout-execution.service") as any
       const executions: any = app.get(PayoutExecutionService)
 
-      // Seed balance + create an APPROVED withdrawal
+      const publisherOwner = await makeUser(prisma, {
+        userType: "PUBLISHER",
+      })
+      const financeApprover = await makeUser(prisma, { userType: "STAFF" })
+      const payoutInitiator = await makeUser(prisma, { userType: "STAFF" })
+      await prisma.publisherMembership.create({
+        data: {
+          userId: publisherOwner.id,
+          publisherId: ctx.publisher.publisher.id,
+          role: "PUBLISHER_OWNER",
+        },
+      })
+      await Promise.all(
+        [financeApprover, payoutInitiator].map((actor) =>
+          prisma.staffMembership.create({
+            data: {
+              userId: actor.id,
+              role: "FINANCE",
+            },
+          }),
+        ),
+      )
+      const payoutMethod = await payouts.createPayoutMethod(
+        ctx.publisher.publisher.id,
+        publisherOwner.id,
+        {
+          type: "bank_transfer",
+          label: "Debt-gate execution test",
+          details: {
+            bankName: "Test Bank",
+            accountHolderName: "Debt Gate Publisher",
+            accountNumber: "000087654321",
+          },
+          isDefault: true,
+        },
+      )
+
+      // Model the state after a legitimate 50 USD reservation: the
+      // withdrawable balance is already reduced and an immutable allocation
+      // exactly covers the APPROVED withdrawal.
       await prisma.publisherBalance.upsert({
         where: { publisherId: ctx.publisher.publisher.id },
         create: {
           publisherId: ctx.publisher.publisher.id,
-          withdrawableBalance: 100,
+          withdrawableBalance: 50,
           debtBalance: 50,
+          allocationCarryForward: 100,
+          allocationCarryForwardUsed: 50,
         },
         update: {
-          withdrawableBalance: 100,
+          withdrawableBalance: 50,
           debtBalance: 50,
+          allocationCarryForward: 100,
+          allocationCarryForwardUsed: 50,
         },
       })
 
@@ -155,27 +257,108 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         update: { isActive: true },
       })
 
-      // Create an APPROVED withdrawal directly (can't use payouts service
-      // because it would reject at requestWithdrawal due to debt check)
-      const withdrawal = await prisma.withdrawal.create({
+      // Build the same canonical PENDING -> APPROVED history produced by the
+      // service. The request service cannot be used here because this test
+      // intentionally starts with debt and is exercising the execution gate.
+      const requestedWithdrawal = await prisma.$transaction(async (tx: any) => {
+        const created = await tx.withdrawal.create({
+          data: {
+            publisherId: ctx.publisher.publisher.id,
+            amount: 50,
+            currency: "USD",
+            publicReference: `WD-DEBT-${crypto.randomUUID()}`,
+            payoutFee: 0,
+            netAmount: 50,
+            feePolicyVersion: "integration-debt-gate-v1",
+            method: "bank_transfer",
+            status: "PENDING",
+            idempotencyKey: "debt-gate-execution-1",
+            payoutMethodId: payoutMethod.id,
+            requestedBy: publisherOwner.id,
+            availableAt: new Date(Date.now() - 100_000), // hold passed
+          },
+        })
+        await tx.withdrawalAllocation.create({
+          data: {
+            withdrawalId: created.id,
+            sourceType: "CARRY_FORWARD",
+            amount: 50,
+            currency: "USD",
+            sequence: 0,
+          },
+        })
+        return created
+      })
+      const withdrawal = await prisma.withdrawal.update({
+        where: { id: requestedWithdrawal.id },
         data: {
-          publisherId: ctx.publisher.publisher.id,
-          amount: 50,
-          method: "bank_transfer",
           status: "APPROVED",
-          approvedBy: ctx.customer.user.id,
+          approvedBy: financeApprover.id,
           approvedAt: new Date(),
-          availableAt: new Date(Date.now() - 100_000), // hold passed
+          version: { increment: 1 },
+        },
+      })
+      await prisma.transaction.create({
+        data: {
+          amount: -50,
+          currency: "USD",
+          type: "WITHDRAWAL",
+          publisherId: ctx.publisher.publisher.id,
+          reference: `withdrawal-${withdrawal.id}`,
+          description: "Debt-gate execution test reservation",
         },
       })
 
-      await expect(
-        executions.executeWithdrawal(
+      const balanceBefore = await prisma.publisherBalance.findUniqueOrThrow({
+        where: { publisherId: ctx.publisher.publisher.id },
+      })
+      const transactionCountBefore = await prisma.transaction.count({
+        where: { publisherId: ctx.publisher.publisher.id },
+      })
+
+      let caught: unknown
+      try {
+        await executions.executeWithdrawal(
           withdrawal.id,
           "manual",
-          ctx.customer.user.id,
-        ),
-      ).rejects.toThrow(BadRequestException)
+          payoutInitiator.id,
+          "Reviewed publisher debt before payout send",
+        )
+      } catch (error) {
+        caught = error
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException)
+      expect((caught as Error).message).toBe(
+        "Publisher has outstanding debt of 50.00 — resolve before executing payout",
+      )
+
+      const balanceAfter = await prisma.publisherBalance.findUniqueOrThrow({
+        where: { publisherId: ctx.publisher.publisher.id },
+      })
+      expect(Number(balanceAfter.withdrawableBalance)).toBe(
+        Number(balanceBefore.withdrawableBalance),
+      )
+      expect(Number(balanceAfter.debtBalance)).toBe(
+        Number(balanceBefore.debtBalance),
+      )
+      expect(balanceAfter.version).toBe(balanceBefore.version)
+      await expect(
+        prisma.withdrawal.findUniqueOrThrow({ where: { id: withdrawal.id } }),
+      ).resolves.toMatchObject({
+        status: "APPROVED",
+        version: withdrawal.version,
+      })
+      await expect(
+        prisma.payoutExecution.count({
+          where: { withdrawalId: withdrawal.id },
+        }),
+      ).resolves.toBe(0)
+      await expect(
+        prisma.transaction.count({
+          where: { publisherId: ctx.publisher.publisher.id },
+        }),
+      ).resolves.toBe(transactionCountBefore)
     } finally {
       await cleanup()
     }

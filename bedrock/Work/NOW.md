@@ -2,7 +2,70 @@
 
 **Phase**: PR #61 is merged and exact commit `442304f` is live across all five Render services and all three Northflank worker workloads. The Neon staging database is migrated through the Stripe-first finance migration and every runtime uses a restricted application role; the former owner password was rotated after cutover. Stripe webhook destinations are active, but both deposit and Connect execution remain fail-closed pending replacement of the staging restricted key and a user-initiated sandbox checkout. Existing Admin-auth and GSC/GA4 deployment follow-ups remain open.
 
-**Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
+**Reconciled through**: GitHub `main` commit `9b47247` (393 commits total).
+The financial-hardening branch was created from and re-fetched against that
+exact deployed-main base before publication.
+
+## Current Local Work: Financial Evidence And Recovery Hardening
+
+- The reported finance defects were confirmed and addressed locally: publisher
+  approval now proves the request-time reservation; dispute holds no longer
+  reuse deposit provider identity; automated payouts cannot be manually marked
+  paid; and the customer wallet cash-out surface is retired.
+- Provider inboxes, payout completion, withdrawal allocation/provenance, and
+  payment-dispute cases now use exact evidence, database guards, serializable
+  transitions, bounded recovery, quarantine, audit, and Finance/Super Admin
+  alerts. Stripe payout completion requires the persisted bank Payout, exact
+  provider minor-unit amount/currency, and immutable connected account.
+- Normalized append-only `PayoutExecutionClaim` rows are now the only send
+  authority; `providerMetadata.externalClaims` is removed/rejected. Withdrawal,
+  execution-status, and execution-stage graphs plus maker-checker boundaries
+  are enforced in PostgreSQL.
+- Wallet reservation and dispute booking now share a wallet row lock. New
+  spending fails closed on positive open/lost uncovered exposure; won or
+  zero-exposure cases allow it. Reserved-fund capture repeats that locked
+  ownership/exposure gate, so an older reservation cannot bypass a newly
+  recorded zero-held dispute. Lost-exposure credit recovery/netting is not
+  synthesized and remains a separately reviewed future design.
+- Legacy direct payout-method creation now has strict bounded per-rail DTO and
+  service validation, rejects unknown/cross-rail fields, and revalidates the
+  locked publisher owner inside the serializable encryption/write/audit
+  transaction. Manual completion displays the immutable payout target,
+  requires its exact public reference, and compares that reference under the
+  canonical completion lock before releasing liability.
+- Deposit replay/reconciliation recognizes every wallet-credit-backed
+  derivative status (`SUCCEEDED`, `PARTIALLY_REFUNDED`, `REFUNDED`, `DISPUTED`,
+  `CHARGEBACK`). Stripe inbox facts include immutable `livemode`, and restricted
+  `rk_*` keys share the fail-closed test/live classifier with `sk_*` keys.
+- Stripe checkout-success recovery still depends on fresh signed redelivery;
+  no independent authenticated Checkout/PaymentIntent catch-up processor is
+  implemented. Wise automated sends, completion, and claimed-send replay
+  remain disabled pending provider certification.
+- `FINANCE_RUNTIME_MODE` now separates `normal`, `recovery_only`, and `locked`.
+  Production missing/invalid configuration locks mutations; `recovery_only`
+  retains exact recovery/reconciliation, while `locked` retains only reads and
+  authenticated inbound evidence.
+- This work is not a rolling-deploy change. Release requires a maintenance
+  window, hard drain of every old API/worker writer, ordered finance
+  migrations, startup of only the evidence-aware image, zero unexplained
+  incident-query findings, and Stripe sandbox canaries. After the guards land,
+  rollback is a money freeze plus forward fix—not an old image or dropped
+  trigger.
+- Both provenance and aggregate migrations now take stable fail-fast SHARE lock
+  barriers before their preflights. The aggregate rehearsal rejects seven
+  isolated legacy-history shapes, excludes unrelated PENDING invitee wallets,
+  and then proves the successful backfill and post-migration assertions.
+- Settled-tree validation is green: 110 API unit suites / 1,236 tests, 13 API
+  integration suites / 129 tests, 20 shared suites / 189 tests, 6 API-client
+  suites / 59 tests, and 25 worker tests. Ten TypeScript checks, repository
+  Biome, all four frontend ESLint checks, dependency policy, documentation
+  registry, dependency-cruise, Prisma/encryption verification, the full
+  finance migration rehearsal, API/shared/database/API-client builds, and the
+  affected Admin production build pass. Independent adversarial review found
+  no remaining code release blocker; the hard-drain and signed Stripe staging
+  matrix remain mandatory operational gates. Registry vulnerability audit
+  remains a required GitHub CI gate because local metadata egress was not
+  authorized.
 
 ## Current Local Work: Staff Marketplace And Canonical Order Integrity
 
@@ -718,6 +781,13 @@ data.
   and the explicit Northflank service/job configuration; the repository
   intentionally defaults to compatibility `all` mode until that
   operator-controlled cutover occurs.
+- Financial evidence hardening requires an operator-controlled hard-drain
+  deployment and signed Stripe staging matrix. Keep payout/deposit execution
+  gates closed until the ordered migrations, one-version worker/API check,
+  populated-clone rehearsal, zero unvalidated financial constraints, incident
+  queries, normalized-claim checks, exact amount/currency/account payout
+  evidence, derivative-deposit redelivery, runtime-mode drills, and
+  late-failure quarantine all pass.
 
 ## Completed 2026-07-28: transitive dependency audit remediation
 

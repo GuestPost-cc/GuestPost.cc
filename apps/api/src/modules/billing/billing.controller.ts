@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  GoneException,
   Headers,
   Param,
   Post,
@@ -19,7 +20,6 @@ import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { BillingService } from "./billing.service"
 import { DepositDto } from "./dto/deposit.dto"
-import { WithdrawDto } from "./dto/withdraw.dto"
 
 @Controller("billing")
 export class BillingController {
@@ -85,17 +85,16 @@ export class BillingController {
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER")
-  withdraw(
-    @Param("id") walletId: string,
-    @Body() body: WithdrawDto,
-    @CurrentUser() user: any,
-  ) {
-    return this.billing.withdraw(
-      walletId,
-      body.amount,
-      user,
-      body.idempotencyKey,
-    )
+  withdraw(): never {
+    // Customer wallets are closed-loop spend balances. The retired
+    // implementation only removed internal wallet liability and never sent
+    // money through Stripe or another provider. Keep a guarded compatibility
+    // response so old callers fail explicitly without touching financial state.
+    throw new GoneException({
+      code: "CUSTOMER_WALLET_CASH_OUT_UNSUPPORTED",
+      message:
+        "Customer wallet cash-out is not supported. Contact support to request review of an eligible return to the original payment method.",
+    })
   }
 
   @Get("transactions")

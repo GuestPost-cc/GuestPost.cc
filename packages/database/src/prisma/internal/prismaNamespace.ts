@@ -422,6 +422,7 @@ export const ModelName = {
   PublisherProviderAccount: 'PublisherProviderAccount',
   PayoutProvider: 'PayoutProvider',
   PayoutExecution: 'PayoutExecution',
+  PayoutExecutionClaim: 'PayoutExecutionClaim',
   WithdrawalAllocation: 'WithdrawalAllocation',
   PayoutWebhookEvent: 'PayoutWebhookEvent',
   PayoutBatch: 'PayoutBatch',
@@ -435,6 +436,7 @@ export const ModelName = {
   Transaction: 'Transaction',
   DepositAttempt: 'DepositAttempt',
   PaymentProviderEvent: 'PaymentProviderEvent',
+  PaymentDispute: 'PaymentDispute',
   Ticket: 'Ticket',
   TicketMessage: 'TicketMessage',
   Notification: 'Notification',
@@ -482,7 +484,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "paymentProviderEvent" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3298,6 +3300,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    PayoutExecutionClaim: {
+      payload: Prisma.$PayoutExecutionClaimPayload<ExtArgs>
+      fields: Prisma.PayoutExecutionClaimFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PayoutExecutionClaimFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PayoutExecutionClaimFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload>
+        }
+        findFirst: {
+          args: Prisma.PayoutExecutionClaimFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PayoutExecutionClaimFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload>
+        }
+        findMany: {
+          args: Prisma.PayoutExecutionClaimFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload>[]
+        }
+        create: {
+          args: Prisma.PayoutExecutionClaimCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload>
+        }
+        createMany: {
+          args: Prisma.PayoutExecutionClaimCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PayoutExecutionClaimCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload>[]
+        }
+        delete: {
+          args: Prisma.PayoutExecutionClaimDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload>
+        }
+        update: {
+          args: Prisma.PayoutExecutionClaimUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload>
+        }
+        deleteMany: {
+          args: Prisma.PayoutExecutionClaimDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PayoutExecutionClaimUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PayoutExecutionClaimUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload>[]
+        }
+        upsert: {
+          args: Prisma.PayoutExecutionClaimUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutExecutionClaimPayload>
+        }
+        aggregate: {
+          args: Prisma.PayoutExecutionClaimAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePayoutExecutionClaim>
+        }
+        groupBy: {
+          args: Prisma.PayoutExecutionClaimGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PayoutExecutionClaimGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PayoutExecutionClaimCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PayoutExecutionClaimCountAggregateOutputType> | number
+        }
+      }
+    }
     WithdrawalAllocation: {
       payload: Prisma.$WithdrawalAllocationPayload<ExtArgs>
       fields: Prisma.WithdrawalAllocationFieldRefs
@@ -4257,6 +4333,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.PaymentProviderEventCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.PaymentProviderEventCountAggregateOutputType> | number
+        }
+      }
+    }
+    PaymentDispute: {
+      payload: Prisma.$PaymentDisputePayload<ExtArgs>
+      fields: Prisma.PaymentDisputeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PaymentDisputeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PaymentDisputeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload>
+        }
+        findFirst: {
+          args: Prisma.PaymentDisputeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PaymentDisputeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload>
+        }
+        findMany: {
+          args: Prisma.PaymentDisputeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload>[]
+        }
+        create: {
+          args: Prisma.PaymentDisputeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload>
+        }
+        createMany: {
+          args: Prisma.PaymentDisputeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PaymentDisputeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload>[]
+        }
+        delete: {
+          args: Prisma.PaymentDisputeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload>
+        }
+        update: {
+          args: Prisma.PaymentDisputeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload>
+        }
+        deleteMany: {
+          args: Prisma.PaymentDisputeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PaymentDisputeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PaymentDisputeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload>[]
+        }
+        upsert: {
+          args: Prisma.PaymentDisputeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentDisputePayload>
+        }
+        aggregate: {
+          args: Prisma.PaymentDisputeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePaymentDispute>
+        }
+        groupBy: {
+          args: Prisma.PaymentDisputeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaymentDisputeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PaymentDisputeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaymentDisputeCountAggregateOutputType> | number
         }
       }
     }
@@ -7277,8 +7427,13 @@ export const WithdrawalScalarFieldEnum = {
   idempotencyKey: 'idempotencyKey',
   payoutMethodId: 'payoutMethodId',
   payoutBatchId: 'payoutBatchId',
+  requestedBy: 'requestedBy',
   approvedBy: 'approvedBy',
   approvedAt: 'approvedAt',
+  rejectedBy: 'rejectedBy',
+  rejectedAt: 'rejectedAt',
+  reversedBy: 'reversedBy',
+  reversedAt: 'reversedAt',
   version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -7297,6 +7452,7 @@ export const PayoutMethodScalarFieldEnum = {
   encryptionKeyVersion: 'encryptionKeyVersion',
   isDefault: 'isDefault',
   isActive: 'isActive',
+  nonterminalWithdrawalCount: 'nonterminalWithdrawalCount',
   version: 'version',
   providerAccountId: 'providerAccountId',
   createdAt: 'createdAt',
@@ -7364,12 +7520,41 @@ export const PayoutExecutionScalarFieldEnum = {
   errorMessage: 'errorMessage',
   providerMetadata: 'providerMetadata',
   idempotencyKey: 'idempotencyKey',
+  livemode: 'livemode',
+  initiatedByUserId: 'initiatedByUserId',
+  completionSource: 'completionSource',
+  completionEvidenceRef: 'completionEvidenceRef',
+  completionEvidenceAt: 'completionEvidenceAt',
+  completedAt: 'completedAt',
+  completionActorUserId: 'completionActorUserId',
+  completionWebhookEventId: 'completionWebhookEventId',
+  cancellationSource: 'cancellationSource',
+  cancellationEvidenceRef: 'cancellationEvidenceRef',
+  cancellationEvidenceAt: 'cancellationEvidenceAt',
+  cancellationPayoutStatus: 'cancellationPayoutStatus',
+  cancelledAt: 'cancelledAt',
+  cancellationActorUserId: 'cancellationActorUserId',
   version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type PayoutExecutionScalarFieldEnum = (typeof PayoutExecutionScalarFieldEnum)[keyof typeof PayoutExecutionScalarFieldEnum]
+
+
+export const PayoutExecutionClaimScalarFieldEnum = {
+  id: 'id',
+  executionId: 'executionId',
+  kind: 'kind',
+  idempotencyKey: 'idempotencyKey',
+  idempotencyKeyFingerprint: 'idempotencyKeyFingerprint',
+  claimedAt: 'claimedAt',
+  lastClaimedAt: 'lastClaimedAt',
+  claimedByUserId: 'claimedByUserId',
+  createdAt: 'createdAt'
+} as const
+
+export type PayoutExecutionClaimScalarFieldEnum = (typeof PayoutExecutionClaimScalarFieldEnum)[keyof typeof PayoutExecutionClaimScalarFieldEnum]
 
 
 export const WithdrawalAllocationScalarFieldEnum = {
@@ -7396,6 +7581,10 @@ export const PayoutWebhookEventScalarFieldEnum = {
   dedupKey: 'dedupKey',
   eventType: 'eventType',
   providerExecutionId: 'providerExecutionId',
+  providerAccountExternalId: 'providerAccountExternalId',
+  payoutAmountMinor: 'payoutAmountMinor',
+  payoutCurrency: 'payoutCurrency',
+  livemode: 'livemode',
   providerStatus: 'providerStatus',
   rawStatus: 'rawStatus',
   status: 'status',
@@ -7596,6 +7785,14 @@ export const PaymentProviderEventScalarFieldEnum = {
   eventType: 'eventType',
   objectId: 'objectId',
   depositAttemptId: 'depositAttemptId',
+  paymentDisputeId: 'paymentDisputeId',
+  providerPaymentId: 'providerPaymentId',
+  providerChargeId: 'providerChargeId',
+  disputeAmountMinor: 'disputeAmountMinor',
+  disputeCurrency: 'disputeCurrency',
+  providerStatus: 'providerStatus',
+  livemode: 'livemode',
+  eventFingerprint: 'eventFingerprint',
   status: 'status',
   attempts: 'attempts',
   availableAt: 'availableAt',
@@ -7608,6 +7805,36 @@ export const PaymentProviderEventScalarFieldEnum = {
 } as const
 
 export type PaymentProviderEventScalarFieldEnum = (typeof PaymentProviderEventScalarFieldEnum)[keyof typeof PaymentProviderEventScalarFieldEnum]
+
+
+export const PaymentDisputeScalarFieldEnum = {
+  id: 'id',
+  provider: 'provider',
+  providerDisputeId: 'providerDisputeId',
+  providerPaymentId: 'providerPaymentId',
+  providerChargeId: 'providerChargeId',
+  depositAttemptId: 'depositAttemptId',
+  depositTransactionId: 'depositTransactionId',
+  walletId: 'walletId',
+  amount: 'amount',
+  currency: 'currency',
+  heldAmount: 'heldAmount',
+  shortfallAmount: 'shortfallAmount',
+  currentExposureAmount: 'currentExposureAmount',
+  status: 'status',
+  providerStatus: 'providerStatus',
+  openedByEventId: 'openedByEventId',
+  resolvedByEventId: 'resolvedByEventId',
+  holdTransactionId: 'holdTransactionId',
+  resolutionTransactionId: 'resolutionTransactionId',
+  version: 'version',
+  openedAt: 'openedAt',
+  resolvedAt: 'resolvedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentDisputeScalarFieldEnum = (typeof PaymentDisputeScalarFieldEnum)[keyof typeof PaymentDisputeScalarFieldEnum]
 
 
 export const TicketScalarFieldEnum = {
@@ -8840,6 +9067,62 @@ export type ListEnumPayoutExecutionStatusFieldRefInput<$PrismaModel> = FieldRefI
 
 
 /**
+ * Reference to a field of type 'PayoutCompletionSource'
+ */
+export type EnumPayoutCompletionSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PayoutCompletionSource'>
+
+
+
+/**
+ * Reference to a field of type 'PayoutCompletionSource[]'
+ */
+export type ListEnumPayoutCompletionSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PayoutCompletionSource[]'>
+
+
+
+/**
+ * Reference to a field of type 'PayoutCancellationSource'
+ */
+export type EnumPayoutCancellationSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PayoutCancellationSource'>
+
+
+
+/**
+ * Reference to a field of type 'PayoutCancellationSource[]'
+ */
+export type ListEnumPayoutCancellationSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PayoutCancellationSource[]'>
+
+
+
+/**
+ * Reference to a field of type 'PayoutExecutionClaimKind'
+ */
+export type EnumPayoutExecutionClaimKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PayoutExecutionClaimKind'>
+
+
+
+/**
+ * Reference to a field of type 'PayoutExecutionClaimKind[]'
+ */
+export type ListEnumPayoutExecutionClaimKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PayoutExecutionClaimKind[]'>
+
+
+
+/**
+ * Reference to a field of type 'BigInt'
+ */
+export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
+
+
+
+/**
+ * Reference to a field of type 'BigInt[]'
+ */
+export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
+
+
+
+/**
  * Reference to a field of type 'PayoutWebhookEventStatus'
  */
 export type EnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PayoutWebhookEventStatus'>
@@ -8976,6 +9259,20 @@ export type EnumPaymentProviderEventStatusFieldRefInput<$PrismaModel> = FieldRef
  * Reference to a field of type 'PaymentProviderEventStatus[]'
  */
 export type ListEnumPaymentProviderEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentProviderEventStatus[]'>
+
+
+
+/**
+ * Reference to a field of type 'PaymentDisputeStatus'
+ */
+export type EnumPaymentDisputeStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentDisputeStatus'>
+
+
+
+/**
+ * Reference to a field of type 'PaymentDisputeStatus[]'
+ */
+export type ListEnumPaymentDisputeStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentDisputeStatus[]'>
 
 
 
@@ -9378,6 +9675,7 @@ export type GlobalOmitConfig = {
   publisherProviderAccount?: Prisma.PublisherProviderAccountOmit
   payoutProvider?: Prisma.PayoutProviderOmit
   payoutExecution?: Prisma.PayoutExecutionOmit
+  payoutExecutionClaim?: Prisma.PayoutExecutionClaimOmit
   withdrawalAllocation?: Prisma.WithdrawalAllocationOmit
   payoutWebhookEvent?: Prisma.PayoutWebhookEventOmit
   payoutBatch?: Prisma.PayoutBatchOmit
@@ -9391,6 +9689,7 @@ export type GlobalOmitConfig = {
   transaction?: Prisma.TransactionOmit
   depositAttempt?: Prisma.DepositAttemptOmit
   paymentProviderEvent?: Prisma.PaymentProviderEventOmit
+  paymentDispute?: Prisma.PaymentDisputeOmit
   ticket?: Prisma.TicketOmit
   ticketMessage?: Prisma.TicketMessageOmit
   notification?: Prisma.NotificationOmit

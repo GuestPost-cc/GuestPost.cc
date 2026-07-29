@@ -37,7 +37,7 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -94,7 +94,11 @@ export default function WithdrawalsPage() {
   const [showRequestDialog, setShowRequestDialog] = useState(false)
 
   const requestSchema = z.object({
-    amount: z.coerce.number().positive("Amount must be positive"),
+    amount: z.coerce
+      .number()
+      .min(1, "Amount must be at least $1")
+      .max(1_000_000, "Amount is too large")
+      .multipleOf(0.01, "Use no more than two decimal places"),
   })
 
   type RequestFormInput = z.input<typeof requestSchema>
@@ -139,12 +143,20 @@ export default function WithdrawalsPage() {
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
   const defaultMethod =
     payoutMethods?.find((m) => m.isDefault) ?? payoutMethods?.[0]
-  const activeMethodId = selectedMethodId ?? defaultMethod?.id
+  const selectedMethod = payoutMethods?.find(
+    (method) => method.id === selectedMethodId,
+  )
+  const activeMethod = selectedMethod ?? defaultMethod
+  const activeMethodId = activeMethod?.id
+  const idempotencyRef = useRef<{
+    fingerprint: string
+    key: string
+  } | null>(null)
 
   const requestMutation = useMutation({
     mutationFn: (data: {
       amount: number
-      payoutMethodId?: string
+      payoutMethodId: string
       method: string
       idempotencyKey: string
     }) => api.publisherPayouts.requestWithdrawal(data),
@@ -154,6 +166,7 @@ export default function WithdrawalsPage() {
       )
       setShowRequestDialog(false)
       reset()
+      idempotencyRef.current = null
       refetch()
       refetchWithdrawals()
     },
@@ -167,12 +180,26 @@ export default function WithdrawalsPage() {
       toast.error("Amount exceeds withdrawable balance")
       return
     }
-    const method = payoutMethods?.find((m) => m.id === activeMethodId)
+    if (!activeMethod) {
+      toast.error("Select an active payout method")
+      return
+    }
+    const fingerprint = [
+      data.amount.toFixed(2),
+      activeMethod.id,
+      activeMethod.type,
+    ].join(":")
+    if (idempotencyRef.current?.fingerprint !== fingerprint) {
+      idempotencyRef.current = {
+        fingerprint,
+        key: crypto.randomUUID(),
+      }
+    }
     requestMutation.mutate({
       amount: data.amount,
-      payoutMethodId: activeMethodId ?? undefined,
-      method: method?.type ?? "bank_transfer",
-      idempotencyKey: crypto.randomUUID(),
+      payoutMethodId: activeMethod.id,
+      method: activeMethod.type,
+      idempotencyKey: idempotencyRef.current.key,
     })
   }
 

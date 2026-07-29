@@ -35,14 +35,14 @@ export class PayoutEncryptionService {
 
   constructor() {
     const hexKey = process.env.PAYOUT_ENCRYPTION_KEY
-    if (!hexKey || hexKey.length < 64) {
+    if (!hexKey) {
       if (process.env.NODE_ENV === "production") {
         throw new Error(
-          "PAYOUT_ENCRYPTION_KEY must be set to a 64+ character hex string in production",
+          "PAYOUT_ENCRYPTION_KEY must be set to exactly 64 hexadecimal characters in production",
         )
       }
       this.logger.warn(
-        "PAYOUT_ENCRYPTION_KEY not set or too short — using dev-only derived key. NEVER run this in production.",
+        "PAYOUT_ENCRYPTION_KEY not set — using dev-only derived key. NEVER run this in production.",
       )
       this.masterKey = scryptSync(
         "dev-only-key-do-not-use-in-production",
@@ -51,7 +51,15 @@ export class PayoutEncryptionService {
       )
       this.currentVersion = 0
     } else {
-      this.masterKey = Buffer.from(hexKey.slice(0, 64), "hex")
+      if (!/^[0-9a-fA-F]{64}$/.test(hexKey)) {
+        throw new Error(
+          "PAYOUT_ENCRYPTION_KEY must be exactly 64 hexadecimal characters (32 bytes)",
+        )
+      }
+      this.masterKey = Buffer.from(hexKey, "hex")
+      if (this.masterKey.length !== KEY_LENGTH) {
+        throw new Error("PAYOUT_ENCRYPTION_KEY must decode to exactly 32 bytes")
+      }
       this.currentVersion = CURRENT_PAYOUT_KEY_VERSION
     }
   }

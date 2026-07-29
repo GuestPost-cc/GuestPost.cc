@@ -1,20 +1,64 @@
 ---
 note_type: backlog
 project: guestpost-platform
-updated: 2026-06-22
+updated: 2026-07-29
 ---
 
 # Backlog
 
 Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 (the 2026-06-15 batch's §11 closed at 31/31 on 2026-06-21).
 
-**2026-06-22 audit dashboard status (current): 18 of 41 findings closed (43.9%)** (not 41/41). **19 open, 4 unchecked**. Each finding (#1-#41) maps to `bedrock/Views/audits/platform-audit-2026-06-22.md` §2. 
+**2026-06-22 audit dashboard status (current): 18 of 41 findings closed (43.9%)** (not 41/41). **19 open, 4 unchecked**. Each finding (#1-#41) maps to `bedrock/Views/audits/platform-audit-2026-06-22.md` §2.
 
-**Phase 8.X closure progress (completed so far):** #1 (Phase 8.1), #2 (Phase 8.2), #3 (Phase 8.3), #6 (Phase 7.10.2.1), #38 (Phase 8.7), #39 (Phase 8.x), #40 (Phase 8.8), #41 (Phase 8.9). 
+**Phase 8.X closure progress (completed so far):** #1 (Phase 8.1), #2 (Phase 8.2), #3 (Phase 8.3), #6 (Phase 7.10.2.1), #38 (Phase 8.7), #39 (Phase 8.x), #40 (Phase 8.8), #41 (Phase 8.9).
 
 **Current phase:** Phase A complete (A1 Revenue SQL, A2 Redis client separation, A3 Backend observability).
 
 **Closure contrast:** The audit dashboard was over-reported as 41/41 closed; the backlog still reflected this inaccurate earlier state for visibility. The canonical source is now the updated audit §12 reflecting 18 closed of 41.
+
+## Current finance follow-ups (2026-07-29)
+
+- [ ] Rehearse and execute the evidence-migration maintenance window: hard
+  drain old API/workers, apply ordered payout/dispute migrations, start only
+  the matching image, use a sanitized populated clone, require zero
+  `pg_constraint.convalidated = false` financial constraints, run incident
+  queries, and use forward-fix rollback. The local PostgreSQL rehearsal passes
+  both fail-fast lock barriers, seven isolated aggregate-corruption cases, the
+  PENDING-invite non-attribution case, successful backfills, and final
+  assertions; sanitized staging/production evidence is still required.
+- [ ] Complete the signed Stripe staging matrix for full-balance withdrawal,
+  exact create-response/status-poll/webhook payout amount/currency/account
+  evidence, pre-provider abort versus typed cancellation, checkout redelivery
+  after a claimed-event crash, every wallet-credit-backed derivative deposit
+  status, persisted `livemode`, normalized-claim mutation/lease/maker-checker
+  denial, and late-failure quarantine.
+- [ ] Exercise and alert the production finance mode matrix. Prove
+  `recovery_only` permits only reads, inbound evidence, exact recovery, and
+  reconciliation; prove `locked` permits only reads/inbound evidence; document
+  the evidence and approver required to return to `normal`.
+- [ ] Design an independent authenticated Stripe deposit catch-up aggregate if
+  recovery objectives require one. It must retrieve provider truth and reuse
+  the exact deposit finalizer; the current inbox cannot authorize credit
+  without fresh signed redelivery.
+- [ ] Add bounded provider revalidation and an incident-reviewed compensation
+  design for contradictory late payout failure; never auto-reopen a completed
+  withdrawal or rewrite `lifetimePaid`.
+- [ ] Design a reviewed chargeback recovery/netting aggregate for `LOST`
+  uncovered exposure before attempting to consume future wallet credits.
+  Define multi-case allocation order, immutable ledger/audit evidence,
+  refund/deposit source policy, idempotency, reconciliation, and terminal-case
+  lifecycle changes. Until then, keep reservation fail-closed and never edit
+  `currentExposureAmount` or balances ad hoc.
+- [ ] Keep Wise automated send/completion/replay disabled until provider
+  amount/currency evidence, terminal mapping, idempotency retention,
+  cancellation, reconciliation, sandbox, and Finance/Security certification
+  gates pass.
+- [ ] Before production launch, implement and rehearse hard payout-key
+  rotation: dual-key/keyring reads with explicit key identity, a bounded
+  resumable compare-and-swap re-encryption job covering active and inactive
+  payout methods/providers, per-row verification, metrics, independent
+  approval, and a tested rollback window. Until then, never replace the master
+  key directly.
 
 ## Phased Engineering Roadmap (v1.0) — 2026-06-30
 

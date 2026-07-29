@@ -161,6 +161,7 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       "approveWithdrawal",
       "markWithdrawalPaid",
       "rejectWithdrawal",
+      "abandonApprovedWithdrawal",
       "reverseWithdrawal",
       "executeWithdrawal",
       "retryPayoutExecution",

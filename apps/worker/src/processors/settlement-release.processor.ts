@@ -1,5 +1,9 @@
 import { prisma } from "@guestpost/database"
-import { QUEUES, runSettlementAutoRelease } from "@guestpost/shared"
+import {
+  assertFinanceOperationAllowed,
+  QUEUES,
+  runSettlementAutoRelease,
+} from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import * as Sentry from "@sentry/node"
@@ -31,6 +35,7 @@ export function createSettlementReleaseWorker() {
         logger.warn("unexpected job name — skipping", { jobName: job.name })
         return
       }
+      assertFinanceOperationAllowed("new_liability")
 
       const batchSize = clampBatchSize(
         (job.data as { batchSize?: number }).batchSize,

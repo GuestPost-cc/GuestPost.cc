@@ -7,9 +7,31 @@ export interface CreateTransferParams {
   description?: string
 }
 
+export type PayoutProviderResponseKind = "STRIPE_TRANSFER" | "STRIPE_PAYOUT"
+
+/**
+ * The provider returned an object, but its immutable account/reference/amount
+ * envelope did not match the command. Callers must never persist any field
+ * from the rejected object.
+ */
+export class PayoutProviderResponseMismatchError extends Error {
+  readonly name = "PayoutProviderResponseMismatchError"
+  readonly code = "PAYOUT_PROVIDER_RESPONSE_MISMATCH"
+
+  constructor(
+    readonly responseKind: PayoutProviderResponseKind,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
 export interface CreateTransferResult {
   providerExecutionId: string
   providerTransferId?: string
+  providerAmountMinor?: number
+  providerCurrency?: string
+  livemode?: boolean
   status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED"
   fee?: number
   metadata?: Record<string, unknown>
@@ -27,13 +49,19 @@ export interface CreateBankPayoutParams {
 
 export interface CreateBankPayoutResult extends CreateTransferResult {
   providerPayoutId: string
+  providerAmountMinor: number
+  providerCurrency: string
   acceptedReference?: string
 }
 
 export interface ProviderExecutionContext {
+  payoutExecutionId?: string
   connectedAccountId?: string
   providerTransferId?: string
   providerPayoutId?: string
+  expectedAmountMinor?: number
+  expectedCurrency?: string
+  expectedPublicReference?: string
 }
 
 export interface PayoutProviderCapabilities {
@@ -50,6 +78,9 @@ export interface PayoutProviderCapabilities {
 export interface CheckStatusResult {
   status: "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELLED"
   providerExecutionId: string
+  providerAmountMinor?: number
+  providerCurrency?: string
+  livemode?: boolean
   fee?: number
   errorMessage?: string
   metadata?: Record<string, unknown>
@@ -58,6 +89,7 @@ export interface CheckStatusResult {
 export interface CancelTransferResult {
   success: boolean
   providerExecutionId: string
+  livemode?: boolean
   metadata?: Record<string, unknown>
 }
 

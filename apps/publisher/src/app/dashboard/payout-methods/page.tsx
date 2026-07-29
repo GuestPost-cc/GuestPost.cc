@@ -27,6 +27,7 @@ import {
   ExternalLink,
   Mail,
   Plus,
+  RotateCcw,
   ShieldCheck,
   Trash2,
 } from "lucide-react"
@@ -76,7 +77,7 @@ export default function PayoutMethodsPage() {
     refetch,
   } = useQuery({
     queryKey: ["payout-methods"],
-    queryFn: () => api.publisherPayouts.listPayoutMethods(),
+    queryFn: () => api.publisherPayouts.listPayoutMethods(true),
   })
 
   const { data: stripeStatus, refetch: refetchStripeStatus } = useQuery({
@@ -126,12 +127,28 @@ export default function PayoutMethodsPage() {
 
   const deactivateMutation = useMutation({
     mutationFn: (id: string) => api.publisherPayouts.deactivatePayoutMethod(id),
-    onSuccess: () => {
-      toast.success("Payout method removed")
+    onSuccess: ({ replayed }) => {
+      toast.success(
+        replayed
+          ? "Payout method was already disabled"
+          : "Payout method disabled",
+      )
       queryClient.invalidateQueries({ queryKey: ["payout-methods"] })
     },
     onError: (err: any) =>
-      toast.error(err?.message ?? "Failed to remove payout method"),
+      toast.error(err?.message ?? "Failed to disable payout method"),
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) => api.publisherPayouts.reactivatePayoutMethod(id),
+    onSuccess: ({ replayed }) => {
+      toast.success(
+        replayed ? "Payout method was already active" : "Payout method enabled",
+      )
+      queryClient.invalidateQueries({ queryKey: ["payout-methods"] })
+    },
+    onError: (err: any) =>
+      toast.error(err?.message ?? "Failed to enable payout method"),
   })
 
   const submitBank = (data: BankForm) => {
@@ -155,6 +172,10 @@ export default function PayoutMethodsPage() {
       isDefault: makeDefault,
     })
   }
+
+  const stripeMethodDisabled = methods?.some(
+    (method) => method.type === "stripe_connect" && !method.isActive,
+  )
 
   if (error)
     return (
@@ -195,14 +216,18 @@ export default function PayoutMethodsPage() {
               </div>
               <Badge
                 variant={
-                  stripeStatus.status === "ENABLED" ? "success" : "secondary"
+                  stripeStatus.status === "ENABLED" && !stripeMethodDisabled
+                    ? "success"
+                    : "secondary"
                 }
               >
-                {stripeStatus.status === "ENABLED"
-                  ? "Ready"
-                  : stripeStatus.connected
-                    ? "Setup required"
-                    : "Not connected"}
+                {stripeStatus.status === "ENABLED" && stripeMethodDisabled
+                  ? "Payouts disabled"
+                  : stripeStatus.status === "ENABLED"
+                    ? "Ready"
+                    : stripeStatus.connected
+                      ? "Setup required"
+                      : "Not connected"}
               </Badge>
             </div>
           </CardHeader>
@@ -284,7 +309,12 @@ export default function PayoutMethodsPage() {
                       </CardDescription>
                     </div>
                   </div>
-                  {m.isDefault && <Badge>Default</Badge>}
+                  <div className="flex gap-2">
+                    {!m.isActive ? (
+                      <Badge variant="secondary">Disabled</Badge>
+                    ) : null}
+                    {m.isDefault ? <Badge>Default</Badge> : null}
+                  </div>
                 </CardHeader>
                 <CardContent className="flex items-end justify-between">
                   <div className="text-sm text-muted-foreground">
@@ -298,16 +328,34 @@ export default function PayoutMethodsPage() {
                       <p>{String(m.displayDetails.maskedEmail)}</p>
                     ) : null}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => deactivateMutation.mutate(m.id)}
-                    disabled={deactivateMutation.isPending}
-                  >
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    Remove
-                  </Button>
+                  {m.isActive ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => deactivateMutation.mutate(m.id)}
+                      disabled={
+                        deactivateMutation.isPending ||
+                        reactivateMutation.isPending
+                      }
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      Disable
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => reactivateMutation.mutate(m.id)}
+                      disabled={
+                        deactivateMutation.isPending ||
+                        reactivateMutation.isPending
+                      }
+                    >
+                      <RotateCcw className="mr-1 h-4 w-4" />
+                      Enable
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )

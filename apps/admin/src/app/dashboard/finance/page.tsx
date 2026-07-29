@@ -63,6 +63,53 @@ const TABS = [
 type Tab = (typeof TABS)[number]
 
 const PAGE_SIZE = 20
+const RECOVERABLE_PAYOUT_CLAIM_STAGES = new Set([
+  "PROVIDER_SEND_CLAIMED",
+  "BANK_PAYOUT_SEND_CLAIMED",
+  "BANK_PAYOUT_RESUME_CLAIMED",
+])
+const EXPIRED_PAYOUT_CLAIM_STAGES = new Set([
+  "PROVIDER_SEND_CLAIM_EXPIRED",
+  "BANK_PAYOUT_CLAIM_EXPIRED",
+])
+const CANCELLATION_RECOVERY_LEASE_MS = 15 * 60 * 1000
+
+function canResumeCancellation(execution: {
+  stage: string
+  errorMessage: string | null
+  updatedAt: string
+}) {
+  if (execution.stage !== "CANCEL_REQUESTED") return false
+  if (execution.errorMessage) return true
+  const updatedAt = Date.parse(execution.updatedAt)
+  return (
+    Number.isFinite(updatedAt) &&
+    Date.now() - updatedAt >= CANCELLATION_RECOVERY_LEASE_MS
+  )
+}
+
+function payoutProviderFor(withdrawal: {
+  method?: string
+  payoutMethod?: { type?: string } | null
+}) {
+  const method = withdrawal.method ?? withdrawal.payoutMethod?.type
+  if (method === "bank_transfer") return "manual"
+  if (method === "wise") return "wise"
+  if (method === "stripe_connect") return "stripe_connect"
+  return null
+}
+
+function payoutProviderLabel(provider: string | null) {
+  if (provider === "stripe_connect") return "Stripe Connect"
+  if (provider === "wise") return "Wise"
+  if (provider === "manual") return "Manual bank"
+  return "Unavailable"
+}
+
+function localDateTimeValue(date = new Date()) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
 
 function StatusBadge({ status }: { status: string }) {
   const variant =
@@ -728,6 +775,19 @@ function FinancePageInner() {
   const [approveTarget, setApproveTarget] = useState<string | null>(null)
   const [approveReason, setApproveReason] = useState("")
   const [forceApproval, setForceApproval] = useState(false)
+  const [withdrawalRejectTarget, setWithdrawalRejectTarget] = useState<
+    string | null
+  >(null)
+  const [withdrawalDecisionMode, setWithdrawalDecisionMode] = useState<
+    "reject" | "abandon"
+  >("reject")
+  const [withdrawalRejectReason, setWithdrawalRejectReason] = useState("")
+  const [withdrawalApprovalTarget, setWithdrawalApprovalTarget] = useState<{
+    id: string
+    amountLabel: string
+    publicReference: string
+    publisherLabel: string
+  } | null>(null)
 
   const approveSettlement = useMutation({
     mutationFn: ({
@@ -761,6 +821,7 @@ function FinancePageInner() {
     mutationFn: (id: string) => api.admin.approveWithdrawal(id),
     onSuccess: () => {
       toast.success("Withdrawal approved")
+      setWithdrawalApprovalTarget(null)
       invalidateWithdrawals()
     },
     onError: (e: any) =>
@@ -768,59 +829,167 @@ function FinancePageInner() {
   })
 
   const rejectWithdrawal = useMutation({
-    mutationFn: (id: string) =>
-      api.admin.rejectWithdrawal(id, "Rejected by admin"),
-    onSuccess: () => {
-      toast.success("Withdrawal rejected")
+    mutationFn: ({
+      id,
+      reason,
+      mode,
+    }: {
+      id: string
+      reason: string
+      mode: "reject" | "abandon"
+    }) =>
+      mode === "abandon"
+        ? api.admin.abandonApprovedWithdrawal(id, reason)
+        : api.admin.rejectWithdrawal(id, reason),
+    onSuccess: (_data, variables) => {
+      toast.success(
+        variables.mode === "abandon"
+          ? "Approved withdrawal safely abandoned"
+          : "Withdrawal rejected",
+      )
+      setWithdrawalRejectTarget(null)
+      setWithdrawalRejectReason("")
       invalidateWithdrawals()
     },
     onError: (e: any) =>
       toast.error(e?.message ?? "Failed to reject withdrawal"),
   })
 
+  const [payoutExecutionTarget, setPayoutExecutionTarget] = useState<{
+    id: string
+    provider: string
+    providerLabel: string
+    amountLabel: string
+    publicReference: string
+    payoutMethodLabel: string
+    confirmationToken: string
+  } | null>(null)
+  const [payoutExecutionReason, setPayoutExecutionReason] = useState("")
+  const [payoutExecutionConfirmation, setPayoutExecutionConfirmation] =
+    useState("")
   const executePayout = useMutation({
-    mutationFn: ({ id, provider }: { id: string; provider: string }) =>
-      api.admin.executePayout(id, provider),
+    mutationFn: ({
+      id,
+      provider,
+      reason,
+    }: {
+      id: string
+      provider: string
+      reason: string
+    }) => api.admin.executePayout(id, provider, reason),
     onSuccess: () => {
       toast.success("Payout execution started")
+      setPayoutExecutionTarget(null)
+      setPayoutExecutionReason("")
+      setPayoutExecutionConfirmation("")
       invalidateWithdrawals()
     },
     onError: (e: any) => toast.error(e?.message ?? "Payout execution failed"),
   })
 
-  const markPaid = useMutation({
-    mutationFn: (id: string) => api.admin.markWithdrawalPaid(id),
-    onSuccess: () => {
-      toast.success("Marked as paid")
-      invalidateWithdrawals()
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Failed to mark paid"),
-  })
-
   // Executions drill-down
   const [executionsFor, setExecutionsFor] = useState<string | null>(null)
+  const [manualCompletionTarget, setManualCompletionTarget] = useState<{
+    withdrawalId: string
+    withdrawalPublicReference: string
+    publisherId: string
+    publisherLabel: string
+    amountLabel: string
+    executionId: string
+    executionCreatedAt: string
+  } | null>(null)
+  const [manualBankReference, setManualBankReference] = useState("")
+  const [manualPaidAt, setManualPaidAt] = useState("")
+  const [manualCompletionReason, setManualCompletionReason] = useState("")
+  const [manualCompletionConfirmation, setManualCompletionConfirmation] =
+    useState("")
+  const resetManualCompletion = () => {
+    setManualCompletionTarget(null)
+    setManualBankReference("")
+    setManualPaidAt("")
+    setManualCompletionReason("")
+    setManualCompletionConfirmation("")
+  }
+  const [executionActionTarget, setExecutionActionTarget] = useState<{
+    action: "retry" | "cancel"
+    id: string
+    label: string
+    providerLabel: string
+    amountLabel: string
+    stage: string
+    evidence: string
+    confirmationToken: "RETRY" | "CANCEL"
+  } | null>(null)
+  const [executionActionReason, setExecutionActionReason] = useState("")
+  const [executionActionConfirmation, setExecutionActionConfirmation] =
+    useState("")
   const executionsQ = useQuery({
     queryKey: ["executions", executionsFor],
     queryFn: () => api.admin.getWithdrawalExecutions(executionsFor!),
     enabled: !!executionsFor,
   })
   const retryExecution = useMutation({
-    mutationFn: (id: string) => api.admin.retryPayoutExecution(id),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.admin.retryPayoutExecution(id, reason),
     onSuccess: () => {
       toast.success("Retry started")
+      setExecutionActionTarget(null)
+      setExecutionActionReason("")
+      setExecutionActionConfirmation("")
       queryClient.invalidateQueries({ queryKey: ["executions"] })
       invalidateWithdrawals()
     },
     onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
   })
   const cancelExecution = useMutation({
-    mutationFn: (id: string) => api.admin.cancelPayoutExecution(id),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.admin.cancelPayoutExecution(id, reason),
     onSuccess: () => {
-      toast.success("Execution cancelled")
+      toast.success("Cancellation command completed")
+      setExecutionActionTarget(null)
+      setExecutionActionReason("")
+      setExecutionActionConfirmation("")
       queryClient.invalidateQueries({ queryKey: ["executions"] })
       invalidateWithdrawals()
     },
-    onError: (e: any) => toast.error(e?.message ?? "Cancel failed"),
+    onError: (e: any) =>
+      toast.error(e?.message ?? "Cancellation recovery failed"),
+  })
+  const completeManualWithdrawal = useMutation({
+    mutationFn: () => {
+      if (!manualCompletionTarget) {
+        throw new Error("Manual payout execution is required")
+      }
+      if (
+        manualCompletionConfirmation !==
+        manualCompletionTarget.withdrawalPublicReference
+      ) {
+        throw new Error("Exact withdrawal reference confirmation is required")
+      }
+      const parsedPaidAt = new Date(manualPaidAt)
+      if (!Number.isFinite(parsedPaidAt.getTime())) {
+        throw new Error("A valid payment timestamp is required")
+      }
+      return api.admin.completeManualWithdrawal(
+        manualCompletionTarget.withdrawalId,
+        {
+          withdrawalPublicReference:
+            manualCompletionTarget.withdrawalPublicReference,
+          executionId: manualCompletionTarget.executionId,
+          bankReference: manualBankReference.trim(),
+          paidAt: parsedPaidAt.toISOString(),
+          reason: manualCompletionReason.trim(),
+        },
+      )
+    },
+    onSuccess: () => {
+      toast.success("Manual bank payment evidence recorded")
+      resetManualCompletion()
+      queryClient.invalidateQueries({ queryKey: ["executions"] })
+      invalidateWithdrawals()
+    },
+    onError: (e: any) =>
+      toast.error(e?.message ?? "Manual payment completion failed"),
   })
 
   // Decrypt dialog
@@ -1173,7 +1342,19 @@ function FinancePageInner() {
                             <div className="flex justify-end gap-2">
                               <Button
                                 size="sm"
-                                onClick={() => approveWithdrawal.mutate(w.id)}
+                                onClick={() =>
+                                  setWithdrawalApprovalTarget({
+                                    id: w.id,
+                                    amountLabel: `$${Number(
+                                      w.netAmount ?? w.amount ?? 0,
+                                    ).toFixed(2)} net`,
+                                    publicReference: w.publicReference ?? w.id,
+                                    publisherLabel:
+                                      w.publisher?.name ||
+                                      w.publisher?.email ||
+                                      w.publisherId,
+                                  })
+                                }
                                 disabled={
                                   approveWithdrawal.isPending || !!isOnHold
                                 }
@@ -1188,7 +1369,11 @@ function FinancePageInner() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => rejectWithdrawal.mutate(w.id)}
+                                onClick={() => {
+                                  setWithdrawalRejectTarget(w.id)
+                                  setWithdrawalDecisionMode("reject")
+                                  setWithdrawalRejectReason("")
+                                }}
                                 disabled={rejectWithdrawal.isPending}
                               >
                                 Reject
@@ -1220,8 +1405,8 @@ function FinancePageInner() {
               Approved Withdrawals — Ready to Pay
             </CardTitle>
             <CardDescription>
-              Execute sends real money through the selected provider. Manual =
-              paid outside the platform, then marked paid.
+              Provider routing comes from the stored payout method. Manual bank
+              executions stay Processing until bank evidence is recorded.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -1278,23 +1463,48 @@ function FinancePageInner() {
                             <>
                               <Button
                                 size="sm"
-                                onClick={() =>
-                                  executePayout.mutate({
-                                    id: w.id,
-                                    provider: "manual",
-                                  })
-                                }
-                                disabled={executePayout.isPending}
+                                variant="outline"
+                                onClick={() => {
+                                  setWithdrawalRejectTarget(w.id)
+                                  setWithdrawalDecisionMode("abandon")
+                                  setWithdrawalRejectReason("")
+                                }}
+                                disabled={rejectWithdrawal.isPending}
+                                title="Release only if no provider send was ever claimed"
                               >
-                                Execute (Manual)
+                                Safely abandon
                               </Button>
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => markPaid.mutate(w.id)}
-                                disabled={markPaid.isPending}
+                                onClick={() => {
+                                  const provider = payoutProviderFor(w)
+                                  if (!provider) return
+                                  const publicReference =
+                                    w.publicReference ?? w.id
+                                  setPayoutExecutionTarget({
+                                    id: w.id,
+                                    provider,
+                                    providerLabel:
+                                      payoutProviderLabel(provider),
+                                    amountLabel: `$${Number(
+                                      w.netAmount ?? w.amount ?? 0,
+                                    ).toFixed(2)} net`,
+                                    publicReference,
+                                    payoutMethodLabel:
+                                      w.payoutMethod?.label ??
+                                      "No destination label",
+                                    confirmationToken: publicReference,
+                                  })
+                                  setPayoutExecutionReason("")
+                                  setPayoutExecutionConfirmation("")
+                                }}
+                                disabled={
+                                  executePayout.isPending ||
+                                  !payoutProviderFor(w)
+                                }
                               >
-                                Mark Paid
+                                Execute (
+                                {payoutProviderLabel(payoutProviderFor(w))})
                               </Button>
                             </>
                           )}
@@ -1359,80 +1569,692 @@ function FinancePageInner() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {executionsQ.data.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell>
-                      {e.provider?.displayName ?? e.provider?.name}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={e.status} />
-                    </TableCell>
-                    <TableCell>${Number(e.amount).toFixed(2)}</TableCell>
-                    <TableCell className="max-w-[220px] text-xs">
-                      <div className="font-medium">{e.stage}</div>
-                      <div className="font-mono text-muted-foreground">
-                        {e.providerTransferId ?? "no transfer"}
-                      </div>
-                      <div className="font-mono text-muted-foreground">
-                        {e.providerPayoutId ?? "no bank payout"}
-                      </div>
-                      <div className="font-mono text-muted-foreground">
-                        {e.acceptedReference ??
-                          e.requestedReference ??
-                          "no reference"}
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      className="max-w-[200px] truncate text-xs text-muted-foreground"
-                      title={e.errorMessage ?? ""}
-                    >
-                      {e.errorMessage ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {(e.status === "FAILED" ||
-                          (e.status === "PROCESSING" &&
-                            ((e.stage === "TRANSFER_RECOVERY_REQUIRED" &&
-                              !e.providerPayoutId) ||
-                              ([
-                                "BANK_PAYOUT_RECOVERY_REQUIRED",
-                                "CANCEL_REQUESTED",
-                              ].includes(e.stage) &&
-                                !!e.providerPayoutId)))) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => retryExecution.mutate(e.id)}
-                            disabled={retryExecution.isPending}
-                          >
-                            Retry
-                          </Button>
-                        )}
-                        {["PENDING", "PROCESSING"].includes(e.status) &&
-                          !!e.providerExecutionId &&
-                          (e.provider?.name !== "stripe_connect" ||
-                            [
-                              "TRANSFER_RECOVERY_REQUIRED",
-                              "BANK_PAYOUT_PENDING",
-                              "BANK_PAYOUT_RECOVERY_REQUIRED",
-                              "CANCEL_REQUESTED",
-                            ].includes(e.stage)) && (
+                {executionsQ.data.map((e) => {
+                  const resumableCancellation = canResumeCancellation(e)
+                  const activeCancellationLease =
+                    e.stage === "CANCEL_REQUESTED" && !resumableCancellation
+                  return (
+                    <TableRow key={e.id}>
+                      <TableCell>
+                        {e.provider?.displayName ?? e.provider?.name}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={e.status} />
+                      </TableCell>
+                      <TableCell>${Number(e.amount).toFixed(2)}</TableCell>
+                      <TableCell className="max-w-[220px] text-xs">
+                        <div className="font-medium">{e.stage}</div>
+                        <div className="font-mono text-muted-foreground">
+                          {e.providerTransferId ?? "no transfer"}
+                        </div>
+                        <div className="font-mono text-muted-foreground">
+                          {e.providerPayoutId ?? "no bank payout"}
+                        </div>
+                        <div className="font-mono text-muted-foreground">
+                          {e.bankTraceReference ??
+                            e.acceptedReference ??
+                            e.requestedReference ??
+                            "no reference"}
+                        </div>
+                      </TableCell>
+                      <TableCell
+                        className="max-w-[200px] truncate text-xs text-muted-foreground"
+                        title={e.errorMessage ?? ""}
+                      >
+                        {e.errorMessage ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {e.status === "PROCESSING" &&
+                            e.stage === "PROVIDER_SENT" &&
+                            e.provider?.name === "manual" && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  const withdrawal = payable.find(
+                                    (candidate) =>
+                                      candidate.id === executionsFor,
+                                  )
+                                  if (!withdrawal?.publicReference) {
+                                    toast.error(
+                                      "This withdrawal has no canonical public reference and cannot be manually completed",
+                                    )
+                                    return
+                                  }
+                                  setExecutionsFor(null)
+                                  setManualBankReference("")
+                                  setManualCompletionReason("")
+                                  setManualCompletionConfirmation("")
+                                  setManualCompletionTarget({
+                                    withdrawalId: executionsFor!,
+                                    withdrawalPublicReference:
+                                      withdrawal.publicReference,
+                                    publisherId:
+                                      withdrawal.publisher?.id ??
+                                      withdrawal.publisherId,
+                                    publisherLabel:
+                                      withdrawal.publisher?.name ||
+                                      withdrawal.publisher?.email ||
+                                      withdrawal.publisherId,
+                                    amountLabel: `${Number(e.amount).toFixed(
+                                      2,
+                                    )} ${e.sourceCurrency}`,
+                                    executionId: e.id,
+                                    executionCreatedAt: e.createdAt,
+                                  })
+                                  setManualPaidAt(localDateTimeValue())
+                                }}
+                              >
+                                Confirm bank payment
+                              </Button>
+                            )}
+                          {(e.status === "FAILED" ||
+                            (e.status === "PROCESSING" &&
+                              (RECOVERABLE_PAYOUT_CLAIM_STAGES.has(e.stage) ||
+                                (e.stage === "TRANSFER_RECOVERY_REQUIRED" &&
+                                  !e.providerPayoutId) ||
+                                (["BANK_PAYOUT_RECOVERY_REQUIRED"].includes(
+                                  e.stage,
+                                ) &&
+                                  !!e.providerPayoutId)))) && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => cancelExecution.mutate(e.id)}
-                              disabled={cancelExecution.isPending}
+                              onClick={() => {
+                                const isClaimRecovery =
+                                  RECOVERABLE_PAYOUT_CLAIM_STAGES.has(e.stage)
+                                setExecutionActionTarget({
+                                  action: "retry",
+                                  id: e.id,
+                                  label: isClaimRecovery
+                                    ? "Recover exact provider claim"
+                                    : "Retry payout execution",
+                                  providerLabel:
+                                    e.provider?.displayName ??
+                                    e.provider?.name ??
+                                    "Unknown provider",
+                                  amountLabel: `$${Number(e.amount).toFixed(
+                                    2,
+                                  )} ${e.sourceCurrency}`,
+                                  stage: e.stage,
+                                  evidence:
+                                    e.bankTraceReference ??
+                                    e.acceptedReference ??
+                                    e.requestedReference ??
+                                    e.providerPayoutId ??
+                                    e.providerTransferId ??
+                                    e.providerExecutionId ??
+                                    "No provider reference recorded",
+                                  confirmationToken: "RETRY",
+                                })
+                                setExecutionActionReason("")
+                                setExecutionActionConfirmation("")
+                              }}
+                              disabled={retryExecution.isPending}
                             >
-                              <XCircle className="mr-1 h-3 w-3" /> Cancel
+                              {RECOVERABLE_PAYOUT_CLAIM_STAGES.has(e.stage)
+                                ? "Recover claim"
+                                : "Retry"}
                             </Button>
                           )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {EXPIRED_PAYOUT_CLAIM_STAGES.has(e.stage) && (
+                            <Badge variant="destructive">
+                              Finance review only
+                            </Badge>
+                          )}
+                          {activeCancellationLease && (
+                            <Badge variant="secondary">
+                              Cancellation in progress
+                            </Badge>
+                          )}
+                          {["PENDING", "PROCESSING"].includes(e.status) &&
+                            ((["CREATED", "DESTINATION_VALIDATED"].includes(
+                              e.stage,
+                            ) &&
+                              !e.providerExecutionId &&
+                              !e.providerTransferId &&
+                              !e.providerPayoutId) ||
+                              (e.provider?.name === "stripe_connect" &&
+                                !!e.providerExecutionId &&
+                                [
+                                  "TRANSFER_RECOVERY_REQUIRED",
+                                  "BANK_PAYOUT_PENDING",
+                                  "BANK_PAYOUT_RECOVERY_REQUIRED",
+                                  "CANCEL_REQUESTED",
+                                ].includes(e.stage) &&
+                                (e.stage !== "CANCEL_REQUESTED" ||
+                                  resumableCancellation))) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setExecutionActionTarget({
+                                    action: "cancel",
+                                    id: e.id,
+                                    label:
+                                      e.stage === "CANCEL_REQUESTED"
+                                        ? "Resume payout cancellation"
+                                        : "Cancel payout execution",
+                                    providerLabel:
+                                      e.provider?.displayName ??
+                                      e.provider?.name ??
+                                      "Unknown provider",
+                                    amountLabel: `$${Number(e.amount).toFixed(
+                                      2,
+                                    )} ${e.sourceCurrency}`,
+                                    stage: e.stage,
+                                    evidence:
+                                      e.bankTraceReference ??
+                                      e.acceptedReference ??
+                                      e.requestedReference ??
+                                      e.providerPayoutId ??
+                                      e.providerTransferId ??
+                                      e.providerExecutionId ??
+                                      "No provider reference recorded",
+                                    confirmationToken: "CANCEL",
+                                  })
+                                  setExecutionActionReason("")
+                                  setExecutionActionConfirmation("")
+                                }}
+                                disabled={cancelExecution.isPending}
+                              >
+                                <XCircle className="mr-1 h-3 w-3" />{" "}
+                                {e.stage === "CANCEL_REQUESTED"
+                                  ? "Resume cancellation"
+                                  : "Cancel"}
+                              </Button>
+                            )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Deliberate approval: approval makes the reservation eligible for send. */}
+      <Dialog
+        open={!!withdrawalApprovalTarget}
+        onOpenChange={(open) => {
+          if (!open && !approveWithdrawal.isPending) {
+            setWithdrawalApprovalTarget(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve publisher withdrawal</DialogTitle>
+            <DialogDescription>
+              Confirm the exact publisher, amount, and reference. Approval does
+              not itself send money, but it makes this reserved withdrawal
+              eligible for a separate Finance execution.
+            </DialogDescription>
+          </DialogHeader>
+          {withdrawalApprovalTarget && (
+            <dl className="grid gap-3 rounded-md border bg-muted/30 p-4 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Publisher</dt>
+                <dd className="text-right font-medium">
+                  {withdrawalApprovalTarget.publisherLabel}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Amount</dt>
+                <dd className="font-medium tabular-nums">
+                  {withdrawalApprovalTarget.amountLabel}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Reference</dt>
+                <dd className="font-mono text-xs">
+                  {withdrawalApprovalTarget.publicReference}
+                </dd>
+              </div>
+            </dl>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={approveWithdrawal.isPending}
+              onClick={() => setWithdrawalApprovalTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                approveWithdrawal.isPending || !withdrawalApprovalTarget
+              }
+              onClick={() =>
+                approveWithdrawal.mutate(withdrawalApprovalTarget!.id)
+              }
+            >
+              {approveWithdrawal.isPending
+                ? "Approving..."
+                : "Confirm approval"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* External-send confirmation: requires exact reference + rationale. */}
+      <Dialog
+        open={!!payoutExecutionTarget}
+        onOpenChange={(open) => {
+          if (!open && !executePayout.isPending) {
+            setPayoutExecutionTarget(null)
+            setPayoutExecutionReason("")
+            setPayoutExecutionConfirmation("")
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              Confirm external payout
+            </DialogTitle>
+            <DialogDescription>
+              This command can send real money through the selected provider.
+              Verify the immutable payout facts below before continuing.
+            </DialogDescription>
+          </DialogHeader>
+          {payoutExecutionTarget && (
+            <>
+              <dl className="grid gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Provider</dt>
+                  <dd className="font-medium">
+                    {payoutExecutionTarget.providerLabel}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Amount</dt>
+                  <dd className="font-medium tabular-nums">
+                    {payoutExecutionTarget.amountLabel}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Reference</dt>
+                  <dd className="font-mono text-xs">
+                    {payoutExecutionTarget.publicReference}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Destination</dt>
+                  <dd className="text-right font-medium">
+                    {payoutExecutionTarget.payoutMethodLabel}
+                  </dd>
+                </div>
+              </dl>
+              <div className="space-y-2">
+                <Label htmlFor="payout-execution-reason">
+                  Finance execution reason
+                </Label>
+                <textarea
+                  id="payout-execution-reason"
+                  className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={payoutExecutionReason}
+                  onChange={(event) =>
+                    setPayoutExecutionReason(event.target.value)
+                  }
+                  minLength={10}
+                  maxLength={500}
+                  placeholder="Explain the evidence and business reason for sending this payout..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  {payoutExecutionReason.length}/500 characters
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payout-execution-confirmation">
+                  Type{" "}
+                  <span className="font-mono">
+                    {payoutExecutionTarget.confirmationToken}
+                  </span>{" "}
+                  to confirm
+                </Label>
+                <Input
+                  id="payout-execution-confirmation"
+                  value={payoutExecutionConfirmation}
+                  onChange={(event) =>
+                    setPayoutExecutionConfirmation(event.target.value)
+                  }
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={payoutExecutionTarget.confirmationToken}
+                />
+              </div>
+            </>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={executePayout.isPending}
+              onClick={() => {
+                setPayoutExecutionTarget(null)
+                setPayoutExecutionReason("")
+                setPayoutExecutionConfirmation("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                executePayout.isPending ||
+                !payoutExecutionTarget ||
+                payoutExecutionReason.trim().length < 10 ||
+                payoutExecutionConfirmation.trim() !==
+                  payoutExecutionTarget.confirmationToken
+              }
+              onClick={() =>
+                executePayout.mutate({
+                  id: payoutExecutionTarget!.id,
+                  provider: payoutExecutionTarget!.provider,
+                  reason: payoutExecutionReason.trim(),
+                })
+              }
+            >
+              {executePayout.isPending ? "Sending..." : "Send real payout"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Retry/recovery/cancellation confirmation with current provider facts. */}
+      <Dialog
+        open={!!executionActionTarget}
+        onOpenChange={(open) => {
+          if (
+            !open &&
+            !retryExecution.isPending &&
+            !cancelExecution.isPending
+          ) {
+            setExecutionActionTarget(null)
+            setExecutionActionReason("")
+            setExecutionActionConfirmation("")
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{executionActionTarget?.label}</DialogTitle>
+            <DialogDescription>
+              {executionActionTarget?.action === "cancel"
+                ? "This may issue a provider cancellation or reversal. Confirm the current stage and provider evidence before continuing."
+                : "This may replay the original idempotent provider claim or continue a provider recovery. Confirm the current evidence before continuing."}
+            </DialogDescription>
+          </DialogHeader>
+          {executionActionTarget && (
+            <>
+              <dl className="grid gap-3 rounded-md border bg-muted/30 p-4 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Provider</dt>
+                  <dd className="font-medium">
+                    {executionActionTarget.providerLabel}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Amount</dt>
+                  <dd className="font-medium tabular-nums">
+                    {executionActionTarget.amountLabel}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Current stage</dt>
+                  <dd className="font-mono text-xs">
+                    {executionActionTarget.stage}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Provider evidence</dt>
+                  <dd className="max-w-[65%] break-all text-right font-mono text-xs">
+                    {executionActionTarget.evidence}
+                  </dd>
+                </div>
+              </dl>
+              <div className="space-y-2">
+                <Label htmlFor="execution-action-reason">
+                  Finance operator reason
+                </Label>
+                <textarea
+                  id="execution-action-reason"
+                  className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={executionActionReason}
+                  onChange={(event) =>
+                    setExecutionActionReason(event.target.value)
+                  }
+                  minLength={10}
+                  maxLength={500}
+                  placeholder="Explain why this exact recovery or cancellation is safe..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  {executionActionReason.length}/500 characters
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="execution-action-confirmation">
+                  Type{" "}
+                  <span className="font-mono">
+                    {executionActionTarget.confirmationToken}
+                  </span>{" "}
+                  to confirm
+                </Label>
+                <Input
+                  id="execution-action-confirmation"
+                  value={executionActionConfirmation}
+                  onChange={(event) =>
+                    setExecutionActionConfirmation(event.target.value)
+                  }
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={executionActionTarget.confirmationToken}
+                />
+              </div>
+            </>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={retryExecution.isPending || cancelExecution.isPending}
+              onClick={() => {
+                setExecutionActionTarget(null)
+                setExecutionActionReason("")
+                setExecutionActionConfirmation("")
+              }}
+            >
+              Back
+            </Button>
+            <Button
+              variant={
+                executionActionTarget?.action === "cancel"
+                  ? "destructive"
+                  : "default"
+              }
+              disabled={
+                retryExecution.isPending ||
+                cancelExecution.isPending ||
+                !executionActionTarget ||
+                executionActionReason.trim().length < 10 ||
+                executionActionConfirmation.trim() !==
+                  executionActionTarget.confirmationToken
+              }
+              onClick={() => {
+                if (!executionActionTarget) return
+                const input = {
+                  id: executionActionTarget.id,
+                  reason: executionActionReason.trim(),
+                }
+                if (executionActionTarget.action === "retry") {
+                  retryExecution.mutate(input)
+                } else {
+                  cancelExecution.mutate(input)
+                }
+              }}
+            >
+              {retryExecution.isPending || cancelExecution.isPending
+                ? "Submitting..."
+                : executionActionTarget?.label}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Evidence-bound completion for manual bank payouts only */}
+      <Dialog
+        open={!!manualCompletionTarget}
+        onOpenChange={(open) => {
+          if (!open && !completeManualWithdrawal.isPending) {
+            resetManualCompletion()
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm manual bank payment</DialogTitle>
+            <DialogDescription>
+              Use evidence from the bank after the transfer was submitted. This
+              completes the withdrawal and releases payout liability; it cannot
+              be used for Stripe Connect or Wise.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {manualCompletionTarget && (
+              <dl className="grid gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Publisher</dt>
+                  <dd className="text-right font-medium">
+                    <span className="block">
+                      {manualCompletionTarget.publisherLabel}
+                    </span>
+                    <span className="block font-mono text-xs text-muted-foreground">
+                      {manualCompletionTarget.publisherId}
+                    </span>
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Amount</dt>
+                  <dd className="font-medium tabular-nums">
+                    {manualCompletionTarget.amountLabel}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">
+                    Withdrawal reference
+                  </dt>
+                  <dd className="break-all text-right font-mono text-xs">
+                    {manualCompletionTarget.withdrawalPublicReference}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Execution ID</dt>
+                  <dd className="break-all text-right font-mono text-xs">
+                    {manualCompletionTarget.executionId}
+                  </dd>
+                </div>
+              </dl>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="manual-bank-reference">
+                Bank confirmation/reference
+              </Label>
+              <Input
+                id="manual-bank-reference"
+                value={manualBankReference}
+                onChange={(event) => setManualBankReference(event.target.value)}
+                minLength={6}
+                maxLength={64}
+                placeholder="Bank trace or confirmation reference"
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-paid-at">Paid at</Label>
+              <Input
+                id="manual-paid-at"
+                type="datetime-local"
+                value={manualPaidAt}
+                min={
+                  manualCompletionTarget
+                    ? localDateTimeValue(
+                        new Date(manualCompletionTarget.executionCreatedAt),
+                      )
+                    : undefined
+                }
+                max={localDateTimeValue()}
+                onChange={(event) => setManualPaidAt(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-completion-reason">
+                Reconciliation note
+              </Label>
+              <textarea
+                id="manual-completion-reason"
+                className="flex min-h-[96px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={manualCompletionReason}
+                onChange={(event) =>
+                  setManualCompletionReason(event.target.value)
+                }
+                minLength={10}
+                maxLength={2000}
+                placeholder="Explain how and where the bank payment was verified..."
+              />
+              <p className="text-xs text-muted-foreground">
+                {manualCompletionReason.length}/2000 characters
+              </p>
+            </div>
+            {manualCompletionTarget && (
+              <div className="space-y-2">
+                <Label htmlFor="manual-completion-confirmation">
+                  Type{" "}
+                  <span className="font-mono">
+                    {manualCompletionTarget.withdrawalPublicReference}
+                  </span>{" "}
+                  exactly to confirm
+                </Label>
+                <Input
+                  id="manual-completion-confirmation"
+                  value={manualCompletionConfirmation}
+                  onChange={(event) =>
+                    setManualCompletionConfirmation(event.target.value)
+                  }
+                  maxLength={191}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={manualCompletionTarget.withdrawalPublicReference}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={completeManualWithdrawal.isPending}
+              onClick={resetManualCompletion}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                completeManualWithdrawal.isPending ||
+                !manualCompletionTarget ||
+                manualBankReference.trim().length < 6 ||
+                !manualPaidAt ||
+                manualCompletionReason.trim().length < 10 ||
+                manualCompletionConfirmation !==
+                  manualCompletionTarget.withdrawalPublicReference
+              }
+              onClick={() => completeManualWithdrawal.mutate()}
+            >
+              {completeManualWithdrawal.isPending
+                ? "Recording..."
+                : "Record evidence and complete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1497,6 +2319,90 @@ function FinancePageInner() {
                 {decryptMutation.isPending ? "Unlocking..." : "Unlock"}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Explicit reject / approved-abandonment decision dialog */}
+      <Dialog
+        open={!!withdrawalRejectTarget}
+        onOpenChange={(open) => {
+          if (!open && !rejectWithdrawal.isPending) {
+            setWithdrawalRejectTarget(null)
+            setWithdrawalRejectReason("")
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {withdrawalDecisionMode === "abandon"
+                ? "Safely abandon approved withdrawal"
+                : "Reject pending withdrawal"}
+            </DialogTitle>
+            <DialogDescription>
+              {withdrawalDecisionMode === "abandon"
+                ? "This separate Finance command releases the reservation only when the server proves that no provider call was ever claimed and every execution is pre-provider-aborted."
+                : "Rejecting this pending request releases its existing reservation exactly once."}{" "}
+              Record the internal Finance rationale; the publisher receives only
+              a generic notification.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="withdrawal-rejection-reason">
+              Internal rejection reason
+            </Label>
+            <textarea
+              id="withdrawal-rejection-reason"
+              className="flex min-h-[96px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={withdrawalRejectReason}
+              onChange={(event) =>
+                setWithdrawalRejectReason(event.target.value)
+              }
+              minLength={10}
+              maxLength={2000}
+              placeholder={
+                withdrawalDecisionMode === "abandon"
+                  ? "Explain why this approved withdrawal must be abandoned before provider send..."
+                  : "Explain the evidence and policy reason for rejecting this pending withdrawal..."
+              }
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              {withdrawalRejectReason.length}/2000 characters
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={rejectWithdrawal.isPending}
+              onClick={() => {
+                setWithdrawalRejectTarget(null)
+                setWithdrawalRejectReason("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                rejectWithdrawal.isPending ||
+                withdrawalRejectReason.trim().length < 10
+              }
+              onClick={() =>
+                rejectWithdrawal.mutate({
+                  id: withdrawalRejectTarget!,
+                  reason: withdrawalRejectReason.trim(),
+                  mode: withdrawalDecisionMode,
+                })
+              }
+            >
+              {rejectWithdrawal.isPending
+                ? "Recording decision..."
+                : withdrawalDecisionMode === "abandon"
+                  ? "Safely abandon and release"
+                  : "Reject and release reservation"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

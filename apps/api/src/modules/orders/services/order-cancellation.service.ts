@@ -18,6 +18,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
+import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
@@ -832,6 +833,11 @@ export class OrderCancellationService {
       order.status === "PENDING_PAYMENT" &&
       amount > 0
     ) {
+      // Releasing a reservation makes cash-equivalent wallet funds available
+      // again. Keep this writer behind the same fail-closed cutover gate as
+      // refunds and deposits; draft cancellations with no reservation remain
+      // available while finance is locked.
+      assertApiFinanceOperationAllowed("new_liability")
       const wallet = await tx.wallet.findUnique({
         where: { organizationId: order.organizationId },
       })

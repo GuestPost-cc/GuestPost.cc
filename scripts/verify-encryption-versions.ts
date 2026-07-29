@@ -1,7 +1,23 @@
 import { CURRENT_PAYOUT_KEY_VERSION } from "../apps/api/src/modules/publisher-payouts/payout-encryption.constants"
-import { createPrismaClient } from "../packages/database/src"
+import { decodePayoutProviderConfig } from "../apps/api/src/modules/publisher-payouts/payout-provider-config"
+import { loadRootEnv } from "./env"
 
-const SUPPORTED_VERSIONS = [0, CURRENT_PAYOUT_KEY_VERSION]
+if (
+  !Number.isSafeInteger(CURRENT_PAYOUT_KEY_VERSION) ||
+  CURRENT_PAYOUT_KEY_VERSION < 0
+) {
+  throw new Error(
+    "CURRENT_PAYOUT_KEY_VERSION must be a non-negative safe integer",
+  )
+}
+
+// The service derives a deterministic key for every historical version from
+// the same master key. A soft bump from v1 to v2 must therefore keep v0 and v1
+// readable; accepting only [0, current] would incorrectly reject v1.
+const SUPPORTED_VERSIONS = Array.from(
+  { length: CURRENT_PAYOUT_KEY_VERSION + 1 },
+  (_, version) => version,
+)
 
 interface VersionGroup {
   table: string
@@ -27,17 +43,21 @@ function parseFlags() {
   const sampleIdx = process.argv.indexOf("--sample")
   if (sampleIdx >= 0) {
     const raw = Number(process.argv[sampleIdx + 1])
-    if (Number.isNaN(raw) || raw < 1) {
+    if (!Number.isSafeInteger(raw) || raw < 1) {
       console.error("error: --sample must be a positive integer")
       process.exit(1)
     }
-    sampleSize = Math.max(1, raw)
+    sampleSize = raw
   }
 
   return { outputJson, quiet, doDecrypt, sampleSize }
 }
 
 async function main() {
+  loadRootEnv({ required: ["DATABASE_URL"] })
+  const { createPrismaClient } = await import(
+    "../packages/database/src/create-prisma-client"
+  )
   const { outputJson, quiet, doDecrypt, sampleSize } = parseFlags()
   const prisma = createPrismaClient()
 
@@ -50,7 +70,6 @@ async function main() {
     const pm = await prisma.payoutMethod.groupBy({
       by: ["encryptionKeyVersion"],
       _count: true,
-      where: { isActive: true },
     })
     for (const g of pm) {
       groups.push({
@@ -78,7 +97,6 @@ async function main() {
     const pp = await prisma.payoutProvider.groupBy({
       by: ["configEncryptionKeyVersion"],
       _count: true,
-      where: { isActive: true },
     })
     for (const g of pp) {
       groups.push({
@@ -103,21 +121,14 @@ async function main() {
     }
 
     // --decrypt: one representative row per (table, version)
-    if (doDecrypt && !outputJson) {
-      // Lazy-import the real encryption service. Must set env before import.
-      const origKey = process.env.PAYOUT_ENCRYPTION_KEY
-      const origEnv = process.env.NODE_ENV
-      process.env.NODE_ENV = "production"
-      process.env.PAYOUT_ENCRYPTION_KEY = origKey || ""
-
+    if (doDecrypt) {
+      // Lazy-import the real encryption service after loading the project
+      // environment. Its own production guard rejects a missing/malformed key;
+      // local development may intentionally verify version-0 fallback rows.
       const { PayoutEncryptionService } = await import(
         "../apps/api/src/modules/publisher-payouts/payout-encryption.service"
       )
       const svc = new PayoutEncryptionService()
-
-      // Restore env after construction
-      process.env.NODE_ENV = origEnv
-      if (!origKey) delete process.env.PAYOUT_ENCRYPTION_KEY
 
       const seen = new Set<string>()
 
@@ -129,8 +140,6 @@ async function main() {
         const rows = await prisma.payoutMethod.findMany({
           where: {
             encryptionKeyVersion: g.encryptionKeyVersion,
-            isActive: true,
-            details: { not: null },
           },
           take: sampleSize,
           select: { id: true, details: true, encryptionKeyVersion: true },
@@ -159,7 +168,8 @@ async function main() {
         }
       }
 
-      // Decrypt PayoutProvider samples
+      // Provider rows are few and may use an empty object as a no-secret
+      // sentinel, so validate every row rather than sampling one per version.
       for (const g of pp) {
         const key = `PayoutProvider:v${g.configEncryptionKeyVersion}`
         if (seen.has(key)) continue
@@ -167,15 +177,16 @@ async function main() {
         const rows = await prisma.payoutProvider.findMany({
           where: {
             configEncryptionKeyVersion: g.configEncryptionKeyVersion,
-            isActive: true,
-            config: { not: null },
           },
-          take: sampleSize,
           select: { id: true, config: true, configEncryptionKeyVersion: true },
         })
         for (const row of rows) {
           try {
-            svc.decrypt(String(row.config), row.configEncryptionKeyVersion)
+            decodePayoutProviderConfig(
+              row.config,
+              row.configEncryptionKeyVersion,
+              (ciphertext, version) => svc.decrypt(ciphertext, version),
+            )
             decryptResults.push({
               table: "PayoutProvider",
               id: row.id,
@@ -208,11 +219,13 @@ async function main() {
         pass: errors.length === 0,
       }
       console.log(JSON.stringify(result, null, quiet ? 0 : 2))
-      process.exit(errors.length ? 1 : 0)
+      if (errors.length > 0) process.exitCode = 1
+      return
     }
 
     if (quiet) {
-      process.exit(errors.length ? 1 : 0)
+      if (errors.length > 0) process.exitCode = 1
+      return
     }
 
     // Human-readable output
@@ -250,7 +263,8 @@ async function main() {
       console.log("\n  Errors:")
       for (const e of errors) console.log(`    ❌ ${e}`)
       console.log("\n  ❌ FAIL")
-      process.exit(1)
+      process.exitCode = 1
+      return
     }
     console.log(
       "\n  ✅ PASS — all encryption versions are in the supported set.",
@@ -262,5 +276,5 @@ async function main() {
 
 main().catch((err) => {
   console.error("Fatal:", err)
-  process.exit(1)
+  process.exitCode = 1
 })

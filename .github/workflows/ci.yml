@@ -103,6 +103,11 @@ jobs:
       - name: Verify migration state
         run: pnpm --filter @guestpost/database exec prisma migrate status
 
+      - name: Rehearse finance migrations on populated historical data
+        env:
+          PGPASSWORD: guestpost
+        run: pnpm test:migrations:finance
+
       - name: Create integration-test template database
         env:
           PGPASSWORD: guestpost

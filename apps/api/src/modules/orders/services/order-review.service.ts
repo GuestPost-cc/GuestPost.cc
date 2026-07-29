@@ -13,6 +13,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
+import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
 import {
   resolvePlatformFeeFraction,
   splitPlatformFee,
@@ -316,6 +317,7 @@ export class OrderReviewService {
     organizationId: string,
     userId: string,
   ) {
+    assertApiFinanceOperationAllowed("new_liability")
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
     })
@@ -399,6 +401,10 @@ export class OrderReviewService {
   }
 
   async createSettlementForOrder(tx: any, orderId: string) {
+    // This method is also called from delivery verification. Keep the gate at
+    // the shared write boundary so an internal caller cannot bypass the
+    // finance-wide maintenance/incident freeze.
+    assertApiFinanceOperationAllowed("new_liability")
     await this.cancellation.assertNoActiveCancellation(orderId, tx)
     const existingSettlement = await tx.settlement.findFirst({
       where: { orderId, status: { not: "CANCELLED" } },

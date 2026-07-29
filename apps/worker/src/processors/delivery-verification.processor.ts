@@ -1,5 +1,5 @@
 import { prisma } from "@guestpost/database"
-import { QUEUES } from "@guestpost/shared"
+import { assertFinanceOperationAllowed, QUEUES } from "@guestpost/shared"
 // Node-only deep imports keep cheerio + aws-sdk + undici/dns out of the
 // shared package's public index — the Next.js apps' webpack chokes on
 // `node:*` schemes when bundling. safe-fetch (undici Agent + dns) joins
@@ -165,6 +165,7 @@ export function createDeliveryVerificationWorker() {
       }
       // Settlement-hold link monitoring sweep (repeatable).
       if (job.name === "settlement-hold-sweep") {
+        assertFinanceOperationAllowed("reconciliation")
         const res = await runSettlementHoldLinkSweep(deps)
         logger.info("settlement-hold link sweep complete", { result: res })
         return res
@@ -173,6 +174,7 @@ export function createDeliveryVerificationWorker() {
         logger.warn("unknown job name", { jobName: job.name })
         return
       }
+      assertFinanceOperationAllowed("new_liability")
       const { deliveryVersionId, actorUserId } = job.data as {
         deliveryVersionId: string
         actorUserId?: string

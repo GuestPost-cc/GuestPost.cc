@@ -238,10 +238,30 @@ equality.
 ### Payout traceability
 
 - Withdrawal source allocations equal the gross withdrawal amount.
-- A completed Stripe Connect execution requires bank-payout evidence and the
+- Approval proves the existing reservation and does not require the reserved
+  amount to remain in withdrawable balance.
+- A completed automated execution requires provider-specific terminal
+  evidence; Stripe Connect additionally requires its Payout ID and
   `BANK_PAID` stage.
+- A completed manual execution requires its configured immutable payment
+  evidence and actor separation.
 - Duplicate completed executions, stale processing, orphan execution states,
   and publisher lifetime-paid drift are findings and require investigation.
+
+### Payment disputes
+
+- A processed dispute-open event has one provider-neutral dispute case.
+- The case owns its hold; held plus shortfall equals disputed amount.
+- Won/released and lost/debited are mutually exclusive.
+- A terminal case has one matching resolution and cannot regress to open.
+- Complete verified out-of-order events converge on the same case; incomplete
+  or contradictory evidence remains retryable without moving money.
+
+### Customer wallet external returns
+
+- Customer wallets are closed-loop.
+- No wallet debit may claim cash-out/refund success without an external return
+  aggregate, source allocation, provider execution, and terminal evidence.
 
 ## Reconciliation
 
@@ -259,7 +279,10 @@ The scan checks:
 - Final publisher orders for required settlements.
 - Final platform orders for required revenue and forbidden settlements.
 - Provider-neutral deposit attempts against wallet ledger evidence.
-- Withdrawal allocations and Stripe bank-payout evidence.
+- Payment dispute case, hold, shortfall, terminal-resolution, and inbox
+  evidence.
+- Withdrawal allocations and route-specific payout completion evidence.
+- Wallet withdrawals without an external return aggregate/execution.
 - Stale, orphaned, duplicate, or lifetime-drift payout states.
 
 Finding IDs are stable across scans and are derived from the finding code,

@@ -12,6 +12,9 @@ import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import { CompleteManualWithdrawalDto } from "./dto/complete-manual-withdrawal.dto"
+import { CreatePayoutMethodDto } from "./dto/create-payout-method.dto"
+import { RejectWithdrawalDto } from "./dto/reject-withdrawal.dto"
 import { RequestWithdrawalDto } from "./dto/request-withdrawal.dto"
 import { PublisherPayoutsService } from "./publisher-payouts.service"
 import { StripeConnectService } from "./stripe-connect.service"
@@ -71,20 +74,22 @@ export class PublisherPayoutsController {
   @UseGuards(MemberRolesGuard)
   @MemberRoles("PUBLISHER_OWNER")
   @Get("payout-methods")
-  listPayoutMethods(@CurrentUser() user: any) {
-    return this.payouts.listPayoutMethods(user.publisherId, user.id)
+  listPayoutMethods(
+    @CurrentUser() user: any,
+    @Query("includeInactive") includeInactive?: string,
+  ) {
+    return this.payouts.listPayoutMethods(
+      user.publisherId,
+      user.id,
+      includeInactive === "true",
+    )
   }
 
   @UseGuards(MemberRolesGuard)
   @MemberRoles("PUBLISHER_OWNER")
   @Post("payout-methods")
   createPayoutMethod(
-    @Body() body: {
-      type: string
-      label: string
-      details: Record<string, unknown>
-      isDefault?: boolean
-    },
+    @Body() body: CreatePayoutMethodDto,
     @CurrentUser() user: any,
   ) {
     return this.payouts.createPayoutMethod(user.publisherId, user.id, body)
@@ -95,6 +100,13 @@ export class PublisherPayoutsController {
   @Post("payout-methods/:id/deactivate")
   deactivatePayoutMethod(@Param("id") id: string, @CurrentUser() user: any) {
     return this.payouts.deactivatePayoutMethod(user.publisherId, user.id, id)
+  }
+
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("payout-methods/:id/reactivate")
+  reactivatePayoutMethod(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.payouts.reactivatePayoutMethod(user.publisherId, user.id, id)
   }
 
   @UseGuards(MemberRolesGuard)
@@ -119,15 +131,23 @@ export class PublisherPayoutsController {
 
   @UseGuards(StaffRolesGuard)
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  @Post("withdrawals/:id/mark-paid")
-  markPaid(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.payouts.markWithdrawalPaid(id, user.id)
+  @Post("withdrawals/:id/manual-complete")
+  completeManualWithdrawal(
+    @Param("id") id: string,
+    @Body() body: CompleteManualWithdrawalDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.payouts.completeManualWithdrawal(id, user.id, body)
   }
 
   @UseGuards(StaffRolesGuard)
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   @Post("withdrawals/:id/reject")
-  rejectWithdrawal(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.payouts.rejectWithdrawal(id, user.id)
+  rejectWithdrawal(
+    @Param("id") id: string,
+    @Body() body: RejectWithdrawalDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.payouts.rejectWithdrawal(id, user.id, body.reason)
   }
 }

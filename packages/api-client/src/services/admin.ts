@@ -1068,6 +1068,12 @@ export interface AdminWithdrawalResponse {
   id: string
   publisherId: string
   amount: string | number
+  currency: string
+  publicReference: string | null
+  payoutFee: string | number
+  netAmount: string | number | null
+  feePolicyVersion: string | null
+  method: string
   status: WithdrawalStatus
   availableAt: string | null
   createdAt: string
@@ -1312,30 +1318,42 @@ export class AdminService {
     return this.client.patch(`/admin/withdrawals/${id}/approve`)
   }
 
-  markWithdrawalPaid(id: string) {
-    return this.client.patch(`/admin/withdrawals/${id}/mark-paid`)
-  }
-
-  rejectWithdrawal(id: string, note?: string) {
+  rejectWithdrawal(id: string, reason: string) {
     return this.client.patch(`/admin/withdrawals/${id}/reject`, {
-      json: note ? { note } : {},
-    })
-  }
-
-  // FAILED -> REVERSED: restore trapped funds after a hard provider failure.
-  // Reason (min 10 chars) is required and audited.
-  reverseFailedWithdrawal(id: string, reason: string) {
-    return this.client.post(`/admin/withdrawals/${id}/reverse`, {
       json: { reason },
     })
   }
 
-  executePayout(withdrawalId: string, providerName: string) {
+  abandonApprovedWithdrawal(id: string, reason: string) {
+    return this.client.patch(`/admin/withdrawals/${id}/abandon`, {
+      json: { reason },
+    })
+  }
+
+  executePayout(withdrawalId: string, providerName: string, reason: string) {
     return this.client.post<{
       executionId: string
       status: string
       providerExecutionId: string | null
-    }>(`/admin/withdrawals/${withdrawalId}/execute`, { json: { providerName } })
+    }>(`/admin/withdrawals/${withdrawalId}/execute`, {
+      json: { providerName, reason },
+    })
+  }
+
+  completeManualWithdrawal(
+    withdrawalId: string,
+    evidence: {
+      withdrawalPublicReference: string
+      executionId: string
+      bankReference: string
+      paidAt: string
+      reason: string
+    },
+  ) {
+    return this.client.post(
+      `/publisher-payouts/withdrawals/${withdrawalId}/manual-complete`,
+      { json: evidence },
+    )
   }
 
   getWithdrawalExecutions(withdrawalId: string) {
@@ -1349,6 +1367,7 @@ export class AdminService {
         providerExecutionId: string | null
         providerTransferId: string | null
         providerPayoutId: string | null
+        bankTraceReference: string | null
         stage: string
         requestedReference: string | null
         acceptedReference: string | null
@@ -1356,17 +1375,22 @@ export class AdminService {
         destinationCurrency: string
         destinationAmount: number | null
         createdAt: string
+        updatedAt: string
         provider: { id: string; name: string; displayName: string }
       }>
     >(`/admin/withdrawals/${withdrawalId}/executions`)
   }
 
-  retryPayoutExecution(executionId: string) {
-    return this.client.post(`/admin/payout-executions/${executionId}/retry`)
+  retryPayoutExecution(executionId: string, reason: string) {
+    return this.client.post(`/admin/payout-executions/${executionId}/retry`, {
+      json: { reason },
+    })
   }
 
-  cancelPayoutExecution(executionId: string) {
-    return this.client.post(`/admin/payout-executions/${executionId}/cancel`)
+  cancelPayoutExecution(executionId: string, reason: string) {
+    return this.client.post(`/admin/payout-executions/${executionId}/cancel`, {
+      json: { reason },
+    })
   }
 
   getReconciliation() {

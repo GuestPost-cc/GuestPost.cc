@@ -1,6 +1,5 @@
 import {
   IsNumber,
-  IsOptional,
   IsString,
   Matches,
   Max,
@@ -24,9 +23,8 @@ export class RequestWithdrawalDto {
   @Matches(/^[A-Za-z0-9_-]+$/)
   idempotencyKey!: string
 
-  @IsOptional()
   @IsString()
   @MaxLength(191)
   @Matches(/^[A-Za-z0-9_-]+$/)
-  payoutMethodId?: string
+  payoutMethodId!: string
 }

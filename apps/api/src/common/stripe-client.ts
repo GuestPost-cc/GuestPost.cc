@@ -1,3 +1,4 @@
+import { classifyStripeKeyMode, type StripeKeyMode } from "@guestpost/shared"
 import Stripe from "stripe"
 
 export type StripeFeature = "deposits" | "connect"
@@ -57,22 +58,44 @@ export function isStripeFeatureEnabled(feature: StripeFeature): boolean {
   )
 }
 
-export function stripeKeyMode(): "test" | "live" | "none" | "invalid" {
-  const key = process.env.STRIPE_SECRET_KEY?.trim()
-  if (!key) return "none"
-  if (key.startsWith("sk_test_") || key.startsWith("rk_test_")) return "test"
-  if (key.startsWith("sk_live_") || key.startsWith("rk_live_")) return "live"
-  return "invalid"
+export function stripeKeyMode(): StripeKeyMode {
+  return classifyStripeKeyMode(process.env.STRIPE_SECRET_KEY)
 }
 
 export function validateStripeEnvironment(): void {
   const deposits = isStripeFeatureEnabled("deposits")
   const connect = isStripeFeatureEnabled("connect")
-  if (!deposits && !connect) return
+  const depositWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
+  const platformPayoutSecret = process.env.STRIPE_PAYOUT_WEBHOOK_SECRET?.trim()
+  const connectedPayoutSecret =
+    process.env.STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET?.trim()
+  if (platformPayoutSecret && !connectedPayoutSecret) {
+    throw new Error(
+      "STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET is missing; Stripe payout webhook secrets must be configured together",
+    )
+  }
+  if (connectedPayoutSecret && !platformPayoutSecret) {
+    throw new Error(
+      "STRIPE_PAYOUT_WEBHOOK_SECRET is missing; Stripe payout webhook secrets must be configured together",
+    )
+  }
+  const configuredWebhookSecrets = [
+    depositWebhookSecret,
+    platformPayoutSecret,
+    connectedPayoutSecret,
+  ].filter((secret): secret is string => Boolean(secret))
+  if (
+    new Set(configuredWebhookSecrets).size !== configuredWebhookSecrets.length
+  ) {
+    throw new Error("Stripe webhook trust-boundary secrets must be different")
+  }
+  if (!deposits && !connect && configuredWebhookSecrets.length === 0) return
 
   const mode = stripeKeyMode()
   if (mode === "none") {
-    throw new Error("Stripe is enabled but STRIPE_SECRET_KEY is missing")
+    throw new Error(
+      "Stripe webhook verification or an enabled feature requires STRIPE_SECRET_KEY",
+    )
   }
   if (mode === "invalid") {
     throw new Error(
@@ -84,15 +107,12 @@ export function validateStripeEnvironment(): void {
       "Live Stripe key refused: set STRIPE_LIVE_MODE_ENABLED=true only after the live-money release gates pass",
     )
   }
-  if (deposits && !process.env.STRIPE_WEBHOOK_SECRET) {
+  if (deposits && !depositWebhookSecret) {
     throw new Error(
       "Stripe deposits are enabled but STRIPE_WEBHOOK_SECRET is missing",
     )
   }
   if (deposits) validateReturnOrigin("NEXT_PUBLIC_PORTAL_URL")
-  const platformPayoutSecret = process.env.STRIPE_PAYOUT_WEBHOOK_SECRET?.trim()
-  const connectedPayoutSecret =
-    process.env.STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET?.trim()
   if (connect && !platformPayoutSecret) {
     throw new Error(
       "Stripe Connect is enabled but STRIPE_PAYOUT_WEBHOOK_SECRET is missing",
@@ -101,22 +121,6 @@ export function validateStripeEnvironment(): void {
   if (connect && !connectedPayoutSecret) {
     throw new Error(
       "Stripe Connect is enabled but STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET is missing",
-    )
-  }
-  if (connect && platformPayoutSecret === connectedPayoutSecret) {
-    throw new Error(
-      "Stripe platform and connected-account webhook secrets must be different",
-    )
-  }
-  if (
-    connect &&
-    deposits &&
-    [platformPayoutSecret, connectedPayoutSecret].includes(
-      process.env.STRIPE_WEBHOOK_SECRET?.trim(),
-    )
-  ) {
-    throw new Error(
-      "Stripe deposit and payout webhook secrets must be different",
     )
   }
   if (connect) validateReturnOrigin("NEXT_PUBLIC_PUBLISHER_URL")
@@ -161,7 +165,18 @@ export function assertStripeObjectMode(
   livemode: boolean | null | undefined,
   objectName: string,
 ): void {
-  const expectedLive = stripeKeyMode() === "live"
+  const mode = stripeKeyMode()
+  if (mode === "none" || mode === "invalid") {
+    throw new Error(
+      `${objectName} mode cannot be verified without a valid Stripe secret or restricted key`,
+    )
+  }
+  if (mode === "live" && !enabled(process.env.STRIPE_LIVE_MODE_ENABLED)) {
+    throw new Error(
+      `${objectName} live mode is refused while STRIPE_LIVE_MODE_ENABLED is not true`,
+    )
+  }
+  const expectedLive = mode === "live"
   if (typeof livemode !== "boolean" || livemode !== expectedLive) {
     throw new Error(
       `${objectName} mode does not match the configured Stripe key; refusing financial state change`,

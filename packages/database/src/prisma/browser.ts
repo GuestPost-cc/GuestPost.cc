@@ -208,6 +208,11 @@ export type PayoutProvider = Prisma.PayoutProviderModel
  */
 export type PayoutExecution = Prisma.PayoutExecutionModel
 /**
+ * Model PayoutExecutionClaim
+ *
+ */
+export type PayoutExecutionClaim = Prisma.PayoutExecutionClaimModel
+/**
  * Model WithdrawalAllocation
  *
  */
@@ -272,6 +277,11 @@ export type DepositAttempt = Prisma.DepositAttemptModel
  *
  */
 export type PaymentProviderEvent = Prisma.PaymentProviderEventModel
+/**
+ * Model PaymentDispute
+ *
+ */
+export type PaymentDispute = Prisma.PaymentDisputeModel
 /**
  * Model Ticket
  *

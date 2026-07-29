@@ -36,7 +36,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -82,7 +82,11 @@ export default function EarningsPage() {
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false)
 
   const withdrawSchema = z.object({
-    amount: z.coerce.number().positive("Amount must be positive"),
+    amount: z.coerce
+      .number()
+      .min(1, "Amount must be at least $1")
+      .max(1_000_000, "Amount is too large")
+      .multipleOf(0.01, "Use no more than two decimal places"),
   })
 
   type WithdrawFormInput = z.input<typeof withdrawSchema>
@@ -113,6 +117,10 @@ export default function EarningsPage() {
     queryKey: ["payout-methods"],
     queryFn: () => api.publisherPayouts.listPayoutMethods(),
   })
+  const withdrawalIdempotencyRef = useRef<{
+    fingerprint: string
+    key: string
+  } | null>(null)
 
   const {
     data: transactions = [],
@@ -135,22 +143,19 @@ export default function EarningsPage() {
   })
 
   const withdrawMutation = useMutation({
-    mutationFn: (amount: number) => {
-      const payoutMethod =
-        payoutMethods?.find((method) => method.isDefault) ?? payoutMethods?.[0]
-      if (!payoutMethod) throw new Error("Connect a payout method first")
-      return api.publisherPayouts.requestWithdrawal({
-        amount,
-        method: payoutMethod.type,
-        payoutMethodId: payoutMethod.id,
-        idempotencyKey: crypto.randomUUID(),
-      })
-    },
+    mutationFn: (request: {
+      amount: number
+      method: string
+      payoutMethodId: string
+      idempotencyKey: string
+    }) => api.publisherPayouts.requestWithdrawal(request),
     onSuccess: () => {
       toast.success("Withdrawal requested successfully")
       setShowWithdrawDialog(false)
       reset()
+      withdrawalIdempotencyRef.current = null
       refetch()
+      refetchTxns()
     },
     onError: (error: any) => {
       toast.error(error?.message ?? "Failed to request withdrawal")
@@ -162,7 +167,29 @@ export default function EarningsPage() {
       toast.error("Amount exceeds withdrawable balance")
       return
     }
-    withdrawMutation.mutate(data.amount)
+    const payoutMethod =
+      payoutMethods?.find((method) => method.isDefault) ?? payoutMethods?.[0]
+    if (!payoutMethod) {
+      toast.error("Connect an active payout method first")
+      return
+    }
+    const fingerprint = [
+      data.amount.toFixed(2),
+      payoutMethod.id,
+      payoutMethod.type,
+    ].join(":")
+    if (withdrawalIdempotencyRef.current?.fingerprint !== fingerprint) {
+      withdrawalIdempotencyRef.current = {
+        fingerprint,
+        key: crypto.randomUUID(),
+      }
+    }
+    withdrawMutation.mutate({
+      amount: data.amount,
+      method: payoutMethod.type,
+      payoutMethodId: payoutMethod.id,
+      idempotencyKey: withdrawalIdempotencyRef.current.key,
+    })
   }
 
   const handleExport = (txns: any[]) => {

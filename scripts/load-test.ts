@@ -70,6 +70,12 @@ async function provisionUserWithSession(
       name: `${name}'s Org`,
       slug,
       memberships: { create: { userId: user.id, role: "OWNER" } },
+      wallets: {
+        create: {
+          userId: user.id,
+          currency: "USD",
+        },
+      },
     },
   })
   await prisma.activeContext.create({

@@ -2,9 +2,23 @@ import { createHash, randomUUID } from "node:crypto"
 import {
   customerWalletStatementDescriptor,
   initialStripeFeeDisclosure,
+  isCreditablePreCreditDepositStatus,
+  isFinanceOperationAllowed,
   isUniqueViolation,
+  isWalletCreditBackedDepositStatus,
+  resolveFinanceRuntimeMode,
 } from "@guestpost/shared"
 import { createFinancialReference } from "@guestpost/shared/dist/financial-reference-server"
+import {
+  type FingerprintablePaymentDisputeEvent,
+  lockWalletForUpdate,
+  type NormalizedPaymentDisputeEvent,
+  type PaymentDisputeOutcome,
+  PaymentDisputeTransitionError,
+  paymentDisputeEventFingerprint,
+  paymentDisputeEventFromStoredRow,
+  transitionPaymentDispute,
+} from "@guestpost/shared/dist/payment-dispute-core"
 import {
   BadRequestException,
   ConflictException,
@@ -12,8 +26,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
 import { PrismaService } from "../../common/prisma.service"
 import {
   assertStripeObjectMode,
@@ -34,6 +50,98 @@ class DuplicateEventError extends Error {
   }
 }
 
+class DepositEvidenceError extends Error {
+  constructor(readonly code: string) {
+    super(code)
+    this.name = "DepositEvidenceError"
+  }
+}
+
+class PaymentProviderEventOwnershipError extends Error {
+  readonly code = "PAYMENT_PROVIDER_EVENT_LEASE_LOST"
+
+  constructor() {
+    super("Payment provider event ownership changed; retry from durable state")
+    this.name = "PaymentProviderEventOwnershipError"
+  }
+}
+
+interface PaymentProviderEventLease {
+  kind: "lease"
+  attempt: number
+  lockedAt: Date
+}
+
+interface PaymentProviderEventSnapshot {
+  kind: "snapshot"
+  status: string
+  attempts: number
+  lockedAt: Date | null
+  processedAt: Date | null
+}
+
+function logReferenceFingerprint(value: string | null | undefined) {
+  if (!value) return null
+  return `sha256:${createHash("sha256").update(value).digest("hex")}`
+}
+
+type PaymentProviderEventAuthority =
+  | PaymentProviderEventLease
+  | PaymentProviderEventSnapshot
+
+type NormalizedStripeDisputeFacts = Omit<
+  NormalizedPaymentDisputeEvent,
+  | "providerEventRowId"
+  | "claimAttempt"
+  | "claimLockedAt"
+  | "providerEventId"
+  | "eventType"
+  | "livemode"
+  | "eventFingerprint"
+>
+type PersistablePaymentDisputeEvent = FingerprintablePaymentDisputeEvent & {
+  eventFingerprint: string
+}
+
+interface PaymentProviderEventEnvelope {
+  provider: string
+  providerEventId: string
+  eventType: string
+  objectId: string | null
+  providerPaymentId: string | null
+  providerChargeId: string | null
+  disputeAmountMinor: bigint | null
+  disputeCurrency: string | null
+  providerStatus: string | null
+  livemode: boolean | null
+  eventFingerprint: string
+}
+
+const PAYMENT_DISPUTE_EVENT_TYPES = new Set([
+  "charge.dispute.created",
+  "charge.dispute.closed",
+])
+const STRIPE_DISPUTE_OPEN_STATUSES = new Set([
+  "needs_response",
+  "under_review",
+  "warning_needs_response",
+  "warning_under_review",
+])
+const STRIPE_DISPUTE_TERMINAL_STATUSES = new Set([
+  "won",
+  "lost",
+  "prevented",
+  "warning_closed",
+])
+const PAYMENT_PROVIDER_EVENT_LEASE_MS = 15 * 60 * 1000
+const STRIPE_DISPUTE_MINOR_UNIT_FACTORS: Readonly<Record<string, number>> =
+  Object.freeze({
+    // USD is the only customer-wallet funding currency currently certified by
+    // the Stripe adapter. Add currencies here only after their exponent and
+    // end-to-end wallet support are explicitly certified.
+    USD: 100,
+  })
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name)
@@ -48,6 +156,244 @@ export class BillingService {
     // always supplies the registry from BillingModule.
     this.depositProvider =
       providerService?.getAdapter("stripe") ?? new StripeDepositAdapter()
+  }
+
+  private paymentProviderEventDate(value: unknown): Date | null {
+    if (value == null) return null
+    const parsed = value instanceof Date ? value : new Date(value as any)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  private paymentProviderEventSnapshot(
+    event: any,
+  ): PaymentProviderEventSnapshot {
+    if (
+      !event ||
+      typeof event.status !== "string" ||
+      !Number.isSafeInteger(event.attempts) ||
+      event.attempts < 0
+    ) {
+      throw new PaymentProviderEventOwnershipError()
+    }
+    const lockedAt = this.paymentProviderEventDate(event.lockedAt)
+    const processedAt = this.paymentProviderEventDate(event.processedAt)
+    if (
+      !["PROCESSED", "IGNORED", "QUARANTINED"].includes(event.status) ||
+      event.lockedAt != null ||
+      !processedAt
+    ) {
+      throw new PaymentProviderEventOwnershipError()
+    }
+    return {
+      kind: "snapshot",
+      status: event.status,
+      attempts: event.attempts,
+      lockedAt,
+      processedAt,
+    }
+  }
+
+  private paymentProviderEventLease(event: any): PaymentProviderEventLease {
+    const lockedAt = this.paymentProviderEventDate(event?.lockedAt)
+    if (
+      event?.status !== "PROCESSING" ||
+      !Number.isSafeInteger(event?.attempts) ||
+      event.attempts <= 0 ||
+      !lockedAt
+    ) {
+      throw new PaymentProviderEventOwnershipError()
+    }
+    return {
+      kind: "lease",
+      attempt: event.attempts,
+      lockedAt,
+    }
+  }
+
+  private paymentProviderEventAuthorityWhere(
+    providerEventRowId: string,
+    authority: PaymentProviderEventAuthority,
+  ): Record<string, unknown> {
+    if (authority.kind === "lease") {
+      return {
+        id: providerEventRowId,
+        status: "PROCESSING",
+        attempts: authority.attempt,
+        lockedAt: authority.lockedAt,
+      }
+    }
+    return {
+      id: providerEventRowId,
+      status: authority.status,
+      attempts: authority.attempts,
+      lockedAt: authority.lockedAt,
+      processedAt: authority.processedAt,
+    }
+  }
+
+  private paymentProviderEventAuthorityMatches(
+    event: any,
+    authority: PaymentProviderEventAuthority,
+  ): boolean {
+    if (!event) return false
+    const lockedAt = this.paymentProviderEventDate(event.lockedAt)
+    if (authority.kind === "lease") {
+      return (
+        event.status === "PROCESSING" &&
+        event.attempts === authority.attempt &&
+        lockedAt?.getTime() === authority.lockedAt.getTime()
+      )
+    }
+    const processedAt = this.paymentProviderEventDate(event.processedAt)
+    return (
+      event.status === authority.status &&
+      event.attempts === authority.attempts &&
+      (lockedAt?.getTime() ?? null) ===
+        (authority.lockedAt?.getTime() ?? null) &&
+      (processedAt?.getTime() ?? null) ===
+        (authority.processedAt?.getTime() ?? null)
+    )
+  }
+
+  private async lockAndAssertPaymentProviderEventAuthority(
+    tx: any,
+    providerEventRowId: string,
+    authority: PaymentProviderEventAuthority,
+  ): Promise<any> {
+    await tx.$queryRawUnsafe(
+      'SELECT "id" FROM "PaymentProviderEvent" WHERE "id" = $1 FOR UPDATE',
+      providerEventRowId,
+    )
+    const event = await tx.paymentProviderEvent.findUnique({
+      where: { id: providerEventRowId },
+    })
+    if (!this.paymentProviderEventAuthorityMatches(event, authority)) {
+      throw new PaymentProviderEventOwnershipError()
+    }
+    return event
+  }
+
+  private async assertPaymentProviderEventTerminalSnapshot(
+    providerEventRowId: string,
+    snapshot: PaymentProviderEventSnapshot,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx: any) => {
+      await this.lockAndAssertPaymentProviderEventAuthority(
+        tx,
+        providerEventRowId,
+        snapshot,
+      )
+    })
+  }
+
+  private async completePaymentProviderEventLease(
+    tx: any,
+    providerEventRowId: string,
+    lease: PaymentProviderEventLease,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    const completed = await tx.paymentProviderEvent.updateMany({
+      where: this.paymentProviderEventAuthorityWhere(providerEventRowId, lease),
+      data,
+    })
+    if (completed.count !== 1) {
+      throw new PaymentProviderEventOwnershipError()
+    }
+  }
+
+  private async ignoreUnsupportedPaymentProviderEvent(
+    providerEvent: any,
+    now: Date,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx: any) => {
+      await tx.$queryRawUnsafe(
+        'SELECT "id" FROM "PaymentProviderEvent" WHERE "id" = $1 FOR UPDATE',
+        providerEvent.id,
+      )
+      const current = await tx.paymentProviderEvent.findUnique({
+        where: { id: providerEvent.id },
+      })
+      const expectedLockedAt = this.paymentProviderEventDate(
+        providerEvent.lockedAt,
+      )
+      const currentLockedAt = this.paymentProviderEventDate(current?.lockedAt)
+      if (
+        !current ||
+        current.status !== providerEvent.status ||
+        current.attempts !== providerEvent.attempts ||
+        (currentLockedAt?.getTime() ?? null) !==
+          (expectedLockedAt?.getTime() ?? null)
+      ) {
+        throw new PaymentProviderEventOwnershipError()
+      }
+
+      let claimFromStatus = current.status
+      if (current.status === "PROCESSING") {
+        if (
+          !currentLockedAt ||
+          currentLockedAt.getTime() >=
+            now.getTime() - PAYMENT_PROVIDER_EVENT_LEASE_MS
+        ) {
+          throw new PaymentProviderEventOwnershipError()
+        }
+        const recovered = await tx.paymentProviderEvent.updateMany({
+          where: {
+            id: current.id,
+            status: "PROCESSING",
+            attempts: current.attempts,
+            lockedAt: currentLockedAt,
+          },
+          data: {
+            status: "FAILED",
+            availableAt: now,
+            lockedAt: null,
+            lastError: "STALE_PROCESSING_LEASE",
+          },
+        })
+        if (recovered.count !== 1) {
+          throw new PaymentProviderEventOwnershipError()
+        }
+        claimFromStatus = "FAILED"
+      } else if (
+        (current.status !== "PENDING" && current.status !== "FAILED") ||
+        current.lockedAt != null
+      ) {
+        throw new PaymentProviderEventOwnershipError()
+      }
+
+      const claimed = await tx.paymentProviderEvent.updateMany({
+        where: {
+          id: current.id,
+          status: claimFromStatus,
+          attempts: current.attempts,
+          lockedAt: null,
+        },
+        data: {
+          status: "PROCESSING",
+          attempts: { increment: 1 },
+          lockedAt: now,
+          lastError: null,
+        },
+      })
+      if (claimed.count !== 1) {
+        throw new PaymentProviderEventOwnershipError()
+      }
+      await this.completePaymentProviderEventLease(
+        tx,
+        current.id,
+        {
+          kind: "lease",
+          attempt: current.attempts + 1,
+          lockedAt: now,
+        },
+        {
+          status: "IGNORED",
+          processedAt: now,
+          lockedAt: null,
+          lastError: "UNSUPPORTED_EVENT_TYPE",
+        },
+      )
+    })
   }
 
   private assertWalletOwned(
@@ -68,6 +414,7 @@ export class BillingService {
     user: any,
     idempotencyKey?: string,
   ) {
+    assertApiFinanceOperationAllowed("new_liability")
     const wallet = await this.prisma.wallet.findUnique({
       where: { id: walletId },
     })
@@ -225,6 +572,11 @@ export class BillingService {
   }
 
   async handleWebhook(signature: string, payload: Buffer) {
+    assertApiFinanceOperationAllowed("inbound_evidence")
+    const financeMode = resolveFinanceRuntimeMode(
+      process.env.FINANCE_RUNTIME_MODE,
+      process.env.NODE_ENV,
+    ).mode
     if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
       this.logger.error(
         "Stripe deposit webhook received without verification configuration",
@@ -241,26 +593,94 @@ export class BillingService {
     }
 
     const object = event.data?.object ?? {}
-    const attemptId = object.metadata?.depositAttemptId ?? null
+    const rawEventType = typeof event.type === "string" ? event.type.trim() : ""
+    const eventType = rawEventType
+      ? rawEventType.length <= 191
+        ? rawEventType
+        : `sha256:${createHash("sha256").update(rawEventType).digest("hex")}`
+      : "unknown"
+    const rawProviderEventId =
+      typeof event.id === "string" ? event.id.trim() : ""
     const providerEventId =
-      typeof event.id === "string" && event.id
-        ? event.id
-        : createHash("sha256").update(payload).digest("hex")
+      rawProviderEventId.length > 191
+        ? `sha256:${createHash("sha256")
+            .update(rawProviderEventId)
+            .digest("hex")}`
+        : rawProviderEventId ||
+          `payload:${createHash("sha256").update(payload).digest("hex")}`
+    const rawObjectId =
+      typeof object.id === "string" &&
+      object.id.trim() &&
+      object.id.trim().length <= 191
+        ? object.id.trim()
+        : null
+    const isDisputeEvent = this.isPaymentDisputeEventType(eventType)
+    const isDepositSuccessEvent =
+      eventType === "checkout.session.completed" ||
+      eventType === "checkout.session.async_payment_succeeded"
+    const isDepositFailureEvent =
+      eventType === "checkout.session.expired" ||
+      eventType === "checkout.session.async_payment_failed"
+    const isEarlyFraudWarningEvent =
+      eventType === "radar.early_fraud_warning.created"
+    const isReplayableDisputeEvent = isDisputeEvent
+    const isSupportedNonReplayableEvent =
+      isDepositSuccessEvent || isDepositFailureEvent || isEarlyFraudWarningEvent
+    let disputeEnvelope: PersistablePaymentDisputeEvent | null = null
+    let quarantineReason: string | null = null
+
+    if (isDisputeEvent) {
+      try {
+        disputeEnvelope = this.normalizeStripeDisputeEvent(
+          object,
+          eventType,
+          providerEventId,
+          event.livemode,
+        )
+      } catch (error) {
+        quarantineReason =
+          error instanceof PaymentDisputeTransitionError
+            ? error.code
+            : "INVALID_DISPUTE_ENVELOPE"
+      }
+    }
+
+    const receivedAt = new Date()
+    const createData = {
+      provider: "stripe",
+      providerEventId,
+      eventType,
+      objectId: disputeEnvelope?.providerDisputeId ?? rawObjectId,
+      // Correlation is attached only after the signed dispute facts have been
+      // matched to a durable deposit. Never trust dispute metadata as an FK.
+      depositAttemptId: null,
+      providerPaymentId: disputeEnvelope?.providerPaymentId ?? null,
+      providerChargeId: disputeEnvelope?.providerChargeId ?? null,
+      disputeAmountMinor: disputeEnvelope?.amountMinor ?? null,
+      disputeCurrency: disputeEnvelope?.currency ?? null,
+      providerStatus: disputeEnvelope?.providerStatus ?? null,
+      // Persist mode for every verified Stripe event. Provider event IDs and
+      // payload fingerprints are not a substitute for an explicit test/live
+      // boundary during replay and incident response.
+      livemode: event.livemode,
+      eventFingerprint:
+        disputeEnvelope?.eventFingerprint ??
+        createHash("sha256").update(payload).digest("hex"),
+      status: quarantineReason ? "QUARANTINED" : "PENDING",
+      attempts: 0,
+      lockedAt: null,
+      processedAt: quarantineReason ? receivedAt : null,
+      lastError: quarantineReason,
+    }
+
     const providerEvents = (this.prisma as any).paymentProviderEvent
     let providerEvent: any
+    let duplicate = false
     try {
-      providerEvent = await providerEvents.create({
-        data: {
-          provider: "stripe",
-          providerEventId,
-          eventType: String(event.type).slice(0, 191),
-          objectId:
-            typeof object.id === "string" ? object.id.slice(0, 191) : null,
-          depositAttemptId: attemptId,
-        },
-      })
+      providerEvent = await providerEvents.create({ data: createData })
     } catch (error) {
       if (!isUniqueViolation(error)) throw error
+      duplicate = true
       providerEvent = await providerEvents.findUnique({
         where: {
           provider_providerEventId: {
@@ -269,410 +689,768 @@ export class BillingService {
           },
         },
       })
+      if (!providerEvent) throw error
+      if (!this.providerEventEnvelopeMatches(providerEvent, createData)) {
+        const collision = await this.recordPaymentProviderEventIdentityConflict(
+          providerEvent.id,
+          createData,
+        )
+        providerEvent = collision.event
+        if (collision.identityConflict) {
+          return {
+            received: true,
+            duplicate: true,
+            identityConflict: true,
+            quarantined: collision.quarantined,
+            canonicalEvidenceRetained: collision.canonicalEvidenceRetained,
+          }
+        }
+      }
       if (
-        providerEvent?.status === "PROCESSED" ||
-        providerEvent?.status === "IGNORED"
+        providerEvent.status === "PROCESSED" ||
+        providerEvent.status === "IGNORED" ||
+        providerEvent.status === "QUARANTINED"
       ) {
-        return { received: true, duplicate: true }
+        const terminalSnapshot =
+          this.paymentProviderEventSnapshot(providerEvent)
+        if (isDepositSuccessEvent && providerEvent.status === "PROCESSED") {
+          if (!isFinanceOperationAllowed(financeMode, "recovery")) {
+            await this.assertPaymentProviderEventTerminalSnapshot(
+              providerEvent.id,
+              terminalSnapshot,
+            )
+            return {
+              received: true,
+              duplicate: true,
+              deferred: true,
+            }
+          }
+          await this.processSuccessfulPayment(
+            object,
+            providerEvent.id,
+            terminalSnapshot,
+          )
+          const finalEvent = await providerEvents.findUnique({
+            where: { id: providerEvent.id },
+            select: { status: true },
+          })
+          return {
+            received: true,
+            duplicate: true,
+            quarantined: finalEvent?.status === "QUARANTINED",
+          }
+        }
+        if (isDepositSuccessEvent && providerEvent.status === "IGNORED") {
+          await this.quarantinePaymentProviderEvent(
+            providerEvent.id,
+            "DEPOSIT_SUCCESS_EVENT_IGNORED",
+            terminalSnapshot,
+          )
+          return {
+            received: true,
+            duplicate: true,
+            quarantined: true,
+          }
+        }
+        await this.assertPaymentProviderEventTerminalSnapshot(
+          providerEvent.id,
+          terminalSnapshot,
+        )
+        return {
+          received: true,
+          duplicate: true,
+          quarantined: providerEvent.status === "QUARANTINED",
+        }
       }
     }
 
+    if (quarantineReason) {
+      await this.quarantinePaymentProviderEvent(
+        providerEvent.id,
+        quarantineReason,
+        this.paymentProviderEventSnapshot(providerEvent),
+      )
+      return { received: true, duplicate, quarantined: true }
+    }
+
+    // Locked mode remains an evidence-ingestion boundary. Dispute envelopes
+    // retain every immutable fact needed by the durable worker, so they may be
+    // acknowledged and recovered later. The normalized checkout inbox does not
+    // retain enough session facts to credit a deposit independently. Returning
+    // 2xx for a new/PENDING checkout-success event would stop Stripe redelivery
+    // and could strand a paid customer permanently, so persist it and ask the
+    // provider to retry.
+    if (!isFinanceOperationAllowed(financeMode, "recovery")) {
+      if (isReplayableDisputeEvent) {
+        if (
+          (providerEvent.status === "PENDING" ||
+            providerEvent.status === "FAILED") &&
+          providerEvent.lockedAt == null
+        ) {
+          return { received: true, duplicate, deferred: true }
+        }
+        throw new ServiceUnavailableException(
+          "Payment dispute event is already being processed; retry delivery",
+        )
+      }
+      if (!isSupportedNonReplayableEvent) {
+        if (
+          !Number.isSafeInteger(providerEvent.attempts) ||
+          providerEvent.attempts < 0
+        ) {
+          throw new ServiceUnavailableException(
+            "Payment provider event has an invalid claim counter",
+          )
+        }
+        await this.ignoreUnsupportedPaymentProviderEvent(
+          providerEvent,
+          new Date(),
+        )
+        return { received: true, duplicate, ignored: true }
+      }
+      throw new ServiceUnavailableException({
+        code: "FINANCE_OPERATION_BLOCKED",
+        message:
+          isDepositSuccessEvent || isDepositFailureEvent
+            ? "Deposit evidence was persisted while finance processing is locked; retry delivery"
+            : "Provider evidence was persisted while finance processing is locked; retry delivery",
+      })
+    }
+
+    const now = new Date()
     await providerEvents.updateMany({
       where: {
         id: providerEvent.id,
         status: "PROCESSING",
-        lockedAt: { lt: new Date(Date.now() - 15 * 60 * 1000) },
+        lockedAt: {
+          lt: new Date(now.getTime() - PAYMENT_PROVIDER_EVENT_LEASE_MS),
+        },
       },
       data: {
         status: "FAILED",
         lockedAt: null,
-        lastError: "StaleProcessingLeaseRecovered",
+        availableAt: now,
+        lastError: "STALE_PROCESSING_LEASE",
       },
     })
+    const previousAttempts = Number(providerEvent.attempts)
+    if (!Number.isSafeInteger(previousAttempts) || previousAttempts < 0) {
+      throw new ServiceUnavailableException(
+        "Payment provider event has an invalid claim counter",
+      )
+    }
     const claimed = await providerEvents.updateMany({
       where: {
         id: providerEvent.id,
         status: { in: ["PENDING", "FAILED"] },
+        attempts: previousAttempts,
+        lockedAt: null,
+        availableAt: { lte: now },
       },
       data: {
         status: "PROCESSING",
-        lockedAt: new Date(),
+        lockedAt: now,
         attempts: { increment: 1 },
+        lastError: null,
       },
     })
-    if (claimed.count === 0) {
-      return { received: true, duplicate: true, processing: true }
+    if (claimed.count !== 1) {
+      // A PROCESSING row belongs to another exact lease. It is not a terminal
+      // replay and must never receive a 2xx acknowledgement: the current owner
+      // may still roll back or crash. Provider redelivery is the recovery
+      // mechanism for non-dispute payloads that are not stored in this inbox.
+      throw new ServiceUnavailableException(
+        "Payment provider event is already being processed; retry delivery",
+      )
+    }
+    const lease: PaymentProviderEventLease = {
+      kind: "lease",
+      attempt: previousAttempts + 1,
+      lockedAt: now,
     }
 
     try {
       if (
-        event.type === "checkout.session.completed" ||
-        event.type === "checkout.session.async_payment_succeeded"
+        eventType === "checkout.session.completed" ||
+        eventType === "checkout.session.async_payment_succeeded"
       ) {
-        await this.processSuccessfulPayment(object, providerEvent?.id)
+        await this.processSuccessfulPayment(object, providerEvent.id, lease)
       } else if (
-        event.type === "checkout.session.expired" ||
-        event.type === "checkout.session.async_payment_failed"
+        eventType === "checkout.session.expired" ||
+        eventType === "checkout.session.async_payment_failed"
       ) {
-        await this.markDepositAttemptFromSession(object, "EXPIRED")
-      } else if (event.type === "charge.dispute.created") {
-        await this.handleChargeback(object)
-        await this.markDepositAttemptFromPaymentIntent(
-          object.payment_intent,
-          "DISPUTED",
+        await this.markDepositAttemptFromSession(
+          object,
+          "EXPIRED",
+          providerEvent.id,
+          lease,
         )
-      } else if (event.type === "charge.dispute.closed") {
-        await this.handleChargebackClosed(object)
-        await this.markDepositAttemptFromPaymentIntent(
-          object.payment_intent,
-          object.status === "lost" ? "CHARGEBACK" : "SUCCEEDED",
-        )
-      } else if (event.type === "radar.early_fraud_warning.created") {
-        await this.handleEarlyFraudWarning(event)
+      } else if (isDisputeEvent) {
+        await this.processPaymentDisputeEvent(providerEvent.id, lease)
+      } else if (isEarlyFraudWarningEvent) {
+        await this.handleEarlyFraudWarning(event, providerEvent.id, lease)
       } else {
-        await providerEvents.update({
-          where: { id: providerEvent.id },
+        const ignored = await providerEvents.updateMany({
+          where: this.paymentProviderEventAuthorityWhere(
+            providerEvent.id,
+            lease,
+          ),
           data: {
             status: "IGNORED",
             lockedAt: null,
             processedAt: new Date(),
-            lastError: "UnsupportedEventType",
+            lastError: "UNSUPPORTED_EVENT_TYPE",
           },
         })
+        if (ignored.count !== 1) {
+          throw new PaymentProviderEventOwnershipError()
+        }
         return { received: true, ignored: true }
       }
-
-      if (
-        event.type !== "checkout.session.completed" &&
-        event.type !== "checkout.session.async_payment_succeeded"
-      ) {
-        await providerEvents.update({
-          where: { id: providerEvent.id },
-          data: {
-            status: "PROCESSED",
-            processedAt: new Date(),
-            lockedAt: null,
-          },
-        })
-      }
     } catch (error) {
-      await providerEvents.updateMany({
-        where: { id: providerEvent.id, status: { not: "PROCESSED" } },
+      if (
+        isDisputeEvent &&
+        error instanceof PaymentDisputeTransitionError &&
+        !error.retryable
+      ) {
+        await this.quarantinePaymentProviderEvent(
+          providerEvent.id,
+          error.code,
+          lease,
+        )
+        return { received: true, quarantined: true }
+      }
+      const retryDelayMs = Math.min(
+        10 * 60 * 1000,
+        30 * 1000 * 2 ** Math.max(0, lease.attempt - 1),
+      )
+      const failed = await providerEvents.updateMany({
+        where: {
+          ...this.paymentProviderEventAuthorityWhere(providerEvent.id, lease),
+        },
         data: {
           status: "FAILED",
           lockedAt: null,
-          lastError:
-            error instanceof Error ? error.name.slice(0, 100) : "UnknownError",
+          availableAt: new Date(Date.now() + retryDelayMs),
+          lastError: this.safeProviderEventError(error),
         },
       })
+      if (failed.count !== 1) {
+        throw new ServiceUnavailableException({
+          code: "PAYMENT_PROVIDER_EVENT_LEASE_LOST",
+          message:
+            "Payment provider event ownership changed; retry from durable state",
+        })
+      }
       throw error
     }
 
     return { received: true }
   }
 
-  private async markDepositAttemptFromSession(session: any, status: "EXPIRED") {
-    const depositAttempt = (this.prisma as any).depositAttempt
-    await depositAttempt.updateMany({
-      where: {
-        OR: [
-          { id: session.metadata?.depositAttemptId ?? "__missing__" },
-          { providerSessionId: session.id },
-        ],
-        status: { in: ["CREATED", "PENDING_CUSTOMER_ACTION", "PROCESSING"] },
-      },
-      data: { status, failedAt: new Date() },
+  private async markDepositAttemptFromSession(
+    session: any,
+    status: "EXPIRED",
+    providerEventRowId: string,
+    lease: PaymentProviderEventLease,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx: any) => {
+      await this.lockAndAssertPaymentProviderEventAuthority(
+        tx,
+        providerEventRowId,
+        lease,
+      )
+      await tx.depositAttempt.updateMany({
+        where: {
+          OR: [
+            { id: session.metadata?.depositAttemptId ?? "__missing__" },
+            { providerSessionId: session.id },
+          ],
+          status: { in: ["CREATED", "PENDING_CUSTOMER_ACTION", "PROCESSING"] },
+        },
+        data: { status, failedAt: new Date() },
+      })
+      await this.completePaymentProviderEventLease(
+        tx,
+        providerEventRowId,
+        lease,
+        {
+          status: "PROCESSED",
+          processedAt: new Date(),
+          lockedAt: null,
+          lastError: null,
+        },
+      )
     })
   }
 
-  private async markDepositAttemptFromPaymentIntent(
-    paymentIntent: unknown,
-    status: "DISPUTED" | "CHARGEBACK" | "SUCCEEDED",
-  ) {
-    if (typeof paymentIntent !== "string" || !paymentIntent) return
-    const depositAttempt = (this.prisma as any).depositAttempt
-    await depositAttempt.updateMany({
-      where: { provider: "stripe", providerPaymentId: paymentIntent },
-      data: { status },
-    })
+  private isPaymentDisputeEventType(
+    eventType: string,
+  ): eventType is NormalizedPaymentDisputeEvent["eventType"] {
+    return PAYMENT_DISPUTE_EVENT_TYPES.has(eventType)
   }
 
-  // Cardholder opened a chargeback at their bank. Stripe will pull the money
-  // regardless of what we do — so the disputed amount must stop being
-  // spendable NOW: move it available -> reserved on the originating wallet
-  // (found via the deposit's payment_intent), audit everything, and alert
-  // every staff member so finance can respond within the evidence window.
-  private async handleChargeback(dispute: any) {
-    this.logger.error(
-      `Stripe chargeback received: dispute ${dispute.id}, charge ${dispute.charge}, amount ${dispute.amount} ${dispute.currency}`,
+  private stripeObjectId(value: unknown, field: string): string {
+    const id =
+      typeof value === "string"
+        ? value.trim()
+        : value &&
+            typeof value === "object" &&
+            typeof (value as { id?: unknown }).id === "string"
+          ? (value as { id: string }).id.trim()
+          : ""
+    if (!id || id.length > 191) {
+      throw new BadRequestException(`Stripe dispute has an invalid ${field}`)
+    }
+    return id
+  }
+
+  private normalizeStripeDispute(
+    dispute: unknown,
+  ): NormalizedStripeDisputeFacts {
+    const payload =
+      dispute && typeof dispute === "object"
+        ? (dispute as Record<string, unknown>)
+        : {}
+    const providerDisputeId = this.stripeObjectId(payload.id, "id")
+    const providerPaymentId = this.stripeObjectId(
+      payload.payment_intent,
+      "payment_intent",
     )
+    const providerChargeId =
+      payload.charge == null
+        ? null
+        : this.stripeObjectId(payload.charge, "charge")
+    if (
+      typeof payload.amount !== "number" ||
+      !Number.isSafeInteger(payload.amount) ||
+      payload.amount <= 0
+    ) {
+      throw new BadRequestException(
+        "Stripe dispute amount must be a positive safe integer",
+      )
+    }
+    const currency =
+      typeof payload.currency === "string"
+        ? payload.currency.trim().toUpperCase()
+        : ""
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      throw new BadRequestException("Stripe dispute currency is invalid")
+    }
+    const minorUnitFactor = STRIPE_DISPUTE_MINOR_UNIT_FACTORS[currency]
+    if (
+      !minorUnitFactor ||
+      !this.depositProvider.capabilities.supportedCurrencies.includes(currency)
+    ) {
+      throw new BadRequestException(
+        `Stripe dispute currency ${currency} is not certified for customer wallets`,
+      )
+    }
+    const providerStatus =
+      typeof payload.status === "string" ? payload.status.trim() : ""
+    if (!providerStatus || providerStatus.length > 64) {
+      throw new BadRequestException("Stripe dispute status is invalid")
+    }
+    return {
+      provider: "stripe",
+      providerDisputeId,
+      providerPaymentId,
+      providerChargeId,
+      amountMinor: BigInt(payload.amount),
+      amount: new Decimal(payload.amount).div(minorUnitFactor).toFixed(2),
+      currency,
+      providerStatus,
+    }
+  }
 
-    const disputedAmount = new Decimal(dispute.amount ?? 0).div(100)
-    const paymentIntent: string | null = dispute.payment_intent ?? null
+  private assertDisputeStatusMatchesEvent(
+    eventType: NormalizedPaymentDisputeEvent["eventType"],
+    providerStatus: string,
+  ): void {
+    const valid =
+      eventType === "charge.dispute.created"
+        ? STRIPE_DISPUTE_OPEN_STATUSES.has(providerStatus)
+        : STRIPE_DISPUTE_TERMINAL_STATUSES.has(providerStatus)
+    if (!valid) {
+      throw new PaymentDisputeTransitionError(
+        "EVENT_ENVELOPE_MISMATCH",
+        "Stripe dispute event type does not match its provider status",
+        false,
+      )
+    }
+  }
 
-    // Link dispute -> originating deposit -> wallet. The `provider: "stripe"`
-    // predicate aligns with the provider-aware partial unique index added in
-    // FIN-02 (migration 20260716030403) so the lookup lands on the same
-    // identity guarantee that write-time uses.
-    const depositTx = paymentIntent
-      ? await this.prisma.transaction.findFirst({
+  private normalizeStripeDisputeEvent(
+    dispute: unknown,
+    eventType: NormalizedPaymentDisputeEvent["eventType"],
+    providerEventId: string,
+    livemode: boolean,
+  ): PersistablePaymentDisputeEvent {
+    const facts = this.normalizeStripeDispute(dispute)
+    this.assertDisputeStatusMatchesEvent(eventType, facts.providerStatus)
+    const fingerprintable: FingerprintablePaymentDisputeEvent = {
+      ...facts,
+      providerEventId,
+      eventType,
+      livemode,
+    }
+    return {
+      ...fingerprintable,
+      eventFingerprint: paymentDisputeEventFingerprint(fingerprintable),
+    }
+  }
+
+  private providerEventEnvelopeMatches(
+    existing: any,
+    expected: PaymentProviderEventEnvelope,
+  ): boolean {
+    return (
+      existing.provider === expected.provider &&
+      existing.providerEventId === expected.providerEventId &&
+      existing.eventType === expected.eventType &&
+      (existing.objectId ?? null) === expected.objectId &&
+      (existing.providerPaymentId ?? null) === expected.providerPaymentId &&
+      (existing.providerChargeId ?? null) === expected.providerChargeId &&
+      (existing.disputeAmountMinor == null
+        ? null
+        : String(existing.disputeAmountMinor)) ===
+        (expected.disputeAmountMinor == null
+          ? null
+          : String(expected.disputeAmountMinor)) &&
+      (existing.disputeCurrency ?? null) === expected.disputeCurrency &&
+      (existing.providerStatus ?? null) === expected.providerStatus &&
+      (existing.livemode ?? null) === expected.livemode &&
+      (existing.eventFingerprint ?? null) === expected.eventFingerprint
+    )
+  }
+
+  /**
+   * Resolve a verified duplicate identity under the inbox-row lock.
+   *
+   * A designated dispute role event is canonical accounting evidence: the
+   * deferred database constraint requires it to remain PROCESSED for as long
+   * as the case points at it. A later signed envelope that reuses its provider
+   * identity is therefore recorded as a durable incident without rewriting
+   * that evidence. Non-canonical collisions may still be quarantined.
+   */
+  private async recordPaymentProviderEventIdentityConflict(
+    providerEventRowId: string,
+    incoming: PaymentProviderEventEnvelope,
+  ): Promise<{
+    event: any
+    identityConflict: boolean
+    quarantined: boolean
+    canonicalEvidenceRetained: boolean
+  }> {
+    return this.prisma.$transaction(async (tx: any) => {
+      await tx.$queryRawUnsafe(
+        'SELECT "id" FROM "PaymentProviderEvent" WHERE "id" = $1 FOR UPDATE',
+        providerEventRowId,
+      )
+      const event = await tx.paymentProviderEvent.findUnique({
+        where: { id: providerEventRowId },
+        include: {
+          openedPaymentDispute: { select: { id: true } },
+          resolvedPaymentDispute: { select: { id: true } },
+        },
+      })
+      if (!event) throw new PaymentProviderEventOwnershipError()
+
+      // Recheck only after obtaining the row lock. This prevents a stale
+      // pre-lock observation from authorizing either quarantine or an alert.
+      if (this.providerEventEnvelopeMatches(event, incoming)) {
+        return {
+          event,
+          identityConflict: false,
+          quarantined: event.status === "QUARANTINED",
+          canonicalEvidenceRetained: false,
+        }
+      }
+
+      const openedPaymentDisputeId = event.openedPaymentDispute?.id ?? null
+      const resolvedPaymentDisputeId = event.resolvedPaymentDispute?.id ?? null
+      const canonicalEvidenceRetained =
+        event.status === "PROCESSED" &&
+        (openedPaymentDisputeId != null || resolvedPaymentDisputeId != null)
+
+      if (!canonicalEvidenceRetained && event.status !== "QUARANTINED") {
+        const quarantined = await tx.paymentProviderEvent.updateMany({
           where: {
-            provider: "stripe",
-            providerRef: paymentIntent,
-            type: "DEPOSIT",
+            id: event.id,
+            status: event.status,
+            attempts: event.attempts,
+            lockedAt: event.lockedAt,
+            processedAt: event.processedAt,
           },
-          select: { id: true, walletId: true, amount: true, reference: true },
+          data: {
+            status: "QUARANTINED",
+            processedAt: ["PROCESSED", "IGNORED"].includes(event.status)
+              ? event.processedAt
+              : new Date(),
+            lockedAt: null,
+            lastError: "DUPLICATE_EVENT_ENVELOPE_MISMATCH",
+          },
         })
-      : null
-
-    let holdResult: {
-      held: string
-      shortfall: string
-      walletId: string
-    } | null = null
-
-    if (depositTx?.walletId && disputedAmount.greaterThan(0)) {
-      try {
-        holdResult = await this.prisma.$transaction(async (tx: any) => {
-          // Idempotency: one hold per dispute. Unique Transaction.reference is
-          // the hard guarantee; this read is the fast path.
-          const existingHold = await tx.transaction.findFirst({
-            where: { reference: `chargeback-hold-${dispute.id}` },
-          })
-          if (existingHold)
-            throw new DuplicateEventError(`chargeback-hold-${dispute.id}`)
-
-          const wallet = await tx.wallet.findUniqueOrThrow({
-            where: { id: depositTx.walletId },
-          })
-          const available = new Decimal(wallet.availableBalance)
-          // Hold what is still there — the org may have spent part of the
-          // deposit already. The shortfall is recorded for finance.
-          const held = Decimal.min(available, disputedAmount)
-          const shortfall = disputedAmount.minus(held)
-
-          if (held.greaterThan(0)) {
-            const updated = await tx.wallet.updateMany({
-              where: { id: wallet.id, version: wallet.version },
-              data: {
-                availableBalance: { decrement: held },
-                reservedBalance: { increment: held },
-                version: { increment: 1 },
-              },
-            })
-            if (updated.count === 0) {
-              throw new ConflictException(
-                "Wallet was modified by another request. Retry.",
-              )
-            }
-          }
-
-          // Hold row is written even for a zero hold so duplicate webhooks
-          // and the dispute-closed handler have a single source of truth.
-          // FIN-02: `provider: "stripe"` pairs with `providerRef` so this row
-          // participates in the provider-aware partial unique index (and so
-          // chargeback webhooks replaying the same payment_intent fail fast).
-          await tx.transaction.create({
-            data: {
-              walletId: wallet.id,
-              amount: held.negated(),
-              type: "RESERVATION",
-              reference: `chargeback-hold-${dispute.id}`,
-              provider: "stripe",
-              providerRef: paymentIntent,
-              description:
-                `Chargeback hold of ${held.toFixed(2)} for dispute ${dispute.id}` +
-                (shortfall.greaterThan(0)
-                  ? ` (${shortfall.toFixed(2)} already spent — uncovered exposure)`
-                  : ""),
-            },
-          })
-
-          return {
-            held: held.toFixed(2),
-            shortfall: shortfall.toFixed(2),
-            walletId: wallet.id,
-          }
-        })
-      } catch (err: any) {
-        if (err instanceof DuplicateEventError || err?.code === "P2002") {
-          this.logger.warn(
-            `Chargeback hold for dispute ${dispute.id} already placed — duplicate webhook ignored`,
-          )
-          return
+        if (quarantined.count !== 1) {
+          throw new PaymentProviderEventOwnershipError()
         }
-        throw err
       }
-    }
 
-    await this.audit.log({
-      action: holdResult
-        ? "STRIPE_CHARGEBACK_HOLD_PLACED"
-        : "STRIPE_CHARGEBACK_UNLINKED",
-      entityType: "StripeDispute",
-      entityId: dispute.id,
-      metadata: {
-        charge: dispute.charge,
-        amount: dispute.amount,
-        currency: dispute.currency,
-        reason: dispute.reason,
-        status: dispute.status,
-        paymentIntent,
-        depositTransactionId: depositTx?.id ?? null,
-        walletId: holdResult?.walletId ?? null,
-        heldAmount: holdResult?.held ?? "0.00",
-        uncoveredExposure: holdResult?.shortfall ?? disputedAmount.toFixed(2),
-      },
-      userId: null,
-      organizationId: null,
+      const action = canonicalEvidenceRetained
+        ? "PAYMENT_PROVIDER_EVENT_IDENTITY_CONFLICT_DETECTED"
+        : "PAYMENT_PROVIDER_EVENT_IDENTITY_CONFLICT_QUARANTINED"
+      const existingIncident = await tx.auditLog.findFirst({
+        where: {
+          action,
+          entityType: "PaymentProviderEvent",
+          entityId: event.id,
+        },
+        select: { id: true },
+      })
+      if (!existingIncident) {
+        await this.audit.log(
+          {
+            action,
+            entityType: "PaymentProviderEvent",
+            entityId: event.id,
+            metadata: {
+              provider: event.provider,
+              providerEventId: event.providerEventId,
+              canonicalEvidenceRetained,
+              openedPaymentDisputeId,
+              resolvedPaymentDisputeId,
+              existingStatus: event.status,
+              existingEventType: event.eventType,
+              incomingEventType: incoming.eventType,
+              existingObjectId: event.objectId ?? null,
+              incomingObjectId: incoming.objectId,
+              existingProviderPaymentId: event.providerPaymentId ?? null,
+              incomingProviderPaymentId: incoming.providerPaymentId,
+              existingProviderChargeId: event.providerChargeId ?? null,
+              incomingProviderChargeId: incoming.providerChargeId,
+              existingDisputeAmountMinor:
+                event.disputeAmountMinor == null
+                  ? null
+                  : String(event.disputeAmountMinor),
+              incomingDisputeAmountMinor:
+                incoming.disputeAmountMinor == null
+                  ? null
+                  : String(incoming.disputeAmountMinor),
+              existingDisputeCurrency: event.disputeCurrency ?? null,
+              incomingDisputeCurrency: incoming.disputeCurrency,
+              existingProviderStatus: event.providerStatus ?? null,
+              incomingProviderStatus: incoming.providerStatus,
+              existingLivemode: event.livemode ?? null,
+              incomingLivemode: incoming.livemode,
+              existingEventFingerprint: event.eventFingerprint ?? null,
+              incomingEventFingerprint: incoming.eventFingerprint,
+            },
+            userId: null,
+            organizationId: null,
+          },
+          tx,
+        )
+      }
+      await this.notifyStaffInTransaction(
+        tx,
+        "PAYMENT_PROVIDER_EVENT_IDENTITY_CONFLICT",
+        canonicalEvidenceRetained
+          ? `Verified payment provider event identity conflict for ${event.providerEventId}; canonical dispute evidence was retained.`
+          : `Verified payment provider event identity conflict for ${event.providerEventId}; the non-canonical inbox event was quarantined.`,
+        `payment-provider-event-identity-conflict:${event.id}`,
+      )
+
+      return {
+        event,
+        identityConflict: true,
+        quarantined: !canonicalEvidenceRetained,
+        canonicalEvidenceRetained,
+      }
     })
+  }
 
-    const summary = holdResult
-      ? `${holdResult.held} held${Number(holdResult.shortfall) > 0 ? `, ${holdResult.shortfall} uncovered` : ""}`
-      : "NO WALLET LINK — manual review required"
-    await this.notifyStaff(
-      "STRIPE_CHARGEBACK",
-      `Chargeback ${dispute.id} for ${disputedAmount.toFixed(2)} ${String(dispute.currency).toUpperCase()} — ${summary}. Respond in Stripe dashboard.`,
-      `chargeback:${dispute.id}:opened`,
+  private paymentDisputeInputFromProviderEvent(
+    event: any,
+  ): NormalizedPaymentDisputeEvent {
+    return paymentDisputeEventFromStoredRow(event)
+  }
+  private async processPaymentDisputeEvent(
+    providerEventRowId: string,
+    lease: PaymentProviderEventLease,
+  ): Promise<PaymentDisputeOutcome> {
+    assertApiFinanceOperationAllowed("recovery")
+    const event = await (this.prisma as any).paymentProviderEvent.findUnique({
+      where: { id: providerEventRowId },
+    })
+    if (!this.paymentProviderEventAuthorityMatches(event, lease)) {
+      throw new PaymentProviderEventOwnershipError()
+    }
+    const input = this.paymentDisputeInputFromProviderEvent(event)
+    return transitionPaymentDispute(
+      this.prisma,
+      {
+        audit: async (tx, auditInput) => {
+          await this.audit.log(auditInput, tx)
+        },
+        notifyFinance: async (tx, notification) => {
+          await this.notifyStaffInTransaction(
+            tx,
+            notification.type,
+            notification.message,
+            notification.dedupKeyPrefix,
+          )
+        },
+      },
+      input,
     )
   }
 
-  // Dispute resolved at the bank. won -> release the hold back to available.
-  // lost -> the money left the platform: consume the hold permanently and
-  // write a CHARGEBACK ledger row so reconciliation stays balanced.
-  private async handleChargebackClosed(dispute: any) {
-    const hold = await this.prisma.transaction.findFirst({
-      where: { reference: `chargeback-hold-${dispute.id}` },
-      select: { id: true, walletId: true, amount: true },
-    })
+  private safeProviderEventError(error: unknown): string {
+    if (error instanceof PaymentDisputeTransitionError) return error.code
+    if (error instanceof PaymentProviderEventOwnershipError) return error.code
+    if (error instanceof BadRequestException) return "INVALID_PROVIDER_EVENT"
+    return "PROVIDER_EVENT_PROCESSING_FAILED"
+  }
 
-    if (!hold?.walletId) {
-      await this.audit.log({
-        action: "STRIPE_CHARGEBACK_CLOSED_UNLINKED",
-        entityType: "StripeDispute",
-        entityId: dispute.id,
-        metadata: {
-          status: dispute.status,
-          paymentIntent: dispute.payment_intent ?? null,
-        },
-        userId: null,
-        organizationId: null,
-      })
-      await this.notifyStaff(
-        "STRIPE_CHARGEBACK",
-        `Chargeback ${dispute.id} closed (${dispute.status}) — no hold on record, reconcile manually`,
-        `chargeback:${dispute.id}:closed-unlinked`,
+  private async quarantinePaymentProviderEvent(
+    providerEventRowId: string,
+    reason: string,
+    authority: PaymentProviderEventAuthority,
+  ): Promise<void> {
+    const safeReason = reason.slice(0, 100)
+    await this.prisma.$transaction(async (tx: any) => {
+      const event = await this.lockAndAssertPaymentProviderEventAuthority(
+        tx,
+        providerEventRowId,
+        authority,
       )
-      return
-    }
-
-    const held = new Decimal(hold.amount).negated() // hold row is negative
-
-    // Money is debited ONLY on an explicit "lost". "won" and "warning_closed"
-    // (inquiry closed, no chargeback ever filed) both release the hold.
-    // Any unrecognized terminal status must not move money — alert instead.
-    const won = dispute.status === "won" || dispute.status === "warning_closed"
-    const lost = dispute.status === "lost"
-    if (!won && !lost) {
-      await this.audit.log({
-        action: "STRIPE_CHARGEBACK_CLOSED_UNRECOGNIZED",
-        entityType: "StripeDispute",
-        entityId: dispute.id,
-        metadata: {
-          status: dispute.status,
-          walletId: hold.walletId,
-          heldAmount: held.toFixed(2),
-        },
-        userId: null,
-        organizationId: null,
-      })
-      await this.notifyStaff(
-        "STRIPE_CHARGEBACK",
-        `Chargeback ${dispute.id} closed with unrecognized status "${dispute.status}" — hold of ${held.toFixed(2)} left in place, resolve manually`,
-        `chargeback:${dispute.id}:closed-unrecognized`,
-      )
-      return
-    }
-    const reference = won
-      ? `chargeback-release-${dispute.id}`
-      : `chargeback-lost-${dispute.id}`
-
-    try {
-      await this.prisma.$transaction(async (tx: any) => {
-        const existing = await tx.transaction.findFirst({
-          where: { reference },
-        })
-        if (existing) throw new DuplicateEventError(reference)
-
-        if (held.greaterThan(0)) {
-          const wallet = await tx.wallet.findUniqueOrThrow({
-            where: { id: hold.walletId },
-          })
-          const updated = await tx.wallet.updateMany({
-            where: { id: wallet.id, version: wallet.version },
-            data: won
-              ? {
-                  reservedBalance: { decrement: held },
-                  availableBalance: { increment: held },
-                  version: { increment: 1 },
-                }
-              : {
-                  reservedBalance: { decrement: held },
-                  version: { increment: 1 },
-                },
-          })
-          if (updated.count === 0) {
-            throw new ConflictException(
-              "Wallet was modified by another request. Retry.",
-            )
-          }
-        }
-
-        await tx.transaction.create({
+      if (event.status !== "QUARANTINED") {
+        const quarantined = await tx.paymentProviderEvent.updateMany({
+          where: this.paymentProviderEventAuthorityWhere(
+            providerEventRowId,
+            authority,
+          ),
           data: {
-            walletId: hold.walletId,
-            // won: RESERVATION offset (+) nets the hold to zero, excluded from
-            // wallet sums. lost: CHARGEBACK (-) is counted — money left.
-            amount: won ? held : held.negated(),
-            type: won ? "RESERVATION" : "CHARGEBACK",
-            reference,
-            description: won
-              ? `Chargeback ${dispute.id} won — hold of ${held.toFixed(2)} released`
-              : `Chargeback ${dispute.id} lost — ${held.toFixed(2)} debited permanently`,
+            status: "QUARANTINED",
+            processedAt: event.processedAt ?? new Date(),
+            lockedAt: null,
+            lastError: safeReason,
           },
         })
-      })
-    } catch (err: any) {
-      if (err instanceof DuplicateEventError || err?.code === "P2002") {
-        this.logger.warn(
-          `Chargeback close for dispute ${dispute.id} already processed — duplicate webhook ignored`,
-        )
-        return
+        if (quarantined.count !== 1) {
+          throw new PaymentProviderEventOwnershipError()
+        }
       }
-      throw err
-    }
-
-    await this.audit.log({
-      action: won
-        ? "STRIPE_CHARGEBACK_WON_RELEASED"
-        : "STRIPE_CHARGEBACK_LOST_DEBITED",
-      entityType: "StripeDispute",
-      entityId: dispute.id,
-      metadata: {
-        walletId: hold.walletId,
-        amount: held.toFixed(2),
-        disputeStatus: dispute.status,
-      },
-      userId: null,
-      organizationId: null,
+      await this.audit.log(
+        {
+          action: "PAYMENT_PROVIDER_EVENT_QUARANTINED",
+          entityType: "PaymentProviderEvent",
+          entityId: event.id,
+          metadata: {
+            provider: event.provider,
+            providerEventId: event.providerEventId,
+            eventType: event.eventType,
+            previousStatus: event.status,
+            reason: safeReason,
+          },
+          userId: null,
+          organizationId: null,
+        },
+        tx,
+      )
+      await this.notifyStaffInTransaction(
+        tx,
+        "PAYMENT_PROVIDER_EVENT_QUARANTINED",
+        `Payment provider event ${event.providerEventId} was quarantined (${safeReason}). Finance review is required.`,
+        `payment-provider-event-quarantine:${event.id}:${safeReason}`,
+      )
     })
+  }
 
-    await this.notifyStaff(
-      "STRIPE_CHARGEBACK",
-      won
-        ? `Chargeback ${dispute.id} WON — ${held.toFixed(2)} released back to the wallet`
-        : `Chargeback ${dispute.id} LOST — ${held.toFixed(2)} debited`,
-      `chargeback:${dispute.id}:${won ? "won" : "lost"}`,
+  private async notifyStaffInTransaction(
+    tx: any,
+    type: string,
+    message: string,
+    dedupKeyPrefix: string,
+  ): Promise<void> {
+    const staff = await tx.staffMembership.findMany({
+      where: { role: { in: ["FINANCE", "SUPER_ADMIN"] } },
+      select: { userId: true },
+    })
+    if (staff.length === 0) return
+    await tx.notification.createMany({
+      data: staff.map((member: { userId: string }) => ({
+        userId: member.userId,
+        organizationId: null,
+        type,
+        message,
+        dedupKey: `${dedupKeyPrefix}:${member.userId}`,
+      })),
+      skipDuplicates: true,
+    })
+  }
+
+  // These wrappers preserve a narrow test seam while still proving that the
+  // supplied provider object exactly matches the durable normalized inbox row.
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: exercised through the intentionally narrow regression-test seam
+  private async handleChargeback(
+    dispute: unknown,
+    providerEventRowId: string,
+  ): Promise<PaymentDisputeOutcome> {
+    return this.handleDisputeTestSeam(
+      dispute,
+      providerEventRowId,
+      "charge.dispute.created",
+    )
+  }
+
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: exercised through the intentionally narrow regression-test seam
+  private async handleChargebackClosed(
+    dispute: unknown,
+    providerEventRowId: string,
+  ): Promise<PaymentDisputeOutcome> {
+    return this.handleDisputeTestSeam(
+      dispute,
+      providerEventRowId,
+      "charge.dispute.closed",
+    )
+  }
+
+  private async handleDisputeTestSeam(
+    dispute: unknown,
+    providerEventRowId: string,
+    eventType: NormalizedPaymentDisputeEvent["eventType"],
+  ): Promise<PaymentDisputeOutcome> {
+    const event = await (this.prisma as any).paymentProviderEvent.findUnique({
+      where: { id: providerEventRowId },
+    })
+    if (!event || event.eventType !== eventType) {
+      throw new PaymentDisputeTransitionError(
+        "EVENT_EVIDENCE_MISSING",
+        "Payment dispute processing requires exact durable provider-event evidence",
+        false,
+      )
+    }
+    const expected = this.normalizeStripeDisputeEvent(
+      dispute,
+      eventType,
+      event.providerEventId,
+      event.livemode,
+    )
+    const persisted = this.paymentDisputeInputFromProviderEvent(event)
+    if (
+      expected.eventFingerprint !== persisted.eventFingerprint ||
+      expected.providerDisputeId !== persisted.providerDisputeId
+    ) {
+      throw new PaymentDisputeTransitionError(
+        "EVENT_ENVELOPE_MISMATCH",
+        "Provider dispute object does not match the durable signed event facts",
+        false,
+      )
+    }
+    return this.processPaymentDisputeEvent(
+      providerEventRowId,
+      this.paymentProviderEventLease(event),
     )
   }
 
@@ -683,138 +1461,306 @@ export class BillingService {
   //
   // Idempotency: uses the Stripe event ID as the audit record entityId, checked
   // before creating duplicate audit entries or notifications.
-  private async handleEarlyFraudWarning(event: any) {
+  private async handleEarlyFraudWarning(
+    event: any,
+    providerEventRowId?: string,
+    lease?: PaymentProviderEventLease,
+  ): Promise<void> {
+    if ((providerEventRowId == null) !== (lease == null)) {
+      throw new PaymentProviderEventOwnershipError()
+    }
     const eventId: string = event.id ?? "unknown"
-
-    // Validate payload structure before accessing nested fields
     const object = event.data?.object
-    if (!object || typeof object !== "object") {
-      this.logger.warn({
-        eventId,
-        eventType: event.type,
-        message: "Early fraud warning missing data.object — malformed payload",
-      })
-      return
-    }
+    await this.prisma.$transaction(async (tx: any) => {
+      if (providerEventRowId && lease) {
+        await this.lockAndAssertPaymentProviderEventAuthority(
+          tx,
+          providerEventRowId,
+          lease,
+        )
+      }
 
-    const paymentIntent: string | null = object.payment_intent ?? null
-    const chargeId: string | null = object.charge ?? null
-    const amount: number = object.amount ?? 0
-    const currency: string = object.currency ?? "unknown"
-
-    this.logger.log({
-      eventId,
-      eventType: event.type,
-      paymentIntent,
-      chargeId,
-      message: "Early fraud warning received",
-    })
-
-    // Idempotency: skip if we already logged this event
-    const existing = await this.prisma.auditLog.findFirst({
-      where: { entityId: eventId, action: "STRIPE_EARLY_FRAUD_WARNING" },
-      select: { id: true },
-    })
-    if (existing) {
-      this.logger.warn({
-        eventId,
-        eventType: event.type,
-        message: "Duplicate early fraud warning — already processed, skipped",
-      })
-      return
-    }
-
-    // Locate the internal payment via payment_intent on the deposit transaction.
-    // FIN-02: `provider: "stripe"` aligns with the provider-aware partial
-    // unique index so lookups and writes share one identity model.
-    const depositTx = paymentIntent
-      ? await this.prisma.transaction.findFirst({
-          where: {
-            provider: "stripe",
-            providerRef: paymentIntent,
-            type: "DEPOSIT",
-          },
-          select: { id: true, walletId: true, orderId: true, reference: true },
+      if (!object || typeof object !== "object") {
+        this.logger.warn({
+          eventId,
+          eventType: event.type,
+          message:
+            "Early fraud warning missing data.object — malformed payload",
         })
-      : null
+      } else {
+        const paymentIntent: string | null =
+          typeof object.payment_intent === "string"
+            ? object.payment_intent
+            : null
+        const chargeId: string | null =
+          typeof object.charge === "string" ? object.charge : null
+        const amount: number =
+          typeof object.amount === "number" &&
+          Number.isSafeInteger(object.amount) &&
+          object.amount >= 0
+            ? object.amount
+            : 0
+        const currency: string =
+          typeof object.currency === "string"
+            ? object.currency.toUpperCase()
+            : "UNKNOWN"
 
-    if (!depositTx) {
-      this.logger.warn({
-        eventId,
-        eventType: event.type,
-        paymentIntent,
-        chargeId,
-        message: "Early fraud warning — no matching deposit transaction found",
-      })
-    }
+        this.logger.log({
+          providerEventRowId: providerEventRowId ?? null,
+          eventFingerprint: logReferenceFingerprint(eventId),
+          eventType: event.type,
+          paymentIntentFingerprint: logReferenceFingerprint(paymentIntent),
+          chargeFingerprint: logReferenceFingerprint(chargeId),
+          message: "Early fraud warning received",
+        })
 
-    // Audit the event (entityId = Stripe event ID for idempotency dedup)
-    await this.audit.log({
-      action: "STRIPE_EARLY_FRAUD_WARNING",
-      entityType: "StripeRadarWarning",
-      entityId: eventId,
-      metadata: {
-        paymentIntent,
-        chargeId,
-        amount,
-        currency,
-        depositTransactionId: depositTx?.id ?? null,
-        walletId: depositTx?.walletId ?? null,
-        orderId: depositTx?.orderId ?? null,
-      },
-      userId: null,
-      organizationId: null,
+        const existing = await tx.auditLog.findFirst({
+          where: { entityId: eventId, action: "STRIPE_EARLY_FRAUD_WARNING" },
+          select: { id: true },
+        })
+        if (!existing) {
+          // FIN-02: `provider: "stripe"` aligns with the provider-aware
+          // transaction identity used by the deposit write path.
+          const depositTx = paymentIntent
+            ? await tx.transaction.findFirst({
+                where: {
+                  provider: "stripe",
+                  providerRef: paymentIntent,
+                  type: "DEPOSIT",
+                },
+                select: {
+                  id: true,
+                  walletId: true,
+                  orderId: true,
+                  reference: true,
+                },
+              })
+            : null
+
+          if (!depositTx) {
+            this.logger.warn({
+              providerEventRowId: providerEventRowId ?? null,
+              eventFingerprint: logReferenceFingerprint(eventId),
+              eventType: event.type,
+              paymentIntentFingerprint: logReferenceFingerprint(paymentIntent),
+              chargeFingerprint: logReferenceFingerprint(chargeId),
+              message:
+                "Early fraud warning — no matching deposit transaction found",
+            })
+          }
+
+          await this.audit.log(
+            {
+              action: "STRIPE_EARLY_FRAUD_WARNING",
+              entityType: "StripeRadarWarning",
+              entityId: eventId,
+              metadata: {
+                paymentIntent,
+                chargeId,
+                amount,
+                currency,
+                depositTransactionId: depositTx?.id ?? null,
+                walletId: depositTx?.walletId ?? null,
+                orderId: depositTx?.orderId ?? null,
+              },
+              userId: null,
+              organizationId: null,
+            },
+            tx,
+          )
+
+          // Exact amount and provider identifiers are Finance-restricted data.
+          const amountFormatted = `${currency} ${(amount / 100).toFixed(2)}`
+          await this.notifyStaffInTransaction(
+            tx,
+            "STRIPE_EARLY_FRAUD_WARNING",
+            depositTx
+              ? `Early fraud warning for ${amountFormatted} — linked to deposit ${depositTx.reference}. Payment intent: ${paymentIntent ?? "N/A"}`
+              : `Early fraud warning for ${amountFormatted} — no deposit match, manual review needed. Payment intent: ${paymentIntent ?? "N/A"}`,
+            `efw:${eventId}`,
+          )
+        }
+      }
+
+      if (providerEventRowId && lease) {
+        await this.completePaymentProviderEventLease(
+          tx,
+          providerEventRowId,
+          lease,
+          {
+            status: "PROCESSED",
+            processedAt: new Date(),
+            lockedAt: null,
+            lastError: null,
+          },
+        )
+      }
+    })
+  }
+
+  private async completeDepositReplayEvent(
+    providerEventRowId: string | undefined,
+    depositAttemptId: string,
+    authority?: PaymentProviderEventAuthority,
+  ): Promise<void> {
+    if (!providerEventRowId) return
+    if (!authority) throw new PaymentProviderEventOwnershipError()
+
+    let terminalEvidenceMismatch = false
+    await this.prisma.$transaction(async (tx: any) => {
+      const event = await this.lockAndAssertPaymentProviderEventAuthority(
+        tx,
+        providerEventRowId,
+        authority,
+      )
+      if (authority.kind === "snapshot") {
+        terminalEvidenceMismatch =
+          authority.status !== "PROCESSED" ||
+          event.depositAttemptId !== depositAttemptId
+        return
+      }
+      await this.completePaymentProviderEventLease(
+        tx,
+        providerEventRowId,
+        authority,
+        {
+          status: "PROCESSED",
+          processedAt: new Date(),
+          lockedAt: null,
+          lastError: null,
+          depositAttemptId,
+        },
+      )
     })
 
-    // Notify Operations
-    const amountFormatted = `${String(currency).toUpperCase()} ${(amount / 100).toFixed(2)}`
-    await this.notifyStaff(
-      "STRIPE_EARLY_FRAUD_WARNING",
-      depositTx
-        ? `Early fraud warning for ${amountFormatted} — linked to deposit ${depositTx.reference}. Payment intent: ${paymentIntent ?? "N/A"}`
-        : `Early fraud warning for ${amountFormatted} — no deposit match, manual review needed. Payment intent: ${paymentIntent ?? "N/A"}`,
-      `efw:${eventId}`,
+    if (terminalEvidenceMismatch) {
+      await this.quarantinePaymentProviderEvent(
+        providerEventRowId,
+        "DEPOSIT_PROCESSED_EVIDENCE_MISMATCH",
+        authority,
+      )
+    }
+  }
+
+  private async resolveDepositLedgerReplay(input: {
+    providerEventRowId?: string
+    providerEventAuthority?: PaymentProviderEventAuthority
+    attempt: any
+    walletId: string
+    amount: Decimal
+    currency: string
+    sessionId: string
+    providerPaymentId: string
+  }): Promise<void> {
+    const candidates = await (this.prisma as any).transaction.findMany({
+      where: {
+        OR: [
+          { reference: input.sessionId },
+          {
+            provider: "stripe",
+            providerRef: input.providerPaymentId,
+          },
+        ],
+      },
+      include: { depositAttempt: true },
+    })
+    const candidate = candidates.length === 1 ? candidates[0] : null
+    const linkedAttempt = candidate?.depositAttempt
+    const exact =
+      candidate?.type === "DEPOSIT" &&
+      candidate.reference === input.sessionId &&
+      candidate.provider === "stripe" &&
+      candidate.providerRef === input.providerPaymentId &&
+      candidate.walletId === input.walletId &&
+      String(candidate.currency).toUpperCase() === input.currency &&
+      new Decimal(candidate.amount).equals(input.amount) &&
+      linkedAttempt?.id === input.attempt.id &&
+      linkedAttempt.walletId === input.walletId &&
+      linkedAttempt.provider === "stripe" &&
+      linkedAttempt.providerSessionId === input.sessionId &&
+      linkedAttempt.providerPaymentId === input.providerPaymentId &&
+      linkedAttempt.ledgerTransactionId === candidate.id &&
+      isWalletCreditBackedDepositStatus(linkedAttempt.status) &&
+      String(linkedAttempt.currency).toUpperCase() === input.currency &&
+      new Decimal(linkedAttempt.amount).equals(input.amount) &&
+      new Decimal(linkedAttempt.walletCredit).equals(input.amount)
+
+    if (exact) {
+      await this.completeDepositReplayEvent(
+        input.providerEventRowId,
+        input.attempt.id,
+        input.providerEventAuthority,
+      )
+      return
+    }
+
+    this.logger.error("Stripe deposit idempotency collision quarantined", {
+      providerEventRowId: input.providerEventRowId ?? null,
+      depositAttemptId: input.attempt.id,
+    })
+    if (input.providerEventRowId) {
+      if (!input.providerEventAuthority) {
+        throw new PaymentProviderEventOwnershipError()
+      }
+      await this.quarantinePaymentProviderEvent(
+        input.providerEventRowId,
+        "DEPOSIT_IDEMPOTENCY_COLLISION",
+        input.providerEventAuthority,
+      )
+      return
+    }
+    throw new ConflictException(
+      "Deposit identity conflicts with existing financial evidence",
     )
   }
 
-  // Phase 7.4 (audit #12) — optional `dedupKeyPrefix` enables per-(event, staff)
-  // idempotency. Callers that have a stable identifier for the event (chargeback
-  // dispute id, etc.) supply the prefix; per-staff suffix is added automatically.
-  // Callers without a stable identifier omit it — legacy NULL dedup applies.
-  private async notifyStaff(
-    type: string,
-    message: string,
-    dedupKeyPrefix?: string,
-  ) {
-    const staff = await this.prisma.staffMembership.findMany({
-      select: { userId: true },
-    })
-    for (const s of staff) {
-      const dedupKey = dedupKeyPrefix ? `${dedupKeyPrefix}:${s.userId}` : null
-      try {
-        await this.prisma.notification.create({
-          data: {
-            userId: s.userId,
-            organizationId: null,
-            type,
-            message,
-            dedupKey,
-          },
-        })
-      } catch (err) {
-        if (isUniqueViolation(err)) {
-          // Idempotent retry — another worker pod already wrote this notification.
-          continue
-        }
-        this.logger.error(`Failed to notify staff ${s.userId}: ${err}`)
-      }
+  private async rejectMalformedDepositEvent(
+    providerEventRowId: string | undefined,
+    reason: string,
+    authority?: PaymentProviderEventAuthority,
+  ): Promise<void> {
+    if (providerEventRowId) {
+      if (!authority) throw new PaymentProviderEventOwnershipError()
+      await this.quarantinePaymentProviderEvent(
+        providerEventRowId,
+        reason,
+        authority,
+      )
+      return
     }
+    throw new BadRequestException("Stripe deposit evidence is invalid")
   }
 
   private async processSuccessfulPayment(
     session: any,
     providerEventRowId?: string,
+    authority?: PaymentProviderEventAuthority,
   ) {
+    assertApiFinanceOperationAllowed("recovery")
+    if ((providerEventRowId == null) !== (authority == null)) {
+      throw new PaymentProviderEventOwnershipError()
+    }
+    const sessionId = typeof session?.id === "string" ? session.id.trim() : ""
+    const paymentIntent =
+      typeof session?.payment_intent === "string"
+        ? session.payment_intent.trim()
+        : typeof session?.payment_intent?.id === "string"
+          ? session.payment_intent.id.trim()
+          : ""
+    if (
+      !sessionId ||
+      sessionId.length > 191 ||
+      !paymentIntent ||
+      paymentIntent.length > 191
+    ) {
+      await this.rejectMalformedDepositEvent(
+        providerEventRowId,
+        "INVALID_DEPOSIT_IDENTITY",
+        authority,
+      )
+      return
+    }
+
     const depositAttemptDelegate = (this.prisma as any).depositAttempt
     const attemptId = session.metadata?.depositAttemptId
     const attempt = depositAttemptDelegate
@@ -822,39 +1768,90 @@ export class BillingService {
           where: {
             OR: [
               { id: attemptId ?? "__missing__" },
-              { providerSessionId: session.id },
+              { providerSessionId: sessionId },
             ],
           },
         })
       : null
-    const walletId = attempt?.walletId ?? session.metadata?.walletId
-    if (!walletId) {
-      throw new BadRequestException(
-        "Stripe deposit is missing its server-owned wallet reference",
+    if (!attempt) {
+      await this.rejectMalformedDepositEvent(
+        providerEventRowId,
+        "DEPOSIT_ATTEMPT_NOT_FOUND",
+        authority,
       )
+      return
     }
+    const walletId = attempt.walletId
 
     // Amount from Stripe authoritative source (amount_total is in cents).
     // Exact Decimal division — Math.round(cents/100) would round $10.50 to
     // $11 and mint money on every non-whole-dollar deposit.
     const amountCents = session.amount_total ?? 0
     if (!Number.isInteger(amountCents) || amountCents <= 0) {
-      this.logger.warn(
-        `Invalid amount_total ${amountCents} in webhook session ${session.id}`,
+      this.logger.warn({
+        providerEventRowId: providerEventRowId ?? null,
+        depositAttemptId: attempt.id,
+        sessionFingerprint: logReferenceFingerprint(sessionId),
+        reason: !Number.isInteger(amountCents)
+          ? "amount_not_integer"
+          : "amount_not_positive",
+        message: "Rejected invalid Stripe deposit amount evidence",
+      })
+      await this.rejectMalformedDepositEvent(
+        providerEventRowId,
+        "INVALID_DEPOSIT_AMOUNT",
+        authority,
       )
-      throw new BadRequestException("Stripe deposit amount is invalid")
+      return
     }
     const amount = new Decimal(amountCents).div(100)
-    const currency = String(
-      session.currency ?? attempt?.currency ?? "",
-    ).toUpperCase()
+    const currency =
+      typeof session.currency === "string"
+        ? session.currency.trim().toUpperCase()
+        : ""
+    if (
+      !/^[A-Z]{3}$/.test(currency) ||
+      !this.depositProvider.capabilities.supportedCurrencies.includes(currency)
+    ) {
+      await this.rejectMalformedDepositEvent(
+        providerEventRowId,
+        "INVALID_DEPOSIT_CURRENCY",
+        authority,
+      )
+      return
+    }
 
     // Never infer payment from the event name alone. Checkout can emit a
     // completion event before delayed methods settle, and malformed fixtures
     // may omit payment_status. Only Stripe's explicit `paid` state can mint
     // wallet value.
     if (session.payment_status !== "paid") {
-      if (attempt) {
+      if (providerEventRowId && authority) {
+        if (authority.kind !== "lease") {
+          await this.rejectMalformedDepositEvent(
+            providerEventRowId,
+            "DEPOSIT_TERMINAL_REPLAY_STATE_MISMATCH",
+            authority,
+          )
+          return
+        }
+        await this.prisma.$transaction(async (tx: any) => {
+          await this.lockAndAssertPaymentProviderEventAuthority(
+            tx,
+            providerEventRowId,
+            authority,
+          )
+          await tx.depositAttempt.updateMany({
+            where: {
+              id: attempt.id,
+              status: {
+                in: ["CREATED", "PENDING_CUSTOMER_ACTION", "PROCESSING"],
+              },
+            },
+            data: { status: "PROCESSING" },
+          })
+        })
+      } else {
         await depositAttemptDelegate.update({
           where: { id: attempt.id },
           data: { status: "PROCESSING" },
@@ -866,49 +1863,84 @@ export class BillingService {
     if (attempt) {
       if (
         attempt.provider !== "stripe" ||
-        (attempt.providerSessionId &&
-          attempt.providerSessionId !== session.id) ||
+        attempt.providerSessionId !== sessionId ||
+        (attempt.providerPaymentId != null &&
+          attempt.providerPaymentId !== paymentIntent) ||
+        (attemptId != null && attemptId !== attempt.id) ||
         !new Decimal(attempt.amount).equals(amount) ||
+        !new Decimal(attempt.walletCredit).equals(amount) ||
         String(attempt.currency).toUpperCase() !== currency
       ) {
-        throw new BadRequestException(
-          "Stripe deposit does not match its server-side funding attempt",
+        await this.rejectMalformedDepositEvent(
+          providerEventRowId,
+          "DEPOSIT_ATTEMPT_EVIDENCE_MISMATCH",
+          authority,
         )
+        return
       }
-      if (attempt.status === "SUCCEEDED") {
-        if (providerEventRowId) {
-          await (this.prisma as any).paymentProviderEvent.update({
-            where: { id: providerEventRowId },
-            data: {
-              status: "PROCESSED",
-              processedAt: new Date(),
-              lockedAt: null,
-            },
-          })
-        }
+      const isCreditedReplay = isWalletCreditBackedDepositStatus(attempt.status)
+      const isCreditableAttempt = isCreditablePreCreditDepositStatus(
+        attempt.status,
+      )
+      if (
+        (!isCreditedReplay && !isCreditableAttempt) ||
+        (isCreditableAttempt && attempt.ledgerTransactionId != null)
+      ) {
+        await this.rejectMalformedDepositEvent(
+          providerEventRowId,
+          "DEPOSIT_ATTEMPT_STATE_MISMATCH",
+          authority,
+        )
+        return
+      }
+      if (isCreditedReplay) {
+        await this.resolveDepositLedgerReplay({
+          providerEventRowId,
+          providerEventAuthority: authority,
+          attempt,
+          walletId,
+          amount,
+          currency,
+          sessionId,
+          providerPaymentId: paymentIntent,
+        })
         return
       }
     }
 
-    const orgId =
-      attempt?.organizationId ?? session.metadata?.organizationId ?? null
-    const paymentIntent =
-      typeof session.payment_intent === "string"
-        ? session.payment_intent
-        : (session.payment_intent?.id ?? null)
+    if (providerEventRowId && authority && authority.kind !== "lease") {
+      await this.rejectMalformedDepositEvent(
+        providerEventRowId,
+        "DEPOSIT_TERMINAL_REPLAY_STATE_MISMATCH",
+        authority,
+      )
+      return
+    }
+
+    const orgId = attempt.organizationId
 
     try {
       await this.prisma.$transaction(async (tx: any) => {
+        if (providerEventRowId && authority) {
+          await this.lockAndAssertPaymentProviderEventAuthority(
+            tx,
+            providerEventRowId,
+            authority,
+          )
+        }
         // Idempotency: unique constraint on Transaction.reference prevents duplicates
         // Even if two webhooks arrive concurrently, only one tx.reference = session.id commits
         const existingTx = await tx.transaction.findFirst({
-          where: { reference: session.id },
+          where: { reference: sessionId },
         })
-        if (existingTx) throw new DuplicateEventError(session.id)
+        if (existingTx) throw new DuplicateEventError(sessionId)
 
         const wallet = await tx.wallet.findUniqueOrThrow({
           where: { id: walletId },
         })
+        if (String(wallet.currency).toUpperCase() !== currency) {
+          throw new DepositEvidenceError("DEPOSIT_WALLET_CURRENCY_MISMATCH")
+        }
         const updated = await tx.wallet.updateMany({
           where: { id: walletId, version: wallet.version },
           data: {
@@ -936,53 +1968,61 @@ export class BillingService {
             walletId,
             amount,
             type: "DEPOSIT",
-            reference: session.id,
+            reference: sessionId,
             // FIN-02: explicit provider label pairs with `providerRef` to
             // populate the `(provider, providerRef)` unique key — identical
             // row identity for write and lookup paths.
             provider: "stripe",
             // payment_intent linkage lets chargeback webhooks find this deposit
             providerRef: paymentIntent,
-            description: attempt?.publicReference
-              ? `GuestPost wallet deposit ${attempt.publicReference}`
-              : `Stripe deposit of ${amount.toFixed(2)}`,
+            description: `GuestPost wallet deposit ${attempt.publicReference}`,
           },
         })
 
-        if (attempt) {
-          await tx.depositAttempt.updateMany({
-            where: {
-              id: attempt.id,
-              status: {
-                in: [
-                  "CREATED",
-                  "PENDING_CUSTOMER_ACTION",
-                  "PROCESSING",
-                  "FAILED",
-                ],
-              },
+        const completedAttempt = await tx.depositAttempt.updateMany({
+          where: {
+            id: attempt.id,
+            walletId,
+            provider: "stripe",
+            providerSessionId: sessionId,
+            amount,
+            walletCredit: amount,
+            currency,
+            status: {
+              in: [
+                "CREATED",
+                "PENDING_CUSTOMER_ACTION",
+                "PROCESSING",
+                "FAILED",
+              ],
             },
-            data: {
-              status: "SUCCEEDED",
-              providerSessionId: session.id,
-              providerPaymentId: paymentIntent,
-              ledgerTransactionId: ledgerTransaction.id,
-              completedAt: new Date(),
-              failedAt: null,
-            },
-          })
+          },
+          data: {
+            status: "SUCCEEDED",
+            providerPaymentId: paymentIntent,
+            ledgerTransactionId: ledgerTransaction.id,
+            completedAt: new Date(),
+            failedAt: null,
+          },
+        })
+        if (completedAttempt.count !== 1) {
+          throw new ConflictException(
+            "Deposit attempt changed while applying the provider payment",
+          )
         }
-        if (providerEventRowId && tx.paymentProviderEvent) {
-          await tx.paymentProviderEvent.update({
-            where: { id: providerEventRowId },
-            data: {
+        if (providerEventRowId && authority) {
+          await this.completePaymentProviderEventLease(
+            tx,
+            providerEventRowId,
+            authority as PaymentProviderEventLease,
+            {
               status: "PROCESSED",
               processedAt: new Date(),
               lockedAt: null,
-              depositAttemptId: attempt?.id ?? undefined,
+              depositAttemptId: attempt.id,
               lastError: null,
             },
-          })
+          )
         }
 
         await this.audit.log(
@@ -992,8 +2032,8 @@ export class BillingService {
             entityId: walletId,
             metadata: {
               amount: amount.toNumber(),
-              reference: attempt?.publicReference ?? session.id,
-              providerSessionId: session.id,
+              reference: attempt.publicReference,
+              providerSessionId: sessionId,
               method: "stripe",
             },
             userId: session.metadata?.userId || null,
@@ -1003,20 +2043,32 @@ export class BillingService {
         )
       })
     } catch (err: any) {
-      if (err instanceof DuplicateEventError || err?.code === "P2002") {
-        this.logger.warn(
-          `Duplicate webhook: session ${session.id} already processed — rolled back`,
+      if (err instanceof DepositEvidenceError) {
+        await this.rejectMalformedDepositEvent(
+          providerEventRowId,
+          err.code,
+          authority,
         )
-        if (providerEventRowId && (this.prisma as any).paymentProviderEvent) {
-          await (this.prisma as any).paymentProviderEvent.update({
-            where: { id: providerEventRowId },
-            data: {
-              status: "PROCESSED",
-              processedAt: new Date(),
-              lockedAt: null,
-            },
-          })
-        }
+        return
+      }
+      if (err instanceof DuplicateEventError || isUniqueViolation(err)) {
+        this.logger.warn({
+          providerEventRowId: providerEventRowId ?? null,
+          depositAttemptId: attempt.id,
+          sessionFingerprint: logReferenceFingerprint(sessionId),
+          message:
+            "Potential duplicate Stripe deposit rolled back pending exact evidence comparison",
+        })
+        await this.resolveDepositLedgerReplay({
+          providerEventRowId,
+          providerEventAuthority: authority,
+          attempt,
+          walletId,
+          amount,
+          currency,
+          sessionId,
+          providerPaymentId: paymentIntent,
+        })
         return
       }
       throw err
@@ -1029,124 +2081,25 @@ export class BillingService {
     }
 
     if (organizationId) {
-      // @@unique([organizationId]) makes upsert race-safe
-      return this.prisma.wallet.upsert({
+      const wallet = await this.prisma.wallet.findUnique({
         where: { organizationId },
-        create: {
-          availableBalance: 0,
-          reservedBalance: 0,
-          currency: "USD",
-          organizationId,
-          userId,
-        },
-        update: {},
         include,
       })
+      if (!wallet) throw new NotFoundException("Wallet is not provisioned")
+      return wallet
     }
 
     // Legacy customer accounts without an active organization use a personal
     // wallet. A partial unique index covers only these rows
     // (organizationId IS NULL), preserving multi-organization wallets that may
     // legitimately share the same creator userId.
-    let wallet = await this.prisma.wallet.findFirst({
+    const wallet = await this.prisma.wallet.findFirst({
       where: { userId, organizationId: null },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       include,
     })
-    if (!wallet) {
-      try {
-        wallet = await this.prisma.wallet.create({
-          data: {
-            availableBalance: 0,
-            reservedBalance: 0,
-            currency: "USD",
-            userId,
-          },
-          include,
-        })
-      } catch (err) {
-        if (!isUniqueViolation(err)) throw err
-        // Another request created the same personal wallet after our read.
-        // Re-read the row protected by Wallet_userId_personal_key.
-        wallet = await this.prisma.wallet.findFirst({
-          where: { userId, organizationId: null },
-          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-          include,
-        })
-        if (!wallet) throw err
-      }
-    }
+    if (!wallet) throw new NotFoundException("Wallet is not provisioned")
     return wallet
-  }
-
-  async withdraw(
-    walletId: string,
-    amount: number,
-    user: any,
-    idempotencyKey?: string,
-  ) {
-    const result = await this.prisma.$transaction(async (tx: any) => {
-      if (idempotencyKey) {
-        const existing = await tx.transaction.findFirst({
-          where: { reference: idempotencyKey, type: "WITHDRAWAL" },
-        })
-        if (existing) {
-          this.logger.warn(`Duplicate withdrawal detected: ${idempotencyKey}`)
-          throw new BadRequestException(
-            "Withdrawal with this idempotency key already exists",
-          )
-        }
-      }
-      const wallet = await tx.wallet.findUniqueOrThrow({
-        where: { id: walletId },
-      })
-      this.assertWalletOwned(wallet, user)
-
-      const available = new Decimal(wallet.availableBalance)
-      if (available.lessThan(amount)) {
-        throw new BadRequestException("Insufficient available balance")
-      }
-
-      const updated = await tx.wallet.updateMany({
-        where: { id: walletId, version: wallet.version },
-        data: {
-          availableBalance: { decrement: amount },
-          version: { increment: 1 },
-        },
-      })
-      if (updated.count === 0) {
-        throw new ConflictException(
-          "Wallet was modified by another request. Retry.",
-        )
-      }
-
-      const fresh = await tx.wallet.findUniqueOrThrow({
-        where: { id: walletId },
-      })
-
-      await tx.transaction.create({
-        data: {
-          walletId,
-          amount: -amount,
-          type: "WITHDRAWAL",
-          reference: idempotencyKey ?? null,
-          description: `Withdrawal of ${amount}`,
-        },
-      })
-
-      return fresh
-    })
-
-    await this.audit.log({
-      action: "WALLET_WITHDRAWAL",
-      entityType: "Wallet",
-      entityId: walletId,
-      metadata: { amount },
-      userId: user.id,
-      organizationId: user.organizationId,
-    })
-
-    return result
   }
 
   async listTransactions(organizationId: string | null, userId: string) {
@@ -1158,6 +2111,35 @@ export class BillingService {
       orderBy: { createdAt: "desc" },
       take: 100,
     })
+  }
+
+  private async lockOwnedSpendableWallet(tx: any, walletId: string, user: any) {
+    // Dispute booking and every path that consumes customer funds serialize
+    // through this row. A Wallet.version check alone is insufficient because
+    // a zero-held dispute records uncovered exposure without changing it.
+    await lockWalletForUpdate(tx, walletId)
+    const wallet = await tx.wallet.findUniqueOrThrow({
+      where: { id: walletId },
+    })
+    this.assertWalletOwned(wallet, user)
+
+    const uncoveredDispute = await tx.paymentDispute.findFirst({
+      where: {
+        walletId,
+        status: { in: ["OPEN", "LOST"] },
+        currentExposureAmount: { gt: 0 },
+      },
+      select: { id: true },
+    })
+    if (uncoveredDispute) {
+      throw new ConflictException({
+        code: "WALLET_SPEND_BLOCKED_BY_DISPUTE",
+        message:
+          "Wallet spending is unavailable while a payment dispute has uncovered exposure",
+      })
+    }
+
+    return wallet
   }
 
   // `existingTx`: when the caller already holds a transaction (e.g. order
@@ -1172,11 +2154,9 @@ export class BillingService {
     user: any,
     existingTx?: any,
   ) {
+    assertApiFinanceOperationAllowed("new_liability")
     const run = async (tx: any) => {
-      const wallet = await tx.wallet.findUniqueOrThrow({
-        where: { id: walletId },
-      })
-      this.assertWalletOwned(wallet, user)
+      const wallet = await this.lockOwnedSpendableWallet(tx, walletId, user)
 
       const available = new Decimal(wallet.availableBalance)
       if (available.lessThan(amount)) {
@@ -1225,11 +2205,9 @@ export class BillingService {
     user: any,
     existingTx?: any,
   ) {
+    assertApiFinanceOperationAllowed("new_liability")
     const run = async (tx: any) => {
-      const wallet = await tx.wallet.findUniqueOrThrow({
-        where: { id: walletId },
-      })
-      this.assertWalletOwned(wallet, user)
+      const wallet = await this.lockOwnedSpendableWallet(tx, walletId, user)
 
       const reserved = new Decimal(wallet.reservedBalance)
       if (reserved.lessThan(amount)) {
@@ -1269,6 +2247,7 @@ export class BillingService {
   }
 
   async refund(walletId: string, amount: number, orderId: string, user: any) {
+    assertApiFinanceOperationAllowed("new_liability")
     const result = await this.prisma.$transaction(async (tx: any) => {
       const wallet = await tx.wallet.findUniqueOrThrow({
         where: { id: walletId },
@@ -1352,6 +2331,9 @@ export class BillingService {
     return {
       publicReference: attempt.publicReference,
       status: normalized,
+      // `processed` is the checkout-success signal consumed by the portal.
+      // Derivative refund/dispute states still have wallet-credit evidence,
+      // but must never be rendered as a newly completed deposit.
       processed: attempt.status === "SUCCEEDED",
       amount: Number(attempt.amount),
       walletCredit: Number(attempt.walletCredit),

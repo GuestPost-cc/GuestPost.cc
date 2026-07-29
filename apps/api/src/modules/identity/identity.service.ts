@@ -44,6 +44,12 @@ export class IdentityService {
             role: "OWNER",
           },
         },
+        wallets: {
+          create: {
+            userId: data.ownerId,
+            currency: "USD",
+          },
+        },
       },
     })
 

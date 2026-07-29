@@ -75,7 +75,11 @@ describe("hybrid worker runtime contract", () => {
       "const INBOX_MAX_RETRY_AGE_MS = 72 * 60 * 60 * 1000",
     )
     expect(source).toContain("const INBOX_MAX_ATTEMPTS = 432")
-    expect(source).toContain("PAYOUT_WEBHOOK_STATE_CONFLICT")
+    expect(source).toContain("PAYOUT_WEBHOOK_TERMINAL_CONFLICT_QUARANTINED")
+    expect(source).toContain("finalizePayoutExecution")
+    expect(source).toContain("PAYOUT_WEBHOOK_UNMATCHED_TERMINAL_QUARANTINED")
+    expect(source).toContain("providerAccountExternalId")
+    expect(source).not.toContain('data: { status: "COMPLETED"')
     const schema = read("packages/database/prisma/schema.prisma")
     expect(schema).toContain("@@unique([providerId, providerExecutionId])")
   })

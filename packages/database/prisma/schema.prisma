@@ -206,6 +206,15 @@ enum PaymentProviderEventStatus {
   PROCESSED
   FAILED
   IGNORED
+  QUARANTINED
+}
+
+// Provider-neutral customer-funding dispute lifecycle. OPEN may transition
+// exactly once to WON or LOST; terminal states never transition back.
+enum PaymentDisputeStatus {
+  OPEN
+  WON
+  LOST
 }
 
 enum TicketStatus {
@@ -277,6 +286,35 @@ enum PayoutExecutionStatus {
   CANCELLED
 }
 
+// A first-class, append-only authority proving that an external money-moving
+// call owns one exact idempotency key. JSON provider metadata is deliberately
+// not authoritative because it can be replaced as provider evidence evolves.
+enum PayoutExecutionClaimKind {
+  PROVIDER_SEND
+  BANK_PAYOUT_SEND
+}
+
+// Immutable provenance for the first terminal evidence that completed a payout.
+// LEGACY_UNVERIFIED is migration-only: new application completions must use one
+// of the four evidence-backed sources.
+enum PayoutCompletionSource {
+  PROVIDER_RESPONSE
+  PROVIDER_WEBHOOK
+  PROVIDER_STATUS_POLL
+  MANUAL_BANK_CONFIRMATION
+  LEGACY_UNVERIFIED
+}
+
+// Why a payout execution was cancelled. PRE_PROVIDER_ABORT proves no external
+// send claim existed. PROVIDER_RESPONSE requires a matching transfer-reversal
+// reference. LEGACY_UNVERIFIED is migration-only and is never accepted from a
+// runtime writer.
+enum PayoutCancellationSource {
+  PRE_PROVIDER_ABORT
+  PROVIDER_RESPONSE
+  LEGACY_UNVERIFIED
+}
+
 enum PublisherProviderAccountStatus {
   PENDING_ONBOARDING
   RESTRICTED
@@ -293,6 +331,7 @@ enum PayoutWebhookEventStatus {
   PROCESSED
   FAILED
   IGNORED
+  QUARANTINED
 }
 
 enum PayoutBatchStatus {
@@ -426,7 +465,14 @@ model User {
   assignedOrders                Order[]                @relation("OrderAssignee")
   orderEvents                   OrderEvent[]
   publications                  Publication[]          @relation("PublicationVerifier")
+  requestedWithdrawals          Withdrawal[]           @relation("WithdrawalRequester")
   approvedWithdrawals           Withdrawal[]           @relation("WithdrawalApprover")
+  rejectedWithdrawals           Withdrawal[]           @relation("WithdrawalRejector")
+  reversedWithdrawals           Withdrawal[]           @relation("WithdrawalReverser")
+  initiatedPayoutExecutions     PayoutExecution[]      @relation("PayoutExecutionInitiator")
+  payoutExecutionClaims         PayoutExecutionClaim[] @relation("PayoutExecutionClaimActor")
+  completedPayoutExecutions     PayoutExecution[]      @relation("PayoutCompletionActor")
+  cancelledPayoutExecutions     PayoutExecution[]      @relation("PayoutCancellationActor")
   adminVerifiedDeliveryVersions OrderDeliveryVersion[] @relation("AdminVerifiedVersion")
   tickets                       Ticket[]
   messages                      TicketMessage[]
@@ -1391,48 +1437,59 @@ model Withdrawal {
   idempotencyKey   String?
   payoutMethodId   String?
   payoutBatchId    String?
+  requestedBy      String?
   approvedBy       String?
   approvedAt       DateTime?
+  rejectedBy       String?
+  rejectedAt       DateTime?
+  reversedBy       String?
+  reversedAt       DateTime?
   version          Int              @default(0)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  publisher      Publisher              @relation(fields: [publisherId], references: [id])
-  approvedByUser User?                  @relation("WithdrawalApprover", fields: [approvedBy], references: [id])
-  payoutMethod   PayoutMethod?          @relation(fields: [payoutMethodId], references: [id])
-  payoutBatch    PayoutBatch?           @relation(fields: [payoutBatchId], references: [id])
-  executions     PayoutExecution[]
-  allocations    WithdrawalAllocation[]
+  publisher       Publisher              @relation(fields: [publisherId], references: [id])
+  requestedByUser User?                  @relation("WithdrawalRequester", fields: [requestedBy], references: [id], onDelete: Restrict)
+  approvedByUser  User?                  @relation("WithdrawalApprover", fields: [approvedBy], references: [id], onDelete: Restrict)
+  rejectedByUser  User?                  @relation("WithdrawalRejector", fields: [rejectedBy], references: [id], onDelete: Restrict)
+  reversedByUser  User?                  @relation("WithdrawalReverser", fields: [reversedBy], references: [id], onDelete: Restrict)
+  payoutMethod    PayoutMethod?          @relation(fields: [payoutMethodId], references: [id])
+  payoutBatch     PayoutBatch?           @relation(fields: [payoutBatchId], references: [id])
+  executions      PayoutExecution[]
+  allocations     WithdrawalAllocation[]
 
   @@unique([publisherId, idempotencyKey])
   @@index([publisherId, status])
+  @@index([requestedBy])
   @@index([approvedBy])
+  @@index([rejectedBy])
+  @@index([reversedBy])
   @@index([status])
   @@index([payoutMethodId])
   @@index([payoutBatchId])
 }
 
 model PayoutMethod {
-  id                   String   @id @default(cuid())
-  publisherId          String
-  type                 String // bank_transfer, paypal, wise
-  label                String
-  details              Json // AES-256-GCM encrypted via PayoutEncryptionService
-  displayDetails       Json? // Non-sensitive display fields (bank name, last4) — unencrypted, safe for list endpoints
-  encryptionKeyVersion Int      @default(0)
-  isDefault            Boolean  @default(false)
-  isActive             Boolean  @default(true)
-  version              Int      @default(0)
-  providerAccountId    String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                         String   @id @default(cuid())
+  publisherId                String
+  type                       String // bank_transfer, paypal, wise
+  label                      String
+  details                    Json // AES-256-GCM encrypted via PayoutEncryptionService
+  displayDetails             Json? // Non-sensitive display fields (bank name, last4) — unencrypted, safe for list endpoints
+  encryptionKeyVersion       Int      @default(0)
+  isDefault                  Boolean  @default(false)
+  isActive                   Boolean  @default(true)
+  nonterminalWithdrawalCount Int      @default(0)
+  version                    Int      @default(0)
+  providerAccountId          String?  @unique
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   publisher       Publisher                 @relation(fields: [publisherId], references: [id])
   withdrawals     Withdrawal[]
   providerAccount PublisherProviderAccount? @relation(fields: [providerAccountId], references: [id])
 
   @@index([publisherId])
-  @@index([providerAccountId])
 }
 
 // A provider recipient/account is separate from a payout method. This lets a
@@ -1456,8 +1513,8 @@ model PublisherProviderAccount {
   createdAt                DateTime                       @default(now())
   updatedAt                DateTime                       @updatedAt
 
-  publisher     Publisher      @relation(fields: [publisherId], references: [id])
-  payoutMethods PayoutMethod[]
+  publisher    Publisher     @relation(fields: [publisherId], references: [id])
+  payoutMethod PayoutMethod?
 
   @@unique([publisherId, provider])
   @@unique([provider, providerAccountId])
@@ -1468,7 +1525,9 @@ model PayoutProvider {
   id                         String   @id @default(cuid())
   name                       String   @unique // "manual", "wise", "stripe_connect"
   displayName                String
-  config                     Json // Provider-specific config (API keys, webhook secrets) — AES-256-GCM encrypted
+  // DB CHECK: non-empty provider config must be AES-256-GCM ciphertext.
+  // Exactly {} is allowed when credentials come from process environment.
+  config                     Json
   configEncryptionKeyVersion Int      @default(0)
   isActive                   Boolean  @default(true)
   version                    Int      @default(0)
@@ -1481,42 +1540,99 @@ model PayoutProvider {
 }
 
 model PayoutExecution {
-  id                  String                @id @default(cuid())
-  withdrawalId        String
-  providerId          String
-  status              PayoutExecutionStatus @default(PENDING)
-  providerExecutionId String? // Provider's reference ID (transfer ID, payment ID)
-  providerTransferId  String?               @db.VarChar(191)
-  providerPayoutId    String?               @db.VarChar(191)
-  amount              Decimal
-  fee                 Decimal               @default(0)
-  sourceCurrency      String                @default("USD") @db.VarChar(3)
-  destinationCurrency String                @default("USD") @db.VarChar(3)
-  destinationAmount   Decimal?
-  providerFee         Decimal               @default(0)
-  requestedReference  String?               @db.VarChar(64)
-  acceptedReference   String?               @db.VarChar(64)
-  bankTraceReference  String?               @db.VarChar(191)
-  stage               String                @default("CREATED") @db.VarChar(64)
-  errorMessage        String?
-  providerMetadata    Json?
-  idempotencyKey      String?
-  version             Int                   @default(0)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  id                       String                    @id @default(cuid())
+  withdrawalId             String
+  providerId               String
+  status                   PayoutExecutionStatus     @default(PENDING)
+  providerExecutionId      String? // Provider's reference ID (transfer ID, payment ID)
+  providerTransferId       String?                   @db.VarChar(191)
+  providerPayoutId         String?                   @db.VarChar(191)
+  amount                   Decimal
+  fee                      Decimal                   @default(0)
+  sourceCurrency           String                    @default("USD") @db.VarChar(3)
+  destinationCurrency      String                    @default("USD") @db.VarChar(3)
+  destinationAmount        Decimal?
+  providerFee              Decimal                   @default(0)
+  requestedReference       String?                   @db.VarChar(64)
+  acceptedReference        String?                   @db.VarChar(64)
+  bankTraceReference       String?                   @db.VarChar(191)
+  stage                    String                    @default("CREATED") @db.VarChar(64)
+  errorMessage             String?
+  providerMetadata         Json?
+  idempotencyKey           String?
+  // Immutable Stripe test/live authority sampled when the execution command
+  // is created. Stripe executions require a boolean; non-Stripe routes use
+  // null. Historical Stripe rows remain null and cannot authorize new money
+  // transitions without evidence-backed repair.
+  livemode                 Boolean?
+  // Staff actor who initiated this immutable execution command. Manual bank
+  // confirmation must be performed by a different Finance actor.
+  initiatedByUserId        String?
+  completionSource         PayoutCompletionSource?
+  // Provider payout/transfer id or immutable manual bank receipt/reference.
+  // The verified webhook row is linked separately when the source is webhook.
+  completionEvidenceRef    String?                   @db.VarChar(191)
+  completionEvidenceAt     DateTime?
+  completedAt              DateTime?
+  completionActorUserId    String?
+  completionWebhookEventId String?                   @unique
+  cancellationSource       PayoutCancellationSource?
+  cancellationEvidenceRef  String?                   @db.VarChar(191)
+  cancellationEvidenceAt   DateTime?
+  cancellationPayoutStatus String?                   @db.VarChar(32)
+  cancelledAt              DateTime?
+  cancellationActorUserId  String?
+  version                  Int                       @default(0)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
 
-  withdrawal Withdrawal     @relation(fields: [withdrawalId], references: [id])
-  provider   PayoutProvider @relation(fields: [providerId], references: [id])
+  withdrawal             Withdrawal             @relation(fields: [withdrawalId], references: [id])
+  provider               PayoutProvider         @relation(fields: [providerId], references: [id])
+  initiatedBy            User?                  @relation("PayoutExecutionInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  completionActor        User?                  @relation("PayoutCompletionActor", fields: [completionActorUserId], references: [id], onDelete: Restrict)
+  completionWebhookEvent PayoutWebhookEvent?    @relation("PayoutCompletionWebhook", fields: [completionWebhookEventId], references: [id], onDelete: Restrict)
+  cancellationActor      User?                  @relation("PayoutCancellationActor", fields: [cancellationActorUserId], references: [id], onDelete: Restrict)
+  claims                 PayoutExecutionClaim[]
 
   @@unique([withdrawalId, idempotencyKey])
   @@unique([providerId, providerExecutionId])
   @@unique([providerId, providerTransferId])
   @@unique([providerId, providerPayoutId])
+  // PostgreSQL permits multiple NULLs. These provider-scoped keys stop one
+  // manual bank receipt/completion reference from completing two withdrawals.
+  @@unique([providerId, bankTraceReference])
+  @@unique([providerId, completionEvidenceRef])
+  @@unique([providerId, cancellationEvidenceRef])
   @@index([withdrawalId, status])
   @@index([providerId, status])
   @@index([status, createdAt])
   @@index([providerExecutionId])
   @@index([providerPayoutId])
+  @@index([initiatedByUserId])
+  @@index([completionActorUserId])
+  @@index([cancellationActorUserId])
+}
+
+// Durable authorization for an external payout call. The database permits one
+// claim per call family and makes every identity field append-only. Exact-key
+// recovery may only advance lastClaimedAt monotonically.
+model PayoutExecutionClaim {
+  id                        String                   @id @default(cuid())
+  executionId               String
+  kind                      PayoutExecutionClaimKind
+  idempotencyKey            String                   @db.VarChar(191)
+  idempotencyKeyFingerprint String                   @db.VarChar(64)
+  claimedAt                 DateTime
+  lastClaimedAt             DateTime
+  claimedByUserId           String
+  createdAt                 DateTime                 @default(now())
+
+  execution PayoutExecution @relation(fields: [executionId], references: [id], onDelete: Restrict)
+  claimedBy User            @relation("PayoutExecutionClaimActor", fields: [claimedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([executionId, kind])
+  @@index([claimedByUserId])
+  @@index([kind, lastClaimedAt])
 }
 
 // Immutable source breakdown for a withdrawal. releasedAt marks an allocation
@@ -1549,25 +1665,38 @@ model WithdrawalAllocation {
 }
 
 model PayoutWebhookEvent {
-  id                  String                   @id @default(cuid())
-  provider            String                   @db.VarChar(32)
+  id                        String                   @id @default(cuid())
+  provider                  String                   @db.VarChar(32)
   // SHA-256 of the provider event id, or of the verified raw payload when the
   // provider supplies no event id. Never use only the transfer id here: one
   // transfer legitimately emits several distinct state-change events.
-  dedupKey            String                   @db.VarChar(64)
-  eventType           String                   @db.VarChar(191)
-  providerExecutionId String?                  @db.VarChar(191)
-  providerStatus      String?                  @db.VarChar(32)
-  rawStatus           String?                  @db.VarChar(100)
-  status              PayoutWebhookEventStatus @default(PENDING)
-  attempts            Int                      @default(0)
-  availableAt         DateTime                 @default(now())
-  lockedAt            DateTime?
-  processedAt         DateTime?
-  lastError           String?                  @db.VarChar(100)
-  receivedAt          DateTime                 @default(now())
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
+  dedupKey                  String                   @db.VarChar(64)
+  eventType                 String                   @db.VarChar(191)
+  providerExecutionId       String?                  @db.VarChar(191)
+  // Stripe Connect top-level event.account. This binds a payout object event
+  // to the immutable connected account selected for the execution.
+  providerAccountExternalId String?                  @db.VarChar(191)
+  // Provider-reported payout amount/currency, normalized at the verified
+  // webhook boundary. Automated completion requires these facts to match the
+  // immutable execution destination exactly.
+  payoutAmountMinor         BigInt?
+  payoutCurrency            String?                  @db.VarChar(3)
+  // Signature-verified Stripe Event.livemode. Stripe rows require a boolean;
+  // non-Stripe rows use null, and the value is immutable provider evidence.
+  livemode                  Boolean?
+  providerStatus            String?                  @db.VarChar(32)
+  rawStatus                 String?                  @db.VarChar(100)
+  status                    PayoutWebhookEventStatus @default(PENDING)
+  attempts                  Int                      @default(0)
+  availableAt               DateTime                 @default(now())
+  lockedAt                  DateTime?
+  processedAt               DateTime?
+  lastError                 String?                  @db.VarChar(100)
+  receivedAt                DateTime                 @default(now())
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+
+  completedExecution PayoutExecution? @relation("PayoutCompletionWebhook")
 
   @@unique([provider, dedupKey])
   @@index([status, availableAt, receivedAt])
@@ -1735,6 +1864,7 @@ model Wallet {
   organization    Organization?    @relation(fields: [organizationId], references: [id])
   transactions    Transaction[]
   depositAttempts DepositAttempt[]
+  paymentDisputes PaymentDispute[]
   // Partial unique index for legacy personal wallets only. A global userId
   // unique would break users who create wallets for multiple organizations.
   // See migration 20260719120000_wallet_personal_user_unique.
@@ -1785,12 +1915,15 @@ model Transaction {
   settlementId String?
   createdAt    DateTime        @default(now())
 
-  wallet                Wallet?                @relation(fields: [walletId], references: [id])
-  order                 Order?                 @relation(fields: [orderId], references: [id])
-  publisher             Publisher?             @relation(fields: [publisherId], references: [id])
-  settlement            Settlement?            @relation(fields: [settlementId], references: [id])
-  depositAttempt        DepositAttempt?
-  withdrawalAllocations WithdrawalAllocation[]
+  wallet                     Wallet?                @relation(fields: [walletId], references: [id])
+  order                      Order?                 @relation(fields: [orderId], references: [id])
+  publisher                  Publisher?             @relation(fields: [publisherId], references: [id])
+  settlement                 Settlement?            @relation(fields: [settlementId], references: [id])
+  depositAttempt             DepositAttempt?
+  withdrawalAllocations      WithdrawalAllocation[]
+  originatingPaymentDisputes PaymentDispute[]       @relation("PaymentDisputeDepositTransaction")
+  paymentDisputeHold         PaymentDispute?        @relation("PaymentDisputeHoldTransaction")
+  paymentDisputeResolution   PaymentDispute?        @relation("PaymentDisputeResolutionTransaction")
 
   @@unique([reference])
   @@index([walletId])
@@ -1836,6 +1969,7 @@ model DepositAttempt {
   organization      Organization?          @relation(fields: [organizationId], references: [id])
   ledgerTransaction Transaction?           @relation(fields: [ledgerTransactionId], references: [id])
   providerEvents    PaymentProviderEvent[]
+  paymentDisputes   PaymentDispute[]
 
   @@unique([walletId, idempotencyKey])
   @@index([organizationId, status])
@@ -1844,28 +1978,94 @@ model DepositAttempt {
 }
 
 model PaymentProviderEvent {
-  id               String                     @id @default(cuid())
-  provider         String                     @db.VarChar(32)
-  providerEventId  String                     @db.VarChar(191)
-  eventType        String                     @db.VarChar(191)
-  objectId         String?                    @db.VarChar(191)
-  depositAttemptId String?
-  status           PaymentProviderEventStatus @default(PENDING)
-  attempts         Int                        @default(0)
-  availableAt      DateTime                   @default(now())
-  lockedAt         DateTime?
-  processedAt      DateTime?
-  lastError        String?                    @db.VarChar(100)
-  receivedAt       DateTime                   @default(now())
-  createdAt        DateTime                   @default(now())
-  updatedAt        DateTime                   @updatedAt
+  id                 String                     @id @default(cuid())
+  provider           String                     @db.VarChar(32)
+  providerEventId    String                     @db.VarChar(191)
+  eventType          String                     @db.VarChar(191)
+  objectId           String?                    @db.VarChar(191)
+  depositAttemptId   String?
+  paymentDisputeId   String?
+  // Safe normalized facts from a signature-verified dispute envelope. Raw
+  // provider bodies are never retained. These fields plus eventFingerprint are
+  // sufficient for deterministic retry and conflicting-envelope detection.
+  providerPaymentId  String?                    @db.VarChar(191)
+  providerChargeId   String?                    @db.VarChar(191)
+  disputeAmountMinor BigInt?
+  disputeCurrency    String?                    @db.VarChar(3)
+  providerStatus     String?                    @db.VarChar(64)
+  livemode           Boolean?
+  eventFingerprint   String?                    @db.VarChar(64)
+  status             PaymentProviderEventStatus @default(PENDING)
+  attempts           Int                        @default(0)
+  availableAt        DateTime                   @default(now())
+  lockedAt           DateTime?
+  processedAt        DateTime?
+  lastError          String?                    @db.VarChar(100)
+  receivedAt         DateTime                   @default(now())
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
-  depositAttempt DepositAttempt? @relation(fields: [depositAttemptId], references: [id])
+  depositAttempt         DepositAttempt? @relation(fields: [depositAttemptId], references: [id])
+  paymentDispute         PaymentDispute? @relation("PaymentDisputeEvents", fields: [paymentDisputeId], references: [id], onDelete: Restrict)
+  openedPaymentDispute   PaymentDispute? @relation("PaymentDisputeOpenedEvent")
+  resolvedPaymentDispute PaymentDispute? @relation("PaymentDisputeResolvedEvent")
 
   @@unique([provider, providerEventId])
   @@index([status, availableAt, receivedAt])
   @@index([depositAttemptId])
+  @@index([paymentDisputeId, eventType])
   @@index([objectId])
+}
+
+// A provider dispute is a durable financial case, separate from both the
+// provider event inbox and the general-purpose ledger identity. The originating
+// payment ID is immutable correlation data; only the DEPOSIT transaction owns
+// the unique (provider, providerRef) external-money identity.
+model PaymentDispute {
+  id                      String               @id @default(cuid())
+  provider                String               @db.VarChar(32)
+  providerDisputeId       String               @db.VarChar(191)
+  providerPaymentId       String               @db.VarChar(191)
+  providerChargeId        String?              @db.VarChar(191)
+  depositAttemptId        String
+  depositTransactionId    String
+  walletId                String
+  amount                  Decimal
+  currency                String               @db.VarChar(3)
+  heldAmount              Decimal              @default(0)
+  /// Immutable amount that was not covered by the original wallet hold or
+  /// direct recovery. Together with heldAmount this always equals amount.
+  shortfallAmount         Decimal              @default(0)
+  /// Current uncovered exposure: equal to shortfallAmount while OPEN or LOST,
+  /// and zero after a WON outcome.
+  currentExposureAmount   Decimal              @default(0)
+  status                  PaymentDisputeStatus
+  providerStatus          String               @db.VarChar(64)
+  openedByEventId         String?              @unique
+  resolvedByEventId       String?              @unique
+  holdTransactionId       String?              @unique
+  resolutionTransactionId String?              @unique
+  version                 Int                  @default(0)
+  openedAt                DateTime?
+  resolvedAt              DateTime?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  depositAttempt        DepositAttempt         @relation(fields: [depositAttemptId], references: [id], onDelete: Restrict)
+  depositTransaction    Transaction            @relation("PaymentDisputeDepositTransaction", fields: [depositTransactionId], references: [id], onDelete: Restrict)
+  wallet                Wallet                 @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  openedByEvent         PaymentProviderEvent?  @relation("PaymentDisputeOpenedEvent", fields: [openedByEventId], references: [id], onDelete: Restrict)
+  resolvedByEvent       PaymentProviderEvent?  @relation("PaymentDisputeResolvedEvent", fields: [resolvedByEventId], references: [id], onDelete: Restrict)
+  providerEvents        PaymentProviderEvent[] @relation("PaymentDisputeEvents")
+  holdTransaction       Transaction?           @relation("PaymentDisputeHoldTransaction", fields: [holdTransactionId], references: [id], onDelete: Restrict)
+  resolutionTransaction Transaction?           @relation("PaymentDisputeResolutionTransaction", fields: [resolutionTransactionId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerDisputeId])
+  @@index([depositAttemptId, status])
+  @@index([depositTransactionId])
+  @@index([walletId, status])
+  @@index([provider, providerPaymentId])
+  @@index([status, createdAt])
 }
 
 model Ticket {

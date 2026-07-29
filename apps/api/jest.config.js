@@ -1,6 +1,6 @@
-// Phase 7.10.2 — converted to jest projects shape. The unit project preserves
-// the existing 47-suite / 652-test baseline exactly. The integration project is
-// greenfield (greater testTimeout for slower DB-backed specs).
+// Phase 7.10.2 — converted to Jest's projects shape. The unit project preserves
+// the fast feedback loop; the integration project uses a dedicated setup file
+// with a larger timeout for database clones, locks, and seeded scenarios.
 //
 // Note: forceExit is root-level (jest's `projects` doesn't honor per-project
 // forceExit). The unit project NEEDS it (grandfathered — Phase 7.8 PR #5
@@ -34,6 +34,14 @@ const baseModuleNameMapperFromSrc = {
     "<rootDir>/../../../packages/shared/src/delivery-verification-core",
   "^@guestpost/shared/dist/object-storage$":
     "<rootDir>/../../../packages/shared/src/object-storage",
+  "^@guestpost/shared/dist/payout-finalization-core$":
+    "<rootDir>/../../../packages/shared/src/payout-finalization-core",
+  "^@guestpost/shared/dist/payout-provider-metadata$":
+    "<rootDir>/../../../packages/shared/src/payout-provider-metadata",
+  "^@guestpost/shared/dist/payment-dispute-core$":
+    "<rootDir>/../../../packages/shared/src/payment-dispute-core",
+  "^@guestpost/shared/dist/prisma-transaction-retry$":
+    "<rootDir>/../../../packages/shared/src/prisma-transaction-retry",
   "^@guestpost/shared/dist/observability/request-context$":
     "<rootDir>/../../../packages/shared/src/observability/request-context",
   "^@guestpost/shared/dist/observability/structured-logger$":
@@ -88,6 +96,14 @@ module.exports = {
           "<rootDir>/../../../../../packages/shared/src/delivery-verification-core",
         "^@guestpost/shared/dist/object-storage$":
           "<rootDir>/../../../../../packages/shared/src/object-storage",
+        "^@guestpost/shared/dist/payout-finalization-core$":
+          "<rootDir>/../../../../../packages/shared/src/payout-finalization-core",
+        "^@guestpost/shared/dist/payout-provider-metadata$":
+          "<rootDir>/../../../../../packages/shared/src/payout-provider-metadata",
+        "^@guestpost/shared/dist/payment-dispute-core$":
+          "<rootDir>/../../../../../packages/shared/src/payment-dispute-core",
+        "^@guestpost/shared/dist/prisma-transaction-retry$":
+          "<rootDir>/../../../../../packages/shared/src/prisma-transaction-retry",
         "^@guestpost/shared/dist/observability/request-context$":
           "<rootDir>/../../../../../packages/shared/src/observability/request-context",
         "^@guestpost/shared/dist/observability/structured-logger$":
@@ -104,7 +120,7 @@ module.exports = {
         "^better-auth/api$": "<rootDir>/../../__mocks__/better-auth",
       },
       setupFiles: ["<rootDir>/../../../jest.setup.js"],
-      testTimeout: 30_000, // integration specs are slower (DB clone + boot + seed)
+      setupFilesAfterEnv: ["<rootDir>/../../../jest.integration.setup.js"],
     },
   ],
   collectCoverageFrom: ["**/*.(t|j)s"],

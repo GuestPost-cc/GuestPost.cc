@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-07-28
+updated: 2026-07-29
 ---
 
 # GuestPost.cc
@@ -12,7 +12,9 @@ updated: 2026-07-28
 
 - **Backend**: NestJS (apps/api), PostgreSQL via Prisma, Redis (BullMQ queues + caching)
 - **Frontend**: Next.js 4 apps (portal, admin, publisher, website), Tailwind, shadcn/ui
-- **Payments**: Stripe Connect (Checkout Sessions + PaymentIntents), Wise API (payouts)
+- **Payments**: Stripe Checkout/PaymentIntents and Stripe Connect; Wise adapter
+  code exists but automated Wise sends/completion/replay are disabled pending
+  certification
 - **Language**: TypeScript 6, strict mode, project references
 - **Tooling**: pnpm 11, Turbo 2, Biome, opencode
 
@@ -126,12 +128,51 @@ Open/partial items require architectural design discussion.
   provider event credits the wallet only for an explicit paid state. The
   attempt, wallet balance, ledger row, webhook inbox row, and audit record
   commit in one database transaction.
+- `docs/FINANCIAL_INVARIANTS.md` is the canonical money-path contract. Customer
+  wallets are closed-loop; the former internal-only wallet withdrawal route is
+  retired. Stripe checkout-success recovery currently depends on fresh signed
+  webhook redelivery because the normalized inbox cannot independently replay
+  a credit and no authenticated provider catch-up worker exists.
+- Stripe chargebacks use durable provider-neutral `PaymentDispute` cases.
+  Deposit provider identity is never reused for holds; case-owned
+  hold/shortfall/resolution evidence, inbox state, wallet movement, ledger, and
+  audit converge through one serializable API/worker transition. Disputes and
+  new wallet reservations share a `Wallet ... FOR UPDATE` boundary; positive
+  `OPEN`/`LOST` current exposure blocks new available-balance spending with a
+  stable 409, including after later credits. `WON`/zero exposure permits spend.
 - Publisher provider accounts are separate from payout methods. Stripe Connect
   uses hosted Express onboarding and stores no publisher bank credentials;
   payout execution persists distinct platform-to-connected `Transfer` and
   connected-to-bank `Payout` references. Only a paid bank payout completes a
   withdrawal, while explicit recovery/cancellation stages keep ambiguous
   provider outcomes reserved for reconciliation.
+- Publisher withdrawal request reserves liability once; approval validates the
+  existing allocation rather than checking available balance again. Automated
+  payout completion requires the persisted provider object, exact provider
+  minor-unit amount/currency, and Stripe connected-account scope. A local
+  `PRE_PROVIDER_ABORT` proves no provider call began and is distinct from typed
+  provider cancellation/reversal.
+- Append-only normalized `PayoutExecutionClaim` rows are the sole authority for
+  provider sends and exact-key recovery; `providerMetadata` is informational
+  and `externalClaims` is forbidden. Database state graphs and maker-checker
+  guards separate the approver, execution initiator/first send claimant, and
+  manual payment checker at their respective trust boundaries.
+- A credited deposit remains wallet-credit-backed in `SUCCEEDED`,
+  `PARTIALLY_REFUNDED`, `REFUNDED`, `DISPUTED`, and `CHARGEBACK`. Every
+  newly accepted Stripe inbox event carries immutable `livemode` evidence;
+  historical rows without it cannot authorize a new money transition. Both
+  `sk_*` and restricted `rk_*` credentials use the same fail-closed mode
+  classifier.
+- Production finance runtime modes are explicit: `normal` permits classified
+  work, `recovery_only` retains reads/inbound evidence/recovery/reconciliation,
+  and `locked` retains only reads/inbound evidence. Missing or invalid
+  production configuration resolves to `locked`.
+- Finance evidence migrations are hard-drain cutovers. Old API/worker writers
+  are incompatible once the database guards are installed; rollback keeps
+  money gates closed and uses an evidence-aware forward fix rather than
+  dropping guards or rewriting financial history. Release proof includes a
+  sanitized populated-clone rehearsal and zero unvalidated financial
+  constraints.
 - Stripe test and live modes are isolated by key/event mode checks, separate
   deposit and Connect webhook secrets, independent feature kill switches, and
   a second opt-in gate for live keys. Stripe Connect is USD-only until an
@@ -202,7 +243,9 @@ Open/partial items require architectural design discussion.
 
 ## Seed Script (`scripts/seed.ts`)
 
-- Creates 6 dev users via the API (real password hashing), then bootstraps staff roles via DB
+- Creates 7 dev users via the API (real password hashing), including an
+  independent Finance checker for payout maker-checker testing, then
+  bootstraps staff roles via DB
 - Expects `.env.development` with `DATABASE_URL` (creates from `.env.example` if missing)
 - Uses `scripts/env.ts` `loadRootEnv()` to load `.env.development`, stripping inline `#` comments (dotenv-compatible)
 - API must be running on `:4000`

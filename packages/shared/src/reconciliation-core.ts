@@ -15,6 +15,11 @@
 // All checks use set-based grouped queries — a fixed number of round trips
 // regardless of row counts.
 
+import {
+  isWalletCreditBackedDepositStatus,
+  WALLET_CREDIT_BACKED_DEPOSIT_STATUSES,
+} from "./deposit-status"
+
 type AnyPrisma = any
 
 // ─── Fixed-point money helpers (BigInt, 12 fractional digits) ───────────────
@@ -79,9 +84,36 @@ export enum ReconciliationCode {
   PAYOUT_DUPLICATE_COMPLETED = "PAYOUT_DUPLICATE_COMPLETED",
   PAYOUT_LIFETIME_DRIFT = "PAYOUT_LIFETIME_DRIFT",
   PAYOUT_COMPLETED_NO_EXECUTION = "PAYOUT_COMPLETED_NO_EXECUTION",
+  PAYOUT_COMPLETION_EVIDENCE_INVALID = "PAYOUT_COMPLETION_EVIDENCE_INVALID",
+  PAYOUT_LEGACY_COMPLETION_UNVERIFIED = "PAYOUT_LEGACY_COMPLETION_UNVERIFIED",
+  PAYOUT_CLAIM_STALE = "PAYOUT_CLAIM_STALE",
+  PAYOUT_CLAIM_EXPIRED = "PAYOUT_CLAIM_EXPIRED",
+  PAYOUT_STATUS_MISMATCH = "PAYOUT_STATUS_MISMATCH",
+  PAYOUT_REQUESTER_PROVENANCE_MISSING = "PAYOUT_REQUESTER_PROVENANCE_MISSING",
+  PAYOUT_WEBHOOK_QUARANTINED = "PAYOUT_WEBHOOK_QUARANTINED",
   DEPOSIT_SUCCEEDED_NO_LEDGER = "DEPOSIT_SUCCEEDED_NO_LEDGER",
   DEPOSIT_LEDGER_AMOUNT_MISMATCH = "DEPOSIT_LEDGER_AMOUNT_MISMATCH",
   DEPOSIT_LEDGER_WITHOUT_SUCCESS = "DEPOSIT_LEDGER_WITHOUT_SUCCESS",
+  DEPOSIT_INBOX_STALE = "DEPOSIT_INBOX_STALE",
+  DEPOSIT_INBOX_FAILED = "DEPOSIT_INBOX_FAILED",
+  DEPOSIT_INBOX_QUARANTINED = "DEPOSIT_INBOX_QUARANTINED",
+  DEPOSIT_PROCESSED_EVIDENCE_MISMATCH = "DEPOSIT_PROCESSED_EVIDENCE_MISMATCH",
+  PAYMENT_PROVIDER_EVENT_MODE_UNVERIFIED = "PAYMENT_PROVIDER_EVENT_MODE_UNVERIFIED",
+  PAYMENT_DISPUTE_PROCESSED_NO_CASE = "PAYMENT_DISPUTE_PROCESSED_NO_CASE",
+  PAYMENT_DISPUTE_AMOUNT_MISMATCH = "PAYMENT_DISPUTE_AMOUNT_MISMATCH",
+  PAYMENT_DISPUTE_EXPOSURE_MISMATCH = "PAYMENT_DISPUTE_EXPOSURE_MISMATCH",
+  PAYMENT_DISPUTE_OPEN_HOLD_MISMATCH = "PAYMENT_DISPUTE_OPEN_HOLD_MISMATCH",
+  PAYMENT_DISPUTE_TERMINAL_HOLD_MISMATCH = "PAYMENT_DISPUTE_TERMINAL_HOLD_MISMATCH",
+  PAYMENT_DISPUTE_TERMINAL_RESOLUTION_MISMATCH = "PAYMENT_DISPUTE_TERMINAL_RESOLUTION_MISMATCH",
+  PAYMENT_DISPUTE_DEPOSIT_EVIDENCE_MISMATCH = "PAYMENT_DISPUTE_DEPOSIT_EVIDENCE_MISMATCH",
+  PAYMENT_DISPUTE_EVENT_EVIDENCE_MISMATCH = "PAYMENT_DISPUTE_EVENT_EVIDENCE_MISMATCH",
+  PAYMENT_DISPUTE_CUMULATIVE_AMOUNT_EXCEEDED = "PAYMENT_DISPUTE_CUMULATIVE_AMOUNT_EXCEEDED",
+  PAYMENT_DISPUTE_UNCOVERED_EXPOSURE = "PAYMENT_DISPUTE_UNCOVERED_EXPOSURE",
+  PAYMENT_DISPUTE_INBOX_STALE = "PAYMENT_DISPUTE_INBOX_STALE",
+  PAYMENT_DISPUTE_INBOX_FAILED = "PAYMENT_DISPUTE_INBOX_FAILED",
+  PAYMENT_DISPUTE_INBOX_QUARANTINED = "PAYMENT_DISPUTE_INBOX_QUARANTINED",
+  PAYMENT_DISPUTE_ORPHAN_LEDGER = "PAYMENT_DISPUTE_ORPHAN_LEDGER",
+  WALLET_WITHDRAWAL_WITHOUT_EXECUTION = "WALLET_WITHDRAWAL_WITHOUT_EXECUTION",
   WITHDRAWAL_ALLOCATION_MISMATCH = "WITHDRAWAL_ALLOCATION_MISMATCH",
   STRIPE_COMPLETED_WITHOUT_BANK_PAYOUT = "STRIPE_COMPLETED_WITHOUT_BANK_PAYOUT",
   PLATFORM_REVENUE_MISSING = "PLATFORM_REVENUE_MISSING",
@@ -130,6 +162,14 @@ export interface DriftRow {
     walletId?: string
     publicReference?: string
     payoutExecutionId?: string
+    completionSource?: string
+    payoutWebhookEventId?: string
+    providerDisputeId?: string
+    providerEventId?: string
+    paymentDisputeId?: string
+    depositAttemptId?: string
+    depositTransactionId?: string
+    providerStatus?: string
   }
   action?: {
     type: "wallet" | "order" | "settlement" | "publisher" | "payout"
@@ -143,7 +183,10 @@ async function checkProviderNeutralDeposits(
   if (!prisma.depositAttempt?.findMany) return []
   const attempts = await prisma.depositAttempt.findMany({
     where: {
-      OR: [{ status: "SUCCEEDED" }, { ledgerTransactionId: { not: null } }],
+      OR: [
+        { status: { in: [...WALLET_CREDIT_BACKED_DEPOSIT_STATUSES] } },
+        { ledgerTransactionId: { not: null } },
+      ],
     },
     select: {
       id: true,
@@ -155,11 +198,38 @@ async function checkProviderNeutralDeposits(
       ledgerTransaction: {
         select: { id: true, amount: true, currency: true, type: true },
       },
+      paymentDisputes: {
+        select: { status: true },
+      },
     },
   })
   const drift: DriftRow[] = []
   for (const attempt of attempts) {
-    if (attempt.status === "SUCCEEDED" && !attempt.ledgerTransaction) {
+    const disputeStatuses = Array.isArray(attempt.paymentDisputes)
+      ? attempt.paymentDisputes.map((item: any) => item.status)
+      : []
+    if (
+      (attempt.status === "DISPUTED" && !disputeStatuses.includes("OPEN")) ||
+      (attempt.status === "CHARGEBACK" && !disputeStatuses.includes("LOST"))
+    ) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_DEPOSIT_EVIDENCE_MISMATCH,
+          entityId: attempt.id,
+          entityType: "DepositAttempt",
+          message: `Deposit ${attempt.publicReference} is ${attempt.status} without the required durable dispute case`,
+          metadata: {
+            publicReference: attempt.publicReference,
+            depositAttemptId: attempt.id,
+            actualStatus: attempt.status,
+          },
+        }),
+      )
+    }
+    const walletWasCredited = isWalletCreditBackedDepositStatus(attempt.status)
+    if (walletWasCredited && !attempt.ledgerTransaction) {
       drift.push(
         makeRow({
           severity: "critical",
@@ -167,13 +237,13 @@ async function checkProviderNeutralDeposits(
           code: ReconciliationCode.DEPOSIT_SUCCEEDED_NO_LEDGER,
           entityId: attempt.id,
           entityType: "DepositAttempt",
-          message: `Deposit ${attempt.publicReference} succeeded without an attached ledger transaction`,
+          message: `Deposit ${attempt.publicReference} is ${attempt.status} without an attached wallet-credit ledger transaction`,
           metadata: { publicReference: attempt.publicReference },
         }),
       )
       continue
     }
-    if (attempt.status !== "SUCCEEDED" && attempt.ledgerTransaction) {
+    if (!walletWasCredited && attempt.ledgerTransaction) {
       drift.push(
         makeRow({
           severity: "critical",
@@ -217,6 +287,934 @@ async function checkProviderNeutralDeposits(
     }
   }
   return drift
+}
+
+async function checkDepositProviderEvents(
+  prisma: AnyPrisma,
+): Promise<DriftRow[]> {
+  if (!prisma.paymentProviderEvent?.findMany) return []
+  const successEventTypes = new Set([
+    "checkout.session.completed",
+    "checkout.session.async_payment_succeeded",
+  ])
+  const events = await prisma.paymentProviderEvent.findMany({
+    where: {
+      eventType: { in: [...successEventTypes] },
+    },
+    select: {
+      id: true,
+      provider: true,
+      providerEventId: true,
+      eventType: true,
+      objectId: true,
+      depositAttemptId: true,
+      livemode: true,
+      status: true,
+      attempts: true,
+      availableAt: true,
+      lockedAt: true,
+      receivedAt: true,
+      lastError: true,
+      depositAttempt: {
+        select: {
+          id: true,
+          walletId: true,
+          provider: true,
+          providerSessionId: true,
+          providerPaymentId: true,
+          walletCredit: true,
+          currency: true,
+          status: true,
+          ledgerTransactionId: true,
+          ledgerTransaction: {
+            select: {
+              id: true,
+              walletId: true,
+              amount: true,
+              currency: true,
+              type: true,
+              provider: true,
+              providerRef: true,
+            },
+          },
+        },
+      },
+    },
+  })
+  const now = Date.now()
+  const drift: DriftRow[] = []
+  for (const event of events.filter((item: any) =>
+    successEventTypes.has(item.eventType),
+  )) {
+    const metadata = {
+      providerEventId: event.providerEventId,
+      depositAttemptId: event.depositAttemptId ?? undefined,
+      actualStatus: event.status,
+    }
+    if (event.provider === "stripe" && typeof event.livemode !== "boolean") {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_PROVIDER_EVENT_MODE_UNVERIFIED,
+          entityId: event.id,
+          entityType: "PaymentProviderEvent",
+          message: `Stripe deposit event ${event.providerEventId} is legacy evidence without a durable test/live mode`,
+          metadata,
+        }),
+      )
+    }
+    if (event.status === "QUARANTINED") {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.DEPOSIT_INBOX_QUARANTINED,
+          entityId: event.id,
+          entityType: "PaymentProviderEvent",
+          message: `Deposit success event ${event.providerEventId} is quarantined and requires Finance review`,
+          metadata,
+        }),
+      )
+      continue
+    }
+    if (event.status === "PROCESSED") {
+      const attempt = event.depositAttempt
+      const ledger = attempt?.ledgerTransaction
+      const exact =
+        attempt &&
+        ledger &&
+        attempt.id === event.depositAttemptId &&
+        attempt.provider === event.provider &&
+        attempt.providerSessionId === event.objectId &&
+        isWalletCreditBackedDepositStatus(attempt.status) &&
+        attempt.ledgerTransactionId === ledger.id &&
+        ledger.type === "DEPOSIT" &&
+        ledger.walletId === attempt.walletId &&
+        toScaled(ledger.amount) === toScaled(attempt.walletCredit) &&
+        ledger.currency === attempt.currency &&
+        ledger.provider === attempt.provider &&
+        ledger.providerRef === attempt.providerPaymentId
+      if (!exact) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.PAYMENT,
+            code: ReconciliationCode.DEPOSIT_PROCESSED_EVIDENCE_MISMATCH,
+            entityId: event.id,
+            entityType: "PaymentProviderEvent",
+            message: `Processed deposit success event ${event.providerEventId} lacks exact attempt and wallet-credit ledger evidence`,
+            metadata,
+          }),
+        )
+      }
+      continue
+    }
+    if (event.status === "FAILED") {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.DEPOSIT_INBOX_FAILED,
+          entityId: event.id,
+          entityType: "PaymentProviderEvent",
+          message: `Deposit success event ${event.providerEventId} failed and requires a signed provider redelivery`,
+          metadata,
+        }),
+      )
+      continue
+    }
+    const receivedAt = new Date(event.receivedAt).getTime()
+    const lockedAt = event.lockedAt
+      ? new Date(event.lockedAt).getTime()
+      : Number.NaN
+    const stale =
+      (event.status === "PENDING" &&
+        (!Number.isFinite(receivedAt) || now - receivedAt > 15 * 60 * 1000)) ||
+      (event.status === "PROCESSING" &&
+        (!Number.isFinite(lockedAt) || now - lockedAt > 15 * 60 * 1000))
+    if (stale) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.DEPOSIT_INBOX_STALE,
+          entityId: event.id,
+          entityType: "PaymentProviderEvent",
+          message: `Deposit success event ${event.providerEventId} has a stale ${event.status} inbox state`,
+          metadata,
+        }),
+      )
+    }
+  }
+  return drift
+}
+
+async function checkPaymentDisputes(prisma: AnyPrisma): Promise<DriftRow[]> {
+  if (!prisma.paymentDispute?.findMany) return []
+  const cases = await prisma.paymentDispute.findMany({
+    select: {
+      id: true,
+      provider: true,
+      providerDisputeId: true,
+      providerPaymentId: true,
+      providerChargeId: true,
+      depositAttemptId: true,
+      depositTransactionId: true,
+      openedByEventId: true,
+      resolvedByEventId: true,
+      providerStatus: true,
+      openedAt: true,
+      resolvedAt: true,
+      amount: true,
+      currency: true,
+      heldAmount: true,
+      shortfallAmount: true,
+      currentExposureAmount: true,
+      status: true,
+      walletId: true,
+      depositAttempt: {
+        select: {
+          id: true,
+          walletId: true,
+          walletCredit: true,
+          currency: true,
+          provider: true,
+          providerPaymentId: true,
+          ledgerTransactionId: true,
+          status: true,
+        },
+      },
+      depositTransaction: {
+        select: {
+          id: true,
+          walletId: true,
+          amount: true,
+          currency: true,
+          type: true,
+          provider: true,
+          providerRef: true,
+        },
+      },
+      openedByEvent: {
+        select: {
+          id: true,
+          provider: true,
+          providerEventId: true,
+          eventType: true,
+          objectId: true,
+          depositAttemptId: true,
+          paymentDisputeId: true,
+          providerPaymentId: true,
+          providerChargeId: true,
+          disputeAmountMinor: true,
+          disputeCurrency: true,
+          providerStatus: true,
+          livemode: true,
+          eventFingerprint: true,
+          status: true,
+        },
+      },
+      resolvedByEvent: {
+        select: {
+          id: true,
+          provider: true,
+          providerEventId: true,
+          eventType: true,
+          objectId: true,
+          depositAttemptId: true,
+          paymentDisputeId: true,
+          providerPaymentId: true,
+          providerChargeId: true,
+          disputeAmountMinor: true,
+          disputeCurrency: true,
+          providerStatus: true,
+          livemode: true,
+          eventFingerprint: true,
+          status: true,
+        },
+      },
+      holdTransaction: {
+        select: {
+          id: true,
+          walletId: true,
+          amount: true,
+          currency: true,
+          type: true,
+          reference: true,
+          provider: true,
+          providerRef: true,
+        },
+      },
+      resolutionTransaction: {
+        select: {
+          id: true,
+          walletId: true,
+          amount: true,
+          currency: true,
+          type: true,
+          reference: true,
+          provider: true,
+          providerRef: true,
+        },
+      },
+    },
+  })
+  const drift: DriftRow[] = []
+  const casesById = new Map(cases.map((item: any) => [item.id, item]))
+  const deposits = new Map<
+    string,
+    {
+      amount: bigint
+      disputed: bigint
+      walletId: string
+      statuses: string[]
+      attempt: any
+      providerDisputeId: string
+    }
+  >()
+  const openStatuses = new Set([
+    "needs_response",
+    "under_review",
+    "warning_needs_response",
+    "warning_under_review",
+  ])
+  const wonStatuses = new Set(["won", "prevented", "warning_closed"])
+
+  const eventAmountMatches = (event: any, amount: unknown): boolean => {
+    try {
+      return (
+        event?.disputeAmountMinor != null &&
+        toScaled(amount) * 100n ===
+          BigInt(event.disputeAmountMinor) * SCALE_FACTOR
+      )
+    } catch {
+      return false
+    }
+  }
+
+  const eventMatchesCase = (
+    event: any,
+    paymentDispute: any,
+    expectedType: "charge.dispute.created" | "charge.dispute.closed",
+  ): boolean => {
+    const validStatus =
+      expectedType === "charge.dispute.created"
+        ? openStatuses.has(event?.providerStatus)
+        : paymentDispute.status === "WON"
+          ? wonStatuses.has(event?.providerStatus)
+          : event?.providerStatus === "lost"
+    return Boolean(
+      event &&
+        event.status === "PROCESSED" &&
+        event.eventType === expectedType &&
+        event.provider === paymentDispute.provider &&
+        event.objectId === paymentDispute.providerDisputeId &&
+        event.paymentDisputeId === paymentDispute.id &&
+        event.depositAttemptId === paymentDispute.depositAttemptId &&
+        event.providerPaymentId === paymentDispute.providerPaymentId &&
+        (event.providerChargeId ?? null) ===
+          (paymentDispute.providerChargeId ?? null) &&
+        event.disputeCurrency === paymentDispute.currency &&
+        eventAmountMatches(event, paymentDispute.amount) &&
+        typeof event.livemode === "boolean" &&
+        typeof event.eventFingerprint === "string" &&
+        /^[0-9a-f]{64}$/.test(event.eventFingerprint) &&
+        validStatus,
+    )
+  }
+
+  for (const paymentDispute of cases) {
+    const amount = toScaled(paymentDispute.amount)
+    const held = toScaled(paymentDispute.heldAmount)
+    const bookedShortfall = toScaled(paymentDispute.shortfallAmount)
+    const currentExposure = toScaled(paymentDispute.currentExposureAmount)
+    if (
+      amount <= 0n ||
+      held < 0n ||
+      held > amount ||
+      bookedShortfall < 0n ||
+      held + bookedShortfall !== amount
+    ) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_AMOUNT_MISMATCH,
+          entityId: paymentDispute.id,
+          entityType: "PaymentDispute",
+          amount: fromScaled(amount),
+          message: `Payment dispute ${paymentDispute.providerDisputeId} has inconsistent amount, hold, or booked shortfall values`,
+          metadata: {
+            paymentDisputeId: paymentDispute.id,
+            providerDisputeId: paymentDispute.providerDisputeId,
+            walletId: paymentDispute.walletId,
+            expectedAmount: fromScaled(amount),
+            actualAmount: `${fromScaled(held)} held + ${fromScaled(bookedShortfall)} booked shortfall`,
+          },
+          action: { type: "wallet", id: paymentDispute.walletId },
+        }),
+      )
+    }
+
+    const expectedExposure =
+      paymentDispute.status === "WON" ? 0n : bookedShortfall
+    if (currentExposure < 0n || currentExposure !== expectedExposure) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_EXPOSURE_MISMATCH,
+          entityId: paymentDispute.id,
+          entityType: "PaymentDispute",
+          amount: fromScaled(currentExposure),
+          message: `Payment dispute ${paymentDispute.providerDisputeId} has inconsistent current exposure for ${paymentDispute.status}`,
+          metadata: {
+            paymentDisputeId: paymentDispute.id,
+            providerDisputeId: paymentDispute.providerDisputeId,
+            walletId: paymentDispute.walletId,
+            expectedAmount: fromScaled(expectedExposure),
+            actualAmount: fromScaled(currentExposure),
+          },
+          action: { type: "wallet", id: paymentDispute.walletId },
+        }),
+      )
+    } else if (currentExposure > 0n) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_UNCOVERED_EXPOSURE,
+          entityId: paymentDispute.id,
+          entityType: "PaymentDispute",
+          amount: fromScaled(currentExposure),
+          message: `Payment dispute ${paymentDispute.providerDisputeId} has ${fromScaled(currentExposure)} ${paymentDispute.currency} of uncovered customer-wallet exposure`,
+          metadata: {
+            paymentDisputeId: paymentDispute.id,
+            providerDisputeId: paymentDispute.providerDisputeId,
+            walletId: paymentDispute.walletId,
+            actualAmount: fromScaled(currentExposure),
+          },
+          action: { type: "wallet", id: paymentDispute.walletId },
+        }),
+      )
+    }
+
+    const attempt = paymentDispute.depositAttempt
+    const deposit = paymentDispute.depositTransaction
+    const hasDepositProjection = Object.hasOwn(
+      paymentDispute,
+      "depositAttemptId",
+    )
+    const exactDeposit =
+      attempt &&
+      deposit &&
+      paymentDispute.currency === "USD" &&
+      deposit.id === paymentDispute.depositTransactionId &&
+      deposit.type === "DEPOSIT" &&
+      deposit.walletId === paymentDispute.walletId &&
+      deposit.currency === paymentDispute.currency &&
+      deposit.provider === paymentDispute.provider &&
+      deposit.providerRef === paymentDispute.providerPaymentId &&
+      attempt.id === paymentDispute.depositAttemptId &&
+      attempt.ledgerTransactionId === deposit.id &&
+      attempt.walletId === paymentDispute.walletId &&
+      attempt.currency === paymentDispute.currency &&
+      attempt.provider === paymentDispute.provider &&
+      attempt.providerPaymentId === paymentDispute.providerPaymentId &&
+      isWalletCreditBackedDepositStatus(attempt.status) &&
+      toScaled(attempt.walletCredit) === toScaled(deposit.amount) &&
+      amount <= toScaled(deposit.amount)
+    if (hasDepositProjection && !exactDeposit) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_DEPOSIT_EVIDENCE_MISMATCH,
+          entityId: paymentDispute.id,
+          entityType: "PaymentDispute",
+          amount: fromScaled(amount),
+          message: `Payment dispute ${paymentDispute.providerDisputeId} does not exactly match its credited deposit and funding attempt`,
+          metadata: {
+            paymentDisputeId: paymentDispute.id,
+            providerDisputeId: paymentDispute.providerDisputeId,
+            walletId: paymentDispute.walletId,
+            depositAttemptId: paymentDispute.depositAttemptId,
+            depositTransactionId: paymentDispute.depositTransactionId,
+          },
+          action: { type: "wallet", id: paymentDispute.walletId },
+        }),
+      )
+    } else if (exactDeposit) {
+      const grouped = deposits.get(deposit.id) ?? {
+        amount: toScaled(deposit.amount),
+        disputed: 0n,
+        walletId: paymentDispute.walletId,
+        statuses: [] as string[],
+        attempt,
+        providerDisputeId: paymentDispute.providerDisputeId,
+      }
+      grouped.disputed += amount
+      grouped.statuses.push(paymentDispute.status)
+      deposits.set(deposit.id, grouped)
+    }
+
+    const validProviderState =
+      paymentDispute.status === "OPEN"
+        ? openStatuses.has(paymentDispute.providerStatus)
+        : paymentDispute.status === "WON"
+          ? wonStatuses.has(paymentDispute.providerStatus)
+          : paymentDispute.providerStatus === "lost"
+    const openingEvidenceValid =
+      paymentDispute.openedByEventId == null
+        ? paymentDispute.status !== "OPEN" &&
+          paymentDispute.openedAt == null &&
+          paymentDispute.openedByEvent == null
+        : paymentDispute.openedAt != null &&
+          paymentDispute.openedByEvent?.id === paymentDispute.openedByEventId &&
+          eventMatchesCase(
+            paymentDispute.openedByEvent,
+            paymentDispute,
+            "charge.dispute.created",
+          )
+    const resolutionEvidenceValid =
+      paymentDispute.status === "OPEN"
+        ? paymentDispute.resolvedByEventId == null &&
+          paymentDispute.resolvedAt == null &&
+          paymentDispute.resolvedByEvent == null
+        : paymentDispute.resolvedByEventId != null &&
+          paymentDispute.resolvedAt != null &&
+          paymentDispute.resolvedByEvent?.id ===
+            paymentDispute.resolvedByEventId &&
+          eventMatchesCase(
+            paymentDispute.resolvedByEvent,
+            paymentDispute,
+            "charge.dispute.closed",
+          )
+    const hasEventProjection = Object.hasOwn(paymentDispute, "providerStatus")
+    if (
+      hasEventProjection &&
+      (!validProviderState || !openingEvidenceValid || !resolutionEvidenceValid)
+    ) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_EVENT_EVIDENCE_MISMATCH,
+          entityId: paymentDispute.id,
+          entityType: "PaymentDispute",
+          message: `Payment dispute ${paymentDispute.providerDisputeId} has missing or contradictory normalized provider-event evidence`,
+          metadata: {
+            paymentDisputeId: paymentDispute.id,
+            providerDisputeId: paymentDispute.providerDisputeId,
+            providerStatus: paymentDispute.providerStatus,
+            expectedStatus: paymentDispute.status,
+          },
+          action: { type: "wallet", id: paymentDispute.walletId },
+        }),
+      )
+    }
+
+    const hold = paymentDispute.holdTransaction
+    const referencePrefix = `payment-dispute:${paymentDispute.provider}:${paymentDispute.providerDisputeId}`
+    const hasExactHold =
+      hold &&
+      hold.walletId === paymentDispute.walletId &&
+      hold.currency === paymentDispute.currency &&
+      hold.type === "RESERVATION" &&
+      hold.reference === `${referencePrefix}:hold` &&
+      hold.provider == null &&
+      hold.providerRef == null &&
+      toScaled(hold.amount) === -held
+    if (paymentDispute.status === "OPEN") {
+      const validHold =
+        paymentDispute.resolutionTransaction == null &&
+        (held === 0n ? hold == null : hasExactHold)
+      if (!validHold) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.PAYMENT,
+            code: ReconciliationCode.PAYMENT_DISPUTE_OPEN_HOLD_MISMATCH,
+            entityId: paymentDispute.id,
+            entityType: "PaymentDispute",
+            amount: fromScaled(held),
+            message: `Open payment dispute ${paymentDispute.providerDisputeId} is missing exact wallet-hold evidence`,
+            metadata: {
+              paymentDisputeId: paymentDispute.id,
+              providerDisputeId: paymentDispute.providerDisputeId,
+              walletId: paymentDispute.walletId,
+              transactionId: hold?.id,
+              expectedAmount: fromScaled(-held),
+              actualAmount: hold ? String(hold.amount) : undefined,
+            },
+            action: { type: "wallet", id: paymentDispute.walletId },
+          }),
+        )
+      }
+      continue
+    }
+
+    const validTerminalHold =
+      held === 0n
+        ? hold == null
+        : paymentDispute.status === "WON"
+          ? hasExactHold
+          : hold == null || hasExactHold
+    if (!validTerminalHold) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_TERMINAL_HOLD_MISMATCH,
+          entityId: paymentDispute.id,
+          entityType: "PaymentDispute",
+          amount: fromScaled(held),
+          message: `Terminal payment dispute ${paymentDispute.providerDisputeId} has invalid historical hold evidence for ${paymentDispute.status}`,
+          metadata: {
+            paymentDisputeId: paymentDispute.id,
+            providerDisputeId: paymentDispute.providerDisputeId,
+            walletId: paymentDispute.walletId,
+            transactionId: hold?.id,
+            expectedAmount: fromScaled(-held),
+            actualAmount: hold ? String(hold.amount) : undefined,
+          },
+          action: { type: "wallet", id: paymentDispute.walletId },
+        }),
+      )
+    }
+
+    const resolution = paymentDispute.resolutionTransaction
+    const expectedType =
+      paymentDispute.status === "WON" ? "RESERVATION" : "CHARGEBACK"
+    const expectedAmount = paymentDispute.status === "WON" ? held : -held
+    const validResolution =
+      held === 0n
+        ? resolution == null
+        : resolution &&
+          resolution.walletId === paymentDispute.walletId &&
+          resolution.currency === paymentDispute.currency &&
+          resolution.type === expectedType &&
+          resolution.reference ===
+            `${referencePrefix}:${paymentDispute.status.toLowerCase()}` &&
+          resolution.provider == null &&
+          resolution.providerRef == null &&
+          toScaled(resolution.amount) === expectedAmount
+    if (!validResolution) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_TERMINAL_RESOLUTION_MISMATCH,
+          entityId: paymentDispute.id,
+          entityType: "PaymentDispute",
+          amount: fromScaled(expectedAmount),
+          message: `Terminal payment dispute ${paymentDispute.providerDisputeId} is missing exact ${paymentDispute.status} resolution evidence`,
+          metadata: {
+            paymentDisputeId: paymentDispute.id,
+            providerDisputeId: paymentDispute.providerDisputeId,
+            walletId: paymentDispute.walletId,
+            transactionId: resolution?.id,
+            expectedAmount: fromScaled(expectedAmount),
+            actualAmount: resolution ? String(resolution.amount) : undefined,
+            expectedStatus: expectedType,
+            actualStatus: resolution?.type,
+          },
+          action: { type: "wallet", id: paymentDispute.walletId },
+        }),
+      )
+    }
+  }
+
+  for (const [depositTransactionId, grouped] of deposits) {
+    if (grouped.disputed > grouped.amount) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_CUMULATIVE_AMOUNT_EXCEEDED,
+          entityId: depositTransactionId,
+          entityType: "Transaction",
+          amount: fromScaled(grouped.disputed - grouped.amount),
+          message: `Cumulative disputes exceed originating deposit ${depositTransactionId}`,
+          metadata: {
+            providerDisputeId: grouped.providerDisputeId,
+            walletId: grouped.walletId,
+            depositTransactionId,
+            expectedAmount: fromScaled(grouped.amount),
+            actualAmount: fromScaled(grouped.disputed),
+          },
+          action: { type: "wallet", id: grouped.walletId },
+        }),
+      )
+    }
+    const expectedAttemptStatus = grouped.statuses.includes("LOST")
+      ? "CHARGEBACK"
+      : grouped.statuses.includes("OPEN")
+        ? "DISPUTED"
+        : "SUCCEEDED"
+    const refundProjectionPreserved =
+      grouped.attempt.status === "PARTIALLY_REFUNDED" ||
+      grouped.attempt.status === "REFUNDED"
+    if (
+      grouped.attempt.status !== expectedAttemptStatus &&
+      !refundProjectionPreserved
+    ) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_DEPOSIT_EVIDENCE_MISMATCH,
+          entityId: grouped.attempt.id,
+          entityType: "DepositAttempt",
+          message: `Deposit attempt ${grouped.attempt.id} is ${grouped.attempt.status} but its dispute cases require ${expectedAttemptStatus}`,
+          metadata: {
+            depositAttemptId: grouped.attempt.id,
+            depositTransactionId,
+            walletId: grouped.walletId,
+            expectedStatus: expectedAttemptStatus,
+            actualStatus: grouped.attempt.status,
+          },
+          action: { type: "wallet", id: grouped.walletId },
+        }),
+      )
+    }
+  }
+
+  if (prisma.paymentProviderEvent?.findMany) {
+    const events = await prisma.paymentProviderEvent.findMany({
+      where: {
+        eventType: {
+          in: ["charge.dispute.created", "charge.dispute.closed"],
+        },
+      },
+      select: {
+        id: true,
+        provider: true,
+        providerEventId: true,
+        eventType: true,
+        objectId: true,
+        depositAttemptId: true,
+        paymentDisputeId: true,
+        providerPaymentId: true,
+        providerChargeId: true,
+        disputeAmountMinor: true,
+        disputeCurrency: true,
+        providerStatus: true,
+        livemode: true,
+        eventFingerprint: true,
+        status: true,
+        attempts: true,
+        availableAt: true,
+        lockedAt: true,
+        receivedAt: true,
+        lastError: true,
+      },
+    })
+    const now = Date.now()
+    for (const event of events.filter((item: any) =>
+      ["charge.dispute.created", "charge.dispute.closed"].includes(
+        item.eventType,
+      ),
+    )) {
+      if (event.status === "QUARANTINED") {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.PAYMENT,
+            code: ReconciliationCode.PAYMENT_DISPUTE_INBOX_QUARANTINED,
+            entityId: event.id,
+            entityType: "PaymentProviderEvent",
+            message: `Payment dispute event ${event.providerEventId} is quarantined and requires Finance review`,
+            metadata: {
+              providerEventId: event.providerEventId,
+              providerDisputeId: event.objectId ?? undefined,
+              paymentDisputeId: event.paymentDisputeId ?? undefined,
+              actualStatus: event.status,
+            },
+          }),
+        )
+        continue
+      }
+      if (event.status === "FAILED") {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.PAYMENT,
+            code: ReconciliationCode.PAYMENT_DISPUTE_INBOX_FAILED,
+            entityId: event.id,
+            entityType: "PaymentProviderEvent",
+            message: `Payment dispute event ${event.providerEventId} failed and is awaiting durable retry`,
+            metadata: {
+              providerEventId: event.providerEventId,
+              providerDisputeId: event.objectId ?? undefined,
+              actualStatus: event.status,
+            },
+          }),
+        )
+        continue
+      }
+      const receivedAt = new Date(event.receivedAt).getTime()
+      const lockedAt = event.lockedAt
+        ? new Date(event.lockedAt).getTime()
+        : Number.NaN
+      const stale =
+        (event.status === "PENDING" && now - receivedAt > 15 * 60 * 1000) ||
+        (event.status === "PROCESSING" &&
+          (!Number.isFinite(lockedAt) || now - lockedAt > 15 * 60 * 1000))
+      if (stale) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.PAYMENT,
+            code: ReconciliationCode.PAYMENT_DISPUTE_INBOX_STALE,
+            entityId: event.id,
+            entityType: "PaymentProviderEvent",
+            message: `Payment dispute event ${event.providerEventId} has a stale ${event.status} inbox state`,
+            metadata: {
+              providerEventId: event.providerEventId,
+              providerDisputeId: event.objectId ?? undefined,
+              actualStatus: event.status,
+            },
+          }),
+        )
+        continue
+      }
+      if (event.status !== "PROCESSED") continue
+
+      const paymentDispute = casesById.get(event.paymentDisputeId)
+      if (!paymentDispute) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.PAYMENT,
+            code: ReconciliationCode.PAYMENT_DISPUTE_PROCESSED_NO_CASE,
+            entityId: event.id,
+            entityType: "PaymentProviderEvent",
+            message: `Processed ${event.eventType} event ${event.providerEventId} has no exact durable payment-dispute association`,
+            metadata: {
+              providerEventId: event.providerEventId,
+              providerDisputeId: event.objectId ?? undefined,
+              paymentDisputeId: event.paymentDisputeId ?? undefined,
+            },
+          }),
+        )
+        continue
+      }
+      if (
+        !eventMatchesCase(
+          event,
+          paymentDispute,
+          event.eventType as "charge.dispute.created" | "charge.dispute.closed",
+        )
+      ) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.PAYMENT,
+            code: ReconciliationCode.PAYMENT_DISPUTE_EVENT_EVIDENCE_MISMATCH,
+            entityId: event.id,
+            entityType: "PaymentProviderEvent",
+            message: `Processed payment dispute event ${event.providerEventId} does not exactly match its durable case`,
+            metadata: {
+              providerEventId: event.providerEventId,
+              providerDisputeId: event.objectId ?? undefined,
+              paymentDisputeId: event.paymentDisputeId,
+            },
+          }),
+        )
+      }
+    }
+  }
+
+  if (prisma.transaction?.findMany) {
+    const ledgerRows = await prisma.transaction.findMany({
+      where: { reference: { startsWith: "payment-dispute:" } },
+      select: {
+        id: true,
+        walletId: true,
+        amount: true,
+        reference: true,
+        paymentDisputeHold: { select: { id: true } },
+        paymentDisputeResolution: { select: { id: true } },
+      },
+    })
+    for (const transaction of ledgerRows.filter((item: any) =>
+      String(item.reference ?? "").startsWith("payment-dispute:"),
+    )) {
+      if (
+        transaction.paymentDisputeHold ||
+        transaction.paymentDisputeResolution
+      ) {
+        continue
+      }
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_DISPUTE_ORPHAN_LEDGER,
+          entityId: transaction.id,
+          entityType: "Transaction",
+          amount: String(transaction.amount),
+          message: `Payment dispute ledger transaction ${transaction.id} is not linked to a durable case`,
+          metadata: {
+            transactionId: transaction.id,
+            walletId: transaction.walletId ?? undefined,
+          },
+          action: transaction.walletId
+            ? { type: "wallet", id: transaction.walletId }
+            : undefined,
+        }),
+      )
+    }
+  }
+
+  return drift
+}
+
+async function checkLegacyWalletWithdrawals(
+  prisma: AnyPrisma,
+): Promise<DriftRow[]> {
+  if (!prisma.transaction?.findMany) return []
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      type: "WITHDRAWAL",
+      walletId: { not: null },
+    },
+    select: {
+      id: true,
+      type: true,
+      walletId: true,
+      amount: true,
+      reference: true,
+      createdAt: true,
+    },
+  })
+
+  // Keep the defensive type check because lightweight reconciliation mocks do
+  // not execute Prisma WHERE clauses. Production Prisma already filters it.
+  return transactions
+    .filter(
+      (transaction: any) =>
+        transaction.type === "WITHDRAWAL" && transaction.walletId,
+    )
+    .map((transaction: any) =>
+      makeRow({
+        severity: "critical",
+        category: ReconciliationCategory.PAYMENT,
+        code: ReconciliationCode.WALLET_WITHDRAWAL_WITHOUT_EXECUTION,
+        entityId: transaction.id,
+        entityType: "Transaction",
+        amount: String(transaction.amount),
+        message: `Wallet withdrawal transaction ${transaction.id} has no durable external refund or transfer evidence`,
+        metadata: {
+          transactionId: transaction.id,
+          walletId: transaction.walletId,
+          publicReference: transaction.reference ?? undefined,
+        },
+        action: { type: "wallet", id: transaction.walletId },
+      }),
+    )
 }
 
 async function checkWithdrawalTraceability(
@@ -1299,8 +2297,18 @@ async function checkStuckPayouts(
   stats: DriftStats,
 ): Promise<DriftRow[]> {
   const drift: DriftRow[] = []
+  const claimLeaseExpiredAt = new Date(Date.now() - 15 * 60 * 1000)
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+  const claimedStages = [
+    "PROVIDER_SEND_CLAIMED",
+    "BANK_PAYOUT_SEND_CLAIMED",
+    "BANK_PAYOUT_RESUME_CLAIMED",
+  ]
+  const expiredClaimStages = [
+    "PROVIDER_SEND_CLAIM_EXPIRED",
+    "BANK_PAYOUT_CLAIM_EXPIRED",
+  ]
 
   // Stale PROCESSING withdrawals (>1h with no recent execution)
   const staleProcessing = await prisma.withdrawal.findMany({
@@ -1342,7 +2350,11 @@ async function checkStuckPayouts(
 
   // Stale PROCESSING executions (>2h)
   const staleExecutions = await prisma.payoutExecution.findMany({
-    where: { status: "PROCESSING", updatedAt: { lt: twoHoursAgo } },
+    where: {
+      status: "PROCESSING",
+      updatedAt: { lt: twoHoursAgo },
+      stage: { notIn: [...claimedStages, ...expiredClaimStages] },
+    },
     select: {
       id: true,
       withdrawalId: true,
@@ -1363,6 +2375,224 @@ async function checkStuckPayouts(
         action: { type: "payout", id: e.withdrawalId },
       }),
     )
+  }
+
+  const claimRecoveryExecutions = await prisma.payoutExecution.findMany({
+    where: {
+      OR: [
+        {
+          status: "PROCESSING",
+          stage: { in: claimedStages },
+          updatedAt: { lt: claimLeaseExpiredAt },
+        },
+        { stage: { in: expiredClaimStages } },
+      ],
+    },
+    select: {
+      id: true,
+      withdrawalId: true,
+      stage: true,
+      updatedAt: true,
+      providerExecutionId: true,
+      providerPayoutId: true,
+    },
+  })
+  for (const execution of claimRecoveryExecutions) {
+    const expired = expiredClaimStages.includes(execution.stage)
+    drift.push(
+      makeRow({
+        severity: expired ? "critical" : "warning",
+        category: ReconciliationCategory.PAYOUT,
+        code: expired
+          ? ReconciliationCode.PAYOUT_CLAIM_EXPIRED
+          : ReconciliationCode.PAYOUT_CLAIM_STALE,
+        entityId: execution.id,
+        entityType: "PayoutExecution",
+        message: expired
+          ? `Payout claim ${execution.id.slice(0, 8)} exceeded the safe idempotent replay window and requires provider lookup`
+          : `Payout claim ${execution.id.slice(0, 8)} outlived its send lease and is eligible only for exact-key recovery`,
+        metadata: {
+          payoutExecutionId: execution.id,
+          actualStatus: execution.stage,
+          transactionId:
+            execution.providerPayoutId ??
+            execution.providerExecutionId ??
+            undefined,
+        },
+        action: { type: "payout", id: execution.withdrawalId },
+      }),
+    )
+  }
+
+  const completedEvidence = await prisma.payoutExecution.findMany({
+    where: { status: "COMPLETED" },
+    select: {
+      id: true,
+      providerExecutionId: true,
+      providerPayoutId: true,
+      completionSource: true,
+      completionEvidenceRef: true,
+      completionEvidenceAt: true,
+      completedAt: true,
+      completionActorUserId: true,
+      completionWebhookEventId: true,
+      bankTraceReference: true,
+      provider: { select: { name: true } },
+      withdrawal: {
+        select: {
+          id: true,
+          status: true,
+          publisherId: true,
+          amount: true,
+        },
+      },
+    },
+  })
+  for (const execution of completedEvidence) {
+    if (execution.withdrawal.status !== "COMPLETED") {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYOUT,
+          code: ReconciliationCode.PAYOUT_STATUS_MISMATCH,
+          entityId: execution.id,
+          entityType: "PayoutExecution",
+          amount: String(execution.withdrawal.amount),
+          message: `Completed payout execution ${execution.id.slice(0, 8)} has ${execution.withdrawal.status} withdrawal`,
+          metadata: {
+            payoutExecutionId: execution.id,
+            publisherId: execution.withdrawal.publisherId,
+            expectedStatus: "COMPLETED",
+            actualStatus: execution.withdrawal.status,
+          },
+          action: { type: "payout", id: execution.withdrawal.id },
+        }),
+      )
+    }
+    const source = execution.completionSource
+    const evidenceAt = execution.completionEvidenceAt
+    const completedAt = execution.completedAt
+    const automated = ["PROVIDER_RESPONSE", "PROVIDER_STATUS_POLL"].includes(
+      source,
+    )
+    const valid =
+      Boolean(source && completedAt) &&
+      (source === "LEGACY_UNVERIFIED"
+        ? !execution.completionActorUserId &&
+          !execution.completionWebhookEventId
+        : Boolean(
+            execution.completionEvidenceRef &&
+              evidenceAt &&
+              evidenceAt.getTime() <= completedAt.getTime(),
+          )) &&
+      (source === "MANUAL_BANK_CONFIRMATION"
+        ? Boolean(
+            execution.completionActorUserId &&
+              !execution.completionWebhookEventId &&
+              execution.bankTraceReference === execution.completionEvidenceRef,
+          )
+        : source === "PROVIDER_WEBHOOK"
+          ? Boolean(
+              !execution.completionActorUserId &&
+                execution.completionWebhookEventId,
+            )
+          : automated
+            ? Boolean(
+                !execution.completionActorUserId &&
+                  !execution.completionWebhookEventId,
+              )
+            : source === "LEGACY_UNVERIFIED") &&
+      (execution.provider.name !== "stripe_connect" ||
+        source === "LEGACY_UNVERIFIED" ||
+        execution.completionEvidenceRef?.startsWith("po_"))
+    if (!valid) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYOUT,
+          code: ReconciliationCode.PAYOUT_COMPLETION_EVIDENCE_INVALID,
+          entityId: execution.id,
+          entityType: "PayoutExecution",
+          message: `Completed payout execution ${execution.id.slice(0, 8)} has invalid or missing completion provenance`,
+          metadata: {
+            payoutExecutionId: execution.id,
+            completionSource: source ?? undefined,
+            publisherId: execution.withdrawal.publisherId,
+          },
+          action: { type: "payout", id: execution.withdrawal.id },
+        }),
+      )
+    }
+    if (source === "LEGACY_UNVERIFIED") {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYOUT,
+          code: ReconciliationCode.PAYOUT_LEGACY_COMPLETION_UNVERIFIED,
+          entityId: execution.id,
+          entityType: "PayoutExecution",
+          amount: String(execution.withdrawal.amount),
+          message: `Completed payout execution ${execution.id.slice(0, 8)} has legacy-unverified settlement evidence and requires Finance substantiation`,
+          metadata: {
+            payoutExecutionId: execution.id,
+            completionSource: source,
+            publisherId: execution.withdrawal.publisherId,
+            transactionId:
+              execution.completionEvidenceRef ??
+              execution.providerPayoutId ??
+              execution.providerExecutionId ??
+              undefined,
+          },
+          action: { type: "payout", id: execution.withdrawal.id },
+        }),
+      )
+    }
+  }
+
+  const missingRequester = await prisma.withdrawal.findMany({
+    where: {
+      status: { in: ["PENDING", "APPROVED"] },
+      requestedBy: null,
+    },
+    select: { id: true, publisherId: true, amount: true, status: true },
+  })
+  for (const withdrawal of missingRequester) {
+    drift.push(
+      makeRow({
+        severity: "critical",
+        category: ReconciliationCategory.PAYOUT,
+        code: ReconciliationCode.PAYOUT_REQUESTER_PROVENANCE_MISSING,
+        entityId: withdrawal.id,
+        entityType: "Withdrawal",
+        amount: String(withdrawal.amount),
+        message: `Withdrawal ${withdrawal.id.slice(0, 8)} is ${withdrawal.status} without requester provenance and is blocked`,
+        metadata: { publisherId: withdrawal.publisherId },
+        action: { type: "payout", id: withdrawal.id },
+      }),
+    )
+  }
+
+  if (prisma.payoutWebhookEvent?.findMany) {
+    const quarantinedEvents = await prisma.payoutWebhookEvent.findMany({
+      where: { status: "QUARANTINED" },
+      select: { id: true, provider: true, providerExecutionId: true },
+    })
+    for (const event of quarantinedEvents) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYOUT,
+          code: ReconciliationCode.PAYOUT_WEBHOOK_QUARANTINED,
+          entityId: event.id,
+          entityType: "PayoutWebhookEvent",
+          message: `Payout webhook ${event.id.slice(0, 8)} is quarantined after contradictory terminal evidence`,
+          metadata: {
+            payoutWebhookEventId: event.id,
+            transactionId: event.providerExecutionId ?? undefined,
+          },
+        }),
+      )
+    }
   }
 
   // One grouped pass: FAILED-orphan / COMPLETED-orphan / duplicate-COMPLETED
@@ -1435,7 +2665,6 @@ async function checkStuckPayouts(
   // lifetimePaid drift vs COMPLETED withdrawal sums
   const [paidBalances, completedSums] = await Promise.all([
     prisma.publisherBalance.findMany({
-      where: { lifetimePaid: { gt: 0 } },
       select: { publisherId: true, lifetimePaid: true },
     }),
     prisma.withdrawal.groupBy({
@@ -1450,25 +2679,36 @@ async function checkStuckPayouts(
       toScaled(s._sum.amount ?? 0),
     ]),
   )
-  for (const b of paidBalances) {
-    const expected = completedByPublisher.get(b.publisherId) ?? 0n
-    const actual = toScaled(b.lifetimePaid)
+  const balanceByPublisher = new Map<string, any>(
+    paidBalances.map((balance: any) => [
+      balance.publisherId as string,
+      balance,
+    ]),
+  )
+  const payoutPublishers = new Set<string>([
+    ...balanceByPublisher.keys(),
+    ...completedByPublisher.keys(),
+  ])
+  for (const publisherId of payoutPublishers) {
+    const balance: any = balanceByPublisher.get(publisherId)
+    const expected = completedByPublisher.get(publisherId) ?? 0n
+    const actual = balance ? toScaled(balance.lifetimePaid) : 0n
     if (actual !== expected) {
       drift.push(
         makeRow({
           severity: "critical",
           category: ReconciliationCategory.PAYOUT,
           code: ReconciliationCode.PAYOUT_LIFETIME_DRIFT,
-          entityId: b.publisherId,
+          entityId: publisherId,
           entityType: "PublisherBalance",
           amount: fromScaled(actual - expected),
-          message: `Publisher ${b.publisherId.slice(0, 8)} lifetimePaid (${fromScaled(actual)}) ≠ sum of COMPLETED withdrawals (${fromScaled(expected)})`,
+          message: `Publisher ${publisherId.slice(0, 8)} lifetimePaid (${fromScaled(actual)}) ≠ sum of COMPLETED withdrawals (${fromScaled(expected)})`,
           metadata: {
             expectedAmount: fromScaled(expected),
             actualAmount: fromScaled(actual),
-            publisherId: b.publisherId,
+            publisherId,
           },
-          action: { type: "publisher", id: b.publisherId },
+          action: { type: "publisher", id: publisherId },
         }),
       )
     }
@@ -1483,7 +2723,7 @@ async function checkStuckPayouts(
     if (!hasCompletedExec.has(w.id)) {
       drift.push(
         makeRow({
-          severity: "warning",
+          severity: "critical",
           category: ReconciliationCategory.PAYOUT,
           code: ReconciliationCode.PAYOUT_COMPLETED_NO_EXECUTION,
           entityId: w.id,
@@ -1523,6 +2763,9 @@ export async function runReconciliation(
     stuckFinancialOrders,
     stuckPayouts,
     providerNeutralDeposits,
+    depositProviderEvents,
+    paymentDisputes,
+    legacyWalletWithdrawals,
     withdrawalTraceability,
   ] = await Promise.all([
     checkWallets(prisma, stats),
@@ -1533,10 +2776,18 @@ export async function runReconciliation(
     checkStuckFinancialOrders(prisma, stats),
     checkStuckPayouts(prisma, stats),
     checkProviderNeutralDeposits(prisma),
+    checkDepositProviderEvents(prisma),
+    checkPaymentDisputes(prisma),
+    checkLegacyWalletWithdrawals(prisma),
     checkWithdrawalTraceability(prisma),
   ])
 
-  orderPaymentRecon.push(...providerNeutralDeposits)
+  orderPaymentRecon.push(
+    ...providerNeutralDeposits,
+    ...depositProviderEvents,
+    ...paymentDisputes,
+    ...legacyWalletWithdrawals,
+  )
   stuckPayouts.push(...withdrawalTraceability)
 
   const allIssues = [

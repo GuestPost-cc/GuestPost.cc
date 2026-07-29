@@ -3,7 +3,9 @@
  * endpoint and asserts the invariants hold. The final referee is the
  * reconciliation endpoint — cached balances must still equal the ledger.
  *
- * Run: pnpm tsx scripts/concurrency-test.ts  (API on :4000, seeded DB)
+ * Run: pnpm tsx scripts/concurrency-test.ts
+ * Requires: API on :4000, seeded DB, and manual payouts enabled in this
+ * development/test environment.
  */
 import { prisma } from "../packages/database/src"
 import { fundExistingWalletForTest } from "./test-wallet-funding"
@@ -59,17 +61,79 @@ async function signIn(email: string, password: string) {
   return r.data.token as string
 }
 
+async function ensureManualPayoutMethod(publisherToken: string) {
+  const listed = await call(
+    "GET",
+    "/publisher-payouts/payout-methods",
+    publisherToken,
+  )
+  if (listed.status !== 200 || !Array.isArray(listed.data)) {
+    throw new Error(
+      `Unable to list payout methods: ${JSON.stringify(listed.data)}`,
+    )
+  }
+  const existing = listed.data.find(
+    (method: any) =>
+      method.type === "bank_transfer" &&
+      method.label === "Concurrency Test Bank",
+  )
+  if (existing) return existing
+
+  const created = await call(
+    "POST",
+    "/publisher-payouts/payout-methods",
+    publisherToken,
+    {
+      type: "bank_transfer",
+      label: "Concurrency Test Bank",
+      details: {
+        bankName: "Concurrency Test Bank",
+        accountHolderName: "Concurrency Test Publisher",
+        accountNumber: "000087654321",
+      },
+      isDefault: true,
+    },
+  )
+  if (created.status >= 400) {
+    throw new Error(
+      `Unable to create the manual payout method required by this test. ` +
+        `Run the API in development/test mode or explicitly enable certified ` +
+        `legacy payout methods. Response: ${JSON.stringify(created.data)}`,
+    )
+  }
+  return created.data
+}
+
 /** Drive one order from DRAFT to DELIVERED, return its settlement id. */
 async function orderToSettlement(
   client: string,
   publisher: string,
   admin: string,
   websiteId: string,
+  listingService: {
+    id: string
+    version: number
+    price: unknown
+    currency: string
+  },
 ) {
+  const runId = `${Date.now()}-${Math.random()}`
   const order = (
     await call("POST", "/orders", client, {
       type: "GUEST_POST",
-      title: `ctest ${Date.now()}-${Math.random()}`,
+      title: `ctest ${runId}`,
+      listingServiceId: listingService.id,
+      expectedListingServiceVersion: listingService.version,
+      expectedPrice: String(listingService.price),
+      expectedCurrency: listingService.currency,
+      briefData: {
+        kind: "GUEST_POST",
+        title: "Concurrency test article",
+        topic: "Concurrency test coverage for financial state transitions",
+        targetUrl: "https://example.com/c",
+        anchorText: "ctest",
+        notes: `Concurrency setup ${runId}`,
+      },
       items: [
         { websiteId, targetUrl: "https://example.com/c", anchorText: "ctest" },
       ],
@@ -106,15 +170,25 @@ async function main() {
   const client = await signIn("client@guestpost.local", "Client123!")
   const publisher = await signIn("publisher@guestpost.local", "Publisher123!")
   const admin = await signIn("admin@guestpost.local", "Admin123!")
+  const finance = await signIn("finance@guestpost.local", "Finance123!")
+  const financeChecker = await signIn(
+    "finance-checker@guestpost.local",
+    "FinanceChecker123!",
+  )
+  const payoutMethod = await ensureManualPayoutMethod(publisher)
 
   const wallet = (await call("GET", "/billing/wallet", client)).data
-  const site = await prisma.website.findFirst({
+  const site = await prisma.website.findFirstOrThrow({
     where: { domain: "techinsider.example.com" },
   })
-  const listing = await prisma.marketplaceListing.findFirst({
-    where: { websiteId: site?.id, status: "APPROVED", type: "GUEST_POST" },
+  const listingService = await prisma.listingService.findFirstOrThrow({
+    where: {
+      serviceType: "GUEST_POST",
+      availability: "AVAILABLE",
+      listing: { websiteId: site.id, status: "APPROVED" },
+    },
   })
-  const price = Number(listing?.price)
+  const price = Number(listingService.price)
 
   // ── Attack 1: double payment — N parallel submit-payment on ONE order ──
   console.log(`── Attack 1: ${PAR} parallel submit-payment on one order`)
@@ -131,9 +205,20 @@ async function main() {
     await call("POST", "/orders", client, {
       type: "GUEST_POST",
       title: "ctest dbl-pay",
+      listingServiceId: listingService.id,
+      expectedListingServiceVersion: listingService.version,
+      expectedPrice: listingService.price.toString(),
+      expectedCurrency: listingService.currency,
+      briefData: {
+        kind: "GUEST_POST",
+        title: "Concurrency double payment",
+        topic: "Concurrency coverage for duplicate customer wallet payment",
+        targetUrl: "https://example.com/1",
+        anchorText: "x",
+      },
       items: [
         {
-          websiteId: site?.id,
+          websiteId: site.id,
           targetUrl: "https://example.com/1",
           anchorText: "x",
         },
@@ -173,9 +258,20 @@ async function main() {
       await call("POST", "/orders", client, {
         type: "GUEST_POST",
         title: `ctest overspend ${i}`,
+        listingServiceId: listingService.id,
+        expectedListingServiceVersion: listingService.version,
+        expectedPrice: listingService.price.toString(),
+        expectedCurrency: listingService.currency,
+        briefData: {
+          kind: "GUEST_POST",
+          title: `Concurrency overspend ${i}`,
+          topic: "Concurrency coverage for aggregate customer wallet limits",
+          targetUrl: `https://example.com/o${i}`,
+          anchorText: "x",
+        },
         items: [
           {
-            websiteId: site?.id,
+            websiteId: site.id,
             targetUrl: `https://example.com/o${i}`,
             anchorText: "x",
           },
@@ -215,7 +311,8 @@ async function main() {
     client,
     publisher,
     admin,
-    site?.id,
+    site.id,
+    listingService,
   )
   await call("POST", `/settlements/${settlementId}/customer-approve`, client)
   const balBefore = await prisma.publisherBalance.findFirstOrThrow({
@@ -254,10 +351,12 @@ async function main() {
   })
   const full = Number(bal.withdrawableBalance)
   const wdResults = await Promise.all(
-    Array.from({ length: PAR }, (_, _i) =>
+    Array.from({ length: PAR }, (_, i) =>
       call("POST", "/publisher-payouts/withdrawals", publisher, {
         amount: full,
         method: "bank_transfer",
+        payoutMethodId: payoutMethod.id,
+        idempotencyKey: `ctest-full-${Date.now()}-${i}`,
       }),
     ),
   )
@@ -287,7 +386,13 @@ async function main() {
     price,
     `ctest-a5-${Date.now()}`,
   )
-  const s2 = await orderToSettlement(client, publisher, admin, site?.id)
+  const s2 = await orderToSettlement(
+    client,
+    publisher,
+    admin,
+    site.id,
+    listingService,
+  )
   await call("POST", `/settlements/${s2.settlementId}/customer-approve`, client)
   await call(
     "POST",
@@ -300,6 +405,7 @@ async function main() {
       call("POST", "/publisher-payouts/withdrawals", publisher, {
         amount: 10,
         method: "bank_transfer",
+        payoutMethodId: payoutMethod.id,
         idempotencyKey: idemKey,
       }),
     ),
@@ -328,10 +434,24 @@ async function main() {
     where: { id: target.id },
     data: { availableAt: new Date() },
   })
-  await call("PATCH", `/admin/withdrawals/${target.id}/approve`, admin)
+  const approval = await call(
+    "PATCH",
+    `/admin/withdrawals/${target.id}/approve`,
+    admin,
+  )
+  check(
+    "payout race fixture reaches APPROVED",
+    approval.status < 400 && approval.data?.status === "APPROVED",
+    approval,
+  )
+  if (approval.status >= 400 || approval.data?.status !== "APPROVED") {
+    throw new Error(
+      `Payout race fixture approval failed: ${JSON.stringify(approval)}`,
+    )
+  }
   const execResults = await Promise.all(
     Array.from({ length: PAR }, () =>
-      call("POST", `/admin/withdrawals/${target.id}/execute`, admin, {
+      call("POST", `/admin/withdrawals/${target.id}/execute`, finance, {
         providerName: "manual",
       }),
     ),
@@ -350,10 +470,19 @@ async function main() {
     execRows.length === 1,
     execRows.length,
   )
+  if (execOk !== 1 || execRows.length !== 1) {
+    throw new Error(
+      `Payout execution race did not produce one canonical execution: ` +
+        JSON.stringify({
+          statuses: execResults.map((result) => result.status),
+          executionCount: execRows.length,
+        }),
+    )
+  }
 
-  // ── Attack 7: double mark-paid — N parallel completions ──
+  // ── Attack 7: legacy completion is retired; exact evidence replays are safe ──
   console.log(
-    `── Attack 7: ${PAR} parallel mark-paid (double lifetimePaid guard)`,
+    `── Attack 7: ${PAR} parallel evidence replays (double lifetimePaid guard)`,
   )
   const paidBefore = Number(
     (
@@ -362,9 +491,44 @@ async function main() {
       })
     ).lifetimePaid,
   )
+  const retiredMarkPaid = await call(
+    "PATCH",
+    `/admin/withdrawals/${target.id}/mark-paid`,
+    admin,
+  )
+  const paidAfterRetiredRoute = Number(
+    (
+      await prisma.publisherBalance.findUniqueOrThrow({
+        where: { id: balBefore.id },
+      })
+    ).lifetimePaid,
+  )
+  check(
+    "legacy mark-paid returns 410",
+    retiredMarkPaid.status === 410 &&
+      retiredMarkPaid.data.code === "LEGACY_MARK_PAID_RETIRED",
+    retiredMarkPaid,
+  )
+  check(
+    "retired mark-paid does not change lifetimePaid",
+    paidAfterRetiredRoute === paidBefore,
+    { paidBefore, paidAfterRetiredRoute },
+  )
+
+  const manualEvidence = {
+    executionId: execRows[0].id,
+    bankReference: `CTEST-BANK-${target.id}`.toUpperCase(),
+    paidAt: new Date().toISOString(),
+    reason: "Verified concurrency-test bank settlement receipt",
+  }
   const paidResults = await Promise.all(
     Array.from({ length: PAR }, () =>
-      call("PATCH", `/admin/withdrawals/${target.id}/mark-paid`, admin),
+      call(
+        "POST",
+        `/publisher-payouts/withdrawals/${target.id}/manual-complete`,
+        financeChecker,
+        manualEvidence,
+      ),
     ),
   )
   const paidOk = paidResults.filter((r) => r.status < 400).length
@@ -376,14 +540,25 @@ async function main() {
     ).lifetimePaid,
   )
   check(
-    "exactly one mark-paid succeeds",
-    paidOk === 1,
+    "all exact evidence replays resolve successfully",
+    paidOk === PAR,
     paidResults.map((r) => r.status),
   )
   check(
     "lifetimePaid incremented exactly once",
     Math.abs(paidAfter - paidBefore - Number(target.amount)) < 0.001,
     { paidBefore, paidAfter },
+  )
+  const completedExecutions = await prisma.payoutExecution.findMany({
+    where: { withdrawalId: target.id, status: "COMPLETED" },
+  })
+  const completedExecution = completedExecutions[0] as any
+  check(
+    "exactly one execution is completed with immutable bank evidence",
+    completedExecutions.length === 1 &&
+      completedExecution.completionSource === "MANUAL_BANK_CONFIRMATION" &&
+      completedExecution.completionEvidenceRef === manualEvidence.bankReference,
+    completedExecutions,
   )
 
   // ── Final referee ──
