@@ -165,6 +165,25 @@ for migration_file in "${migration_root}"/*/migration.sql; do
         -v "aggregate_case=pending_personal_wallet" \
         >/dev/null
     fi
+    if [[ "${migration_name}" == "20260802096000_revision_lifecycle_backstop" ]]; then
+      echo "Proving revision migration rejects unexplained active duplicates"
+      run_rehearsal_file \
+        scripts/fixtures/pre-revision-lifecycle-unexplained-duplicates.sql \
+        >/dev/null
+      if revision_output="$(run_rehearsal_file "${migration_file}" 2>&1)"; then
+        echo "Revision migration unexpectedly accepted unexplained duplicates" >&2
+        exit 70
+      fi
+      if [[ "${revision_output}" != *"revision lifecycle migration blocked: an order has multiple active revisions"* ]]; then
+        echo "Revision migration failed for an unexpected reason:" >&2
+        echo "${revision_output}" >&2
+        exit 71
+      fi
+      run_rehearsal_file \
+        scripts/fixtures/pre-revision-lifecycle-unexplained-duplicates-cleanup.sql \
+        >/dev/null
+      echo "Unexplained-revision preflight rejection passed"
+    fi
     migration_started_at="$(date +%s)"
     run_rehearsal_file "${migration_file}" >/dev/null
     migration_finished_at="$(date +%s)"

@@ -2167,6 +2167,29 @@ BEGIN
     RAISE EXCEPTION 'One-active-revision structural guard is missing';
   END IF;
 
+  IF (
+    SELECT COUNT(*)
+    FROM "Revision"
+    WHERE "id" IN (
+      'migration-rehearsal-evidenced-revision-one',
+      'migration-rehearsal-evidenced-revision-two'
+    )
+      AND "status" = 'APPROVED'
+  ) <> 2 THEN
+    RAISE EXCEPTION
+      'Evidence-backed historical revision fulfillment was not repaired';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "Revision"
+    WHERE "orderId" = 'migration-rehearsal-settlement-order'
+      AND "status" NOT IN ('APPROVED', 'REJECTED')
+  ) THEN
+    RAISE EXCEPTION
+      'Evidence-backed historical revisions remained active after migration';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1
     FROM "DeliveryFraudFlag" flag

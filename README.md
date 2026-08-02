@@ -66,9 +66,12 @@ pnpm services:up
 # 4. Build every package and app once. This also generates the Prisma client
 #    and copies its native engine binary into packages/database/dist/prisma.
 pnpm build
+
+# 5. With every API and worker process stopped, apply committed migrations.
+pnpm db:migrations:deploy
 ```
 
-After step 4 the repo is ready to run.
+After step 5 the repo is ready to run.
 
 ### Development
 
@@ -91,6 +94,15 @@ pnpm check:website-docs
 `pnpm dev:*` is wired through Turborepo with `dependsOn: ["^build"]`, so workspace
 dependencies (`@guestpost/database`, `@guestpost/shared`, …) are built before the
 target app starts.
+
+`pnpm dev:all` clears generated Next.js state before the production build and
+again before the development servers, then runs `pnpm db:migrations:status`
+before it starts any API, worker, or web process. The first cleanup removes
+stale build locks; the second prevents production route artifacts from hiding
+valid development routes. Pending or failed migrations stop startup instead
+of allowing new application code to run against an older schema. Stop every
+running API and worker before `pnpm db:migrations:deploy`; financial evidence
+migrations are not guaranteed to be compatible with old writers.
 
 Public website architecture, documentation maintenance, discovery endpoints,
 security boundaries, and release checks are documented in

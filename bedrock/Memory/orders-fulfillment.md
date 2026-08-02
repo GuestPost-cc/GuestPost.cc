@@ -259,3 +259,10 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 - PostgreSQL repeats the precision and capture checks. OrderItem insertion,
   mutation, reassignment, and deletion are blocked after PAID state, PURCHASE
   evidence, or Settlement creation.
+- A revision request remains active until replacement content is submitted for
+  customer review, at which point the service closes that exact request as
+  `APPROVED` while holding the parent Order lock. Migration `0960` repairs only
+  legacy nonterminal revisions with a `CONTENT_SUBMITTED` event strictly inside
+  that revision's request window; equal-timestamp or otherwise unexplained
+  duplicates fail preflight. A partial unique index then enforces at most one
+  nonterminal Revision per Order.

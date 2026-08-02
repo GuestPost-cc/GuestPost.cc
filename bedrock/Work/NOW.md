@@ -1,9 +1,9 @@
 # Current Status
 
-**Phase**: Draft PR #84 (`agent/financial-integrity-hardening`) contains commit
-`5d3a660` with the completed local hardening. It is not merged or deployed.
-The branch was created from and re-fetched against GitHub `main` commit
-`9b47247`; `origin/main` remains an ancestor of the branch.
+**Phase**: Draft PR #84 (`agent/financial-integrity-hardening`) contains the
+completed financial hardening plus local schema/login recovery work. It is not
+merged or deployed. The branch was created from and re-fetched against GitHub
+`main` commit `9b47247`; `origin/main` remains an ancestor of the branch.
 
 ## Current Local Work: Financial Evidence And Release Integrity
 
@@ -47,22 +47,38 @@ The branch was created from and re-fetched against GitHub `main` commit
   allowlists so nested actor, reviewer, finance, refund, cancellation
   idempotency, and other internal evidence cannot escape via a newly selected
   Prisma relation.
+- Local authenticated 500s were traced to 13 committed migrations missing from
+  the development database. `dev:all` now fails closed on pending, failed, or
+  unreachable Prisma migration state before launching any application writer;
+  migration deployment stays an explicit hard-drain operation. Generated
+  Next.js state is cleared before the production build and again before dev
+  startup so stale build locks and route artifacts cannot hide login pages.
+- Initial `ActiveContext` creation is a user-keyed no-overwrite upsert, closing
+  the concurrent first-request P2002/500 window without overwriting a context
+  selected by a concurrent switch. Revision migration `0960` repairs only
+  legacy requests with replacement-submission event evidence in their exact
+  request window and still aborts on ambiguous or unexplained duplicates.
+- The shared password form has a native POST fallback, preventing a
+  pre-hydration submit from leaking credential fields into a URL or access log.
 - This is a mixed-version-incompatible financial release. Deployment requires
   a maintenance window, hard drain of every old API/worker writer, ordered
   migrations `0900` through `0960`, startup of only the evidence-aware image,
   zero unexplained incident-query findings, and signed Stripe deposit/payout
   canaries. Rollback after database guards land is a money freeze and forward
   fix, never an old image or trigger removal.
-- Validation is green: 116 API unit suites / 1,379 tests, 15 PostgreSQL API
+- Validation is green: 117 API unit suites / 1,382 tests, 15 PostgreSQL API
   integration suites / 138 tests, 24 shared suites / 241 tests, 13 integration
   package suites / 104 tests, 6 API-client suites / 59 tests, and 32 worker
   tests. A clean 57-migration replay, populated finance upgrade rehearsal,
   database generation/build, focused delivery/revision concurrency suites, the
   full repository policy/type/lint/documentation/dependency checks, and all 12
-  production builds pass. GitHub CodeRabbit and the required `build-and-test`
-  check also pass on `5d3a660`. Populated staging migration evidence, signed
-  Stripe deposit/payout canaries, and recorded Finance/Security approval remain
-  mandatory before the draft can be marked ready or merged.
+  production builds pass. Clean-start browser checks pass for the shared login,
+  customer work queue/orders/billing/marketplace/campaigns, publisher
+  orders/earnings/withdrawals/payout methods/websites/integrations, and Admin
+  command/finance/settlement/dispute/verification/marketplace/governance pages.
+  Populated staging migration evidence, signed Stripe deposit/payout canaries,
+  and recorded Finance/Security approval remain mandatory before the draft can
+  be marked ready or merged.
 
 ## Current Local Work: Staff Marketplace And Canonical Order Integrity
 

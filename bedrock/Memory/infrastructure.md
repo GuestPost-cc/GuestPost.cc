@@ -121,7 +121,12 @@ Resend, Google, or Sentry deployment credentials.
 
 ## Dev Commands
 
-- `pnpm dev:all` — compose + all apps (stable local stack); after the production build it removes only `apps/*/.next/dev` before starting Next dev servers so stale development route manifests cannot hide valid app-router pages.
+- `pnpm dev:all` — compose + all apps (stable local stack). It removes generated
+  `apps/*/.next` state before the production build to clear abandoned locks,
+  checks `prisma migrate status` after the build, removes production Next output
+  again, and only then starts API, worker, and Next dev servers. Pending, failed,
+  or unreachable migration state therefore fails before any application writer
+  starts; committed migrations remain an explicit hard-drain deploy operation.
 - `pnpm -F @guestpost/api test` — unit jest project only (fast feedback; ~5s for 47 suites / 652 tests)
 - `pnpm -F @guestpost/api test:integration` — integration jest project only (real-DB; ~3s/spec)
 - `pnpm -F @guestpost/api test:all` — both projects (48 suites / 653 tests as of 2026-06-22)

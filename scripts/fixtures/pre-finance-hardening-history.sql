@@ -513,6 +513,53 @@ UPDATE "Order"
 SET "activeDeliveryVersionId" = 'migration-rehearsal-settlement-delivery'
 WHERE "id" = 'migration-rehearsal-settlement-order';
 
+-- Historical revision rows were not closed when replacement content was
+-- submitted. Each request below has one CONTENT_SUBMITTED event inside its
+-- own revision window, so the 0960 migration can repair it without inferring
+-- intent from the order's later status.
+INSERT INTO "Revision" (
+  "id", "orderId", "notes", "status", "createdAt", "updatedAt"
+) VALUES
+  (
+    'migration-rehearsal-evidenced-revision-one',
+    'migration-rehearsal-settlement-order',
+    'Historical first revision with replacement-content evidence',
+    'REQUESTED',
+    CURRENT_TIMESTAMP - INTERVAL '9 days',
+    CURRENT_TIMESTAMP - INTERVAL '9 days'
+  ),
+  (
+    'migration-rehearsal-evidenced-revision-two',
+    'migration-rehearsal-settlement-order',
+    'Historical second revision with replacement-content evidence',
+    'REQUESTED',
+    CURRENT_TIMESTAMP - INTERVAL '8 days',
+    CURRENT_TIMESTAMP - INTERVAL '8 days'
+  );
+
+INSERT INTO "OrderEvent" (
+  "id", "orderId", "eventType", "actorId", "message", "metadata",
+  "createdAt"
+) VALUES
+  (
+    'migration-rehearsal-evidenced-resubmission-one',
+    'migration-rehearsal-settlement-order',
+    'CONTENT_SUBMITTED',
+    'migration-rehearsal-publisher-owner',
+    'Historical replacement content submitted for revision one',
+    '{"version":2,"hasContent":true}'::jsonb,
+    CURRENT_TIMESTAMP - INTERVAL '8 days 12 hours'
+  ),
+  (
+    'migration-rehearsal-evidenced-resubmission-two',
+    'migration-rehearsal-settlement-order',
+    'CONTENT_SUBMITTED',
+    'migration-rehearsal-publisher-owner',
+    'Historical replacement content submitted for revision two',
+    '{"version":3,"hasContent":true}'::jsonb,
+    CURRENT_TIMESTAMP - INTERVAL '7 days 12 hours'
+  );
+
 -- Pre-0940 unresolved signal: the fraud-resolution migration must project
 -- this historical immutable flag into DeliveryFraudHold before switching the
 -- canonical settlement predicate to that table.

@@ -16,7 +16,11 @@ Three actor types enforced via `ActorTypeGuard`:
 
 ## ActiveContext
 
-Decoupled from auth provider (Better-Auth). Stores which org/publisher the user is currently acting as in `ActiveContext` table. Provides immediate context changes, easy to query/validate. No first-membership-wins — all context explicit.
+Decoupled from auth provider (Better-Auth). Stores which org/publisher the user is currently acting as in `ActiveContext` table. Provides immediate context changes, easy to query/validate. No first-membership-wins — all context explicit. First-use creation is a user-keyed upsert with an empty update so concurrent authenticated requests cannot collide on the unique user id and cannot overwrite a context established by a simultaneous explicit switch.
+
+The shared password login form declares a native `POST` fallback. React still
+intercepts hydrated submissions, while a click before hydration cannot place
+email/password fields in the URL, browser history, referrers, or access logs.
 
 ## Auth Guards (applied globally in NestJS)
 
