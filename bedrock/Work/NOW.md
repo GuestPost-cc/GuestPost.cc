@@ -1,9 +1,9 @@
 # Current Status
 
-**Phase**: PR #84 (`agent/financial-integrity-hardening`) is being hardened and
-tested locally. It is not merged or deployed. The branch was created from and
-re-fetched against GitHub `main` commit `9b47247`; `origin/main` remains an
-ancestor of the branch.
+**Phase**: Draft PR #84 (`agent/financial-integrity-hardening`) contains commit
+`5d3a660` with the completed local hardening. It is not merged or deployed.
+The branch was created from and re-fetched against GitHub `main` commit
+`9b47247`; `origin/main` remains an ancestor of the branch.
 
 ## Current Local Work: Financial Evidence And Release Integrity
 
@@ -59,7 +59,10 @@ ancestor of the branch.
   tests. A clean 57-migration replay, populated finance upgrade rehearsal,
   database generation/build, focused delivery/revision concurrency suites, the
   full repository policy/type/lint/documentation/dependency checks, and all 12
-  production builds pass. Commit/push and GitHub CI remain before merge.
+  production builds pass. GitHub CodeRabbit and the required `build-and-test`
+  check also pass on `5d3a660`. Populated staging migration evidence, signed
+  Stripe deposit/payout canaries, and recorded Finance/Security approval remain
+  mandatory before the draft can be marked ready or merged.
 
 ## Current Local Work: Staff Marketplace And Canonical Order Integrity
 
