@@ -1153,6 +1153,24 @@ ORDER BY w."createdAt";
 Approval must never compensate for a mismatch by looking for the amount in
 withdrawable balance.
 
+Migration `20260802097000_legacy_withdrawal_reservation_evidence` repairs only
+a missing legacy `PENDING` reservation proven by one exact pre-cutover debit,
+one matching requester audit, and the absence of decision, reversal,
+execution, and allocation evidence. It also reconstructs an already-released
+legacy `REJECTED` reservation only when that exact pre-cutover request evidence
+is paired with one exact post-cutover rejection reversal and matching
+request/rejection actor audits, with no approval or payout execution. A
+pending repair increases carry-forward and carry-forward-used equally; a
+rejected repair increases only carry-forward because the exact reversal
+already restored the liability. Neither path changes withdrawable balance or
+lifetime paid.
+
+Any row outside that exact evidence class is unexplained and blocks the
+release. Preserve its ledger and audits, establish provider and bank truth when
+applicable, and use a separately reviewed typed repair. Never improvise an
+allocation, relabel a transaction, or update a balance directly to clear this
+query.
+
 ## Payout send-claim authority and maker-checker integrity
 
 `PayoutExecutionClaim` is the only database send authority. This query must
@@ -1764,6 +1782,11 @@ and cannot establish the no-send boundary. Once a claim or provider ID exists,
 require the route's typed provider cancellation/reversal evidence instead. A
 rejected withdrawal with active/missing allocations is a critical reservation
 contradiction.
+
+The only automatic exception for a missing rejected allocation is the exact
+pre-cutover debit plus post-cutover rejection-reversal evidence class handled
+by migration `20260802097000`; every other result remains a release blocker.
+Do not create or release allocations with ad hoc SQL.
 
 ## Completion and lifetime-paid comparison
 

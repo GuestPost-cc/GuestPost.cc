@@ -78,7 +78,7 @@ BEGIN
     FROM "Withdrawal"
    WHERE id LIKE 'migration-rehearsal-withdrawal-%'
      AND "requestedBy" = 'migration-rehearsal-publisher-owner';
-  IF requester_count <> 4 THEN
+  IF requester_count <> 6 THEN
     RAISE EXCEPTION
       'Historical withdrawal requester provenance did not backfill exactly';
   END IF;
@@ -134,6 +134,118 @@ BEGIN
   IF backfilled_wallet_count <> 1 THEN
     RAISE EXCEPTION
       'History-free organization wallet aggregate was not backfilled exactly';
+  END IF;
+END;
+$$;
+
+-- Migration 0970 may reconstruct only exact pre-provider reservation and
+-- post-cutover rejection evidence. Its balance deltas must preserve every
+-- spendable/lifetime amount while closing the carry-forward source gap.
+DO $$
+DECLARE
+  pending_allocation_count INTEGER;
+  rejected_allocation_count INTEGER;
+  reconstruction_audit_count INTEGER;
+  repaired_withdrawable NUMERIC;
+  repaired_carry_forward NUMERIC;
+  repaired_carry_used NUMERIC;
+  active_carry_allocations NUMERIC;
+  allocation_guard_enabled "char";
+BEGIN
+  SELECT COUNT(*)
+    INTO pending_allocation_count
+    FROM "WithdrawalAllocation"
+   WHERE "withdrawalId" =
+       'migration-rehearsal-withdrawal-pending-reserved'
+     AND "sourceType" = 'CARRY_FORWARD'
+     AND "sourceTransactionId" IS NULL
+     AND amount = 25
+     AND currency = 'USD'
+     AND sequence = 0
+     AND "releasedAt" IS NULL;
+  IF pending_allocation_count <> 1 THEN
+    RAISE EXCEPTION
+      'Exact legacy pending withdrawal reservation was not reconstructed';
+  END IF;
+
+  SELECT COUNT(*)
+    INTO rejected_allocation_count
+    FROM "WithdrawalAllocation"
+   WHERE "withdrawalId" =
+       'migration-rehearsal-withdrawal-rejected-reserved'
+     AND "sourceType" = 'CARRY_FORWARD'
+     AND "sourceTransactionId" IS NULL
+     AND amount = 25
+     AND currency = 'USD'
+     AND sequence = 0
+     AND "releasedAt" = (
+       SELECT "rejectedAt"
+       FROM "Withdrawal"
+       WHERE id = 'migration-rehearsal-withdrawal-rejected-reserved'
+     );
+  IF rejected_allocation_count <> 1 THEN
+    RAISE EXCEPTION
+      'Exact legacy rejected withdrawal reservation was not reconstructed';
+  END IF;
+
+  SELECT
+    "withdrawableBalance",
+    "allocationCarryForward",
+    "allocationCarryForwardUsed"
+  INTO
+    repaired_withdrawable,
+    repaired_carry_forward,
+    repaired_carry_used
+  FROM "PublisherBalance"
+  WHERE "publisherId" = 'migration-rehearsal-publisher';
+  IF repaired_withdrawable IS DISTINCT FROM 65
+    OR repaired_carry_forward IS DISTINCT FROM 90
+    OR repaired_carry_used IS DISTINCT FROM 25
+    OR repaired_carry_forward - repaired_carry_used
+      IS DISTINCT FROM repaired_withdrawable THEN
+    RAISE EXCEPTION
+      'Legacy withdrawal repair changed money or left carry-forward drift';
+  END IF;
+
+  SELECT COALESCE(SUM(allocation.amount), 0)
+    INTO active_carry_allocations
+    FROM "WithdrawalAllocation" allocation
+    JOIN "Withdrawal" withdrawal
+      ON withdrawal.id = allocation."withdrawalId"
+   WHERE withdrawal."publisherId" = 'migration-rehearsal-publisher'
+     AND allocation."sourceType" = 'CARRY_FORWARD'
+     AND allocation."releasedAt" IS NULL;
+  IF active_carry_allocations IS DISTINCT FROM repaired_carry_used THEN
+    RAISE EXCEPTION
+      'Active carry-forward evidence does not match aggregate usage';
+  END IF;
+
+  SELECT COUNT(*)
+    INTO reconstruction_audit_count
+    FROM "AuditLog"
+   WHERE action = 'LEGACY_WITHDRAWAL_RESERVATION_RECONSTRUCTED'
+     AND "entityType" = 'Withdrawal'
+     AND "entityId" IN (
+       'migration-rehearsal-withdrawal-pending-reserved',
+       'migration-rehearsal-withdrawal-rejected-reserved'
+     )
+     AND "userId" IS NULL
+     AND metadata->>'migration' =
+       '20260802097000_legacy_withdrawal_reservation_evidence';
+  IF reconstruction_audit_count <> 2 THEN
+    RAISE EXCEPTION
+      'Legacy withdrawal reconstruction system audits are missing';
+  END IF;
+
+  SELECT tgenabled
+    INTO allocation_guard_enabled
+    FROM pg_trigger
+   WHERE tgrelid = '"WithdrawalAllocation"'::regclass
+     AND tgname = 'WithdrawalAllocation_evidence_guard'
+     AND NOT tgisinternal;
+  IF allocation_guard_enabled IS DISTINCT FROM 'O' THEN
+    RAISE EXCEPTION
+      'WithdrawalAllocation evidence guard was not restored';
   END IF;
 END;
 $$;

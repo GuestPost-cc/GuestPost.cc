@@ -58,19 +58,28 @@ merged or deployed. The branch was created from and re-fetched against GitHub
   selected by a concurrent switch. Revision migration `0960` repairs only
   legacy requests with replacement-submission event evidence in their exact
   request window and still aborts on ambiguous or unexplained duplicates.
+- Migration `0970` reconstructs only exact legacy publisher-withdrawal
+  reservations: pending rows require one pre-cutover debit and requester audit;
+  rejected rows also require one exact post-cutover reversal and matching
+  decision audit. Pending repairs add equal carry-forward/used amounts;
+  rejected repairs add only carry-forward. Withdrawable balance and lifetime
+  paid never change, and ambiguous history aborts instead of being guessed or
+  repaired with ad hoc SQL.
 - The shared password form has a native POST fallback, preventing a
   pre-hydration submit from leaking credential fields into a URL or access log.
 - This is a mixed-version-incompatible financial release. Deployment requires
   a maintenance window, hard drain of every old API/worker writer, ordered
-  migrations `0900` through `0960`, startup of only the evidence-aware image,
+  migrations `0900` through `0970`, startup of only the evidence-aware image,
   zero unexplained incident-query findings, and signed Stripe deposit/payout
   canaries. Rollback after database guards land is a money freeze and forward
   fix, never an old image or trigger removal.
 - Validation is green: 117 API unit suites / 1,382 tests, 15 PostgreSQL API
   integration suites / 138 tests, 24 shared suites / 241 tests, 13 integration
   package suites / 104 tests, 6 API-client suites / 59 tests, and 32 worker
-  tests. A clean 57-migration replay, populated finance upgrade rehearsal,
-  database generation/build, focused delivery/revision concurrency suites, the
+  tests. The populated 58-migration finance upgrade rehearsal through `0970`
+  passes, including exact positive, idempotent no-op, same-amount collision,
+  and unsafe-evidence rejection coverage for the legacy reservation repair.
+  Database generation/build, focused delivery/revision concurrency suites, the
   full repository policy/type/lint/documentation/dependency checks, and all 12
   production builds pass. Clean-start browser checks pass for the shared login,
   customer work queue/orders/billing/marketplace/campaigns, publisher

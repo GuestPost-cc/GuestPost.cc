@@ -97,13 +97,17 @@ INSERT INTO "StaffMembership" (
 
 INSERT INTO "PublisherBalance" (
   "id", "publisherId", "withdrawableBalance", "lifetimeEarnings",
-  "lifetimePaid", "createdAt", "updatedAt"
+  "lifetimePaid", "allocationCutoverAt", "allocationCarryForward",
+  "allocationCarryForwardUsed", "createdAt", "updatedAt"
 ) VALUES (
   'migration-rehearsal-publisher-balance',
   'migration-rehearsal-publisher',
-  0,
+  65,
   400,
   100,
+  CURRENT_TIMESTAMP - INTERVAL '5 days',
+  40,
+  0,
   CURRENT_TIMESTAMP,
   CURRENT_TIMESTAMP
 );
@@ -191,6 +195,95 @@ INSERT INTO "Withdrawal" (
     CURRENT_TIMESTAMP - INTERVAL '9 days'
   );
 
+-- Allocation tracking was introduced after these request-time debits. The
+-- PENDING row remains reserved; the REJECTED row crossed the allocation
+-- cutover and has an exact compensating reversal. They deliberately share an
+-- amount so the rejected row's canonical reversal cannot be misattributed to
+-- the pending request. Migration 0970 may rebuild only this evidence, without
+-- changing withdrawable or lifetime balances.
+INSERT INTO "Withdrawal" (
+  "id", "publisherId", "amount", "currency", "publicReference", "payoutFee",
+  "netAmount", "feePolicyVersion", "method", "status", "availableAt",
+  "idempotencyKey", "version", "createdAt", "updatedAt"
+) VALUES
+  (
+    'migration-rehearsal-withdrawal-pending-reserved',
+    'migration-rehearsal-publisher',
+    25,
+    'USD',
+    'WD-REHEARSAL-PENDING-RESERVED',
+    0,
+    25,
+    'legacy-no-fee',
+    'bank_transfer',
+    'PENDING',
+    CURRENT_TIMESTAMP - INTERVAL '10 days',
+    'migration-rehearsal-pending-reserved',
+    0,
+    CURRENT_TIMESTAMP - INTERVAL '12 days',
+    CURRENT_TIMESTAMP - INTERVAL '12 days'
+  ),
+  (
+    'migration-rehearsal-withdrawal-rejected-reserved',
+    'migration-rehearsal-publisher',
+    25,
+    'USD',
+    'WD-REHEARSAL-REJECTED-RESERVED',
+    0,
+    25,
+    'legacy-no-fee',
+    'bank_transfer',
+    'REJECTED',
+    CURRENT_TIMESTAMP - INTERVAL '10 days',
+    'migration-rehearsal-rejected-reserved',
+    1,
+    CURRENT_TIMESTAMP - INTERVAL '12 days',
+    CURRENT_TIMESTAMP - INTERVAL '3 days'
+  );
+
+INSERT INTO "Transaction" (
+  "id", "amount", "currency", "type", "reference", "description",
+  "publisherId", "createdAt"
+)
+SELECT
+  'migration-rehearsal-pending-reservation-debit',
+  -withdrawal."amount",
+  withdrawal."currency",
+  'WITHDRAWAL'::"TransactionType",
+  'withdrawal-' || withdrawal."id",
+  'Historical pending publisher withdrawal reservation',
+  withdrawal."publisherId",
+  withdrawal."createdAt" + INTERVAL '1 second'
+FROM "Withdrawal" withdrawal
+WHERE withdrawal."id" =
+  'migration-rehearsal-withdrawal-pending-reserved'
+UNION ALL
+SELECT
+  'migration-rehearsal-rejected-reservation-debit',
+  -withdrawal."amount",
+  withdrawal."currency",
+  'WITHDRAWAL'::"TransactionType",
+  'withdrawal-' || withdrawal."id",
+  'Historical rejected publisher withdrawal reservation',
+  withdrawal."publisherId",
+  withdrawal."createdAt" + INTERVAL '1 second'
+FROM "Withdrawal" withdrawal
+WHERE withdrawal."id" =
+  'migration-rehearsal-withdrawal-rejected-reserved'
+UNION ALL
+SELECT
+  'migration-rehearsal-rejected-reservation-reversal',
+  withdrawal."amount",
+  withdrawal."currency",
+  'WITHDRAWAL_REVERSAL'::"TransactionType",
+  'withdrawal-reject-' || withdrawal."id",
+  'Historical exact publisher withdrawal rejection reversal',
+  withdrawal."publisherId",
+  withdrawal."updatedAt" - INTERVAL '1 second'
+FROM "Withdrawal" withdrawal
+WHERE withdrawal."id" =
+  'migration-rehearsal-withdrawal-rejected-reserved';
+
 INSERT INTO "AuditLog" (
   "id", "action", "entityType", "entityId", "userId", "organizationId",
   "createdAt"
@@ -205,6 +298,22 @@ SELECT
   "createdAt"
 FROM "Withdrawal"
 WHERE "id" LIKE 'migration-rehearsal-withdrawal-%';
+
+INSERT INTO "AuditLog" (
+  "id", "action", "entityType", "entityId", "userId", "organizationId",
+  "createdAt"
+)
+SELECT
+  'migration-rehearsal-rejection-reserved',
+  'WITHDRAWAL_REJECTED',
+  'Withdrawal',
+  withdrawal."id",
+  'migration-rehearsal-finance',
+  'migration-rehearsal-org',
+  withdrawal."updatedAt"
+FROM "Withdrawal" withdrawal
+WHERE withdrawal."id" =
+  'migration-rehearsal-withdrawal-rejected-reserved';
 
 INSERT INTO "AuditLog" (
   "id", "action", "entityType", "entityId", "userId", "organizationId",

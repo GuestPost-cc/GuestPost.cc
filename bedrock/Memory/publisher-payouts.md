@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: publisher-payouts
 project: guestpost-platform
-updated: 2026-07-29
+updated: 2026-08-03
 ---
 
 # Publisher Payouts
@@ -27,6 +27,17 @@ completed execution. Runtime reversal remains disabled.
 Requester, decision actors, immutable command fields, allocations, status
 edges, exact version increments, and terminal state are protected in
 PostgreSQL. Approval/rejection require a current unbanned Finance/Super Admin.
+
+Migration `20260802097000_legacy_withdrawal_reservation_evidence` reconstructs
+only exact legacy reservation evidence. A missing pending allocation requires
+one pre-cutover request debit and matching requester audit, with no decision,
+reversal, execution, or allocation. A missing rejected allocation additionally
+requires one exact post-cutover rejection reversal and matching actor audits,
+with no approval or execution. Ambiguous history aborts instead of being
+guessed. Pending reconstruction adds equal carry-forward and used amounts;
+rejected reconstruction adds only carry-forward because its proven reversal
+already restored liability. Neither changes withdrawable balance or lifetime
+paid, and direct SQL is never an accepted fallback.
 
 ## Provider execution and send authority
 
@@ -89,6 +100,10 @@ populated-clone rehearsal, validated constraints, signed sandbox evidence, and
 forward-fix rollback. The payout and aggregate migrations take stable,
 fail-fast SHARE lock barriers before their corruption preflights so old
 READ-COMMITTED writers cannot race a successful snapshot.
+
+The current release contains 58 migrations through `20260802097000`; every
+writer remains drained until that ordered chain and its exact-evidence
+postflights succeed.
 
 ## Key files
 

@@ -174,6 +174,26 @@ unreleased allocations still equal the withdrawal; it does not look for the
 reserved amount in available balance a second time. Eligibility is derived from
 real membership/user state and the selected active payout method.
 
+Migration `20260802097000_legacy_withdrawal_reservation_evidence` bridges only
+the legacy rows whose immutable local evidence proves this reservation. A
+missing `PENDING` allocation requires one exact pre-cutover withdrawal debit,
+the matching requester audit, and no decision, reversal, execution, or other
+allocation. A missing `REJECTED` allocation additionally requires one exact
+post-cutover rejection reversal and matching request/rejection actor audits,
+with no approval or payout execution. Duplicate, partial, contradictory, or
+otherwise ambiguous history aborts the migration; it is never classified by a
+matching balance total alone.
+
+The reconstructed source is `CARRY_FORWARD`, while the debit and reversal
+remain immutable supporting evidence rather than allocation sources. A pending
+repair adds the amount to both carry-forward and carry-forward-used, so
+available carry-forward and withdrawable liability do not change. A rejected
+repair creates an already-released allocation and adds only carry-forward,
+because the exact reversal already restored that liability. No pending,
+approved, debt, earnings, lifetime-paid, or withdrawable amount is rewritten.
+Ambiguous history requires an incident review; never improvise balance or
+allocation SQL.
+
 The database-enforced withdrawal graph is:
 
 ```text

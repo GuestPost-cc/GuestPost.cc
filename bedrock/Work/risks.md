@@ -1,13 +1,14 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-08-02
+updated: 2026-08-03
 ---
 
 # Risks
 
-Updated 2026-08-02 after the financial evidence, order capture, settlement,
-Google-metric quarantine, and integration-encryption hardening. All
+Updated 2026-08-03 after the financial evidence, order capture, settlement,
+Google-metric quarantine, integration-encryption hardening, and exact legacy
+withdrawal-reservation repair. All
 historical audit findings at Medium severity or above are closed; the remaining
 items are staging gates, strategic/long-horizon risks, and operator-action
 follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
@@ -27,11 +28,19 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   cancellation, catalog/order capture, revision, delivery/fraud, settlement,
   and completion write shapes. A rolling deployment or rollback to the prior
   application would create an outage. Mitigation: hard-drain all old writers,
-  apply the complete ordered chain including `0900` through `0960`, start only
-  the matching image, keep money gates closed, rehearse on a populated clone,
-  require every financial constraint to be validated, and forward-fix.
+  apply all 58 migrations in the complete ordered chain through `0970`, start
+  only the matching image, keep money gates closed, rehearse on a populated
+  clone, require every financial constraint to be validated, and forward-fix.
   Short-timeout SHARE barriers make preflights fail rather than race a
   still-active old writer.
+- **Legacy withdrawal-reservation repair is intentionally narrow.** Migration
+  `0970` accepts only an exact pre-cutover request debit/audit; a rejected row
+  additionally needs one exact post-cutover reversal and matching decision
+  audit, with no payout execution. Pending repair adds equal carry-forward and
+  used amounts; rejected repair adds only carry-forward. Missing, duplicate,
+  contradictory, or ambiguous evidence blocks deployment. Preserve the rows
+  and investigate; never improvise allocation or balance SQL to force the
+  preflight through.
 - **Google performance metrics are unavailable until exact domain binding is
   implemented.** GSC/GA4 OAuth, discovery, linking, sync, schedules, daily
   writes, summaries, and public projection intentionally fail closed. Raw rows

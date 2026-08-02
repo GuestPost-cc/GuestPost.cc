@@ -187,7 +187,7 @@ The mode does not protect against an old image that does not implement it.
 Remove money-route access at the gateway, drain old writers, and prove their
 replica count is zero before applying the guards.
 
-The `20260802090000`–`20260802096000` boundary is also a hard-drain cutover.
+The `20260802090000`–`20260802097000` boundary is also a hard-drain cutover.
 Before applying it, stop API, finance workers, auto-accept/settlement workers,
 and integration on-demand workers. The USD preflight must return no non-USD
 fact; do not edit a failing row to USD. The migration then installs relational
@@ -195,11 +195,34 @@ settlement guards, quarantines Google old-writer paths, and adds persisted
 integration key versions. Restart only the matching image in
 `FINANCE_RUNTIME_MODE=recovery_only`; run migration assertions, reconciliation,
 and sandbox canaries before deliberately returning finance to `normal`.
-The final three migrations add append-only fraud-hold adjudication,
-payload-bound order idempotency/contract snapshots, and the one-active-revision
-backstop. Legacy snapshot values stay `NULL` because current catalog terms are
-not historical evidence. Old API and worker images do not understand those
-guards and must remain drained.
+The final four migrations add append-only fraud-hold adjudication,
+payload-bound order idempotency/contract snapshots, the one-active-revision
+backstop, and exact-evidence reconstruction for legacy withdrawal reservations.
+Legacy snapshot values stay `NULL` because current catalog terms are not
+historical evidence. Old API and worker images do not understand those guards
+and must remain drained. For this release, migration status must report all 58
+migrations current through
+`20260802097000_legacy_withdrawal_reservation_evidence`.
+
+Migration `20260802097000` is a narrow accounting-evidence repair, not a
+general balance backfill. A missing legacy `PENDING` reservation qualifies
+only when one exact pre-cutover request debit and matching requester audit
+exist, there is no decision, reversal, execution, or existing allocation, and
+every amount/currency/timestamp fact agrees. A legacy `REJECTED` reservation
+qualifies only when that same pre-cutover debit is paired with one exact
+post-cutover rejection reversal and matching request/rejection actor audits,
+with no approval or payout execution. Any missing, duplicate, contradictory,
+or otherwise ambiguous history aborts the migration.
+
+For a proven pending reservation, the migration adds the amount to both
+`allocationCarryForward` and `allocationCarryForwardUsed`, leaving available
+carry-forward and `withdrawableBalance` unchanged. For a proven post-cutover
+rejection, it adds the amount only to `allocationCarryForward` because the
+exact reversal already restored the liability; the released allocation does
+not consume carry-forward. The migration never changes pending/approved/debt,
+lifetime earnings, or lifetime paid. Preserve a failed preflight and reconcile
+the immutable ledger/audit history. Never improvise direct SQL, invent an
+allocation, or adjust a balance merely to make the release proceed.
 
 Before this boundary, run `pnpm test:migrations:finance` against the maintained
 populated historical fixture and against a sanitized production clone. Also run

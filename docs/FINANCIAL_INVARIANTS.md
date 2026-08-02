@@ -622,6 +622,20 @@ Every update increments `version` by exactly one.
   increments `lifetimePaid` exactly once.
 - A missing publisher balance, allocation mismatch, version conflict, or
   ambiguous execution fails closed.
+- Legacy reservation reconstruction is evidence-only. A missing `PENDING`
+  allocation requires one exact pre-cutover withdrawal debit, matching
+  requester audit, and no decision, reversal, execution, or allocation. A
+  missing `REJECTED` allocation requires the same exact pre-cutover request
+  evidence plus one exact post-cutover rejection reversal and matching
+  request/rejection actor audits, with no approval or payout execution.
+  Migration `20260802097000_legacy_withdrawal_reservation_evidence` aborts on
+  every missing, duplicate, partial, contradictory, or ambiguous fact.
+- An evidence-proven pending reconstruction increases carry-forward and
+  carry-forward-used equally; available carry-forward and withdrawable
+  liability remain unchanged. An evidence-proven rejected reconstruction
+  creates a released allocation and increases only carry-forward because its
+  exact reversal already restored the liability. Neither path changes
+  pending, approved, debt, lifetime earnings, or lifetime paid.
 - Across active and completed states, at most one money-moving execution may
   exist for a withdrawal; a partial unique index enforces the combined set.
   A replacement execution is also rejected when any prior execution lacks
@@ -894,7 +908,10 @@ provider feature flags, the payout-send kill switch, gateway controls during a
 hard drain, or database evidence guards.
 
 Direct SQL is acceptable for read-only incident analysis. Direct balance
-`UPDATE` statements are not a repair procedure.
+`UPDATE` statements are not a repair procedure. Never improvise allocation,
+ledger, or balance SQL to bypass an evidence-repair preflight; preserve the
+rows and build a typed, reviewed, incident-specific compensation only after
+external and internal evidence agree.
 
 ## 15. Change and release gate
 

@@ -12,6 +12,7 @@ rehearsal_port="${PGPORT:-5432}"
 rehearsal_user="${PGUSER:-guestpost}"
 rehearsal_password="${PGPASSWORD:-guestpost}"
 rehearsal_database="guestpost_finance_migration_rehearsal"
+negative_rehearsal_database="guestpost_finance_migration_negative"
 hardening_start="20260729085000_payment_provider_event_quarantine"
 migration_root="packages/database/prisma/migrations"
 
@@ -49,14 +50,15 @@ run_admin_sql() {
     -c "${statement}"
 }
 
-run_rehearsal_file() {
-  local sql_file="$1"
-  shift
+run_rehearsal_file_in_database() {
+  local target_database="$1"
+  local sql_file="$2"
+  shift 2
   if [[ "${use_local_docker}" == true ]]; then
     docker exec -i gp-postgres \
       psql \
       -U "${rehearsal_user}" \
-      -d "${rehearsal_database}" \
+      -d "${target_database}" \
       -v ON_ERROR_STOP=1 \
       -X \
       "$@" < "${sql_file}"
@@ -66,14 +68,26 @@ run_rehearsal_file() {
     -h "${rehearsal_host}" \
     -p "${rehearsal_port}" \
     -U "${rehearsal_user}" \
-    -d "${rehearsal_database}" \
+    -d "${target_database}" \
     -v ON_ERROR_STOP=1 \
     -X \
     "$@" \
     -f "${sql_file}"
 }
 
+run_rehearsal_file() {
+  local sql_file="$1"
+  shift
+  run_rehearsal_file_in_database \
+    "${rehearsal_database}" \
+    "${sql_file}" \
+    "$@"
+}
+
 cleanup() {
+  run_admin_sql \
+    "DROP DATABASE IF EXISTS \"${negative_rehearsal_database}\" WITH (FORCE)" \
+    >/dev/null
   run_admin_sql \
     "DROP DATABASE IF EXISTS \"${rehearsal_database}\" WITH (FORCE)" \
     >/dev/null
@@ -184,10 +198,56 @@ for migration_file in "${migration_root}"/*/migration.sql; do
         >/dev/null
       echo "Unexplained-revision preflight rejection passed"
     fi
+    if [[ "${migration_name}" == "20260802097000_legacy_withdrawal_reservation_evidence" ]]; then
+      for legacy_case in \
+        pending_missing_debit \
+        rejected_missing_reversal \
+        rejected_at_cutover
+      do
+        echo "Proving legacy withdrawal migration rejects ${legacy_case}"
+        run_admin_sql \
+          "DROP DATABASE IF EXISTS \"${negative_rehearsal_database}\" WITH (FORCE)" \
+          >/dev/null
+        run_admin_sql \
+          "CREATE DATABASE \"${negative_rehearsal_database}\" TEMPLATE \"${rehearsal_database}\"" \
+          >/dev/null
+        run_rehearsal_file_in_database \
+          "${negative_rehearsal_database}" \
+          scripts/fixtures/pre-legacy-withdrawal-reservation-unsafe.sql \
+          -v "legacy_case=${legacy_case}" \
+          >/dev/null
+        if legacy_output="$(
+          run_rehearsal_file_in_database \
+            "${negative_rehearsal_database}" \
+            "${migration_file}" \
+            2>&1
+        )"; then
+          echo "Legacy withdrawal migration unexpectedly accepted ${legacy_case}" >&2
+          exit 72
+        fi
+        expected_legacy_error="pending reservation cannot be reconstructed exactly"
+        if [[ "${legacy_case}" != "pending_missing_debit" ]]; then
+          expected_legacy_error="rejected reservation cannot be reconstructed exactly"
+        fi
+        if [[ "${legacy_output}" != *"${expected_legacy_error}"* ]]; then
+          echo "Legacy withdrawal migration failed for an unexpected reason in ${legacy_case}:" >&2
+          echo "${legacy_output}" >&2
+          exit 73
+        fi
+        run_admin_sql \
+          "DROP DATABASE IF EXISTS \"${negative_rehearsal_database}\" WITH (FORCE)" \
+          >/dev/null
+        echo "Legacy withdrawal ${legacy_case} rejection passed"
+      done
+    fi
     migration_started_at="$(date +%s)"
     run_rehearsal_file "${migration_file}" >/dev/null
     migration_finished_at="$(date +%s)"
     echo "Applied ${migration_name} in $((migration_finished_at - migration_started_at))s"
+    if [[ "${migration_name}" == "20260802097000_legacy_withdrawal_reservation_evidence" ]]; then
+      run_rehearsal_file "${migration_file}" >/dev/null
+      echo "Legacy withdrawal migration idempotent rerun passed"
+    fi
     if [[ "${migration_name}" == "20260729120000_provision_finance_aggregates" ]]; then
       run_rehearsal_file \
         scripts/fixtures/pre-aggregate-hardening-missing-wallet-history-cleanup.sql \
