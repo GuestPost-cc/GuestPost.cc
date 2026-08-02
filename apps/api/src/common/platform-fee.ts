@@ -1,4 +1,7 @@
-import { resolvePlatformFeeFractionCore } from "@guestpost/shared"
+import {
+  resolvePlatformFeeFractionCore,
+  resolvePlatformFeePolicyCore,
+} from "@guestpost/shared"
 import { Decimal } from "@prisma/client/runtime/client"
 
 // Splits a gross amount into platform fee and net using exact Decimal math.
@@ -23,4 +26,8 @@ export async function resolvePlatformFeeFraction(prisma: any): Promise<number> {
     prisma,
     process.env.PLATFORM_FEE_PERCENT,
   )
+}
+
+export async function resolvePlatformFeePolicy(prisma: any) {
+  return resolvePlatformFeePolicyCore(prisma)
 }

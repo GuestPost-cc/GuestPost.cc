@@ -23,8 +23,8 @@ metric is replaced.
 | Open PageRank, global rank, and referring domains | `OPEN_PAGE_RANK_API` | Worker | 30 days |
 | Ahrefs organic traffic | `PUBLISHER_MANUAL` or `ADMIN_IMPORT` | Publisher/Admin | 90 days |
 | Moz Domain Authority | `PUBLISHER_MANUAL` or `ADMIN_IMPORT` | Publisher/Admin | 90 days |
-| GSC clicks/impressions | Linked Google Search Console property | Existing integration worker | 30-day summary |
-| GA4 sessions/users/pageviews | Linked Google Analytics property | Existing integration worker | 30-day summary |
+| GSC clicks/impressions | Quarantined | Disabled pending canonical-domain binding | Not public |
+| GA4 sessions/users/pageviews | Quarantined | Disabled pending web-stream/domain binding | Not public |
 
 Publisher listings cannot be submitted for review until both manual metrics
 exist and are no more than 90 days old. Values imported by an administrator can
@@ -44,17 +44,34 @@ compatibility read fields only. Provider/source truth lives in
 
 ### Google visibility contract
 
-GSC and GA4 values are absent from the public listing response unless all of
-the following are true for that provider:
+GSC and GA4 metrics are unconditionally disabled. Existing OAuth account rows
+are retained for incident-safe recovery, but new initiation and callbacks,
+resource discovery, website linking, queueing, provider sync,
+daily-row writes, denormalized summaries, schedules, and public `siteMetrics`
+all fail closed with `GOOGLE_METRICS_DISABLED`. The migration marks existing
+links `DISABLED`, clears their successful-sync timestamp, fails pending jobs,
+and disables schedules. Raw daily rows remain only as untrusted forensic
+history; they are never public evidence.
 
-1. a `WebsiteIntegration` is linked to the website;
-2. its parent integration is `ACTIVE`;
-3. the website link is `CONNECTED`, `SYNCING`, or `OUT_OF_SYNC`; and
-4. the link has completed at least one successful sync (`syncedAt` exists).
+Legacy GSC/GA4 JSON is scrubbed. Listing traffic is rebuilt from the canonical
+`WebsiteMetric.AHREFS_ORGANIC_TRAFFIC` row, and the public projection ignores a
+stale `MarketplaceListing.traffic` value. The database rejects writes from an
+old provider worker, so a rolling old pod cannot repopulate quarantined data.
+Marketplace traffic filters, explicit traffic sorting, default ranking, and
+rule-based recommendations also use only a `CURRENT`, unexpired Ahrefs
+`WebsiteMetric` row. Missing or expired traffic projects as `null` and ranks
+last with stable creation-time and listing-ID tie-breakers; the denormalized
+listing column is never marketplace evidence.
 
-Disconnecting, disabling, removing, or losing access to a property therefore
-hides its public Google metric group. Stored historical rows are not deleted.
-Domain metrics remain independently visible with their source and freshness.
+Re-enabling Google metrics requires a separately reviewed release with an
+append-only binding that records provider, resource/property, canonical
+domain, binding method/version/evidence time, and—for GA4—the exact web data
+stream. GSC must match an exact normalized `sc-domain:` or URL-prefix resource
+under an explicit permission policy. GA4 must match the stream `defaultUri`
+and filter every report by the bound stream and hostname. One active binding
+per `(websiteId, provider)` must be enforced in PostgreSQL. The ordinary
+website edit path cannot change canonical domain; a future domain migration
+must revoke verification/bindings and clear summaries atomically.
 
 ## Provider security and migration path
 
@@ -119,6 +136,8 @@ identity checks:
 
 - an invalid website URL, a duplicate domain within the file, or a domain
   already registered anywhere on the platform skips the entire row;
+- a service currency other than exact `USD` is a row error; it is never
+  normalized, converted, or silently imported;
 - an unsupported optional value is normalized to blank and recorded as a row
   warning while the remaining valid row stays importable;
 - unknown, duplicate, inactive, and excess category slugs are skipped
@@ -178,7 +197,9 @@ Publisher owner in the active publisher context:
 4. Import a small CSV into a test publisher and verify the rows remain drafts.
 5. Run the domain metric job or wait for its creation/import wake-up.
 6. Save publisher manual metrics and submit the listing for review.
-7. Confirm GSC and GA4 groups appear only after linking and a successful sync,
-   and disappear after unlink/disconnect.
+7. Confirm every GSC/GA4 discovery, link, schedule, sync, daily-write, and
+   summary path fails closed with `GOOGLE_METRICS_DISABLED`, and that public,
+   saved-list, service, and recommendation responses contain no Google metric
+   payload or legacy GA-derived traffic.
 8. Apply a short temporary override in local data and run the re-verification
    sweep after its expiry to confirm automatic revocation.

@@ -2,7 +2,9 @@ import { createHash } from "node:crypto"
 import {
   assertStripeFinancialObjectMode,
   classifyStripeKeyMode,
+  isSupportedMoneyCurrency,
   publisherPayoutStatementDescriptor,
+  USD_CURRENCY,
 } from "@guestpost/shared"
 import { finalizePayoutExecution } from "@guestpost/shared/dist/payout-finalization-core"
 import { mergePayoutProviderMetadata } from "@guestpost/shared/dist/payout-provider-metadata"
@@ -91,7 +93,7 @@ function exactUsdMinorAmount(
   amount: unknown,
   currency: unknown,
 ): number | null {
-  if (String(currency ?? "").toUpperCase() !== "USD") return null
+  if (!isSupportedMoneyCurrency(currency)) return null
   try {
     const minor = new Decimal(String(amount)).mul(100)
     if (!minor.isInteger() || minor.lessThanOrEqualTo(0)) return null
@@ -126,12 +128,10 @@ function stripeResponseMatchesCommand(
     objectId.startsWith(expectedPrefix) &&
     result?.providerExecutionId === objectId &&
     result?.providerAmountMinor === amountMinor &&
-    String(result?.providerCurrency ?? "").toUpperCase() ===
-      String(input.currency).toUpperCase() &&
+    result?.providerCurrency === USD_CURRENCY &&
     metadata.connectedAccountId === input.connectedAccountId &&
     metadata.providerAmountMinor === amountMinor &&
-    String(metadata.providerCurrency ?? "").toUpperCase() ===
-      String(input.currency).toUpperCase() &&
+    metadata.providerCurrency === USD_CURRENCY &&
     metadata.providerPublicReference === input.publicReference &&
     result?.livemode === input.livemode &&
     metadata.livemode === input.livemode
@@ -193,6 +193,18 @@ const CERTIFIED_EXTERNAL_PAYOUT_PROVIDERS = new Set<string>([
 
 function payoutConflict(code: string, message: string): ConflictException {
   return new ConflictException({ code, message })
+}
+
+function assertCanonicalUsdPayoutCurrency(
+  currency: unknown,
+  entity: string,
+): asserts currency is typeof USD_CURRENCY {
+  if (!isSupportedMoneyCurrency(currency)) {
+    throw payoutConflict(
+      "PAYOUT_CURRENCY_INVALID",
+      `${entity} is not denominated in canonical USD`,
+    )
+  }
 }
 
 @Injectable()
@@ -660,6 +672,7 @@ export class PayoutExecutionService {
           "Publisher balance is missing; payout call is blocked",
         )
       }
+      assertCanonicalUsdPayoutCurrency(balance.currency, "Publisher balance")
       if (new Decimal(balance.debtBalance ?? 0).greaterThan(0)) {
         throw new ConflictException(
           "Publisher debt changed after payout claim; external call is blocked",
@@ -728,6 +741,7 @@ export class PayoutExecutionService {
         (sum: Decimal, allocation: any) => sum.plus(allocation.amount),
         new Decimal(0),
       )
+      assertCanonicalUsdPayoutCurrency(fresh.withdrawal.currency, "Withdrawal")
       if (
         fresh.withdrawal.allocations.length === 0 ||
         !allocationTotal.equals(new Decimal(fresh.withdrawal.amount)) ||
@@ -735,8 +749,7 @@ export class PayoutExecutionService {
           (allocation: any) =>
             allocation.releasedAt !== null ||
             !new Decimal(allocation.amount).greaterThan(0) ||
-            allocation.currency.toUpperCase() !==
-              fresh.withdrawal.currency.toUpperCase(),
+            allocation.currency !== USD_CURRENCY,
         )
       ) {
         throw new ConflictException(
@@ -750,10 +763,8 @@ export class PayoutExecutionService {
         !new Decimal(fresh.destinationAmount ?? fresh.amount).equals(
           new Decimal(fresh.withdrawal.netAmount ?? fresh.withdrawal.amount),
         ) ||
-        fresh.sourceCurrency.toUpperCase() !==
-          fresh.withdrawal.currency.toUpperCase() ||
-        fresh.destinationCurrency.toUpperCase() !==
-          fresh.withdrawal.currency.toUpperCase()
+        fresh.sourceCurrency !== USD_CURRENCY ||
+        fresh.destinationCurrency !== USD_CURRENCY
       ) {
         throw new ConflictException(
           "Payout execution amount or currency changed before external call",
@@ -831,8 +842,7 @@ export class PayoutExecutionService {
           !account.payoutsEnabled ||
           !account.detailsSubmitted ||
           !account.payoutScheduleConfigured ||
-          account.defaultCurrency?.toUpperCase() !==
-            fresh.withdrawal.currency.toUpperCase())
+          account.defaultCurrency !== USD_CURRENCY)
       ) {
         throw new ConflictException(
           "Stripe payout account is no longer fully enabled",
@@ -987,6 +997,7 @@ export class PayoutExecutionService {
       select: {
         id: true,
         method: true,
+        currency: true,
         publicReference: true,
         publisher: { select: { organizationId: true } },
       },
@@ -994,6 +1005,7 @@ export class PayoutExecutionService {
     if (!routingWithdrawal) {
       throw new NotFoundException("Withdrawal not found")
     }
+    assertCanonicalUsdPayoutCurrency(routingWithdrawal.currency, "Withdrawal")
     const derivedProvider = providerByMethod[routingWithdrawal.method]
     if (!derivedProvider) {
       throw new BadRequestException(
@@ -1051,6 +1063,7 @@ export class PayoutExecutionService {
           `Withdrawal ${withdrawalId} is ${withdrawal.status}, expected APPROVED`,
         )
       }
+      assertCanonicalUsdPayoutCurrency(withdrawal.currency, "Withdrawal")
       if (!withdrawal.approvedBy) {
         throw payoutConflict(
           "PAYOUT_APPROVER_PROVENANCE_MISSING",
@@ -1154,8 +1167,7 @@ export class PayoutExecutionService {
           !account.transfersEnabled ||
           !account.payoutsEnabled ||
           !account.detailsSubmitted ||
-          account.defaultCurrency?.toUpperCase() !==
-            withdrawal.currency.toUpperCase() ||
+          account.defaultCurrency !== USD_CURRENCY ||
           !account.payoutScheduleConfigured)
       ) {
         throw new BadRequestException(
@@ -1196,8 +1208,7 @@ export class PayoutExecutionService {
           (allocation: any) =>
             allocation.releasedAt === null &&
             new Decimal(allocation.amount).greaterThan(0) &&
-            allocation.currency.toUpperCase() ===
-              withdrawal.currency.toUpperCase(),
+            allocation.currency === USD_CURRENCY,
         ) &&
         allocationTotal.equals(new Decimal(withdrawal.amount))
       if (!reservationValid) {
@@ -1262,7 +1273,7 @@ export class PayoutExecutionService {
               }
             : null,
         ),
-        destinationCurrency: withdrawal.currency,
+        destinationCurrency: USD_CURRENCY,
         recipientFingerprint: null,
       }
       const providerSnapshot = {
@@ -1279,8 +1290,8 @@ export class PayoutExecutionService {
           status: "PROCESSING",
           amount: withdrawal.amount,
           fee: 0,
-          sourceCurrency: withdrawal.currency,
-          destinationCurrency: withdrawal.currency,
+          sourceCurrency: USD_CURRENCY,
+          destinationCurrency: USD_CURRENCY,
           destinationAmount: withdrawal.netAmount ?? withdrawal.amount,
           requestedReference: withdrawal.publicReference,
           stage: "CREATED",
@@ -1300,7 +1311,7 @@ export class PayoutExecutionService {
             withdrawalId,
             providerName,
             amount: String(withdrawal.amount),
-            currency: withdrawal.currency,
+            currency: USD_CURRENCY,
             payoutMethodId: payoutMethod.id,
             payoutMethodVersion: payoutMethod.version,
             providerAccountRowId: account?.id ?? null,
@@ -1377,8 +1388,7 @@ export class PayoutExecutionService {
             !currentAccount.payoutsEnabled ||
             !currentAccount.detailsSubmitted ||
             !currentAccount.payoutScheduleConfigured ||
-            currentAccount.defaultCurrency?.toUpperCase() !==
-              claim.withdrawal.currency.toUpperCase()))
+            currentAccount.defaultCurrency !== USD_CURRENCY))
       ) {
         throw new ConflictException(
           "Payout destination changed after claim; no send was attempted",
@@ -1492,7 +1502,7 @@ export class PayoutExecutionService {
       )
       transferResult = await adapter.createTransfer({
         amount: Number(claim.withdrawal.netAmount ?? claim.withdrawal.amount),
-        currency: claim.withdrawal.currency,
+        currency: USD_CURRENCY,
         recipientDetails,
         providerConfig,
         idempotencyKey: claim.execution.idempotencyKey,
@@ -1505,7 +1515,7 @@ export class PayoutExecutionService {
         !stripeResponseMatchesCommand(transferResult, {
           kind: "transfer",
           amount: claim.withdrawal.netAmount ?? claim.withdrawal.amount,
-          currency: claim.withdrawal.currency,
+          currency: USD_CURRENCY,
           connectedAccountId: String(recipientDetails.connectedAccountId),
           publicReference:
             claim.withdrawal.publicReference ?? claim.withdrawal.id,
@@ -1611,7 +1621,7 @@ export class PayoutExecutionService {
             bankSendClaim.withdrawal.netAmount ??
               bankSendClaim.withdrawal.amount,
           ),
-          currency: bankSendClaim.withdrawal.currency,
+          currency: USD_CURRENCY,
           connectedAccountId: String(recipientDetails.connectedAccountId),
           idempotencyKey: bankIdempotencyKey,
           description: `GuestPost publisher payout ${
@@ -1633,7 +1643,7 @@ export class PayoutExecutionService {
             amount:
               bankSendClaim.withdrawal.netAmount ??
               bankSendClaim.withdrawal.amount,
-            currency: bankSendClaim.withdrawal.currency,
+            currency: USD_CURRENCY,
             connectedAccountId: String(recipientDetails.connectedAccountId),
             publicReference:
               bankSendClaim.withdrawal.publicReference ??
@@ -1962,7 +1972,7 @@ export class PayoutExecutionService {
       this.assertProviderModeForExecution(claim.execution, "stripe_connect")
       transfer = await adapter.createTransfer({
         amount: Number(claim.withdrawal.netAmount ?? claim.withdrawal.amount),
-        currency: claim.withdrawal.currency,
+        currency: USD_CURRENCY,
         recipientDetails: claim.recipientDetails,
         providerConfig: claim.providerConfig,
         idempotencyKey: claim.execution.idempotencyKey,
@@ -1974,7 +1984,7 @@ export class PayoutExecutionService {
         !stripeResponseMatchesCommand(transfer, {
           kind: "transfer",
           amount: claim.withdrawal.netAmount ?? claim.withdrawal.amount,
-          currency: claim.withdrawal.currency,
+          currency: USD_CURRENCY,
           connectedAccountId: String(claim.recipientDetails.connectedAccountId),
           publicReference:
             claim.withdrawal.publicReference ?? claim.withdrawal.id,
@@ -2164,7 +2174,7 @@ export class PayoutExecutionService {
       this.assertProviderModeForExecution(claim.execution, "stripe_connect")
       payout = await adapter.createBankPayout({
         amount: Number(claim.withdrawal.netAmount ?? claim.withdrawal.amount),
-        currency: claim.withdrawal.currency,
+        currency: USD_CURRENCY,
         connectedAccountId,
         idempotencyKey: bankKey,
         description: `GuestPost publisher payout ${
@@ -2180,7 +2190,7 @@ export class PayoutExecutionService {
         !stripeResponseMatchesCommand(payout, {
           kind: "payout",
           amount: claim.withdrawal.netAmount ?? claim.withdrawal.amount,
-          currency: claim.withdrawal.currency,
+          currency: USD_CURRENCY,
           connectedAccountId,
           publicReference:
             claim.withdrawal.publicReference ?? claim.withdrawal.id,
@@ -2520,7 +2530,7 @@ export class PayoutExecutionService {
       this.assertProviderModeForExecution(claimed.execution, "stripe_connect")
       payout = await adapter.createBankPayout({
         amount: Number(withdrawal.netAmount ?? withdrawal.amount),
-        currency: withdrawal.currency,
+        currency: USD_CURRENCY,
         connectedAccountId: claimed.immutableConnectedAccountId,
         idempotencyKey: claimed.bankIdempotencyKey,
         description: `GuestPost publisher payout ${withdrawal.publicReference ?? withdrawal.id}`,
@@ -2533,7 +2543,7 @@ export class PayoutExecutionService {
         !stripeResponseMatchesCommand(payout, {
           kind: "payout",
           amount: withdrawal.netAmount ?? withdrawal.amount,
-          currency: withdrawal.currency,
+          currency: USD_CURRENCY,
           connectedAccountId: claimed.immutableConnectedAccountId,
           publicReference: withdrawal.publicReference ?? withdrawal.id,
           livemode: claimed.execution.livemode,
@@ -2991,7 +3001,7 @@ export class PayoutExecutionService {
         claimedVersion,
         connectedAccountId: lockedConnectedAccountId,
         expectedAmountMinor,
-        expectedCurrency: locked.destinationCurrency.toUpperCase(),
+        expectedCurrency: USD_CURRENCY,
         expectedPublicReference: locked.withdrawal.publicReference,
       }
     })

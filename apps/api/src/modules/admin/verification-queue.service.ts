@@ -1,4 +1,7 @@
-import { WorkflowDecisionService } from "@guestpost/shared"
+import {
+  runLockedOrderSerializableTransaction,
+  WorkflowDecisionService,
+} from "@guestpost/shared"
 import {
   ConflictException,
   Injectable,
@@ -7,6 +10,7 @@ import {
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { DeliveryInterventionService } from "../orders/services/delivery-intervention.service"
+import { assertCurrentStaffAuthority } from "../orders/services/staff-authority"
 
 @Injectable()
 export class AdminVerificationQueueService {
@@ -23,10 +27,15 @@ export class AdminVerificationQueueService {
   async listQueue() {
     const orders = await this.prisma.order.findMany({
       where: {
-        status: "PUBLISHED",
-        activeDeliveryVersion: {
-          verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
-        },
+        OR: [
+          {
+            status: "PUBLISHED",
+            activeDeliveryVersion: {
+              verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
+            },
+          },
+          { fraudFlags: { some: { resolution: null } } },
+        ],
       },
       include: {
         website: {
@@ -48,7 +57,33 @@ export class AdminVerificationQueueService {
         activeDeliveryVersion: {
           include: {
             evidence: { orderBy: { createdAt: "desc" }, take: 1 },
-            fraudFlags: true,
+          },
+        },
+        fraudFlags: {
+          where: { resolution: null },
+          orderBy: { createdAt: "asc" },
+          include: {
+            deliveryVersion: {
+              select: {
+                id: true,
+                version: true,
+                publishedUrl: true,
+                verificationStatus: true,
+                supersededByVersion: true,
+                evidence: {
+                  orderBy: { checkedAt: "desc" },
+                  take: 1,
+                  select: {
+                    httpStatus: true,
+                    resolvedUrl: true,
+                    anchorFound: true,
+                    linkFound: true,
+                    targetUrlMatched: true,
+                    checkedAt: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -60,11 +95,14 @@ export class AdminVerificationQueueService {
       const version = order.activeDeliveryVersion
       const evidence = version?.evidence?.[0] ?? null
       const queueTimeMs = now - (version?.createdAt?.getTime() ?? now)
-      const priority = this.decision.computeVerificationPriority(
-        { amount: Number(order.amount ?? 0) },
-        order.website?.publisher ?? null,
-        queueTimeMs,
-      )
+      const priority =
+        order.fraudFlags.length > 0
+          ? { score: 100, label: "CRITICAL" as const }
+          : this.decision.computeVerificationPriority(
+              { amount: Number(order.amount ?? 0) },
+              order.website?.publisher ?? null,
+              queueTimeMs,
+            )
 
       return {
         orderId: order.id,
@@ -114,9 +152,16 @@ export class AdminVerificationQueueService {
                     checkedAt: evidence.checkedAt,
                   }
                 : null,
-              fraudFlags: (version.fraudFlags ?? []).map((f: any) => ({
+              fraudFlags: (order.fraudFlags ?? []).map((f: any) => ({
+                id: f.id,
+                deliveryVersionId: f.deliveryVersionId,
                 type: f.type,
                 details: f.details,
+                createdAt: f.createdAt,
+                deliveryVersion: {
+                  ...f.deliveryVersion,
+                  evidence: f.deliveryVersion.evidence[0] ?? null,
+                },
               })),
             }
           : null,
@@ -168,71 +213,89 @@ export class AdminVerificationQueueService {
       this.decision.computeReviewWindowDays() * 24 * 60 * 60 * 1000
     const autoAcceptAt = new Date(now.getTime() + reviewWindowMs)
 
-    const upd = await this.prisma.orderDeliveryVersion.updateMany({
-      where: {
-        id: version.id,
-        verificationVersion: version.verificationVersion,
-      },
-      data: {
-        interventionStatus: "APPROVED",
-        verificationFailureReason: null,
-        verificationVersion: version.verificationVersion + 1,
-        adminVerifiedById: userId,
-        adminOverrideReason: reason as any,
-        adminVerifiedNotes: notes ?? null,
-      },
-    })
-    if (upd.count === 0)
-      throw new ConflictException(
-        "Delivery was modified by another request. Retry.",
-      )
+    await runLockedOrderSerializableTransaction(
+      this.prisma,
+      order.id,
+      async (tx: any) => {
+        await assertCurrentStaffAuthority(tx, userId, role, [
+          "SUPER_ADMIN",
+          "OPERATIONS",
+        ])
+        const upd = await tx.orderDeliveryVersion.updateMany({
+          where: {
+            id: version.id,
+            verificationVersion: version.verificationVersion,
+          },
+          data: {
+            interventionStatus: "APPROVED",
+            verificationFailureReason: null,
+            verificationVersion: version.verificationVersion + 1,
+            adminVerifiedById: userId,
+            adminOverrideReason: reason as any,
+            adminVerifiedNotes: notes ?? null,
+          },
+        })
+        if (upd.count === 0)
+          throw new ConflictException(
+            "Delivery was modified by another request. Retry.",
+          )
 
-    const orderUpd = await this.prisma.order.updateMany({
-      where: { id: order.id, status: "PUBLISHED" },
-      data: {
-        status: "VERIFIED",
-        verifiedAt: now,
-        verifiedBy: userId,
-        verifyMethod: "MANUAL_ADMIN",
-        autoAcceptAt,
-      },
-    })
-    if (orderUpd.count === 0)
-      throw new ConflictException(
-        "Order was modified by another request. Retry.",
-      )
+        const orderUpd = await tx.order.updateMany({
+          where: {
+            id: order.id,
+            status: "PUBLISHED",
+            version: order.version,
+          },
+          data: {
+            status: "VERIFIED",
+            verifiedAt: now,
+            verifiedBy: userId,
+            verifyMethod: "MANUAL_ADMIN",
+            autoAcceptAt,
+            version: { increment: 1 },
+          },
+        })
+        if (orderUpd.count === 0)
+          throw new ConflictException(
+            "Order was modified by another request. Retry.",
+          )
 
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId: order.id,
-        eventType: "VERIFIED_MANUAL",
-        actorId: userId,
-        message: `Admin manually verified delivery — reason: ${reason}${notes ? ` (${notes})` : ""}`,
-        metadata: {
-          deliveryVersionId: version.id,
-          verifyMethod: "MANUAL_ADMIN",
-          adminReason: reason,
-          adminNotes: notes ?? null,
-          autoAcceptAt: autoAcceptAt.toISOString(),
-        },
-      },
-    })
+        await tx.orderEvent.create({
+          data: {
+            orderId: order.id,
+            eventType: "VERIFIED_MANUAL",
+            actorId: userId,
+            message: `Admin manually verified delivery — reason: ${reason}${notes ? ` (${notes})` : ""}`,
+            metadata: {
+              deliveryVersionId: version.id,
+              verifyMethod: "MANUAL_ADMIN",
+              adminReason: reason,
+              adminNotes: notes ?? null,
+              autoAcceptAt: autoAcceptAt.toISOString(),
+            },
+          },
+        })
 
-    await this.audit.log({
-      action: "ORDER_DELIVERY_MANUAL_APPROVED",
-      entityType: "OrderDeliveryVersion",
-      entityId: version.id,
-      metadata: {
-        orderId: order.id,
-        deliveryVersionId: version.id,
-        publisherId: order.website?.publisherId ?? null,
-        reason,
-        roleAtTime: role,
-        notes: notes ?? null,
+        await this.audit.log(
+          {
+            action: "ORDER_DELIVERY_MANUAL_APPROVED",
+            entityType: "OrderDeliveryVersion",
+            entityId: version.id,
+            metadata: {
+              orderId: order.id,
+              deliveryVersionId: version.id,
+              publisherId: order.website?.publisherId ?? null,
+              reason,
+              roleAtTime: role,
+              notes: notes ?? null,
+            },
+            userId,
+            organizationId: order.organizationId,
+          },
+          tx,
+        )
       },
-      userId,
-      organizationId: order.organizationId,
-    })
+    )
 
     return {
       status: "VERIFIED",
@@ -257,49 +320,62 @@ export class AdminVerificationQueueService {
 
     const version: any = order.activeDeliveryVersion
 
-    const upd = await this.prisma.orderDeliveryVersion.updateMany({
-      where: {
-        id: version.id,
-        verificationVersion: version.verificationVersion,
-      },
-      data: {
-        interventionStatus: "REJECTED",
-        verificationFailureReason: reason,
-        verificationVersion: version.verificationVersion + 1,
-      },
-    })
-    if (upd.count === 0)
-      throw new ConflictException(
-        "Delivery was modified by another request. Retry.",
-      )
+    await runLockedOrderSerializableTransaction(
+      this.prisma,
+      order.id,
+      async (tx: any) => {
+        await assertCurrentStaffAuthority(tx, userId, role, [
+          "SUPER_ADMIN",
+          "OPERATIONS",
+        ])
+        const upd = await tx.orderDeliveryVersion.updateMany({
+          where: {
+            id: version.id,
+            verificationVersion: version.verificationVersion,
+          },
+          data: {
+            interventionStatus: "REJECTED",
+            verificationFailureReason: reason,
+            verificationVersion: version.verificationVersion + 1,
+          },
+        })
+        if (upd.count === 0)
+          throw new ConflictException(
+            "Delivery was modified by another request. Retry.",
+          )
 
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId: order.id,
-        eventType: "ORDER_CANCELLED",
-        actorId: userId,
-        message: `Delivery rejected by admin: ${reason}`,
-        metadata: {
-          deliveryVersionId: version.id,
-          reason,
-        },
-      },
-    })
+        await tx.orderEvent.create({
+          data: {
+            orderId: order.id,
+            eventType: "ORDER_CANCELLED",
+            actorId: userId,
+            message: `Delivery rejected by admin: ${reason}`,
+            metadata: {
+              deliveryVersionId: version.id,
+              reason,
+            },
+          },
+        })
 
-    await this.audit.log({
-      action: "ORDER_DELIVERY_MANUAL_REJECTED",
-      entityType: "OrderDeliveryVersion",
-      entityId: version.id,
-      metadata: {
-        orderId: order.id,
-        deliveryVersionId: version.id,
-        publisherId: order.website?.publisherId ?? null,
-        reason,
-        roleAtTime: role,
+        await this.audit.log(
+          {
+            action: "ORDER_DELIVERY_MANUAL_REJECTED",
+            entityType: "OrderDeliveryVersion",
+            entityId: version.id,
+            metadata: {
+              orderId: order.id,
+              deliveryVersionId: version.id,
+              publisherId: order.website?.publisherId ?? null,
+              reason,
+              roleAtTime: role,
+            },
+            userId,
+            organizationId: order.organizationId,
+          },
+          tx,
+        )
       },
-      userId,
-      organizationId: order.organizationId,
-    })
+    )
 
     return { status: "REJECTED" }
   }

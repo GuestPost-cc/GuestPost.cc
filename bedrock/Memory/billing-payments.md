@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: billing-payments
 project: guestpost-platform
-updated: 2026-07-29
+updated: 2026-08-02
 ---
 
 # Billing & Payments
@@ -18,6 +18,10 @@ Both reservation and capture lock and re-authorize the owned wallet and fail
 closed on positive open/lost uncovered dispute exposure, so a standalone
 capture cannot spend an earlier reservation after a zero-held dispute case is
 recorded.
+Order checkout locks the Order before the Wallet and validates its exact USD
+item contract before either reservation or capture. The paid transition,
+reservation, PURCHASE evidence, audit, and submission commit atomically; a
+concurrent checkout request cannot debit the same Order twice.
 The former customer wallet-withdrawal endpoint and API-client method are
 retired because they reduced an internal balance without an external return.
 A future return requires source allocation, destination policy, provider

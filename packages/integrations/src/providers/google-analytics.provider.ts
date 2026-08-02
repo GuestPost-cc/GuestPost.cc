@@ -4,6 +4,7 @@ import {
   ReauthRequiredError,
   TokenExpiredError,
 } from "../errors"
+import { assertGoogleMetricsEnabled } from "../google-metrics-gate"
 import type { DiscoveryResource, SyncResult } from "../types"
 import type { DiscoveryProvider, SyncProvider } from "./provider.interface"
 
@@ -18,6 +19,7 @@ export class GoogleAnalyticsProvider
   implements DiscoveryProvider, SyncProvider
 {
   async discoverResources(accessToken: string): Promise<DiscoveryResource[]> {
+    assertGoogleMetricsEnabled()
     const accounts = await this.listAccounts(accessToken)
     const resources: DiscoveryResource[] = []
 
@@ -45,6 +47,7 @@ export class GoogleAnalyticsProvider
     endDate?: Date,
     websiteIntegrationId?: string,
   ): Promise<SyncResult> {
+    assertGoogleMetricsEnabled()
     const startedAt = new Date()
     const propertyId = `properties/${externalResourceId}`
     const end = endDate ?? new Date()
@@ -80,9 +83,8 @@ export class GoogleAnalyticsProvider
       if (!response.ok) {
         if (response.status === 401) throw new TokenExpiredError()
         if (response.status === 403) throw new ReauthRequiredError()
-        const body = await response.text().catch(() => "")
         throw new ProviderError(
-          `GA4 API error: ${response.status} ${body}`,
+          `GA4 API request failed with status ${response.status}`,
           "GA4_API_ERROR",
         )
       }

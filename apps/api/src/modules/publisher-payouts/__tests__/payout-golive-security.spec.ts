@@ -510,7 +510,7 @@ describe("Provider adapters — idempotency and production safety", () => {
     const adapter = new StripeConnectPayoutAdapter()
     await adapter.createTransfer({
       amount: 100,
-      currency: "usd",
+      currency: "USD",
       recipientDetails: {
         connectedAccountId: "acct_1",
         publicReference: "GP-WD-0001",
@@ -524,6 +524,28 @@ describe("Provider adapters — idempotency and production safety", () => {
       expect.not.objectContaining({ idempotency_key: expect.anything() }),
       { idempotencyKey: "payout-wd-1-v0" },
     )
+  })
+
+  it("rejects a non-canonical payout command currency before calling Stripe", async () => {
+    const create = jest.fn()
+    jest.spyOn(stripeClient, "getStripeClient").mockReturnValue({
+      transfers: { create },
+    } as any)
+
+    const adapter = new StripeConnectPayoutAdapter()
+    await expect(
+      adapter.createTransfer({
+        amount: 100,
+        currency: "usd",
+        recipientDetails: {
+          connectedAccountId: "acct_1",
+          publicReference: "GP-WD-0001",
+        },
+        providerConfig: {},
+        idempotencyKey: "payout-wd-1-v0",
+      }),
+    ).rejects.toThrow(/currency/i)
+    expect(create).not.toHaveBeenCalled()
   })
 
   it("rejects a Stripe Transfer response for a different connected account", async () => {
@@ -669,7 +691,7 @@ describe("Provider adapters — idempotency and production safety", () => {
     const stripe = new StripeConnectPayoutAdapter()
     const params = {
       amount: 100,
-      currency: "usd",
+      currency: "USD",
       recipientDetails: {
         connectedAccountId: "acct_1",
         publicReference: "GP-WD-0001",

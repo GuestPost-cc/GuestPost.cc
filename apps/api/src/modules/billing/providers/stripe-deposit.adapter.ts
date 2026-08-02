@@ -1,5 +1,6 @@
 import {
   customerWalletStatementSuffix,
+  isSupportedMoneyCurrency,
   normalizeFinancialReference,
 } from "@guestpost/shared"
 import { Injectable } from "@nestjs/common"
@@ -28,6 +29,9 @@ export class StripeDepositAdapter implements DepositProviderAdapter {
   async createSession(
     input: CreateDepositSessionInput,
   ): Promise<DepositSessionResult> {
+    if (!isSupportedMoneyCurrency(input.currency)) {
+      throw new Error("Stripe deposits require canonical USD currency")
+    }
     const stripe = getStripeClient("deposits")
     const reference = normalizeFinancialReference(input.publicReference, 32)
     const session = await stripe.checkout.sessions.create(
@@ -36,7 +40,7 @@ export class StripeDepositAdapter implements DepositProviderAdapter {
         line_items: [
           {
             price_data: {
-              currency: input.currency.toLowerCase(),
+              currency: "usd",
               product_data: {
                 name: "GuestPost wallet deposit",
                 description: `Wallet funding reference ${reference}`,

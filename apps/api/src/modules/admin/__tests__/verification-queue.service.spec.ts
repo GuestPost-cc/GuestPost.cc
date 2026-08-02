@@ -57,6 +57,7 @@ describe("AdminVerificationQueueService", () => {
               ],
               fraudFlags: [],
             },
+            fraudFlags: [],
           },
         ]),
       },
@@ -93,10 +94,15 @@ describe("AdminVerificationQueueService", () => {
     expect(prisma.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          status: "PUBLISHED",
-          activeDeliveryVersion: {
-            verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
-          },
+          OR: [
+            {
+              status: "PUBLISHED",
+              activeDeliveryVersion: {
+                verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
+              },
+            },
+            { fraudFlags: { some: { resolution: null } } },
+          ],
         },
       }),
     )

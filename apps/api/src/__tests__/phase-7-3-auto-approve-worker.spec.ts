@@ -51,6 +51,7 @@ function makeSettlement(opts: {
     id: opts.id,
     version: opts.version ?? 1,
     orderId: opts.orderId ?? `order-${opts.id}`,
+    currency: "USD",
     reviewEndsAt: new Date("2026-06-15T00:00:00Z"),
     order: {
       id: opts.orderId ?? `order-${opts.id}`,
@@ -66,12 +67,40 @@ function makeSettlement(opts: {
 }
 
 function makeTxMock() {
+  let currentOrderId = "order-s1"
   return {
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    order: {
+      findUnique: jest.fn().mockImplementation(({ where }) => {
+        currentOrderId = where.id
+        return {
+          id: where.id,
+          status: "DELIVERED",
+          version: 3,
+          currency: "USD",
+          paymentStatus: "PAID",
+          activeDeliveryVersionId: "v1",
+        }
+      }),
+    },
+    orderDeliveryVersion: {
+      findUnique: jest.fn().mockImplementation(() => ({
+        id: "v1",
+        orderId: currentOrderId,
+        verificationStatus: "VERIFIED",
+        interventionStatus: "NONE",
+      })),
+    },
     settlement: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     settlementApproval: { upsert: jest.fn().mockResolvedValue({}) },
     orderEvent: { create: jest.fn().mockResolvedValue({}) },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
     orderDispute: { findFirst: jest.fn().mockResolvedValue(null) },
+    revision: { findFirst: jest.fn().mockResolvedValue(null) },
+    orderCancellationRequest: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    deliveryFraudFlag: { count: jest.fn().mockResolvedValue(0) },
   }
 }
 
@@ -143,6 +172,68 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
     expect(tx.settlementApproval.upsert).not.toHaveBeenCalled()
     expect(tx.orderEvent.create).not.toHaveBeenCalled()
     expect(tx.auditLog.create).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      "unresolved fraud",
+      (tx: any) => tx.deliveryFraudFlag.count.mockResolvedValue(1),
+    ],
+    [
+      "active revision",
+      (tx: any) => tx.revision.findFirst.mockResolvedValue({ id: "r1" }),
+    ],
+    [
+      "cancellation request",
+      (tx: any) =>
+        tx.orderCancellationRequest.findFirst.mockResolvedValue({ id: "c1" }),
+    ],
+    [
+      "unverified delivery",
+      (tx: any) =>
+        tx.orderDeliveryVersion.findUnique.mockResolvedValue({
+          id: "v1",
+          orderId: "order-s1",
+          verificationStatus: "FAILED",
+          interventionStatus: "NONE",
+        }),
+    ],
+    [
+      "non-USD order",
+      (tx: any) =>
+        tx.order.findUnique.mockResolvedValue({
+          id: "order-s1",
+          status: "DELIVERED",
+          version: 3,
+          currency: "EUR",
+          paymentStatus: "PAID",
+          activeDeliveryVersionId: "v1",
+        }),
+    ],
+    [
+      "unpaid order",
+      (tx: any) =>
+        tx.order.findUnique.mockResolvedValue({
+          id: "order-s1",
+          status: "DELIVERED",
+          version: 3,
+          currency: "USD",
+          paymentStatus: "REFUNDED",
+          activeDeliveryVersionId: "v1",
+        }),
+    ],
+  ])("skips when the canonical gate finds %s", async (_label, arrange) => {
+    const prisma = makePrismaMock()
+    prisma.settlement.findMany.mockResolvedValue([makeSettlement({ id: "s1" })])
+    const tx = makeTxMock()
+    arrange(tx)
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(tx))
+
+    const result = await runSettlementAutoApprove(prisma as any)
+
+    expect(result).toMatchObject({ scanned: 1, approved: 0, skipped: 1 })
+    expect(tx.settlement.updateMany).not.toHaveBeenCalled()
+    expect(tx.settlementApproval.upsert).not.toHaveBeenCalled()
   })
 
   it("version-guard race: updateMany returns count=0 → counted as skipped, not approved", async () => {

@@ -1,24 +1,29 @@
 import { prisma } from "@guestpost/database"
-import { assertFinanceOperationAllowed, QUEUES } from "@guestpost/shared"
+import {
+  assertFinanceOperationAllowed,
+  QUEUE_JOBS,
+  QUEUES,
+} from "@guestpost/shared"
 // Node-only deep imports keep cheerio + aws-sdk + undici/dns out of the
 // shared package's public index — the Next.js apps' webpack chokes on
 // `node:*` schemes when bundling. safe-fetch (undici Agent + dns) joins
 // the same convention as delivery-verification-core, object-storage,
 // observability/structured-logger.
 import {
-  type FetchResult,
   runDeliveryVerification,
   runSettlementHoldLinkSweep,
 } from "@guestpost/shared/dist/delivery-verification-core"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { putObject } from "@guestpost/shared/dist/object-storage"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import * as Sentry from "@sentry/node"
+import { Queue } from "bullmq"
 import {
-  isSafePublicUrl,
-  readBodyWithCap,
-  SafeFetchError,
-  safeFetch,
-} from "@guestpost/shared/dist/safe-fetch"
+  deliveryVerificationDispatchBatchSize,
+  dispatchPendingDeliveryVerifications,
+  isDeliveryVerificationJobEligible,
+} from "../delivery-verification-dispatch"
+import { fetchWithChain } from "../delivery-verification-fetch"
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
@@ -31,118 +36,6 @@ const logger = createLogger("worker.delivery-verification")
 // parses HTML, persists evidence + snapshot, runs fraud detection, and
 // transitions the delivery version. Retries on transient failure with 5/15/60m
 // backoff; after exhaustion the core routes to MANUAL_REVIEW.
-
-// Phase 7.11 (#13): cap response bodies at 5MB. Typical guest-post pages
-// are ~200KB; 5MB is well above legitimate traffic but well below the
-// pod's RSS budget at concurrency 4. Oversize triggers SafeFetchError
-// (BODY_TOO_LARGE), which we treat as a verification failure → retry →
-// MANUAL_REVIEW after attempts exhaust.
-const MAX_HTML_BYTES = 5 * 1024 * 1024
-
-// Manual redirect resolution (max 5 hops). Phase 7.11 (#14): safeFetch
-// uses an undici Agent whose connect.lookup validates the resolved IP
-// against PRIVATE_IP_PATTERNS, closing the DNS-rebinding TOCTOU window
-// that the legacy isSafePublicUrl + fetch() pair left open.
-async function fetchWithChain(startUrl: string): Promise<FetchResult> {
-  const redirectChain: string[] = []
-  let current = startUrl
-  let lastStatus = 0
-  let lastHeaders: Record<string, string> = {}
-
-  for (let hop = 0; hop < 6; hop++) {
-    // Pre-flight check kept as defense-in-depth + clearer error message
-    // for the redirect-chain error field. safeFetch repeats the check
-    // internally; the duplication is intentional and free.
-    if (!isSafePublicUrl(current)) {
-      return {
-        finalUrl: current,
-        status: 0,
-        headers: {},
-        html: "",
-        redirectChain,
-        error: "unsafe (non-public) URL",
-      }
-    }
-    let res: Response
-    try {
-      res = await safeFetch(current, {
-        redirect: "manual",
-        signal: AbortSignal.timeout(15000),
-        headers: { "User-Agent": "GuestPost-DeliveryVerification/1.0" },
-      })
-    } catch (err: any) {
-      const reason =
-        err instanceof SafeFetchError
-          ? `${err.code}: ${err.message}`
-          : (err?.message ?? "fetch failed")
-      return {
-        finalUrl: current,
-        status: 0,
-        headers: lastHeaders,
-        html: "",
-        redirectChain,
-        error: reason,
-      }
-    }
-    lastStatus = res.status
-    lastHeaders = Object.fromEntries(res.headers.entries())
-
-    // Follow 3xx with a Location header
-    if (res.status >= 300 && res.status < 400) {
-      const loc = res.headers.get("location")
-      if (!loc) break
-      let next: string
-      try {
-        next = new URL(loc, current).toString()
-      } catch {
-        break
-      }
-      redirectChain.push(current)
-      current = next
-      continue
-    }
-
-    // Terminal response. Phase 7.11 (#13): capped read.
-    const contentLengthHeader = res.headers.get("content-length")
-    const parsedLength =
-      contentLengthHeader != null ? Number(contentLengthHeader) : undefined
-    const contentLength =
-      parsedLength !== undefined && Number.isFinite(parsedLength)
-        ? parsedLength
-        : undefined
-
-    const html = await readBodyWithCap(res, MAX_HTML_BYTES).catch(
-      (err: any) => {
-        if (err instanceof SafeFetchError && err.code === "BODY_TOO_LARGE") {
-          logger.warn("response body cap exceeded", {
-            reason: "body_size_exceeded",
-            url: current,
-            maxBodySize: MAX_HTML_BYTES,
-            contentLength,
-          })
-        }
-        return ""
-      },
-    )
-    return {
-      finalUrl: current,
-      status: res.status,
-      headers: lastHeaders,
-      html,
-      redirectChain,
-      error: undefined,
-    }
-  }
-
-  return {
-    finalUrl: current,
-    status: lastStatus || 508,
-    headers: lastHeaders,
-    html: "",
-    redirectChain,
-    error: "too many redirects",
-  }
-}
 
 export function createDeliveryVerificationWorker() {
   const deps = {
@@ -168,9 +61,46 @@ export function createDeliveryVerificationWorker() {
         assertFinanceOperationAllowed("reconciliation")
         const res = await runSettlementHoldLinkSweep(deps)
         logger.info("settlement-hold link sweep complete", { result: res })
+        if (res.failed > 0 || res.scanCapReached) {
+          Sentry.captureMessage("Settlement-hold link sweep incomplete", {
+            level: "warning",
+            tags: {
+              queue: QUEUES.DELIVERY_VERIFICATION,
+              job: job.name,
+              sweepRunId: job.id ?? "unknown",
+            },
+            extra: {
+              scanned: res.scanned,
+              checked: res.checked,
+              failed: res.failed,
+              scan_cap_reached: res.scanCapReached,
+              oldest_unchecked_created_at:
+                res.oldestUncheckedCreatedAt?.toISOString() ?? null,
+            },
+          })
+        }
         return res
       }
-      if (job.name !== "delivery-verify") {
+      if (
+        job.name === QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].DISPATCH_SWEEP
+      ) {
+        assertFinanceOperationAllowed("new_liability")
+        const queue = new Queue(QUEUES.DELIVERY_VERIFICATION, { connection })
+        try {
+          const res = await dispatchPendingDeliveryVerifications(
+            prisma,
+            queue,
+            deliveryVerificationDispatchBatchSize(job.data?.batchSize),
+          )
+          logger.info("delivery verification dispatch sweep complete", {
+            result: res,
+          })
+          return res
+        } finally {
+          await queue.close()
+        }
+      }
+      if (job.name !== QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].VERIFY) {
         logger.warn("unknown job name", { jobName: job.name })
         return
       }
@@ -179,9 +109,23 @@ export function createDeliveryVerificationWorker() {
         deliveryVersionId: string
         actorUserId?: string
       }
+      const expectedVerificationVersion = job.data?.verificationVersion
+      const eligible = await isDeliveryVerificationJobEligible(
+        prisma,
+        deliveryVersionId,
+        expectedVerificationVersion,
+      )
+      if (!eligible) {
+        logger.info("delivery verification skipped as stale or inactive", {
+          deliveryVersionId,
+          verificationVersion: job.data?.verificationVersion,
+        })
+        return { skipped: "stale_or_inactive" }
+      }
       const maxAttempts = job.opts.attempts ?? 1
       const isFinalAttempt = job.attemptsMade >= maxAttempts - 1
       const res = await runDeliveryVerification(deps, deliveryVersionId, {
+        expectedVerificationVersion,
         actorUserId,
         isFinalAttempt,
       })

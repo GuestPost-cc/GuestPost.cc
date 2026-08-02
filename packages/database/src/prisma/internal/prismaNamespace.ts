@@ -415,6 +415,8 @@ export const ModelName = {
   DeliveryVerificationEvidence: 'DeliveryVerificationEvidence',
   DeliverySnapshot: 'DeliverySnapshot',
   DeliveryFraudFlag: 'DeliveryFraudFlag',
+  DeliveryFraudHold: 'DeliveryFraudHold',
+  DeliveryFraudFlagResolution: 'DeliveryFraudFlagResolution',
   OrderReview: 'OrderReview',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
@@ -484,7 +486,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2779,6 +2781,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.DeliveryFraudFlagCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.DeliveryFraudFlagCountAggregateOutputType> | number
+        }
+      }
+    }
+    DeliveryFraudHold: {
+      payload: Prisma.$DeliveryFraudHoldPayload<ExtArgs>
+      fields: Prisma.DeliveryFraudHoldFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DeliveryFraudHoldFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DeliveryFraudHoldFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload>
+        }
+        findFirst: {
+          args: Prisma.DeliveryFraudHoldFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DeliveryFraudHoldFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload>
+        }
+        findMany: {
+          args: Prisma.DeliveryFraudHoldFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload>[]
+        }
+        create: {
+          args: Prisma.DeliveryFraudHoldCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload>
+        }
+        createMany: {
+          args: Prisma.DeliveryFraudHoldCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DeliveryFraudHoldCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload>[]
+        }
+        delete: {
+          args: Prisma.DeliveryFraudHoldDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload>
+        }
+        update: {
+          args: Prisma.DeliveryFraudHoldUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload>
+        }
+        deleteMany: {
+          args: Prisma.DeliveryFraudHoldDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DeliveryFraudHoldUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DeliveryFraudHoldUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload>[]
+        }
+        upsert: {
+          args: Prisma.DeliveryFraudHoldUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudHoldPayload>
+        }
+        aggregate: {
+          args: Prisma.DeliveryFraudHoldAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDeliveryFraudHold>
+        }
+        groupBy: {
+          args: Prisma.DeliveryFraudHoldGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryFraudHoldGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DeliveryFraudHoldCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryFraudHoldCountAggregateOutputType> | number
+        }
+      }
+    }
+    DeliveryFraudFlagResolution: {
+      payload: Prisma.$DeliveryFraudFlagResolutionPayload<ExtArgs>
+      fields: Prisma.DeliveryFraudFlagResolutionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DeliveryFraudFlagResolutionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DeliveryFraudFlagResolutionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload>
+        }
+        findFirst: {
+          args: Prisma.DeliveryFraudFlagResolutionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DeliveryFraudFlagResolutionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload>
+        }
+        findMany: {
+          args: Prisma.DeliveryFraudFlagResolutionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload>[]
+        }
+        create: {
+          args: Prisma.DeliveryFraudFlagResolutionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload>
+        }
+        createMany: {
+          args: Prisma.DeliveryFraudFlagResolutionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DeliveryFraudFlagResolutionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload>[]
+        }
+        delete: {
+          args: Prisma.DeliveryFraudFlagResolutionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload>
+        }
+        update: {
+          args: Prisma.DeliveryFraudFlagResolutionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload>
+        }
+        deleteMany: {
+          args: Prisma.DeliveryFraudFlagResolutionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DeliveryFraudFlagResolutionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DeliveryFraudFlagResolutionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload>[]
+        }
+        upsert: {
+          args: Prisma.DeliveryFraudFlagResolutionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFlagResolutionPayload>
+        }
+        aggregate: {
+          args: Prisma.DeliveryFraudFlagResolutionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDeliveryFraudFlagResolution>
+        }
+        groupBy: {
+          args: Prisma.DeliveryFraudFlagResolutionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryFraudFlagResolutionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DeliveryFraudFlagResolutionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryFraudFlagResolutionCountAggregateOutputType> | number
         }
       }
     }
@@ -7129,13 +7279,16 @@ export const OrderScalarFieldEnum = {
   organizationId: 'organizationId',
   campaignId: 'campaignId',
   idempotencyKey: 'idempotencyKey',
+  requestFingerprint: 'requestFingerprint',
   version: 'version',
+  settlementGateVersion: 'settlementGateVersion',
   activeDeliveryVersionId: 'activeDeliveryVersionId',
   listingId: 'listingId',
   listingServiceId: 'listingServiceId',
   fulfillmentChannel: 'fulfillmentChannel',
   turnaroundDays: 'turnaroundDays',
   warrantyDays: 'warrantyDays',
+  revisionRoundsSnapshot: 'revisionRoundsSnapshot',
   submittedAt: 'submittedAt',
   acceptedAt: 'acceptedAt',
   fulfillmentDueAt: 'fulfillmentDueAt',
@@ -7261,8 +7414,11 @@ export const SettlementScalarFieldEnum = {
   orderId: 'orderId',
   publisherId: 'publisherId',
   grossAmount: 'grossAmount',
+  currency: 'currency',
   platformFee: 'platformFee',
   publisherAmount: 'publisherAmount',
+  platformFeeBps: 'platformFeeBps',
+  feePolicyVersion: 'feePolicyVersion',
   status: 'status',
   reviewEndsAt: 'reviewEndsAt',
   releasePolicy: 'releasePolicy',
@@ -7379,6 +7535,34 @@ export const DeliveryFraudFlagScalarFieldEnum = {
 export type DeliveryFraudFlagScalarFieldEnum = (typeof DeliveryFraudFlagScalarFieldEnum)[keyof typeof DeliveryFraudFlagScalarFieldEnum]
 
 
+export const DeliveryFraudHoldScalarFieldEnum = {
+  fraudFlagId: 'fraudFlagId',
+  orderId: 'orderId',
+  deliveryVersionId: 'deliveryVersionId',
+  type: 'type',
+  createdAt: 'createdAt'
+} as const
+
+export type DeliveryFraudHoldScalarFieldEnum = (typeof DeliveryFraudHoldScalarFieldEnum)[keyof typeof DeliveryFraudHoldScalarFieldEnum]
+
+
+export const DeliveryFraudFlagResolutionScalarFieldEnum = {
+  id: 'id',
+  fraudFlagId: 'fraudFlagId',
+  orderId: 'orderId',
+  deliveryVersionId: 'deliveryVersionId',
+  kind: 'kind',
+  reason: 'reason',
+  resolvedByUserId: 'resolvedByUserId',
+  resolvedByRole: 'resolvedByRole',
+  evidenceId: 'evidenceId',
+  evidence: 'evidence',
+  createdAt: 'createdAt'
+} as const
+
+export type DeliveryFraudFlagResolutionScalarFieldEnum = (typeof DeliveryFraudFlagResolutionScalarFieldEnum)[keyof typeof DeliveryFraudFlagResolutionScalarFieldEnum]
+
+
 export const OrderReviewScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
@@ -7395,6 +7579,7 @@ export type OrderReviewScalarFieldEnum = (typeof OrderReviewScalarFieldEnum)[key
 export const PublisherBalanceScalarFieldEnum = {
   id: 'id',
   publisherId: 'publisherId',
+  currency: 'currency',
   pendingBalance: 'pendingBalance',
   approvedBalance: 'approvedBalance',
   withdrawableBalance: 'withdrawableBalance',
@@ -7605,6 +7790,7 @@ export const PayoutBatchScalarFieldEnum = {
   id: 'id',
   name: 'name',
   status: 'status',
+  currency: 'currency',
   totalAmount: 'totalAmount',
   totalCount: 'totalCount',
   completedAmount: 'completedAmount',
@@ -7699,8 +7885,11 @@ export const PlatformRevenueScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
   amount: 'amount',
+  currency: 'currency',
   platformFee: 'platformFee',
   netRevenue: 'netRevenue',
+  platformFeeBps: 'platformFeeBps',
+  feePolicyVersion: 'feePolicyVersion',
   recordedAt: 'recordedAt',
   reversedAt: 'reversedAt',
   listingServiceId: 'listingServiceId',
@@ -8186,6 +8375,7 @@ export type ListingFulfillmentRuleScalarFieldEnum = (typeof ListingFulfillmentRu
 export const PlatformSettingsScalarFieldEnum = {
   id: 'id',
   platformFeePct: 'platformFeePct',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -8203,6 +8393,7 @@ export const ExternalAccountScalarFieldEnum = {
   displayName: 'displayName',
   encryptedAccessToken: 'encryptedAccessToken',
   encryptedRefreshToken: 'encryptedRefreshToken',
+  encryptionKeyVersion: 'encryptionKeyVersion',
   tokenExpiresAt: 'tokenExpiresAt',
   grantedScopes: 'grantedScopes',
   status: 'status',
@@ -9025,6 +9216,20 @@ export type ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> = Fiel
 
 
 /**
+ * Reference to a field of type 'DeliveryFraudResolutionKind'
+ */
+export type EnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryFraudResolutionKind'>
+
+
+
+/**
+ * Reference to a field of type 'DeliveryFraudResolutionKind[]'
+ */
+export type ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryFraudResolutionKind[]'>
+
+
+
+/**
  * Reference to a field of type 'WithdrawalStatus'
  */
 export type EnumWithdrawalStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WithdrawalStatus'>
@@ -9668,6 +9873,8 @@ export type GlobalOmitConfig = {
   deliveryVerificationEvidence?: Prisma.DeliveryVerificationEvidenceOmit
   deliverySnapshot?: Prisma.DeliverySnapshotOmit
   deliveryFraudFlag?: Prisma.DeliveryFraudFlagOmit
+  deliveryFraudHold?: Prisma.DeliveryFraudHoldOmit
+  deliveryFraudFlagResolution?: Prisma.DeliveryFraudFlagResolutionOmit
   orderReview?: Prisma.OrderReviewOmit
   publisherBalance?: Prisma.PublisherBalanceOmit
   withdrawal?: Prisma.WithdrawalOmit

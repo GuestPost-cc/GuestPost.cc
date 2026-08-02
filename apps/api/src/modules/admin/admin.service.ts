@@ -14,6 +14,7 @@ import {
   getOrderLifecycleStage,
   getOrderLifecycleStageIndex,
   isOrderLifecycleException,
+  platformFeePercentToBasisPoints,
   QUEUES,
   StaffRole,
   validateWebsiteEnlistmentInput,
@@ -1639,7 +1640,7 @@ export class AdminService {
         activeDeliveryVersion: {
           include: {
             evidence: { orderBy: { createdAt: "desc" } },
-            fraudFlags: true,
+            fraudFlags: { include: { resolution: true } },
             snapshots: true,
             adminVerifiedBy: { select: { id: true, name: true, email: true } },
           },
@@ -1884,6 +1885,15 @@ export class AdminService {
               type: flag.type,
               details: flag.details,
               createdAt: flag.createdAt,
+              resolution: flag.resolution
+                ? {
+                    id: flag.resolution.id,
+                    kind: flag.resolution.kind,
+                    reason: flag.resolution.reason,
+                    resolvedByUserId: flag.resolution.resolvedByUserId,
+                    createdAt: flag.resolution.createdAt,
+                  }
+                : null,
             })),
             screenshotUrl: order.activeDeliveryVersion.screenshotUrl,
             evidence: order.activeDeliveryVersion.evidence.map((evidence) => ({
@@ -3361,9 +3371,16 @@ export class AdminService {
     reason: string,
     actor: { id: string },
   ) {
-    // Clamp defensively — the DTO already bounds 0–100, but a future
-    // internal callsite might bypass the pipe.
-    const clamped = Math.min(Math.max(platformFeePct, 0), 100)
+    // Internal callers can bypass DTO validation, so financial policy inputs
+    // are parsed again here and rejected rather than silently rounded/clamped.
+    let canonicalFeePct: number
+    try {
+      canonicalFeePct = platformFeePercentToBasisPoints(platformFeePct) / 100
+    } catch {
+      throw new BadRequestException(
+        "platformFeePct must be between 0 and 100 with at most two decimal places",
+      )
+    }
 
     return this.prisma.$transaction(async (tx: any) => {
       const settings = await tx.platformSettings.findFirst()
@@ -3372,9 +3389,9 @@ export class AdminService {
       }
 
       const oldValue = Number(settings.platformFeePct)
-      if (oldValue === clamped) {
+      if (oldValue === canonicalFeePct) {
         throw new BadRequestException(
-          `platformFeePct is already ${clamped} — no change`,
+          `platformFeePct is already ${canonicalFeePct} — no change`,
         )
       }
 
@@ -3383,7 +3400,7 @@ export class AdminService {
       const updated = await tx.platformSettings.updateMany({
         where: { id: settings.id, version: settings.version },
         data: {
-          platformFeePct: clamped,
+          platformFeePct: canonicalFeePct,
           version: { increment: 1 },
         },
       })
@@ -3401,7 +3418,7 @@ export class AdminService {
           metadata: {
             field: "platformFeePct",
             oldValue,
-            newValue: clamped,
+            newValue: canonicalFeePct,
             reason,
           },
           userId: actor.id,
@@ -3412,7 +3429,7 @@ export class AdminService {
 
       return {
         id: settings.id,
-        platformFeePct: clamped,
+        platformFeePct: canonicalFeePct,
       }
     })
   }

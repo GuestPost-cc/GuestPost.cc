@@ -1,8 +1,12 @@
 import { createPrismaClient } from "@guestpost/database"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { Queue } from "bullmq"
-import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
+import {
+  IntegrationEncryptionService,
+  integrationTokenEncryptionContext,
+} from "../adapters/encryption.adapter"
 import { DiscoveryInProgressError, IntegrationNotFoundError } from "../errors"
+import { assertGoogleMetricsEnabled } from "../google-metrics-gate"
 import { getProvider } from "../providers"
 import { INTEGRATION_QUEUES } from "../queue-names"
 import { createIntegrationQueueConnection } from "../redis"
@@ -10,7 +14,12 @@ import type { OwnerContext } from "../types"
 import { wakeOnDemandWorker } from "../worker-wakeup"
 
 const db = createPrismaClient()
-const encryption = new IntegrationEncryptionService()
+let encryptionSingleton: IntegrationEncryptionService | undefined
+
+function integrationEncryption(): IntegrationEncryptionService {
+  encryptionSingleton ??= new IntegrationEncryptionService()
+  return encryptionSingleton
+}
 
 function createDiscoveryQueue(): Queue {
   return new Queue(INTEGRATION_QUEUES.DISCOVERY, {
@@ -41,6 +50,7 @@ export class DiscoveryService {
     owner: OwnerContext,
     externalAccountId: string,
   ): Promise<{ enqueued: boolean }> {
+    assertGoogleMetricsEnabled()
     const account = await (db as any).externalAccount.findFirst({
       where: {
         id: externalAccountId,
@@ -57,6 +67,7 @@ export class DiscoveryService {
     owner: OwnerContext,
     externalAccountId: string,
   ): Promise<{ enqueued: boolean }> {
+    assertGoogleMetricsEnabled()
     const account = await (db as any).externalAccount.findFirst({
       where: {
         id: externalAccountId,
@@ -106,6 +117,16 @@ export class DiscoveryService {
     analytics?: { found: number; created: number }
     error?: string
   }> {
+    try {
+      assertGoogleMetricsEnabled()
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Google metrics disabled",
+      }
+    }
+
     const { externalAccountId, ownerType, ownerId } = payload
 
     try {
@@ -113,7 +134,7 @@ export class DiscoveryService {
         where: { id: externalAccountId },
       })
       if (
-        !account ||
+        account?.status !== "ACTIVE" ||
         account.ownerType !== ownerType ||
         account.ownerId !== ownerId
       ) {
@@ -121,7 +142,11 @@ export class DiscoveryService {
       }
 
       const accessToken = (
-        encryption.decrypt(account.encryptedAccessToken) as {
+        integrationEncryption().decrypt(
+          account.encryptedAccessToken,
+          account.encryptionKeyVersion,
+          integrationTokenEncryptionContext(account, "access"),
+        ) as {
           value: string
         }
       ).value
@@ -154,6 +179,8 @@ export class DiscoveryService {
           // Find or create PublisherIntegration for this provider + connection
           let integration = await (db as any).publisherIntegration.findFirst({
             where: {
+              ownerType,
+              ownerId,
               provider,
               connectionId: externalAccountId,
             },
@@ -171,6 +198,42 @@ export class DiscoveryService {
               },
             })
             isNew = true
+          } else if (integration.status === "DISCONNECTED") {
+            // Reconnect only the exact owner + credential + provider aggregate.
+            // The compare-and-set prevents two discovery jobs from both
+            // claiming reactivation or reviving a retargeted identity.
+            const reactivated = await (
+              db as any
+            ).publisherIntegration.updateMany({
+              where: {
+                id: integration.id,
+                ownerType,
+                ownerId,
+                provider,
+                connectionId: externalAccountId,
+                status: "DISCONNECTED",
+              },
+              data: { status: "ACTIVE" },
+            })
+            if (reactivated.count === 1) {
+              integration = { ...integration, status: "ACTIVE" }
+            } else {
+              const concurrent = await (
+                db as any
+              ).publisherIntegration.findFirst({
+                where: {
+                  id: integration.id,
+                  ownerType,
+                  ownerId,
+                  provider,
+                  connectionId: externalAccountId,
+                },
+              })
+              if (concurrent?.status !== "ACTIVE") {
+                throw new IntegrationNotFoundError()
+              }
+              integration = concurrent
+            }
           }
 
           // Create IntegrationSchedule if new or missing
@@ -182,6 +245,19 @@ export class DiscoveryService {
               data: {
                 integrationId: integration.id,
                 nextRunAt: new Date(),
+              },
+            })
+          } else if (!schedule.enabled) {
+            await (db as any).integrationSchedule.updateMany({
+              where: {
+                id: schedule.id,
+                integrationId: integration.id,
+                enabled: false,
+              },
+              data: {
+                enabled: true,
+                nextRunAt: new Date(),
+                version: { increment: 1 },
               },
             })
           }
@@ -199,7 +275,10 @@ export class DiscoveryService {
             ]),
           )
           const linked = await (db as any).websiteIntegration.findMany({
-            where: { integrationId: integration.id },
+            where: {
+              integrationId: integration.id,
+              status: { not: "REMOVED" },
+            },
           })
           for (const websiteIntegration of linked) {
             const resource = foundById.get(

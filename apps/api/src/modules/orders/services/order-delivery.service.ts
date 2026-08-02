@@ -1,15 +1,20 @@
 import {
+  deliveryVerificationJobId,
   isUniqueViolation,
   normalizeUrl,
   notificationDedupKey,
   orderEventMetadata,
+  QUEUE_JOBS,
   QUEUES,
+  runLockedOrderSerializableTransaction,
 } from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
@@ -33,6 +38,8 @@ const PLACEHOLDER_VALUES = new Set([
 
 @Injectable()
 export class OrderDeliveryService {
+  private readonly logger = new Logger(OrderDeliveryService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -88,108 +95,136 @@ export class OrderDeliveryService {
       dto.publishedUrl,
     )
 
-    return this.prisma.$transaction(async (tx: any) => {
-      // Next version number for this order (immutable history)
-      const last = await tx.orderDeliveryVersion.findFirst({
-        where: { orderId: order.id },
-        orderBy: { version: "desc" },
-        select: { version: true, id: true },
-      })
-      const nextVersion = (last?.version ?? 0) + 1
-
-      // Supersede the prior active version (kept forever, marked superseded)
-      if (last) {
-        await tx.orderDeliveryVersion.update({
-          where: { id: last.id },
-          data: { supersededByVersion: nextVersion },
+    const version = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      order.id,
+      async (tx: any) => {
+        // Next version number for this order (immutable history)
+        const last = await tx.orderDeliveryVersion.findFirst({
+          where: { orderId: order.id },
+          orderBy: { version: "desc" },
+          select: { version: true, id: true },
         })
-      }
+        const nextVersion = (last?.version ?? 0) + 1
 
-      const version = await tx.orderDeliveryVersion.create({
-        data: {
-          orderId: order.id,
-          version: nextVersion,
-          publishedUrl,
-          normalizedUrl,
-          articleTitle: dto.articleTitle ?? null,
-          notes: dto.notes ?? null,
-          screenshotUrl: dto.screenshotUrl ?? null,
-          submittedByUserId: actorUserId,
-          verificationStatus: "PENDING",
-          interventionStatus: "NONE",
-        },
-      })
+        // Supersede the prior active version (kept forever, marked superseded)
+        if (last) {
+          await tx.orderDeliveryVersion.update({
+            where: { id: last.id },
+            data: { supersededByVersion: nextVersion },
+          })
+        }
 
-      // Optimistic-locked order transition to PUBLISHED + active pointer + mirror
-      const upd = await tx.order.updateMany({
-        where: { id: order.id, version: order.version },
-        data: {
-          status: "PUBLISHED",
-          publishedUrl,
-          publishedAt: new Date(),
-          activeDeliveryVersionId: version.id,
-          version: { increment: 1 },
-        },
-      })
-      if (upd.count === 0)
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
+        const version = await tx.orderDeliveryVersion.create({
+          data: {
+            orderId: order.id,
+            version: nextVersion,
+            publishedUrl,
+            normalizedUrl,
+            articleTitle: dto.articleTitle ?? null,
+            notes: dto.notes ?? null,
+            screenshotUrl: dto.screenshotUrl ?? null,
+            submittedByUserId: actorUserId,
+            verificationStatus: "PENDING",
+            interventionStatus: "NONE",
+          },
+        })
+
+        // Optimistic-locked order transition to PUBLISHED + active pointer + mirror
+        const upd = await tx.order.updateMany({
+          where: { id: order.id, version: order.version },
+          data: {
+            status: "PUBLISHED",
+            publishedUrl,
+            publishedAt: new Date(),
+            activeDeliveryVersionId: version.id,
+            version: { increment: 1 },
+          },
+        })
+        if (upd.count === 0)
+          throw new ConflictException(
+            "Order was modified by another request. Retry.",
+          )
+
+        // Platform fulfillment uses this hook to close the assignment in the
+        // same transaction as publication. A reassignment, cancellation, or
+        // duplicate publish racing this transaction therefore has one winner.
+        await beforeCommit?.(tx)
+
+        await tx.orderEvent.create({
+          data: {
+            orderId: order.id,
+            eventType: "PUBLICATION_MARKED",
+            actorId: actorUserId,
+            message: `Delivery v${nextVersion} submitted: ${publishedUrl}`,
+            metadata: {
+              publishedUrl,
+              version: nextVersion,
+              deliveryVersionId: version.id,
+            },
+          },
+        })
+
+        await this.audit.log(
+          {
+            action: "ORDER_DELIVERY_SUBMITTED",
+            entityType: "OrderDeliveryVersion",
+            entityId: version.id,
+            metadata: {
+              ...orderEventMetadata(order),
+              orderId: order.id,
+              deliveryVersionId: version.id,
+              version: nextVersion,
+              publishedUrl,
+              submittedByUserId: actorUserId,
+            },
+            userId: actorUserId,
+            organizationId: order.organizationId,
+          },
+          tx,
         )
 
-      // Platform fulfillment uses this hook to close the assignment in the
-      // same transaction as publication. A reassignment, cancellation, or
-      // duplicate publish racing this transaction therefore has one winner.
-      await beforeCommit?.(tx)
+        return version
+      },
+    )
 
-      await tx.orderEvent.create({
-        data: {
-          orderId: order.id,
-          eventType: "PUBLICATION_MARKED",
-          actorId: actorUserId,
-          message: `Delivery v${nextVersion} submitted: ${publishedUrl}`,
-          metadata: {
-            publishedUrl,
-            version: nextVersion,
-            deliveryVersionId: version.id,
-          },
-        },
-      })
-
-      await this.audit.log(
-        {
-          action: "ORDER_DELIVERY_SUBMITTED",
-          entityType: "OrderDeliveryVersion",
-          entityId: version.id,
-          metadata: {
-            ...orderEventMetadata(order),
-            orderId: order.id,
-            deliveryVersionId: version.id,
-            version: nextVersion,
-            publishedUrl,
-            submittedByUserId: actorUserId,
-          },
-          userId: actorUserId,
-          organizationId: order.organizationId,
-        },
-        tx,
-      )
-
-      // Enqueue independent verification (signed, retry 3x w/ 5/15/60m backoff)
+    // Redis is an external durability boundary and must not run inside the
+    // retryable database closure. A deterministic jobId makes a caller retry
+    // safe if Redis accepted the first enqueue but its response was lost.
+    try {
       await this.queue.addJob(
         QUEUES.DELIVERY_VERIFICATION,
-        "delivery-verify",
-        { deliveryVersionId: version.id, actorUserId },
+        QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].VERIFY,
         {
-          jobId: `delivery-verify-${version.id}`,
+          deliveryVersionId: version.id,
+          verificationVersion: version.verificationVersion,
+          actorUserId,
+        },
+        {
+          jobId: deliveryVerificationJobId(
+            version.id,
+            version.verificationVersion,
+          ),
           attempts: 3,
           backoff: { type: "custom" },
           removeOnComplete: { count: 100 },
           removeOnFail: { count: 100 },
         },
       )
+    } catch (error) {
+      this.logger.error(
+        `Delivery ${version.id} committed but verification enqueue failed; the dispatch sweep will recover it`,
+        error instanceof Error ? error.stack : String(error),
+      )
+      throw new ServiceUnavailableException({
+        code: "DELIVERY_VERIFICATION_ENQUEUE_FAILED",
+        message:
+          "Delivery was saved, but immediate verification dispatch failed. The recovery sweep will retry automatically.",
+        deliveryVersionId: version.id,
+      })
+    }
 
-      return version
-    })
+    return version
   }
 
   async listDeliveries(orderId: string) {
@@ -199,6 +234,7 @@ export class OrderDeliveryService {
       include: {
         evidence: { orderBy: { createdAt: "desc" }, take: 1 },
         snapshots: true,
+        fraudFlags: { include: { resolution: true } },
       },
     })
   }
@@ -314,110 +350,117 @@ export class OrderDeliveryService {
     }
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    return this.prisma.$transaction(async (tx: any) => {
-      const upd = await tx.orderDeliveryVersion.updateMany({
-        where: { id: v.id, verificationVersion: v.verificationVersion },
-        data: {
-          interventionStatus: "APPROVED",
-          verificationFailureReason: null,
-          verificationVersion: v.verificationVersion + 1,
-        },
-      })
-      if (upd.count === 0)
-        throw new ConflictException(
-          "Delivery was modified by another request. Retry.",
-        )
-
-      const ordUpd = await tx.order.updateMany({
-        where: { id: order.id, version: order.version, status: "PUBLISHED" },
-        data: {
-          status: "DELIVERED",
-          deliveredAt: new Date(),
-          verifiedAt: new Date(),
-          verifiedBy: userId,
-          verifyMethod: "CUSTOMER_MANUAL",
-          deliveryAcceptedMethod: "CUSTOMER",
-          version: { increment: 1 },
-        },
-      })
-      if (ordUpd.count === 0)
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
-        )
-
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "DELIVERY_CONFIRMED",
-          actorId: userId,
-          message:
-            "Customer manually accepted the delivery after the automated check could not verify it",
-          metadata: {
-            priorVerification: v.verificationStatus,
-            deliveryVersionId: v.id,
+    return runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        const upd = await tx.orderDeliveryVersion.updateMany({
+          where: { id: v.id, verificationVersion: v.verificationVersion },
+          data: {
+            interventionStatus: "APPROVED",
+            verificationFailureReason: null,
+            verificationVersion: v.verificationVersion + 1,
           },
-        },
-      })
-      await this.audit.log(
-        {
-          action: "ORDER_DELIVERY_CUSTOMER_ACCEPTED",
-          entityType: "OrderDeliveryVersion",
-          entityId: v.id,
-          metadata: {
-            ...orderEventMetadata(order),
-            orderId,
-            publishedUrl: v.publishedUrl,
-            priorVerification: v.verificationStatus,
-            publisherId: order.website?.publisherId ?? null,
-          },
-          userId,
-          organizationId,
-        },
-        tx,
-      )
-
-      // Best-effort notify the publisher owners.
-      // Phase 7.4 (audit #12) — dedupKey per (delivery version, owner) means
-      // a worker retry of this customer-accept flow produces ONE notification
-      // per publisher owner, not three.
-      if (order.website?.publisherId) {
-        const owners = await tx.publisherMembership.findMany({
-          where: {
-            publisherId: order.website.publisherId,
-            role: "PUBLISHER_OWNER",
-          },
-          select: { userId: true },
         })
-        for (const o of owners) {
-          const dedupKey = notificationDedupKey.deliveryAccepted(v.id, o.userId)
-          try {
-            await tx.notification.create({
-              data: {
-                userId: o.userId,
-                organizationId,
-                type: "ORDER_DELIVERY_CUSTOMER_ACCEPTED",
-                message: `Customer manually accepted delivery for order ${orderId}.`,
-                dedupKey,
-              },
-            })
-          } catch (err) {
-            if (!isUniqueViolation(err)) {
-              // best-effort path: swallow other errors as before
+        if (upd.count === 0)
+          throw new ConflictException(
+            "Delivery was modified by another request. Retry.",
+          )
+
+        const ordUpd = await tx.order.updateMany({
+          where: { id: order.id, version: order.version, status: "PUBLISHED" },
+          data: {
+            status: "DELIVERED",
+            deliveredAt: new Date(),
+            verifiedAt: new Date(),
+            verifiedBy: userId,
+            verifyMethod: "CUSTOMER_MANUAL",
+            deliveryAcceptedMethod: "CUSTOMER",
+            version: { increment: 1 },
+          },
+        })
+        if (ordUpd.count === 0)
+          throw new ConflictException(
+            "Order was modified by another request. Retry.",
+          )
+
+        await tx.orderEvent.create({
+          data: {
+            orderId,
+            eventType: "DELIVERY_CONFIRMED",
+            actorId: userId,
+            message:
+              "Customer manually accepted the delivery after the automated check could not verify it",
+            metadata: {
+              priorVerification: v.verificationStatus,
+              deliveryVersionId: v.id,
+            },
+          },
+        })
+        await this.audit.log(
+          {
+            action: "ORDER_DELIVERY_CUSTOMER_ACCEPTED",
+            entityType: "OrderDeliveryVersion",
+            entityId: v.id,
+            metadata: {
+              ...orderEventMetadata(order),
+              orderId,
+              publishedUrl: v.publishedUrl,
+              priorVerification: v.verificationStatus,
+              publisherId: order.website?.publisherId ?? null,
+            },
+            userId,
+            organizationId,
+          },
+          tx,
+        )
+
+        // Best-effort notify the publisher owners.
+        // Phase 7.4 (audit #12) — dedupKey per (delivery version, owner) means
+        // a worker retry of this customer-accept flow produces ONE notification
+        // per publisher owner, not three.
+        if (order.website?.publisherId) {
+          const owners = await tx.publisherMembership.findMany({
+            where: {
+              publisherId: order.website.publisherId,
+              role: "PUBLISHER_OWNER",
+            },
+            select: { userId: true },
+          })
+          for (const o of owners) {
+            const dedupKey = notificationDedupKey.deliveryAccepted(
+              v.id,
+              o.userId,
+            )
+            try {
+              await tx.notification.create({
+                data: {
+                  userId: o.userId,
+                  organizationId,
+                  type: "ORDER_DELIVERY_CUSTOMER_ACCEPTED",
+                  message: `Customer manually accepted delivery for order ${orderId}.`,
+                  dedupKey,
+                },
+              })
+            } catch (err) {
+              if (!isUniqueViolation(err)) {
+                // best-effort path: swallow other errors as before
+              }
             }
           }
         }
-      }
 
-      // Create settlement with computed release policy — same as the
-      // confirmDelivery path uses via OrderReviewService.
-      await this.orderReview.createSettlementForOrder(tx, orderId)
-      const completed = await tx.order.findUniqueOrThrow({
-        where: { id: orderId },
-        select: { status: true },
-      })
+        // Create settlement with computed release policy — same as the
+        // confirmDelivery path uses via OrderReviewService.
+        await this.orderReview.createSettlementForOrder(tx, orderId)
+        const completed = await tx.order.findUniqueOrThrow({
+          where: { id: orderId },
+          select: { status: true },
+        })
 
-      return { status: completed.status, acceptedBy: "customer" }
-    })
+        return { status: completed.status, acceptedBy: "customer" }
+      },
+    )
   }
 
   async getDelivery(id: string) {
@@ -426,7 +469,7 @@ export class OrderDeliveryService {
       include: {
         evidence: { orderBy: { createdAt: "desc" } },
         snapshots: true,
-        fraudFlags: true,
+        fraudFlags: { include: { resolution: true } },
       },
     })
     if (!v) throw new NotFoundException("Delivery version not found")

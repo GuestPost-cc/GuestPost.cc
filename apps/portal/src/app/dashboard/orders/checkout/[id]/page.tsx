@@ -42,7 +42,22 @@ export default function CheckoutPage({
   })
 
   const { mutate: proceedToPayment, isPending: isProcessing } = useMutation({
-    mutationFn: () => api.orders.submitPayment(resolvedParams.id),
+    mutationFn: () => {
+      if (
+        !order?.totalAmountExact ||
+        order.currency !== "USD" ||
+        !Number.isInteger(order.version)
+      ) {
+        throw new Error(
+          "This checkout state is invalid. Refresh the order before paying.",
+        )
+      }
+      return api.orders.submitPayment(resolvedParams.id, {
+        expectedVersion: order.version,
+        expectedAmount: order.totalAmountExact,
+        expectedCurrency: order.currency,
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customer-orders"] })
       queryClient.invalidateQueries({
@@ -52,7 +67,13 @@ export default function CheckoutPage({
       toast.success("Payment submitted successfully")
       window.location.href = `/dashboard/orders/${resolvedParams.id}`
     },
-    onError: (err: any) => toast.error(err?.message || "Payment failed"),
+    onError: (err: any) => {
+      queryClient.invalidateQueries({
+        queryKey: ["order", resolvedParams.id],
+      })
+      queryClient.invalidateQueries({ queryKey: ["wallet"] })
+      toast.error(err?.message || "Payment failed")
+    },
   })
 
   if (orderLoading || walletLoading) {
@@ -90,6 +111,8 @@ export default function CheckoutPage({
   const reserved = Number((wallet as any)?.reservedBalance ?? 0)
   const hasSufficientBalance = balance >= amount
   const canPay = customerCanMutateOrder(order, user)
+  const hasCanonicalCheckoutEvidence =
+    order.currency === "USD" && order.totalAmountExact !== null
   const postPaymentBalance = Math.max(0, balance - amount)
 
   return (
@@ -238,6 +261,19 @@ export default function CheckoutPage({
             </div>
           )}
 
+          {!hasCanonicalCheckoutEvidence && (
+            <div className="flex items-start gap-3 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium">Checkout unavailable</p>
+                <p className="mt-1">
+                  This order does not have a valid exact USD total. Refresh or
+                  recreate the draft before paying.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3">
             {user?.customerRole === "OWNER" && (
               <Button
@@ -258,7 +294,7 @@ export default function CheckoutPage({
                 </Link>
               </Button>
             )}
-            {hasSufficientBalance && canPay && (
+            {hasSufficientBalance && canPay && hasCanonicalCheckoutEvidence && (
               <Button
                 className="flex-1"
                 disabled={isProcessing || order?.status !== "DRAFT"}

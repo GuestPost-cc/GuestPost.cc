@@ -396,7 +396,7 @@ export class UpdateSupportTicketStatusDto {
 export class UpdatePlatformFeeDto {
   // Fee must be 0–100 inclusive. Bounds check is in the DTO so a malformed
   // payload never reaches the service; the service still clamps for safety.
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(100)
   platformFeePct!: number

@@ -57,6 +57,17 @@ provider retrieval or webhook reconciliation establishes truth. Code must not:
 
 ## 3. Amounts and currencies
 
+- The launch accounting currency is exactly `USD`. Catalog prices, orders,
+  wallets, deposits, disputes, settlements, publisher balances, revenue,
+  withdrawals, payout executions, allocations, batches, and ledger rows must
+  all persist the case-sensitive value `USD`.
+- Do not uppercase or relabel a persisted non-USD financial row. Provider
+  envelopes may be normalized at their authenticated boundary, but a legacy
+  `EUR`, `GBP`, lowercase, blank, or mixed-currency database fact is corruption
+  that blocks the transition and the USD-boundary migration until reconciled.
+- Every service boundary compares amount and currency together. An order may
+  spend only a USD wallet against a USD listing-service snapshot; every ledger
+  write sets currency explicitly rather than relying on a database default.
 - Persist money as `Decimal` or provider minor units, never binary floating
   point.
 - Normalize provider minor units with a currency-specific exponent. Do not
@@ -80,6 +91,11 @@ namespaces.
 - The first accepted command stores a hash of immutable inputs. Repeating the
   same key and inputs returns the canonical result. Reusing the key with
   different inputs returns `409 Conflict`.
+- Order creation hashes a canonical, tenant-, customer-, and actor-bound
+  payload into `Order.requestFingerprint`. The tenant-scoped key and hash are
+  immutable. A concurrent unique-key loser re-reads the committed winner only
+  after rollback and returns it only when the hash matches; historical rows
+  without verifiable binding fail closed instead of being replayed.
 - Ledger references are server-generated and domain-prefixed.
 - Provider object uniqueness is scoped by provider and provider object type.
   A deposit PaymentIntent identity must not be reused as the identity of an
@@ -112,6 +128,28 @@ it. Current orders are:
   `Order -> Wallet -> PaymentDispute exposure predicate -> ledger`;
 - customer payment dispute:
   `PaymentProviderEvent -> immutable deposit lookup -> Wallet -> PaymentDispute -> ledger`.
+- settlement creation/approval/release:
+  `Order aggregate lock -> relational eligibility snapshot -> Settlement ->
+  PublisherBalance -> ledger/audit`. Delivery, dispute, revision, fraud, and
+  cancellation writers acquire the same Order lock before becoming visible;
+  the release reader does not lock child rows in the reverse order.
+
+For every `OrderDeliveryVersion`, `OrderDispute`, `Revision`,
+`DeliveryFraudFlag`, `DeliveryFraudFlagResolution`, or
+`OrderCancellationRequest` command, the parent `Order ... FOR UPDATE` lock is
+the first application lock in the retryable transaction. `DeliveryFraudHold`
+is not a command surface: PostgreSQL projects it from an immutable flag and
+removes it only while appending the matching adjudication. Blocker-table
+triggers are database backstops, not the application lock strategy:
+PostgreSQL can already own the child tuple when a `BEFORE` trigger runs, which
+would invert the lock order against a settlement reader. When only a child ID
+is supplied, resolve `orderId` with a non-locking preflight read, then lock
+`Order` first and re-read/revalidate the child inside the transaction. The
+canonical helper runs these closures at `SERIALIZABLE` with a bounded retry
+only for trusted serialization/deadlock codes. Provider, queue, external
+notification delivery, email, and object-storage work stays outside the
+retryable closure; durable notification rows may remain part of the atomic
+database work.
 
 The deposit lookup is evidence validation, not a row lock. Customer spend and
 dispute processing intentionally share `Wallet ... FOR UPDATE` before either
@@ -142,6 +180,58 @@ method, but it never reactivates a method that its owner disabled.
   transaction.
 - A public request may return a retryable error only when repeating its scoped
   idempotency key is safe.
+
+Settlement financial identity, review policy, and reporting snapshots are
+immutable after creation. A release commits only with one exact
+`SETTLEMENT_RELEASE` ledger row whose settlement, order, publisher, amount, and
+currency match; that evidence is append-only. A released settlement without
+that pair cannot commit, including through direct SQL.
+
+A captured Order (`PAID`, including a later `REFUNDED` payment state) has
+exactly one append-only `PURCHASE` row. That row is negative,
+USD, exact to the Order amount, belongs to the Organization's USD Wallet, and
+has no provider, publisher, or settlement identity. It is the canonical
+capture evidence; a status flag, reservation row, audit event, or redirect
+cannot substitute for it. Payment capture claims the Order first, then moves
+Wallet available → reserved → consumed and inserts the `PURCHASE` in the same
+serializable transaction. Concurrent submissions may produce only one winner.
+The database verifies this relationship in both directions at commit: a
+captured header cannot commit without its exact PURCHASE, and an Order with a
+PURCHASE cannot be rewritten to `PENDING` or `FAILED`.
+
+Platform-owned fulfillment does not weaken that proof. A new
+`PlatformRevenue` row is allowed only while the locked Order is paid,
+`DELIVERED`, explicitly snapshotted as `PLATFORM`, and passes the same active
+delivery/dispute/revision/cancellation/unresolved-fraud gate as publisher
+settlement. Its USD amount equals the Order and the one canonical `PURCHASE`;
+`amount = platformFee + netRevenue` in whole cents. It snapshots integer
+`platformFeeBps` plus the singleton `PlatformSettings` row/version identity.
+Those fields and all attribution snapshots are immutable. A refund may append
+`reversedAt` exactly once, but cannot edit or delete recognition evidence.
+Reversed rows that predate versioned policy evidence may retain a null policy
+pair; no new or unreversed row may do so.
+
+Before that capture, `ListingService.price`, every `OrderItem.price`, and
+`Order.amount` are positive USD values exact to one cent. Order construction
+and cart totals stay in Decimal space. Add, remove, reprice, and capture all
+take the parent Order lock first and increment the Order version when the cart
+changes. Capture requires at least one `PENDING_PAYMENT` item, one matching
+website identity, and `Order.amount = SUM(OrderItem.price)` before touching the
+Wallet. The command also carries the exact Order version, canonical two-decimal
+amount string, and `USD` currency shown to the buyer. A stale command fails
+before any Wallet or item read; it cannot adopt a concurrent cart mutation or
+server re-price.
+
+Capture locks and revalidates the complete immutable attribution chain:
+`Order.listingServiceId -> ListingService.listingId -> MarketplaceListing.websiteId
+-> Order.websiteId`. The service, Order type, listing, website, and
+fulfillment-channel snapshot must agree; the service must be `AVAILABLE`, the
+listing `APPROVED`, and the website active and ownership-verified. Every item
+price must equal the current selected service price. PostgreSQL repeats the
+amount, precision, catalog-attribution, live-availability, and capture checks.
+Once the
+Order is paid, has PURCHASE evidence, or has a Settlement, OrderItem insertion,
+mutation, reassignment, and deletion are forbidden.
 
 ## 6. Customer wallet
 
@@ -356,6 +446,106 @@ fail or quarantine the newer attempt, and must not log that either mutation
 succeeded.
 
 ## 9. Publisher withdrawals
+
+### Publisher settlement eligibility
+
+Settlement policy is not settlement evidence. Creation, customer/system/admin
+approval, and final release all use the same live predicate while holding the
+Order aggregate lock. Eligibility requires all of the following:
+
+- order status `DELIVERED`, payment status `PAID`, and currency exactly `USD`;
+- the active delivery identity belongs to the order and is independently
+  `VERIFIED` or carries a current explicit `APPROVED`/`OVERRIDDEN` intervention;
+- an explicit `REJECTED` intervention always wins;
+- no open/under-review dispute and no current `DeliveryFraudHold`;
+- every revision is terminal (`APPROVED` or `REJECTED`); and
+- every cancellation request is safely terminal (`REJECTED`, `WITHDRAWN`, or
+  `APPROVED` with the explicit `CONTINUE_ORDER` resolution).
+
+Revision and cancellation states are terminal allowlists: a future enum value
+blocks settlement until reviewed. PostgreSQL serializes blocker writes through
+the Order row and independently rejects an ineligible Settlement insert or
+release. A conditional update that loses after the first financial write must
+throw so the entire transaction rolls back; returning “skipped” would commit a
+partial release. One settlement can own at most one `SETTLEMENT_RELEASE` ledger
+row.
+
+Publisher attribution is relational and cannot be caller-selected:
+`Order.websiteId -> Website.publisherId` is canonical. Once any Order
+references a Website, ordinary writes cannot change that Website's publisher
+or ownership type. A Settlement must match that publisher, the exact paid
+Order amount and currency, and the snapshotted listing-service identity.
+OrderItem publisher fields and stale request payloads are not liability
+authority.
+
+There is exactly one `PlatformSettings` row. Its fee percentage has at most two
+decimal places and resolves exactly to integer basis points; clamping,
+rounding an unrepresentable input, `NaN`, and sub-basis-point values are
+rejected. Every new Settlement and PlatformRevenue row snapshots both the
+basis points and the settings row/version identity. Its exact fee split must
+equal that policy at creation and cannot drift when the singleton changes
+later. Released/cancelled/reversed historical snapshots remain immutable
+evidence.
+
+Delivery fraud flags are bound to the same Order as their delivery and are
+immutable after insertion. PostgreSQL atomically projects each flag into
+`DeliveryFraudHold`; its structural `(deliveryVersionId, type)` uniqueness is
+the one-open-hold concurrency invariant. A recurring signal after resolution
+appends a new immutable flag and hold instead of rewriting history. Eligibility
+reads the hold projection, never “absence of a duplicate” or a mutable flag
+status. A hold can disappear only in the same transaction that appends its
+one immutable `DeliveryFraudFlagResolution`; a deferred constraint rejects a
+standalone delete.
+
+`STAFF_CLEARED` requires a current, non-banned STAFF user with an allowed
+`SUPER_ADMIN`, `OPERATIONS`, or `FINANCE` membership, the role snapshotted at
+decision time, and a substantive reason. `LINK_RESTORED` has no synthetic
+staff actor: it requires fresh, passing, append-only
+`DeliveryVerificationEvidence` for the same active, non-superseded delivery
+and links that evidence by ID. Verification evidence and raw delivery
+snapshots are append-only. Resolution insertion advances the settlement fence
+under the Order lock, so it cannot race release. Slow verification and
+link-recheck jobs re-read active-delivery identity, supersession, and the
+signed optimistic generation under that lock before changing state or
+appending evidence. Stale jobs may leave an unreferenced content-addressed
+object, but no database evidence, state, flag, or hold.
+
+Automated policy may choose when an eligible row is reviewed, but it never
+bypasses this predicate. Its additional freshness boundary is defined below;
+human and system decisions remain distinct immutable evidence.
+
+Every customer revision surface uses the canonical Order-review transition:
+after locking Order it revalidates organization, an ACTIVE organization
+membership, creator-or-owner authority, `CUSTOMER_REVIEW` status, cancellation
+holds, and the snapshotted revision limit before creating a Revision. That
+limit is the immutable
+`Order.revisionRoundsSnapshot` captured at create time; mutable marketplace
+terms are never consulted for an in-flight order. A pre-final delivery re-verification
+atomically clears any old manual intervention before moving back to a pending
+state. Once an order is `DELIVERED`, `SETTLED`, `COMPLETED`, `CANCELLED`, or
+`REFUNDED`, manual rejection, re-verification, and negative verification
+override cannot rewrite the delivery evidence that authorized or concluded its
+financial lifecycle.
+
+Orders created before the revision snapshot existed retain `NULL` as explicit
+unverified contract evidence. Migration must not copy the current mutable
+ListingService entitlement into history. A revision request on such an order
+fails closed with `REVISION_POLICY_EVIDENCE_MISSING` pending a separately
+designed, reviewed evidence-repair workflow.
+
+Automated release has one additional evidence boundary: after locking the
+canonical Order and Settlement, it selects the newest immutable verification
+observation for the currently active delivery. The observation must be no more
+than 12 hours old, not future-dated or committed after the release time, have
+HTTP status `200`, `301`, or `302`, and prove the link, target URL, and anchor.
+The 12-hour constant is fixed in application and PostgreSQL (one missed margin
+for the six-hour monitor) and is not deployment-configurable. Missing, stale,
+or failed evidence increments `freshnessBlocked` and performs no approval,
+balance, ledger, or Order write. Human release does not use this freshness
+window, but still requires durable ADMIN approval and every canonical
+eligibility gate above. Workers emit structured warnings for
+`freshnessBlocked`, link-check failures, and `scanCapReached`; operators must
+treat those as an incomplete evidence scan, never as permission to release.
 
 A withdrawal request reserves an existing publisher liability exactly once:
 

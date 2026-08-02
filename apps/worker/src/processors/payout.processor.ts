@@ -753,8 +753,7 @@ function failedWebhookEnvelopeMatches(execution: any, event: any): boolean {
       event.providerExecutionId === execution.providerPayoutId &&
       expectedAmountMinor !== null &&
       normalizedMinorAmount(event.payoutAmountMinor) === expectedAmountMinor &&
-      String(event.payoutCurrency ?? "").toUpperCase() ===
-        String(execution.destinationCurrency).toUpperCase()
+      event.payoutCurrency === execution.destinationCurrency
     )
   }
   if (execution.provider.name === "wise") {

@@ -50,6 +50,10 @@ describe("OrderOperationsService", () => {
           ...data,
         })),
       },
+      revision: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       fulfillmentAssignment: {
         findFirst: jest.fn().mockResolvedValue({
           id: "fa-1",
@@ -58,6 +62,7 @@ describe("OrderOperationsService", () => {
         }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
       $transaction: jest.fn(),
     }
     prismaMock.$transaction.mockImplementation(async (callback: any) =>

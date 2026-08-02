@@ -1,5 +1,9 @@
 import { createPrismaClient } from "@guestpost/database"
-import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
+import {
+  IntegrationEncryptionService,
+  type IntegrationTokenIdentity,
+  integrationTokenEncryptionContext,
+} from "../adapters/encryption.adapter"
 import {
   IntegrationNotFoundError,
   NoActiveCredentialError,
@@ -9,18 +13,52 @@ import {
   WebsiteAlreadyLinkedError,
   WebsiteIntegrationNotFoundError,
 } from "../errors"
+import { assertGoogleMetricsEnabled } from "../google-metrics-gate"
 import { getProvider } from "../providers"
 import type { OwnerContext } from "../types"
 import { ExternalAccountStatus } from "../types"
 
 const db = createPrismaClient()
-const encryption = new IntegrationEncryptionService()
+let encryptionSingleton: IntegrationEncryptionService | undefined
+
+function integrationEncryption(): IntegrationEncryptionService {
+  encryptionSingleton ??= new IntegrationEncryptionService()
+  return encryptionSingleton
+}
 
 interface GoogleUserInfo {
   id: string
   email?: string
   name?: string
   picture?: string
+}
+
+function tokenIdentity(account: {
+  provider: string
+  externalUserId: string
+  ownerType: string
+  ownerId: string
+}): IntegrationTokenIdentity {
+  return {
+    provider: account.provider,
+    externalUserId: account.externalUserId,
+    ownerType: account.ownerType,
+    ownerId: account.ownerId,
+  }
+}
+
+function getCredentialProvider(provider: string) {
+  // ExternalAccount.provider historically stores the OAuth authority family
+  // (GOOGLE/MICROSOFT), while newer rows may store the service provider enum.
+  // Resolve both representations through the one registry registration that
+  // owns refresh/revocation for that credential family.
+  const registrationKey =
+    provider === "GOOGLE"
+      ? "GOOGLE_SEARCH_CONSOLE"
+      : provider === "MICROSOFT"
+        ? "BING_WEBMASTER"
+        : provider
+  return { registrationKey, registration: getProvider(registrationKey) }
 }
 
 export class IntegrationService {
@@ -55,6 +93,9 @@ export class IntegrationService {
     returnUrl: string,
     stateNonce: string,
   ): Promise<string> {
+    // Do not request fresh provider credentials for a capability that is
+    // deliberately quarantined. This must run before config/provider access.
+    assertGoogleMetricsEnabled()
     const registration = getProvider(provider)
     if (!registration?.oauthProvider) {
       throw new ProviderError(
@@ -74,6 +115,9 @@ export class IntegrationService {
     provider: string,
     code: string,
   ): Promise<{ externalAccountId: string }> {
+    // Reject in-flight callbacks before exchanging the authorization code or
+    // persisting credentials while Google metric ingestion is quarantined.
+    assertGoogleMetricsEnabled()
     const registration = getProvider(provider)
     if (!registration?.oauthProvider) {
       throw new ProviderError(
@@ -95,6 +139,35 @@ export class IntegrationService {
     // 3. Upsert an owner-scoped ExternalAccount. The same Google identity may
     //    be used by a publisher and the platform, but encrypted credentials
     //    are never shared or overwritten across those trust boundaries.
+    const identity = tokenIdentity({
+      provider,
+      externalUserId: userInfo.id,
+      ownerType: owner.ownerType,
+      ownerId: owner.ownerId,
+    })
+    const encryption = integrationEncryption()
+    const encryptedAccessToken = encryption.encrypt(
+      { value: tokens.accessToken },
+      {
+        authenticatedContext: integrationTokenEncryptionContext(
+          identity,
+          "access",
+        ),
+      },
+    )
+    const encryptedRefreshToken = encryption.encrypt(
+      { value: tokens.refreshToken },
+      {
+        authenticatedContext: integrationTokenEncryptionContext(
+          identity,
+          "refresh",
+        ),
+      },
+    )
+    if (encryptedAccessToken.version !== encryptedRefreshToken.version) {
+      throw new Error("Integration token encryption versions do not match")
+    }
+
     await (db as any).externalAccount.upsert({
       where: {
         provider_externalUserId_ownerType_ownerId: {
@@ -111,12 +184,9 @@ export class IntegrationService {
         ownerId: owner.ownerId,
         email: userInfo.email ?? null,
         displayName: userInfo.name ?? null,
-        encryptedAccessToken: encryption.encrypt({
-          value: tokens.accessToken,
-        }).ciphertext,
-        encryptedRefreshToken: encryption.encrypt({
-          value: tokens.refreshToken,
-        }).ciphertext,
+        encryptedAccessToken: encryptedAccessToken.ciphertext,
+        encryptedRefreshToken: encryptedRefreshToken.ciphertext,
+        encryptionKeyVersion: encryptedAccessToken.version,
         tokenExpiresAt: tokens.expiresAt,
         grantedScopes: tokens.scopes,
         status: ExternalAccountStatus.ACTIVE,
@@ -124,12 +194,9 @@ export class IntegrationService {
       update: {
         email: userInfo.email ?? null,
         displayName: userInfo.name ?? null,
-        encryptedAccessToken: encryption.encrypt({
-          value: tokens.accessToken,
-        }).ciphertext,
-        encryptedRefreshToken: encryption.encrypt({
-          value: tokens.refreshToken,
-        }).ciphertext,
+        encryptedAccessToken: encryptedAccessToken.ciphertext,
+        encryptedRefreshToken: encryptedRefreshToken.ciphertext,
+        encryptionKeyVersion: encryptedAccessToken.version,
         tokenExpiresAt: tokens.expiresAt,
         grantedScopes: tokens.scopes,
         status: ExternalAccountStatus.ACTIVE,
@@ -305,6 +372,7 @@ export class IntegrationService {
     owner: OwnerContext,
     integrationId: string,
   ): Promise<{ enqueued: boolean }> {
+    assertGoogleMetricsEnabled()
     const integration = await (db as any).publisherIntegration.findFirst({
       where: {
         id: integrationId,
@@ -323,6 +391,7 @@ export class IntegrationService {
   }
 
   async listResources(owner: OwnerContext, integrationId: string) {
+    assertGoogleMetricsEnabled()
     const integration = await this.findOwnedIntegration(owner, integrationId)
     const accessToken = await this.getActiveAccessToken(
       integration.connectionId,
@@ -360,6 +429,7 @@ export class IntegrationService {
     websiteId: string,
     externalResourceId: string,
   ) {
+    assertGoogleMetricsEnabled()
     const integration = await this.findOwnedIntegration(owner, integrationId)
     if (owner.ownerType === "PLATFORM" && websiteId !== owner.ownerId) {
       throw new WebsiteIntegrationNotFoundError()
@@ -396,12 +466,14 @@ export class IntegrationService {
       if (existingProperty.websiteId !== websiteId) {
         throw new PropertyAlreadyLinkedError(existingProperty.website?.url)
       }
-      return {
-        externalResourceId: existingProperty.externalResourceId,
-        externalResourceName: existingProperty.externalResourceName,
-        alreadyLinked: true,
-        linkedWebsiteId: website.id,
-        linkedWebsiteUrl: website.url,
+      if (existingProperty.status !== "REMOVED") {
+        return {
+          externalResourceId: existingProperty.externalResourceId,
+          externalResourceName: existingProperty.externalResourceName,
+          alreadyLinked: true,
+          linkedWebsiteId: website.id,
+          linkedWebsiteUrl: website.url,
+        }
       }
     }
 
@@ -433,6 +505,56 @@ export class IntegrationService {
       (candidate) => candidate.externalResourceId === externalResourceId,
     )
     if (!resource) throw new PropertyNotFoundError()
+
+    // A removed link is durable source provenance, so relinking reactivates
+    // only the exact same integration + website + provider property identity.
+    // updateMany is a compare-and-set: two concurrent relinks cannot both
+    // transition the tombstone, and neither can retarget its historical id.
+    if (existingProperty?.status === "REMOVED") {
+      const reactivated = await (db as any).websiteIntegration.updateMany({
+        where: {
+          id: existingProperty.id,
+          integrationId,
+          websiteId,
+          externalResourceId,
+          status: "REMOVED",
+        },
+        data: {
+          externalResourceName: resource.externalResourceName ?? null,
+          metadata: resource.metadata ?? undefined,
+          status: "CONNECTED",
+          syncedAt: null,
+        },
+      })
+      if (reactivated.count === 1) {
+        return {
+          externalResourceId: existingProperty.externalResourceId,
+          externalResourceName: resource.externalResourceName ?? null,
+          alreadyLinked: false,
+          linkedWebsiteId: website.id,
+          linkedWebsiteUrl: website.url,
+        }
+      }
+
+      const concurrent = await (db as any).websiteIntegration.findUnique({
+        where: { id: existingProperty.id },
+      })
+      if (
+        concurrent?.integrationId === integrationId &&
+        concurrent?.websiteId === websiteId &&
+        concurrent?.externalResourceId === externalResourceId &&
+        concurrent?.status !== "REMOVED"
+      ) {
+        return {
+          externalResourceId: concurrent.externalResourceId,
+          externalResourceName: concurrent.externalResourceName,
+          alreadyLinked: true,
+          linkedWebsiteId: website.id,
+          linkedWebsiteUrl: website.url,
+        }
+      }
+      throw new WebsiteAlreadyLinkedError()
+    }
 
     let linked: any
     try {
@@ -470,15 +592,32 @@ export class IntegrationService {
     await this.findOwnedIntegration(owner, integrationId)
     const linked = await (db as any).websiteIntegration.findFirst({
       where: { id: websiteIntegrationId, integrationId },
-      select: { id: true },
+      select: { id: true, status: true },
     })
     if (!linked) throw new WebsiteIntegrationNotFoundError()
 
-    // The daily metric tables retain their source ids as historical snapshots;
-    // deleting only the active mapping allows the property to be linked again.
-    await (db as any).websiteIntegration.delete({
-      where: { id: websiteIntegrationId },
+    if (linked.status === "REMOVED") return
+
+    // WebsiteIntegration is durable source provenance. Tombstoning keeps its
+    // primary key and provider-property identity available to historical daily
+    // metrics; a future exact relink uses the CAS path above.
+    const removed = await (db as any).websiteIntegration.updateMany({
+      where: {
+        id: websiteIntegrationId,
+        integrationId,
+        status: { not: "REMOVED" },
+      },
+      data: { status: "REMOVED", syncedAt: null },
     })
+    if (removed.count !== 1) {
+      const concurrent = await (db as any).websiteIntegration.findFirst({
+        where: { id: websiteIntegrationId, integrationId },
+        select: { status: true },
+      })
+      if (concurrent?.status !== "REMOVED") {
+        throw new WebsiteIntegrationNotFoundError()
+      }
+    }
   }
 
   private async findOwnedIntegration(
@@ -502,19 +641,30 @@ export class IntegrationService {
     const account = await (db as any).externalAccount.findUnique({
       where: { id: connectionId },
     })
-    if (!account) throw new NoActiveCredentialError()
+    if (!account || account.status !== ExternalAccountStatus.ACTIVE) {
+      throw new NoActiveCredentialError()
+    }
+    const identity = tokenIdentity(account)
+    const encryption = integrationEncryption()
 
     const isExpired =
       account.tokenExpiresAt.getTime() - Date.now() < 30 * 60 * 1000
 
     if (isExpired && account.encryptedRefreshToken) {
-      const refreshToken = (
-        encryption.decrypt(account.encryptedRefreshToken) as {
-          value: string
-        }
-      ).value
+      const refreshTokenPayload = encryption.decrypt(
+        account.encryptedRefreshToken,
+        account.encryptionKeyVersion,
+        integrationTokenEncryptionContext(identity, "refresh"),
+      )
+      if (
+        typeof refreshTokenPayload.value !== "string" ||
+        refreshTokenPayload.value.length === 0
+      ) {
+        throw new NoActiveCredentialError()
+      }
+      const refreshToken = refreshTokenPayload.value
 
-      const registration = getProvider(account.provider)
+      const { registration } = getCredentialProvider(account.provider)
       if (!registration?.oauthProvider) {
         throw new ProviderError(
           `Provider ${account.provider} does not support OAuth`,
@@ -525,29 +675,82 @@ export class IntegrationService {
       const tokens =
         await registration.oauthProvider.refreshTokens(refreshToken)
 
-      await (db as any).externalAccount.update({
-        where: { id: connectionId },
+      const encryptedAccessToken = encryption.encrypt(
+        { value: tokens.accessToken },
+        {
+          authenticatedContext: integrationTokenEncryptionContext(
+            identity,
+            "access",
+          ),
+        },
+      )
+      const encryptedRefreshToken = encryption.encrypt(
+        { value: tokens.refreshToken },
+        {
+          authenticatedContext: integrationTokenEncryptionContext(
+            identity,
+            "refresh",
+          ),
+        },
+      )
+      if (encryptedAccessToken.version !== encryptedRefreshToken.version) {
+        throw new Error("Integration token encryption versions do not match")
+      }
+
+      const updated = await (db as any).externalAccount.updateMany({
+        where: {
+          id: connectionId,
+          status: ExternalAccountStatus.ACTIVE,
+          encryptionKeyVersion: account.encryptionKeyVersion,
+          encryptedRefreshToken: account.encryptedRefreshToken,
+        },
         data: {
-          encryptedAccessToken: encryption.encrypt({
-            value: tokens.accessToken,
-          }).ciphertext,
-          encryptedRefreshToken: encryption.encrypt({
-            value: tokens.refreshToken,
-          }).ciphertext,
+          encryptedAccessToken: encryptedAccessToken.ciphertext,
+          encryptedRefreshToken: encryptedRefreshToken.ciphertext,
+          encryptionKeyVersion: encryptedAccessToken.version,
           tokenExpiresAt: tokens.expiresAt,
           grantedScopes: tokens.scopes,
           lastUsedAt: new Date(),
         },
       })
 
-      return tokens.accessToken
+      if (updated.count === 1) return tokens.accessToken
+
+      // Another refresh, OAuth callback, or key-rotation worker won the CAS.
+      // Never overwrite its newer refresh token/ciphertext with this response.
+      const current = await (db as any).externalAccount.findUnique({
+        where: { id: connectionId },
+      })
+      if (!current || current.status !== ExternalAccountStatus.ACTIVE) {
+        throw new NoActiveCredentialError()
+      }
+      const currentIdentity = tokenIdentity(current)
+      const currentToken = encryption.decrypt(
+        current.encryptedAccessToken,
+        current.encryptionKeyVersion,
+        integrationTokenEncryptionContext(currentIdentity, "access"),
+      )
+      if (
+        typeof currentToken.value !== "string" ||
+        currentToken.value.length === 0
+      ) {
+        throw new NoActiveCredentialError()
+      }
+      return currentToken.value
     }
 
-    return (
-      encryption.decrypt(account.encryptedAccessToken) as {
-        value: string
-      }
-    ).value
+    const accessToken = encryption.decrypt(
+      account.encryptedAccessToken,
+      account.encryptionKeyVersion,
+      integrationTokenEncryptionContext(identity, "access"),
+    )
+    if (
+      typeof accessToken.value !== "string" ||
+      accessToken.value.length === 0
+    ) {
+      throw new NoActiveCredentialError()
+    }
+    return accessToken.value
   }
 
   async disconnect(owner: OwnerContext, integrationId: string): Promise<void> {
@@ -561,25 +764,119 @@ export class IntegrationService {
     })
     if (!integration) throw new IntegrationNotFoundError()
 
-    // Revoke tokens if possible
-    if (integration.connection) {
-      try {
-        const accessToken = (
-          encryption.decrypt(integration.connection.encryptedAccessToken) as {
-            value: string
-          }
-        ).value
-        const registration = getProvider(integration.provider)
-        await registration?.oauthProvider?.revokeToken(accessToken)
-      } catch {
-        // best-effort revocation
-      }
-    }
+    // Serialize every integration that shares this credential. This prevents
+    // two concurrent sibling disconnects from both observing the other as
+    // active and consequently skipping the last-connection revocation.
+    //
+    // IMPORTANT: the compile-time Google-metrics quarantine currently keeps
+    // OAuth callback/discovery reactivation from racing this locked aggregate.
+    // Before that gate is removed, every connection/create/reactivation path
+    // must take this same ExternalAccount row lock and re-check ACTIVE status.
+    await (db as any).$transaction(
+      async (tx: any) => {
+        const lockedConnections = await tx.$queryRaw`
+        SELECT "id"
+        FROM "ExternalAccount"
+        WHERE "id" = ${integration.connectionId}
+        FOR UPDATE
+      `
+        if (
+          !Array.isArray(lockedConnections) ||
+          lockedConnections.length !== 1
+        ) {
+          throw new NoActiveCredentialError()
+        }
 
-    // Cascade delete will remove websiteIntegrations, syncs, schedule, discoveries
-    await (db as any).publisherIntegration.delete({
-      where: { id: integrationId },
-    })
+        const current = await tx.publisherIntegration.findFirst({
+          where: {
+            id: integrationId,
+            ownerType: owner.ownerType,
+            ownerId: owner.ownerId,
+            connectionId: integration.connectionId,
+          },
+          include: { connection: true },
+        })
+        if (!current) throw new IntegrationNotFoundError()
+        if (!current.connection) throw new NoActiveCredentialError()
+
+        const activeSiblingCount = await tx.publisherIntegration.count({
+          where: {
+            connectionId: current.connectionId,
+            id: { not: current.id },
+            status: { not: "DISCONNECTED" },
+          },
+        })
+        const isLastConnection = activeSiblingCount === 0
+
+        if (
+          isLastConnection &&
+          current.connection.status !== ExternalAccountStatus.REVOKED
+        ) {
+          const { registrationKey, registration } = getCredentialProvider(
+            current.connection.provider,
+          )
+          if (!registration?.oauthProvider) {
+            throw new ProviderError(
+              `Credential provider ${registrationKey} does not support token revocation`,
+              "TOKEN_REVOCATION_NOT_SUPPORTED",
+            )
+          }
+
+          const decrypted = integrationEncryption().decrypt(
+            current.connection.encryptedAccessToken,
+            current.connection.encryptionKeyVersion,
+            integrationTokenEncryptionContext(
+              tokenIdentity(current.connection),
+              "access",
+            ),
+          )
+          if (
+            typeof decrypted.value !== "string" ||
+            decrypted.value.length === 0
+          ) {
+            throw new NoActiveCredentialError()
+          }
+
+          // Provider errors are deliberately not swallowed. A failed or
+          // unconfirmed revocation must leave the aggregate connected so the
+          // caller can retry and cannot mistake a local tombstone for evidence
+          // that the external credential was revoked.
+          await registration.oauthProvider.revokeToken(decrypted.value)
+        }
+
+        // Disconnect is an aggregate tombstone, not deletion.
+        // WebsiteIntegration ids remain durable daily-metric provenance, and
+        // the schedule is disabled in the same commit so no worker can observe
+        // a half-disconnected state.
+        const disconnected = await tx.publisherIntegration.updateMany({
+          where: {
+            id: integrationId,
+            ownerType: owner.ownerType,
+            ownerId: owner.ownerId,
+            connectionId: current.connectionId,
+          },
+          data: { status: "DISCONNECTED" },
+        })
+        if (disconnected.count !== 1) throw new IntegrationNotFoundError()
+
+        await tx.integrationSchedule.updateMany({
+          where: { integrationId, enabled: true },
+          data: { enabled: false, version: { increment: 1 } },
+        })
+        await tx.websiteIntegration.updateMany({
+          where: { integrationId, status: { not: "REMOVED" } },
+          data: { status: "REMOVED", syncedAt: null },
+        })
+
+        if (isLastConnection) {
+          await tx.externalAccount.update({
+            where: { id: current.connectionId },
+            data: { status: ExternalAccountStatus.REVOKED },
+          })
+        }
+      },
+      { timeout: 30_000 },
+    )
   }
 
   private async fetchGoogleUserInfo(

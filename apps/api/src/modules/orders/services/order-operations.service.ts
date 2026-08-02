@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto"
-import { orderEventMetadata, QUEUES } from "@guestpost/shared"
+import {
+  orderEventMetadata,
+  QUEUES,
+  runLockedOrderSerializableTransaction,
+} from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
@@ -12,6 +16,7 @@ import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
 import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderDeliveryService } from "./order-delivery.service"
+import { closeActiveRevisionForResubmission } from "./revision-lifecycle"
 
 @Injectable()
 export class OrderOperationsService {
@@ -328,66 +333,80 @@ export class OrderOperationsService {
     }
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    const updated = await this.prisma.$transaction(async (tx: any) => {
-      const changed = await tx.order.updateMany({
-        where: { id: orderId, version: order.version, status: order.status },
-        data: { status: "CUSTOMER_REVIEW", version: { increment: 1 } },
-      })
-      if (changed.count === 0) {
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
+    const updated = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        await this.cancellation.assertNoActiveCancellation(orderId, tx)
+        const changed = await tx.order.updateMany({
+          where: { id: orderId, version: order.version, status: order.status },
+          data: { status: "CUSTOMER_REVIEW", version: { increment: 1 } },
+        })
+        if (changed.count === 0) {
+          throw new ConflictException(
+            "Order was modified by another request. Retry.",
+          )
+        }
+        const fulfilledRevisionId = await closeActiveRevisionForResubmission(
+          tx,
+          orderId,
         )
-      }
-      await this.guardAssignment(
-        tx,
-        assignment,
-        userId,
-        staffRole,
-        "IN_PROGRESS",
-      )
-      await tx.contentOrder.upsert({
-        where: { orderId },
-        create: {
-          orderId,
-          title: order.title ?? "Content",
-          brief: content,
-          status: "IN_PROGRESS",
-        },
-        update: { brief: content, status: "IN_PROGRESS" },
-      })
-      const articleVersion = await this.createFinalArticleVersion(
-        tx,
-        orderId,
-        userId,
-        content,
-      )
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
-          actorId: userId,
-          message: `Content submitted for review by operations`,
-          metadata: {
-            hasContent: true,
-            fromStatus: order.status,
-            articleVersionId: articleVersion?.id,
-            version: articleVersion?.version,
-          },
-        },
-      })
-      await this.audit.log(
-        {
-          action: "CONTENT_SUBMITTED_FOR_REVIEW",
-          entityType: "Order",
-          entityId: orderId,
-          metadata: { ...orderEventMetadata(order), fromStatus: order.status },
+        await this.guardAssignment(
+          tx,
+          assignment,
           userId,
-          organizationId: order.organizationId,
-        },
-        tx,
-      )
-      return tx.order.findUniqueOrThrow({ where: { id: orderId } })
-    })
+          staffRole,
+          "IN_PROGRESS",
+        )
+        await tx.contentOrder.upsert({
+          where: { orderId },
+          create: {
+            orderId,
+            title: order.title ?? "Content",
+            brief: content,
+            status: "IN_PROGRESS",
+          },
+          update: { brief: content, status: "IN_PROGRESS" },
+        })
+        const articleVersion = await this.createFinalArticleVersion(
+          tx,
+          orderId,
+          userId,
+          content,
+        )
+        await tx.orderEvent.create({
+          data: {
+            orderId,
+            eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
+            actorId: userId,
+            message: "Content submitted for review by operations",
+            metadata: {
+              hasContent: true,
+              fromStatus: order.status,
+              articleVersionId: articleVersion?.id,
+              version: articleVersion?.version,
+              fulfilledRevisionId,
+            },
+          },
+        })
+        await this.audit.log(
+          {
+            action: "CONTENT_SUBMITTED_FOR_REVIEW",
+            entityType: "Order",
+            entityId: orderId,
+            metadata: {
+              ...orderEventMetadata(order),
+              fromStatus: order.status,
+              fulfilledRevisionId,
+            },
+            userId,
+            organizationId: order.organizationId,
+          },
+          tx,
+        )
+        return tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      },
+    )
 
     await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
       userId: order.customerId,

@@ -40,6 +40,13 @@ describe("BillingService", () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      order: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "order-1",
+          organizationId: "org-1",
+          currency: "USD",
+        }),
+      },
       transaction: {
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -155,6 +162,22 @@ describe("BillingService", () => {
         },
       })
     })
+
+    it("rejects a non-canonical wallet currency before creating a deposit attempt", async () => {
+      prismaMock.wallet.findUnique.mockResolvedValue({
+        ...mockWallet,
+        currency: "usd",
+      })
+
+      await expect(
+        service.createCheckoutSession("wallet-1", 20, mockUser, "request-1"),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "WALLET_CURRENCY_UNSUPPORTED",
+        }),
+      })
+      expect(prismaMock.depositAttempt.create).not.toHaveBeenCalled()
+    })
   })
 
   describe("getWallet", () => {
@@ -238,11 +261,40 @@ describe("BillingService", () => {
       expect(prismaMock.wallet.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            availableBalance: { decrement: 200 },
-            reservedBalance: { increment: 200 },
+            availableBalance: { decrement: new Decimal(200) },
+            reservedBalance: { increment: new Decimal(200) },
           }),
         }),
       )
+      expect(prismaMock.transaction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          type: "RESERVATION",
+          currency: "USD",
+          amount: new Decimal(-200),
+        }),
+      })
+    })
+
+    it("rejects a non-USD order before reserving wallet funds", async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
+        prismaMock.order.findUnique.mockResolvedValue({
+          id: "order-1",
+          organizationId: "org-1",
+          currency: "EUR",
+        })
+        return cb(prismaMock)
+      })
+
+      await expect(
+        service.reserve("wallet-1", 200, "order-1", mockUser),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "ORDER_CURRENCY_UNSUPPORTED",
+        }),
+      })
+      expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
     })
 
     it("returns a stable 409 and moves no money when dispute exposure is uncovered", async () => {
@@ -336,6 +388,13 @@ describe("BillingService", () => {
       )
 
       expect(Number(result.reservedBalance)).toBe(100)
+      expect(prismaMock.transaction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          type: "PURCHASE",
+          currency: "USD",
+          amount: new Decimal(-100),
+        }),
+      })
     })
 
     it("locks and blocks capture when dispute exposure is uncovered", async () => {
@@ -416,6 +475,13 @@ describe("BillingService", () => {
       expect(auditMock.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: "WALLET_REFUND" }),
       )
+      expect(prismaMock.transaction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          type: "REFUND",
+          currency: "USD",
+          amount: new Decimal(200),
+        }),
+      })
     })
 
     it("prevents duplicate refund", async () => {
@@ -548,19 +614,28 @@ describe("BillingService", () => {
         capabilities: { supportedCurrencies: ["USD"] },
         verifyWebhook: jest.fn().mockReturnValue(event),
       }
+      let quarantinedProcessedAt: Date | null = null
       prismaMock.paymentProviderEvent.create.mockImplementation(
-        ({ data }: any) => Promise.resolve({ id: "inbox-1", ...data }),
+        ({ data }: any) => {
+          quarantinedProcessedAt = data.processedAt
+          return Promise.resolve({ id: "inbox-1", ...data })
+        },
       )
-      prismaMock.paymentProviderEvent.findUnique.mockResolvedValue({
-        id: "inbox-1",
-        provider: "stripe",
-        providerEventId: event.id,
-        eventType: event.type,
-        status: "QUARANTINED",
-        attempts: 0,
-        lockedAt: null,
-        processedAt: new Date(),
-      })
+      prismaMock.paymentProviderEvent.findUnique.mockImplementation(() =>
+        Promise.resolve({
+          id: "inbox-1",
+          provider: "stripe",
+          providerEventId: event.id,
+          eventType: event.type,
+          status: "QUARANTINED",
+          attempts: 0,
+          lockedAt: null,
+          // Re-read the exact persisted fence. A fresh Date made this test
+          // millisecond-dependent even though PostgreSQL returns the value
+          // written by the create above.
+          processedAt: quarantinedProcessedAt,
+        }),
+      )
       prismaMock.$transaction.mockImplementation((callback: any) =>
         callback(prismaMock),
       )

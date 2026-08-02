@@ -219,6 +219,47 @@ async function registerSettlementHoldLinkSweep(): Promise<RegisteredJob> {
   return { name: "settlement-hold-sweep", queue: QUEUES.DELIVERY_VERIFICATION }
 }
 
+// Postgres is the delivery source of truth. This sweep recovers a committed
+// PENDING delivery when the API's post-commit Redis enqueue failed or returned
+// ambiguously after Redis accepted it.
+async function registerDeliveryVerificationDispatchSweep(): Promise<RegisteredJob> {
+  const everyMs =
+    Math.max(
+      Number(process.env.DELIVERY_VERIFICATION_DISPATCH_MINUTES ?? 5),
+      1,
+    ) *
+    60 *
+    1000
+  const batchSize = positiveInt(
+    process.env.DELIVERY_VERIFICATION_DISPATCH_BATCH_SIZE,
+    100,
+  )
+  await removeRepeatableJobsByName(
+    QUEUES.DELIVERY_VERIFICATION,
+    "delivery-verification-dispatch-sweep",
+  )
+  const queue = new Queue(QUEUES.DELIVERY_VERIFICATION, { connection })
+  await queue.add(
+    "delivery-verification-dispatch-sweep",
+    signJobPayload({ batchSize }, 0),
+    {
+      repeat: { every: everyMs },
+      jobId: "delivery-verification-dispatch-sweep",
+      removeOnComplete: { count: 24 },
+      removeOnFail: { count: 24 },
+    },
+  )
+  await queue.close()
+  logger.info("registered delivery verification dispatch sweep", {
+    intervalMs: everyMs,
+    batchSize,
+  })
+  return {
+    name: "delivery-verification-dispatch-sweep",
+    queue: QUEUES.DELIVERY_VERIFICATION,
+  }
+}
+
 // Phase 7.3 — settlement review window auto-approval. Replaces the per-API-pod
 // setInterval; one worker, one cron, one sweep per cadence cluster-wide via
 // BullMQ jobId dedup. Preserves the two existing env vars
@@ -535,6 +576,17 @@ function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
       data: {},
       createWorker: createDeliveryVerificationWorker,
     },
+    "delivery-verification-dispatch": {
+      queue: QUEUES.DELIVERY_VERIFICATION,
+      jobName: QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].DISPATCH_SWEEP,
+      data: {
+        batchSize: positiveInt(
+          process.env.DELIVERY_VERIFICATION_DISPATCH_BATCH_SIZE,
+          100,
+        ),
+      },
+      createWorker: createDeliveryVerificationWorker,
+    },
     "settlement-auto-approve": {
       queue: QUEUES.SETTLEMENT,
       jobName: QUEUE_JOBS[QUEUES.SETTLEMENT].AUTO_APPROVE,
@@ -626,7 +678,10 @@ async function removeHybridRepeatables(): Promise<void> {
     },
     {
       queue: QUEUES.DELIVERY_VERIFICATION,
-      names: [QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].HOLD_LINK_SWEEP],
+      names: [
+        QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].HOLD_LINK_SWEEP,
+        QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].DISPATCH_SWEEP,
+      ],
     },
     {
       queue: QUEUES.SETTLEMENT,
@@ -686,7 +741,10 @@ async function runScheduledTask(taskName: string): Promise<void> {
   const queue = new Queue(task.queue, { connection })
   try {
     const jobBucketMs =
-      taskName === "payment-dispute-inbox" ? 5 * 60 * 1000 : 10 * 60 * 1000
+      taskName === "payment-dispute-inbox" ||
+      taskName === "delivery-verification-dispatch"
+        ? 5 * 60 * 1000
+        : 10 * 60 * 1000
     const jobBucket = Math.floor(Date.now() / jobBucketMs)
     const job = await queue.add(task.jobName, signJobPayload(task.data), {
       jobId: `scheduled-${taskName}-${jobBucket}`,
@@ -907,6 +965,7 @@ async function bootstrap() {
       registerPaymentDisputeInbox(),
       registerWebsiteReverifySweep(),
       registerDomainMetricsRefresh(),
+      registerDeliveryVerificationDispatchSweep(),
       registerSettlementHoldLinkSweep(),
       registerSettlementAutoApproveSweep(),
       registerSettlementAutoReleaseSweep(),

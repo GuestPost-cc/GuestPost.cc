@@ -7,7 +7,9 @@ import {
 } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { projectExternalOrder } from "../orders/order-visibility"
 import { OrdersService } from "../orders/orders.service"
+import { OrderReviewService } from "../orders/services/order-review.service"
 
 @Injectable()
 export class CampaignsService {
@@ -15,6 +17,7 @@ export class CampaignsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly orders: OrdersService,
+    private readonly orderReview: OrderReviewService,
   ) {}
 
   async createOrder(
@@ -29,6 +32,11 @@ export class CampaignsService {
       organizationId: string
       campaignId?: string
       idempotencyKey?: string
+      listingServiceId?: string
+      briefData?: Record<string, unknown>
+      expectedListingServiceVersion?: unknown
+      expectedPrice?: unknown
+      expectedCurrency?: unknown
     },
     userId: string,
   ) {
@@ -73,6 +81,11 @@ export class CampaignsService {
         organizationId: data.organizationId,
         campaignId: data.campaignId,
         idempotencyKey: data.idempotencyKey,
+        listingServiceId: data.listingServiceId,
+        briefData: data.briefData,
+        expectedListingServiceVersion: data.expectedListingServiceVersion,
+        expectedPrice: data.expectedPrice,
+        expectedCurrency: data.expectedCurrency,
         targetUrl: data.targetUrl,
         anchorText: data.anchorText,
         items: data.websiteId
@@ -88,14 +101,8 @@ export class CampaignsService {
       userId,
     )
 
-    await this.audit.log({
-      action: "ORDER_CREATED",
-      entityType: "Order",
-      entityId: order.id,
-      metadata: { type: data.type, campaignId: data.campaignId ?? null },
-      userId,
-      organizationId: data.organizationId,
-    })
+    // OrdersService owns the idempotent ORDER_CREATED evidence. Emitting a
+    // second campaign-layer audit here would duplicate it on exact replay.
     return order
   }
 
@@ -115,7 +122,7 @@ export class CampaignsService {
     })
 
     if (!order) throw new NotFoundException(`Order ${id} not found`)
-    return order
+    return projectExternalOrder(order, "CUSTOMER")
   }
 
   async listOrders(organizationId: string, take = 50, skip = 0) {
@@ -130,7 +137,12 @@ export class CampaignsService {
       }),
       this.prisma.order.count({ where }),
     ])
-    return { items, total, take, skip }
+    return {
+      items: items.map((order) => projectExternalOrder(order, "CUSTOMER")),
+      total,
+      take,
+      skip,
+    }
   }
 
   async createCampaign(
@@ -206,7 +218,12 @@ export class CampaignsService {
       }),
       this.prisma.order.count({ where }),
     ])
-    return { items, total, take, skip }
+    return {
+      items: items.map((order) => projectExternalOrder(order, "CUSTOMER")),
+      total,
+      take,
+      skip,
+    }
   }
 
   // Org-scoped partial update. Status changes never touch orders — a PAUSED
@@ -285,7 +302,12 @@ export class CampaignsService {
       }),
       this.prisma.order.count({ where }),
     ])
-    return { items, total, take, skip }
+    return {
+      items: items.map((order) => projectExternalOrder(order, "PUBLISHER")),
+      total,
+      take,
+      skip,
+    }
   }
 
   async requestRevision(
@@ -294,23 +316,18 @@ export class CampaignsService {
     notes: string,
     userId: string,
   ) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, organizationId },
-    })
-
-    if (!order) throw new NotFoundException(`Order ${orderId} not found`)
-
-    const revision = await this.prisma.revision.create({
-      data: { orderId, notes, status: "REQUESTED" },
-    })
-    await this.audit.log({
-      action: "REVISION_REQUESTED",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: { revisionId: revision.id },
-      userId,
-      organizationId,
-    })
-    return revision
+    // This legacy campaign route intentionally delegates to the same state
+    // machine as POST /orders/:id/revisions. Keeping one writer prevents this
+    // surface from bypassing status, cancellation, revision-limit, lock-order,
+    // and audit invariants.
+    return projectExternalOrder(
+      await this.orderReview.requestRevision(
+        orderId,
+        organizationId,
+        userId,
+        notes,
+      ),
+      "CUSTOMER",
+    )
   }
 }

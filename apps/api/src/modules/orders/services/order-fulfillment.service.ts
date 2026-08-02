@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto"
-import { orderEventMetadata, QUEUES } from "@guestpost/shared"
+import {
+  orderEventMetadata,
+  QUEUES,
+  runLockedOrderSerializableTransaction,
+} from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
@@ -11,6 +15,7 @@ import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
 import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderDeliveryService } from "./order-delivery.service"
+import { closeActiveRevisionForResubmission } from "./revision-lifecycle"
 
 @Injectable()
 export class OrderFulfillmentService {
@@ -240,24 +245,43 @@ export class OrderFulfillmentService {
     }
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    const updated = await this.prisma.$transaction(async (tx: any) => {
-      const fresh = await this.transition(
-        orderId,
-        order.version,
-        "CONTENT_READY",
-        { status: "CUSTOMER_REVIEW" },
-        tx,
-      )
-      await tx.orderEvent.create({
-        data: {
+    const updated = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        const current = await tx.order.findFirst({
+          where: { id: orderId, website: { publisherId } },
+        })
+        if (!current) throw new NotFoundException("Order not found")
+        if (current.status !== "CONTENT_READY") {
+          throw new ConflictException(
+            "Order changed before review submission. Refresh and retry.",
+          )
+        }
+        await this.cancellation.assertNoActiveCancellation(orderId, tx)
+        const fresh = await this.transition(
           orderId,
-          eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
-          actorId: userId,
-          message: "Content submitted for customer review",
-        },
-      })
-      return fresh
-    })
+          current.version,
+          "CONTENT_READY",
+          { status: "CUSTOMER_REVIEW" },
+          tx,
+        )
+        const fulfilledRevisionId = await closeActiveRevisionForResubmission(
+          tx,
+          orderId,
+        )
+        await tx.orderEvent.create({
+          data: {
+            orderId,
+            eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
+            actorId: userId,
+            message: "Content submitted for customer review",
+            metadata: { fulfilledRevisionId },
+          },
+        })
+        return fresh
+      },
+    )
 
     await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
       userId: order.customerId,
@@ -290,70 +314,97 @@ export class OrderFulfillmentService {
     }
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    const updated = await this.prisma.$transaction(async (tx: any) => {
-      const fresh = await this.transition(
-        orderId,
-        order.version,
-        order.status,
-        { status: "CUSTOMER_REVIEW" },
-        tx,
-      )
-      await tx.contentOrder.upsert({
-        where: { orderId },
-        create: {
+    const updated = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        const current = await tx.order.findFirst({
+          where: { id: orderId, website: { publisherId } },
+        })
+        if (!current) throw new NotFoundException("Order not found")
+        if (
+          !["ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION"].includes(
+            current.status,
+          )
+        ) {
+          throw new ConflictException(
+            "Order changed before review submission. Refresh and retry.",
+          )
+        }
+        await this.cancellation.assertNoActiveCancellation(orderId, tx)
+        const fresh = await this.transition(
           orderId,
-          title: order.title ?? "Content",
-          brief: content,
-          status: "IN_PROGRESS",
-        },
-        update: { brief: content, status: "IN_PROGRESS" },
-      })
-      const articleVersion = await this.createFinalArticleVersion(
-        tx,
-        orderId,
-        userId,
-        content,
-      )
-      await tx.orderEvent.createMany({
-        data: [
-          {
+          current.version,
+          current.status,
+          { status: "CUSTOMER_REVIEW" },
+          tx,
+        )
+        const fulfilledRevisionId = await closeActiveRevisionForResubmission(
+          tx,
+          orderId,
+        )
+        await tx.contentOrder.upsert({
+          where: { orderId },
+          create: {
             orderId,
-            eventType: "CONTENT_SUBMITTED",
-            actorId: userId,
-            message: "Content submitted by publisher",
-            metadata: {
-              hasContent: true,
-              articleVersionId: articleVersion?.id,
-              version: articleVersion?.version,
-            },
+            title: current.title ?? "Content",
+            brief: content,
+            status: "IN_PROGRESS",
           },
-          {
-            orderId,
-            eventType: "CONTENT_MARKED_READY",
-            actorId: userId,
-            message: "Content marked ready for review",
-          },
-          {
-            orderId,
-            eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
-            actorId: userId,
-            message: "Content submitted for customer review",
-          },
-        ],
-      })
-      await this.audit.log(
-        {
-          action: "CONTENT_SUBMITTED_FOR_REVIEW",
-          entityType: "Order",
-          entityId: orderId,
-          metadata: { ...orderEventMetadata(order), publisherId },
+          update: { brief: content, status: "IN_PROGRESS" },
+        })
+        const articleVersion = await this.createFinalArticleVersion(
+          tx,
+          orderId,
           userId,
-          organizationId: order.organizationId,
-        },
-        tx,
-      )
-      return fresh
-    })
+          content,
+        )
+        await tx.orderEvent.createMany({
+          data: [
+            {
+              orderId,
+              eventType: "CONTENT_SUBMITTED",
+              actorId: userId,
+              message: "Content submitted by publisher",
+              metadata: {
+                hasContent: true,
+                articleVersionId: articleVersion?.id,
+                version: articleVersion?.version,
+              },
+            },
+            {
+              orderId,
+              eventType: "CONTENT_MARKED_READY",
+              actorId: userId,
+              message: "Content marked ready for review",
+            },
+            {
+              orderId,
+              eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
+              actorId: userId,
+              message: "Content submitted for customer review",
+              metadata: { fulfilledRevisionId },
+            },
+          ],
+        })
+        await this.audit.log(
+          {
+            action: "CONTENT_SUBMITTED_FOR_REVIEW",
+            entityType: "Order",
+            entityId: orderId,
+            metadata: {
+              ...orderEventMetadata(current),
+              publisherId,
+              fulfilledRevisionId,
+            },
+            userId,
+            organizationId: current.organizationId,
+          },
+          tx,
+        )
+        return fresh
+      },
+    )
 
     await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
       userId: order.customerId,

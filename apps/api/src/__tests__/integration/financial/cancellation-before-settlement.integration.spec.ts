@@ -42,9 +42,9 @@ describe("[INTEGRATION] Financial — cancellation before settlement", () => {
 
       await expectFinancialState(ctx, {
         orderStatus: OrderStatus.CANCELLED,
-        walletAvailableBalance: 100,
-        transactionCount: 1,
-        transactionSum: 100,
+        walletAvailableBalance: 0,
+        transactionCount: 2,
+        transactionSum: 0,
       })
     } finally {
       await cleanup()

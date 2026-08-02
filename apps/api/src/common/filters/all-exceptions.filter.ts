@@ -71,6 +71,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (error.code === "TOKEN_EXPIRED" || error.code === "REAUTH_REQUIRED") {
       return HttpStatus.UNAUTHORIZED
     }
+    if (error.code === "GOOGLE_METRICS_DISABLED") {
+      return HttpStatus.SERVICE_UNAVAILABLE
+    }
     if (
       error.code === "PROVIDER_ERROR" &&
       (error.details?.providerCode === "GOOGLE_OAUTH_CONFIG_MISSING" ||

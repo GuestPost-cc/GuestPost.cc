@@ -20,6 +20,8 @@ interface GoogleErrorResponse {
  * Implements OAuthProvider using Google OAuth2 endpoints.
  */
 export class GoogleAuthProvider implements OAuthProvider {
+  private static readonly TOKEN_REVOCATION_TIMEOUT_MS = 10_000
+
   constructor(private readonly scopes: string[]) {}
 
   async getAuthorizationUrl(
@@ -125,11 +127,20 @@ export class GoogleAuthProvider implements OAuthProvider {
   }
 
   async revokeToken(accessToken: string): Promise<void> {
-    await fetch("https://oauth2.googleapis.com/revoke", {
+    const response = await fetch("https://oauth2.googleapis.com/revoke", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token: accessToken }),
+      signal: AbortSignal.timeout(
+        GoogleAuthProvider.TOKEN_REVOCATION_TIMEOUT_MS,
+      ),
     })
+    if (!response.ok) {
+      throw new ProviderError(
+        `Google token revocation failed with status ${response.status}`,
+        "GOOGLE_TOKEN_REVOCATION_FAILED",
+      )
+    }
   }
 
   private static getRequiredEnv(

@@ -93,6 +93,18 @@ describe("hybrid worker runtime contract", () => {
     expect(removal).toContain("ownedSchedules")
     expect(removal).toContain(".filter((job) => names.has(job.name))")
     expect(removal).not.toContain("repeatables.map(")
+    expect(removal).toContain("DISPATCH_SWEEP")
+  })
+
+  it("wires delivery verification orphan recovery into both scheduler modes", () => {
+    const source = read("apps/worker/src/index.ts")
+    expect(source).toContain("registerDeliveryVerificationDispatchSweep()")
+    expect(source).toContain('"delivery-verification-dispatch": {')
+    expect(source).toContain(
+      "QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].DISPATCH_SWEEP",
+    )
+    const schedule = read("apps/worker/src/lib/maintenance-schedule.ts")
+    expect(schedule).toContain('tasks.push("delivery-verification-dispatch")')
   })
 
   it("does not keep a burst worker alive for delayed retries", () => {

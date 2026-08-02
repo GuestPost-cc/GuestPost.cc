@@ -85,8 +85,29 @@ export function createSettlementReleaseWorker() {
         scanned: result.scanned,
         released: result.released,
         skipped: result.skipped,
+        freshness_blocked: result.freshnessBlocked,
         duration_ms: result.durationMs,
       })
+
+      if (result.freshnessBlocked > 0) {
+        Sentry.captureMessage(
+          "Settlement auto-release blocked by stale verification evidence",
+          {
+            level: "warning",
+            tags: {
+              queue: "settlement",
+              job: job.name,
+              sweepRunId: job.id ?? "unknown",
+            },
+            extra: {
+              freshness_blocked: result.freshnessBlocked,
+              scanned: result.scanned,
+              released: result.released,
+              batch_size: batchSize,
+            },
+          },
+        )
+      }
 
       if (result.durationMs > slowMs) {
         Sentry.captureMessage("Settlement auto-release sweep slow", {

@@ -1,71 +1,65 @@
 # Current Status
 
-**Phase**: PR #61 is merged and exact commit `442304f` is live across all five Render services and all three Northflank worker workloads. The Neon staging database is migrated through the Stripe-first finance migration and every runtime uses a restricted application role; the former owner password was rotated after cutover. Stripe webhook destinations are active, but both deposit and Connect execution remain fail-closed pending replacement of the staging restricted key and a user-initiated sandbox checkout. Existing Admin-auth and GSC/GA4 deployment follow-ups remain open.
+**Phase**: PR #84 (`agent/financial-integrity-hardening`) is being hardened and
+tested locally. It is not merged or deployed. The branch was created from and
+re-fetched against GitHub `main` commit `9b47247`; `origin/main` remains an
+ancestor of the branch.
 
-**Reconciled through**: GitHub `main` commit `9b47247` (393 commits total).
-The financial-hardening branch was created from and re-fetched against that
-exact deployed-main base before publication.
+## Current Local Work: Financial Evidence And Release Integrity
 
-## Current Local Work: Financial Evidence And Recovery Hardening
-
-- The reported finance defects were confirmed and addressed locally: publisher
-  approval now proves the request-time reservation; dispute holds no longer
-  reuse deposit provider identity; automated payouts cannot be manually marked
-  paid; and the customer wallet cash-out surface is retired.
-- Provider inboxes, payout completion, withdrawal allocation/provenance, and
-  payment-dispute cases now use exact evidence, database guards, serializable
-  transitions, bounded recovery, quarantine, audit, and Finance/Super Admin
-  alerts. Stripe payout completion requires the persisted bank Payout, exact
-  provider minor-unit amount/currency, and immutable connected account.
-- Normalized append-only `PayoutExecutionClaim` rows are now the only send
-  authority; `providerMetadata.externalClaims` is removed/rejected. Withdrawal,
-  execution-status, and execution-stage graphs plus maker-checker boundaries
-  are enforced in PostgreSQL.
-- Wallet reservation and dispute booking now share a wallet row lock. New
-  spending fails closed on positive open/lost uncovered exposure; won or
-  zero-exposure cases allow it. Reserved-fund capture repeats that locked
-  ownership/exposure gate, so an older reservation cannot bypass a newly
-  recorded zero-held dispute. Lost-exposure credit recovery/netting is not
-  synthesized and remains a separately reviewed future design.
-- Legacy direct payout-method creation now has strict bounded per-rail DTO and
-  service validation, rejects unknown/cross-rail fields, and revalidates the
-  locked publisher owner inside the serializable encryption/write/audit
-  transaction. Manual completion displays the immutable payout target,
-  requires its exact public reference, and compares that reference under the
-  canonical completion lock before releasing liability.
-- Deposit replay/reconciliation recognizes every wallet-credit-backed
-  derivative status (`SUCCEEDED`, `PARTIALLY_REFUNDED`, `REFUNDED`, `DISPUTED`,
-  `CHARGEBACK`). Stripe inbox facts include immutable `livemode`, and restricted
-  `rk_*` keys share the fail-closed test/live classifier with `sk_*` keys.
-- Stripe checkout-success recovery still depends on fresh signed redelivery;
-  no independent authenticated Checkout/PaymentIntent catch-up processor is
-  implemented. Wise automated sends, completion, and claimed-send replay
-  remain disabled pending provider certification.
-- `FINANCE_RUNTIME_MODE` now separates `normal`, `recovery_only`, and `locked`.
-  Production missing/invalid configuration locks mutations; `recovery_only`
-  retains exact recovery/reconciliation, while `locked` retains only reads and
-  authenticated inbound evidence.
-- This work is not a rolling-deploy change. Release requires a maintenance
-  window, hard drain of every old API/worker writer, ordered finance
-  migrations, startup of only the evidence-aware image, zero unexplained
-  incident-query findings, and Stripe sandbox canaries. After the guards land,
-  rollback is a money freeze plus forward fix—not an old image or dropped
-  trigger.
-- Both provenance and aggregate migrations now take stable fail-fast SHARE lock
-  barriers before their preflights. The aggregate rehearsal rejects seven
-  isolated legacy-history shapes, excludes unrelated PENDING invitee wallets,
-  and then proves the successful backfill and post-migration assertions.
-- Settled-tree validation is green: 110 API unit suites / 1,236 tests, 13 API
-  integration suites / 129 tests, 20 shared suites / 189 tests, 6 API-client
-  suites / 59 tests, and 25 worker tests. Ten TypeScript checks, repository
-  Biome, all four frontend ESLint checks, dependency policy, documentation
-  registry, dependency-cruise, Prisma/encryption verification, the full
-  finance migration rehearsal, API/shared/database/API-client builds, and the
-  affected Admin production build pass. Independent adversarial review found
-  no remaining code release blocker; the hard-drain and signed Stripe staging
-  matrix remain mandatory operational gates. Registry vulnerability audit
-  remains a required GitHub CI gate because local metadata egress was not
-  authorized.
+- The original money defects are fixed: publisher approval uses the already
+  reserved balance instead of charging it twice; chargeback holds have an
+  independent ledger identity; approved automated payouts cannot be manually
+  completed without provider/bank evidence; and the buyer wallet withdrawal
+  endpoint is retired because it never moved money externally.
+- Launch accounting is exact, case-sensitive USD only. Catalog, order, wallet,
+  deposit, refund/dispute, settlement/revenue, publisher balance, withdrawal,
+  payout execution/allocation/batch, and ledger boundaries enforce currency in
+  application code and PostgreSQL. Historical non-USD rows stop migration
+  preflight and are never relabelled.
+- Order create, cart mutation, and payment capture serialize on the Order row.
+  Capture re-authorizes the actor and verifies the reviewed delivery version,
+  immutable catalog/service/version/amount/currency snapshot, live listing and
+  website state, exact USD wallet evidence, and idempotency fingerprint.
+  PostgreSQL guards the paid-order/purchase-ledger equivalence and immutable
+  captured contract.
+- Manual approval and automated settlement release share one canonical live
+  predicate under the Order lock. Active revisions, disputes, cancellations,
+  delivery failure/change, unresolved fraud flags, and current holds block
+  release. Auto-release additionally requires successful current-delivery
+  evidence no older than 12 hours. Blocker writes and settlement writes are
+  serialized by database triggers; one exact release ledger row is required.
+- Delivery verification is durable and bounded: enqueue failures persist for
+  retry, worker fetches cap redirects/body/time, superseded delivery evidence
+  cannot authorize settlement, and structured warnings surface freshness
+  blocks, hold-sweep failures, and scan-cap exhaustion. Fraud flags are
+  adjudicated through append-only resolution evidence plus current holds;
+  manual rejection checks current version and exact state while locked.
+- GSC/GA4 metrics are fully quarantined until exact property/web-stream to
+  canonical-domain binding exists. Legacy summaries are scrubbed, stale writer
+  inserts are rejected, and marketplace traffic uses only current unexpired
+  Ahrefs evidence.
+- Integration token encryption accepts only exact 64-hex keys, persists a
+  per-account key version, authenticates version-2+ ciphertext to immutable
+  account identity and token purpose, updates access/refresh tokens atomically,
+  and includes a lock/CAS-based batch rotation and verification command.
+- External customer/publisher order responses use explicit public-field
+  allowlists so nested actor, reviewer, finance, refund, cancellation
+  idempotency, and other internal evidence cannot escape via a newly selected
+  Prisma relation.
+- This is a mixed-version-incompatible financial release. Deployment requires
+  a maintenance window, hard drain of every old API/worker writer, ordered
+  migrations `0900` through `0960`, startup of only the evidence-aware image,
+  zero unexplained incident-query findings, and signed Stripe deposit/payout
+  canaries. Rollback after database guards land is a money freeze and forward
+  fix, never an old image or trigger removal.
+- Validation is green: 116 API unit suites / 1,379 tests, 15 PostgreSQL API
+  integration suites / 138 tests, 24 shared suites / 241 tests, 13 integration
+  package suites / 104 tests, 6 API-client suites / 59 tests, and 32 worker
+  tests. A clean 57-migration replay, populated finance upgrade rehearsal,
+  database generation/build, focused delivery/revision concurrency suites, the
+  full repository policy/type/lint/documentation/dependency checks, and all 12
+  production builds pass. Commit/push and GitHub CI remain before merge.
 
 ## Current Local Work: Staff Marketplace And Canonical Order Integrity
 

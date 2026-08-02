@@ -61,6 +61,7 @@ describe("OrderCancellationService", () => {
       },
       wallet: { findUnique: jest.fn() },
       transaction: { findFirst: jest.fn().mockResolvedValue(null) },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
       $transaction: jest
         .fn()
         .mockImplementation(async (callback: any) => callback(prisma)),
@@ -126,6 +127,12 @@ describe("OrderCancellationService", () => {
           responsibility: "CUSTOMER",
         }),
       }),
+    )
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.order.updateMany.mock.invocationCallOrder[0],
+    )
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.orderCancellationRequest.create.mock.invocationCallOrder[0],
     )
   })
 

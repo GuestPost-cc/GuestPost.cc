@@ -4,9 +4,11 @@ import {
   initialStripeFeeDisclosure,
   isCreditablePreCreditDepositStatus,
   isFinanceOperationAllowed,
+  isSupportedMoneyCurrency,
   isUniqueViolation,
   isWalletCreditBackedDepositStatus,
   resolveFinanceRuntimeMode,
+  USD_CURRENCY,
 } from "@guestpost/shared"
 import { createFinancialReference } from "@guestpost/shared/dist/financial-reference-server"
 import {
@@ -408,6 +410,68 @@ export class BillingService {
       throw new ForbiddenException("Wallet does not belong to this account")
   }
 
+  private assertCanonicalUsdCurrency(
+    currency: unknown,
+    code: string,
+    message: string,
+  ) {
+    if (!isSupportedMoneyCurrency(currency)) {
+      throw new ConflictException({ code, message })
+    }
+  }
+
+  private canonicalMoneyAmount(
+    amount: Decimal | number | string,
+    operation: string,
+  ): Decimal {
+    let value: Decimal
+    try {
+      value = new Decimal(amount)
+    } catch {
+      throw new BadRequestException({
+        code: "MONEY_AMOUNT_INVALID",
+        message: `${operation} amount is invalid`,
+      })
+    }
+    if (
+      !value.isFinite() ||
+      value.lessThanOrEqualTo(0) ||
+      !value.mul(100).isInteger()
+    ) {
+      throw new BadRequestException({
+        code: "MONEY_AMOUNT_INVALID",
+        message: `${operation} amount must be positive with no more than two decimal places`,
+      })
+    }
+    return value
+  }
+
+  private async assertOrderMatchesWallet(
+    tx: any,
+    orderId: string,
+    wallet: { organizationId: string | null },
+  ) {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, organizationId: true, currency: true },
+    })
+    if (!order) throw new NotFoundException("Order not found")
+    this.assertCanonicalUsdCurrency(
+      order.currency,
+      "ORDER_CURRENCY_UNSUPPORTED",
+      "Order currency is not supported by USD-only wallet movements",
+    )
+    if (
+      !wallet.organizationId ||
+      order.organizationId !== wallet.organizationId
+    ) {
+      throw new ConflictException({
+        code: "ORDER_WALLET_OWNERSHIP_MISMATCH",
+        message: "Order and wallet do not belong to the same organization",
+      })
+    }
+  }
+
   async createCheckoutSession(
     walletId: string,
     amount: number,
@@ -421,18 +485,21 @@ export class BillingService {
     if (!wallet) throw new NotFoundException("Wallet not found")
 
     this.assertWalletOwned(wallet, user)
+    this.assertCanonicalUsdCurrency(
+      wallet.currency,
+      "WALLET_CURRENCY_UNSUPPORTED",
+      "Card deposits require a canonical USD wallet",
+    )
 
     if (!isStripeFeatureEnabled("deposits")) {
       throw new BadRequestException("Card deposits are temporarily unavailable")
     }
     if (
       !this.depositProvider.capabilities.supportedCurrencies.includes(
-        wallet.currency.toUpperCase(),
+        USD_CURRENCY,
       )
     ) {
-      throw new BadRequestException(
-        `Card deposits do not support ${wallet.currency.toUpperCase()}`,
-      )
+      throw new BadRequestException("Card deposits do not support USD")
     }
 
     const amountDecimal = new Decimal(amount)
@@ -461,7 +528,7 @@ export class BillingService {
     if (
       existing &&
       (!new Decimal(existing.amount).equals(amountDecimal) ||
-        existing.currency !== wallet.currency.toUpperCase())
+        existing.currency !== USD_CURRENCY)
     ) {
       throw new ConflictException(
         "This deposit request key was already used for a different amount or currency",
@@ -499,7 +566,7 @@ export class BillingService {
           amount: amountDecimal,
           walletCredit: amountDecimal,
           customerFee: 0,
-          currency: wallet.currency.toUpperCase(),
+          currency: USD_CURRENCY,
           status: "CREATED",
           idempotencyKey: requestKey,
         },
@@ -514,7 +581,7 @@ export class BillingService {
       if (!attempt) throw error
       if (
         !new Decimal(attempt.amount).equals(amountDecimal) ||
-        attempt.currency !== wallet.currency.toUpperCase()
+        attempt.currency !== USD_CURRENCY
       ) {
         throw new ConflictException(
           "This deposit request key was already used for a different amount or currency",
@@ -532,7 +599,7 @@ export class BillingService {
         organizationId: wallet.organizationId,
         userId: user.id,
         amountMinor,
-        currency: wallet.currency,
+        currency: USD_CURRENCY,
         idempotencyKey: `deposit-session-${attempt.id}`,
         successUrl: `${portalUrl}/dashboard/billing?success=true`,
         cancelUrl: `${portalUrl}/dashboard/billing?canceled=true`,
@@ -1030,13 +1097,22 @@ export class BillingService {
         "Stripe dispute amount must be a positive safe integer",
       )
     }
-    const currency =
-      typeof payload.currency === "string"
-        ? payload.currency.trim().toUpperCase()
-        : ""
-    if (!/^[A-Z]{3}$/.test(currency)) {
+    // Stripe currency values are lowercase by contract. Accept exactly that
+    // provider representation, then cross the adapter boundary once into the
+    // canonical application representation. Mixed case/whitespace is rejected
+    // instead of being silently repaired.
+    if (
+      typeof payload.currency !== "string" ||
+      !/^[a-z]{3}$/.test(payload.currency)
+    ) {
       throw new BadRequestException("Stripe dispute currency is invalid")
     }
+    if (payload.currency !== "usd") {
+      throw new BadRequestException(
+        `Stripe dispute currency ${payload.currency} is not certified for customer wallets`,
+      )
+    }
+    const currency = USD_CURRENCY
     const minorUnitFactor = STRIPE_DISPUTE_MINOR_UNIT_FACTORS[currency]
     if (
       !minorUnitFactor ||
@@ -1672,7 +1748,7 @@ export class BillingService {
       candidate.provider === "stripe" &&
       candidate.providerRef === input.providerPaymentId &&
       candidate.walletId === input.walletId &&
-      String(candidate.currency).toUpperCase() === input.currency &&
+      candidate.currency === input.currency &&
       new Decimal(candidate.amount).equals(input.amount) &&
       linkedAttempt?.id === input.attempt.id &&
       linkedAttempt.walletId === input.walletId &&
@@ -1681,7 +1757,7 @@ export class BillingService {
       linkedAttempt.providerPaymentId === input.providerPaymentId &&
       linkedAttempt.ledgerTransactionId === candidate.id &&
       isWalletCreditBackedDepositStatus(linkedAttempt.status) &&
-      String(linkedAttempt.currency).toUpperCase() === input.currency &&
+      linkedAttempt.currency === input.currency &&
       new Decimal(linkedAttempt.amount).equals(input.amount) &&
       new Decimal(linkedAttempt.walletCredit).equals(input.amount)
 
@@ -1805,13 +1881,14 @@ export class BillingService {
       return
     }
     const amount = new Decimal(amountCents).div(100)
-    const currency =
-      typeof session.currency === "string"
-        ? session.currency.trim().toUpperCase()
-        : ""
+    // Stripe Checkout emits lowercase ISO currency codes. Do not accept
+    // arbitrary case/whitespace and then normalize it; only the exact provider
+    // value crosses into our canonical internal USD representation.
     if (
-      !/^[A-Z]{3}$/.test(currency) ||
-      !this.depositProvider.capabilities.supportedCurrencies.includes(currency)
+      session.currency !== "usd" ||
+      !this.depositProvider.capabilities.supportedCurrencies.includes(
+        USD_CURRENCY,
+      )
     ) {
       await this.rejectMalformedDepositEvent(
         providerEventRowId,
@@ -1820,6 +1897,7 @@ export class BillingService {
       )
       return
     }
+    const currency = USD_CURRENCY
 
     // Never infer payment from the event name alone. Checkout can emit a
     // completion event before delayed methods settle, and malformed fixtures
@@ -1869,7 +1947,7 @@ export class BillingService {
         (attemptId != null && attemptId !== attempt.id) ||
         !new Decimal(attempt.amount).equals(amount) ||
         !new Decimal(attempt.walletCredit).equals(amount) ||
-        String(attempt.currency).toUpperCase() !== currency
+        attempt.currency !== currency
       ) {
         await this.rejectMalformedDepositEvent(
           providerEventRowId,
@@ -1938,7 +2016,7 @@ export class BillingService {
         const wallet = await tx.wallet.findUniqueOrThrow({
           where: { id: walletId },
         })
-        if (String(wallet.currency).toUpperCase() !== currency) {
+        if (wallet.currency !== currency) {
           throw new DepositEvidenceError("DEPOSIT_WALLET_CURRENCY_MISMATCH")
         }
         const updated = await tx.wallet.updateMany({
@@ -1968,6 +2046,7 @@ export class BillingService {
             walletId,
             amount,
             type: "DEPOSIT",
+            currency: USD_CURRENCY,
             reference: sessionId,
             // FIN-02: explicit provider label pairs with `providerRef` to
             // populate the `(provider, providerRef)` unique key — identical
@@ -2122,6 +2201,11 @@ export class BillingService {
       where: { id: walletId },
     })
     this.assertWalletOwned(wallet, user)
+    this.assertCanonicalUsdCurrency(
+      wallet.currency,
+      "WALLET_CURRENCY_UNSUPPORTED",
+      "Wallet spending requires a canonical USD wallet",
+    )
 
     const uncoveredDispute = await tx.paymentDispute.findFirst({
       where: {
@@ -2149,17 +2233,19 @@ export class BillingService {
   // the double-charge bug under concurrent submit-payment.
   async reserve(
     walletId: string,
-    amount: number,
+    amount: Decimal | number | string,
     orderId: string,
     user: any,
     existingTx?: any,
   ) {
     assertApiFinanceOperationAllowed("new_liability")
+    const amountDecimal = this.canonicalMoneyAmount(amount, "Reservation")
     const run = async (tx: any) => {
       const wallet = await this.lockOwnedSpendableWallet(tx, walletId, user)
+      await this.assertOrderMatchesWallet(tx, orderId, wallet)
 
       const available = new Decimal(wallet.availableBalance)
-      if (available.lessThan(amount)) {
+      if (available.lessThan(amountDecimal)) {
         throw new BadRequestException(
           "Insufficient available balance to reserve",
         )
@@ -2168,8 +2254,8 @@ export class BillingService {
       const updated = await tx.wallet.updateMany({
         where: { id: walletId, version: wallet.version },
         data: {
-          availableBalance: { decrement: amount },
-          reservedBalance: { increment: amount },
+          availableBalance: { decrement: amountDecimal },
+          reservedBalance: { increment: amountDecimal },
           version: { increment: 1 },
         },
       })
@@ -2186,10 +2272,11 @@ export class BillingService {
       await tx.transaction.create({
         data: {
           walletId,
-          amount: -amount,
+          amount: amountDecimal.negated(),
           type: "RESERVATION",
+          currency: USD_CURRENCY,
           orderId,
-          description: `Reservation of ${amount} for order ${orderId}`,
+          description: `Reservation of ${amountDecimal.toFixed(2)} USD for order ${orderId}`,
         },
       })
 
@@ -2200,24 +2287,26 @@ export class BillingService {
 
   async payFromReserved(
     walletId: string,
-    amount: number,
+    amount: Decimal | number | string,
     orderId: string,
     user: any,
     existingTx?: any,
   ) {
     assertApiFinanceOperationAllowed("new_liability")
+    const amountDecimal = this.canonicalMoneyAmount(amount, "Payment")
     const run = async (tx: any) => {
       const wallet = await this.lockOwnedSpendableWallet(tx, walletId, user)
+      await this.assertOrderMatchesWallet(tx, orderId, wallet)
 
       const reserved = new Decimal(wallet.reservedBalance)
-      if (reserved.lessThan(amount)) {
+      if (reserved.lessThan(amountDecimal)) {
         throw new BadRequestException("Insufficient reserved balance")
       }
 
       const updated = await tx.wallet.updateMany({
         where: { id: walletId, version: wallet.version },
         data: {
-          reservedBalance: { decrement: amount },
+          reservedBalance: { decrement: amountDecimal },
           version: { increment: 1 },
         },
       })
@@ -2234,10 +2323,11 @@ export class BillingService {
       await tx.transaction.create({
         data: {
           walletId,
-          amount: -amount,
+          amount: amountDecimal.negated(),
           type: "PURCHASE",
+          currency: USD_CURRENCY,
           orderId,
-          description: `Payment of ${amount} from reserved funds for order ${orderId}`,
+          description: `Payment of ${amountDecimal.toFixed(2)} USD from reserved funds for order ${orderId}`,
         },
       })
 
@@ -2246,13 +2336,25 @@ export class BillingService {
     return existingTx ? run(existingTx) : this.prisma.$transaction(run)
   }
 
-  async refund(walletId: string, amount: number, orderId: string, user: any) {
+  async refund(
+    walletId: string,
+    amount: Decimal | number | string,
+    orderId: string,
+    user: any,
+  ) {
     assertApiFinanceOperationAllowed("new_liability")
+    const amountDecimal = this.canonicalMoneyAmount(amount, "Refund")
     const result = await this.prisma.$transaction(async (tx: any) => {
       const wallet = await tx.wallet.findUniqueOrThrow({
         where: { id: walletId },
       })
       this.assertWalletOwned(wallet, user)
+      this.assertCanonicalUsdCurrency(
+        wallet.currency,
+        "WALLET_CURRENCY_UNSUPPORTED",
+        "Wallet refunds require a canonical USD wallet",
+      )
+      await this.assertOrderMatchesWallet(tx, orderId, wallet)
 
       // Idempotency check using unique reference — database-level @@unique prevents race
       const existingRefund = await tx.transaction.findFirst({
@@ -2269,7 +2371,7 @@ export class BillingService {
       const updated = await tx.wallet.updateMany({
         where: { id: walletId, version: wallet.version },
         data: {
-          availableBalance: { increment: amount },
+          availableBalance: { increment: amountDecimal },
           version: { increment: 1 },
         },
       })
@@ -2284,11 +2386,12 @@ export class BillingService {
       await tx.transaction.create({
         data: {
           walletId,
-          amount,
+          amount: amountDecimal,
           type: "REFUND",
+          currency: USD_CURRENCY,
           orderId,
           reference: `refund-${orderId}`,
-          description: `Refund of ${amount} for order ${orderId}`,
+          description: `Refund of ${amountDecimal.toFixed(2)} USD for order ${orderId}`,
         },
       })
 
@@ -2299,7 +2402,11 @@ export class BillingService {
       action: "WALLET_REFUND",
       entityType: "Wallet",
       entityId: walletId,
-      metadata: { amount, orderId },
+      metadata: {
+        amount: amountDecimal.toFixed(2),
+        currency: USD_CURRENCY,
+        orderId,
+      },
       userId: user.id,
       organizationId: user.organizationId,
     })

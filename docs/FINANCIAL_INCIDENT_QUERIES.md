@@ -70,7 +70,24 @@ financial_relations AS (
       'PayoutProvider',
       'PayoutExecution',
       'PayoutExecutionClaim',
-      'PayoutWebhookEvent'
+      'PayoutWebhookEvent',
+      'MarketplaceListing',
+      'ListingService',
+      'Order',
+      'OrderItem',
+      'Website',
+      'Settlement',
+      'PlatformSettings',
+      'PlatformRevenue',
+      'OrderDeliveryVersion',
+      'DeliveryVerificationEvidence',
+      'DeliverySnapshot',
+      'DeliveryFraudFlag',
+      'DeliveryFraudHold',
+      'DeliveryFraudFlagResolution',
+      'Revision',
+      'OrderDispute',
+      'OrderCancellationRequest'
     )
 )
 SELECT
@@ -156,7 +173,24 @@ WHERE namespace.nspname = current_schema()
     'PayoutProvider',
     'PayoutExecution',
     'PayoutExecutionClaim',
-    'PayoutWebhookEvent'
+    'PayoutWebhookEvent',
+    'MarketplaceListing',
+    'ListingService',
+    'Order',
+    'OrderItem',
+    'Website',
+    'Settlement',
+    'PlatformSettings',
+    'PlatformRevenue',
+    'OrderDeliveryVersion',
+    'DeliveryVerificationEvidence',
+    'DeliverySnapshot',
+    'DeliveryFraudFlag',
+    'DeliveryFraudHold',
+    'DeliveryFraudFlagResolution',
+    'Revision',
+    'OrderDispute',
+    'OrderCancellationRequest'
   )
   AND constraint_row.convalidated = FALSE
 ORDER BY relation.relname, constraint_row.conname;
@@ -165,6 +199,417 @@ ORDER BY relation.relname, constraint_row.conname;
 Do not treat a present `NOT VALID` financial constraint as installed
 protection. Preserve the failed rows, determine why validation did not
 complete, and keep finance gates closed.
+
+## Paid-order and settlement accounting identity
+
+Each statement below must return zero rows. First, prove every paid Order has
+one exact wallet capture rather than only a status flag:
+
+```sql
+SELECT
+  o.id AS order_id,
+  o."organizationId",
+  o.amount AS order_amount,
+  o.currency AS order_currency,
+  evidence.purchase_count,
+  evidence.identity_matches
+FROM "Order" o
+LEFT JOIN LATERAL (
+  SELECT
+    COUNT(*) AS purchase_count,
+    COALESCE(BOOL_AND(
+      p.amount = -o.amount
+      AND p.currency = o.currency
+      AND p.currency = 'USD'
+      AND p."publisherId" IS NULL
+      AND p."settlementId" IS NULL
+      AND p.provider IS NULL
+      AND p."providerRef" IS NULL
+      AND w.id IS NOT NULL
+      AND w.currency = o.currency
+      AND w."organizationId" = o."organizationId"
+    ), FALSE) AS identity_matches
+  FROM "Transaction" p
+  LEFT JOIN "Wallet" w ON w.id = p."walletId"
+  WHERE p."orderId" = o.id AND p.type = 'PURCHASE'
+) evidence ON TRUE
+WHERE (
+    o."paymentStatus" IN ('PAID', 'REFUNDED')
+    AND (
+      o.currency <> 'USD'
+      OR o.amount IS NULL
+      OR o.amount <= 0
+      OR o.amount * 100 <> trunc(o.amount * 100)
+      OR evidence.purchase_count <> 1
+      OR NOT evidence.identity_matches
+    )
+  )
+  OR (
+    o."paymentStatus" NOT IN ('PAID', 'REFUNDED')
+    AND evidence.purchase_count <> 0
+  )
+ORDER BY o."createdAt";
+
+-- Catalog/cart facts must be positive and exactly representable in USD cents.
+-- Any result blocks the USD-boundary migration; never round these rows in
+-- place because their original commercial intent must be reconciled.
+SELECT 'MarketplaceListing' AS relation_name, id, NULL::NUMERIC AS amount
+FROM "MarketplaceListing"
+WHERE currency <> 'USD'
+UNION ALL
+SELECT 'ListingService', id, price
+FROM "ListingService"
+WHERE currency <> 'USD'
+   OR price <= 0
+   OR price * 100 <> trunc(price * 100)
+UNION ALL
+SELECT 'Order', id, amount
+FROM "Order"
+WHERE currency <> 'USD'
+   OR amount IS NULL
+   OR amount <= 0
+   OR amount * 100 <> trunc(amount * 100)
+UNION ALL
+SELECT 'OrderItem', id, price
+FROM "OrderItem"
+WHERE price IS NULL
+   OR price <= 0
+   OR price * 100 <> trunc(price * 100);
+
+-- A captured/purchased/settled Order contract has at least one line, one
+-- website identity, and an exact header-to-line total. Item status remains the
+-- immutable checkout status; fulfillment evidence lives on its own models.
+SELECT
+  o.id AS order_id,
+  o."paymentStatus",
+  o.amount AS order_amount,
+  item_facts.item_count,
+  item_facts.item_total,
+  item_facts.invalid_item_count
+FROM "Order" o
+CROSS JOIN LATERAL (
+  SELECT
+    COUNT(*) AS item_count,
+    SUM(i.price) AS item_total,
+    COUNT(*) FILTER (
+      WHERE i.status <> 'PENDING_PAYMENT'
+         OR i."websiteId" IS DISTINCT FROM o."websiteId"
+    ) AS invalid_item_count
+  FROM "OrderItem" i
+  WHERE i."orderId" = o.id
+) item_facts
+WHERE (
+    o."paymentStatus" = 'PAID'
+    OR EXISTS (
+      SELECT 1 FROM "Transaction" p
+      WHERE p."orderId" = o.id AND p.type = 'PURCHASE'
+    )
+    OR EXISTS (
+      SELECT 1 FROM "Settlement" s
+      WHERE s."orderId" = o.id
+    )
+  )
+  AND (
+    o."websiteId" IS NULL
+    OR item_facts.item_count = 0
+    OR item_facts.item_total IS DISTINCT FROM o.amount
+    OR item_facts.invalid_item_count > 0
+  )
+ORDER BY o."createdAt";
+
+-- Captured liability attribution must resolve through one exact relational
+-- catalog chain. Do not compare historical Order terms with today's mutable
+-- service type, pricing, turnaround, warranty, revision, currency, or owner
+-- terms; those are not evidence of the contract at capture time.
+SELECT
+  o.id AS order_id,
+  o."listingId" AS order_listing_id,
+  o."listingServiceId" AS order_service_id,
+  o."websiteId" AS order_website_id,
+  ls."listingId" AS service_listing_id,
+  ml."websiteId" AS listing_website_id,
+  w.id AS resolved_website_id
+FROM "Order" o
+LEFT JOIN "ListingService" ls ON ls.id = o."listingServiceId"
+LEFT JOIN "MarketplaceListing" ml ON ml.id = ls."listingId"
+LEFT JOIN "Website" w ON w.id = ml."websiteId"
+WHERE (
+    o."paymentStatus" IN ('PAID', 'REFUNDED')
+    OR EXISTS (
+      SELECT 1 FROM "Transaction" p
+      WHERE p."orderId" = o.id AND p.type = 'PURCHASE'
+    )
+    OR EXISTS (
+      SELECT 1 FROM "Settlement" s WHERE s."orderId" = o.id
+    )
+  )
+  AND (
+    ls.id IS NULL
+    OR ml.id IS NULL
+    OR w.id IS NULL
+    OR o."listingId" IS DISTINCT FROM ls."listingId"
+    OR o."listingId" IS DISTINCT FROM ml.id
+    OR o."websiteId" IS DISTINCT FROM ml."websiteId"
+    OR o."websiteId" IS DISTINCT FROM w.id
+  )
+ORDER BY o."createdAt";
+
+SELECT COUNT(*) AS platform_settings_rows
+FROM "PlatformSettings"
+HAVING COUNT(*) <> 1;
+
+SELECT
+  s.id AS settlement_id,
+  s.status,
+  s."orderId",
+  s."publisherId",
+  s."grossAmount",
+  s.currency,
+  s."platformFee",
+  s."publisherAmount",
+  s."platformFeeBps",
+  s."feePolicyVersion"
+FROM "Settlement" s
+LEFT JOIN "Order" o ON o.id = s."orderId"
+LEFT JOIN "Website" w ON w.id = o."websiteId"
+CROSS JOIN "PlatformSettings" p
+WHERE s.currency <> 'USD'
+   OR o.currency IS DISTINCT FROM s.currency
+   OR o.amount IS DISTINCT FROM s."grossAmount"
+   OR w."publisherId" IS DISTINCT FROM s."publisherId"
+   OR s."grossAmount" <> s."platformFee" + s."publisherAmount"
+   OR (
+     s.status NOT IN ('RELEASED', 'CANCELLED')
+     AND (
+       s."platformFeeBps" IS DISTINCT FROM (p."platformFeePct" * 100)::INTEGER
+       OR s."feePolicyVersion" IS DISTINCT FROM
+          format('platform-settings:%s:v%s', p.id, p.version)
+       OR s."platformFee" IS DISTINCT FROM
+          round(s."grossAmount" * p."platformFeePct" / 100, 2)
+     )
+   )
+   OR (
+     s.status = 'RELEASED'
+     AND 1 IS DISTINCT FROM (
+       SELECT COUNT(*)
+       FROM "Transaction" r
+       WHERE r."settlementId" = s.id
+         AND r.type = 'SETTLEMENT_RELEASE'
+         AND r.amount = s."publisherAmount"
+         AND r.currency = s.currency
+         AND r."orderId" = s."orderId"
+         AND r."publisherId" = s."publisherId"
+         AND r."walletId" IS NULL
+         AND r.provider IS NULL
+         AND r."providerRef" IS NULL
+     )
+   )
+ORDER BY s."createdAt";
+
+SELECT
+  revenue.id AS platform_revenue_id,
+  revenue."orderId",
+  revenue.amount,
+  revenue.currency,
+  revenue."platformFee",
+  revenue."netRevenue",
+  revenue."platformFeeBps",
+  revenue."feePolicyVersion",
+  revenue."fulfillmentChannel",
+  revenue."reversedAt",
+  order_row.status AS order_status,
+  order_row."paymentStatus" AS order_payment_status,
+  purchase.purchase_count,
+  purchase.identity_matches
+FROM "PlatformRevenue" revenue
+LEFT JOIN "Order" order_row ON order_row.id = revenue."orderId"
+LEFT JOIN LATERAL (
+  SELECT
+    COUNT(*) AS purchase_count,
+    COALESCE(bool_and(
+      ledger.amount = -revenue.amount
+      AND ledger.currency = 'USD'
+      AND ledger."publisherId" IS NULL
+      AND ledger."settlementId" IS NULL
+      AND ledger.provider IS NULL
+      AND ledger."providerRef" IS NULL
+      AND wallet.currency = 'USD'
+      AND wallet."organizationId" = order_row."organizationId"
+    ), FALSE) AS identity_matches
+  FROM "Transaction" ledger
+  LEFT JOIN "Wallet" wallet ON wallet.id = ledger."walletId"
+  WHERE ledger."orderId" = revenue."orderId"
+    AND ledger.type = 'PURCHASE'
+) purchase ON TRUE
+WHERE order_row.id IS NULL
+   OR revenue.currency <> 'USD'
+   OR order_row.currency <> 'USD'
+   OR order_row.amount IS DISTINCT FROM revenue.amount
+   OR order_row."fulfillmentChannel" IS DISTINCT FROM 'PLATFORM'
+   OR revenue."fulfillmentChannel" IS DISTINCT FROM 'PLATFORM'
+   OR revenue.amount <= 0
+   OR revenue."platformFee" < 0
+   OR revenue."netRevenue" < 0
+   OR revenue.amount * 100 <> trunc(revenue.amount * 100)
+   OR revenue."platformFee" * 100 <> trunc(revenue."platformFee" * 100)
+   OR revenue."netRevenue" * 100 <> trunc(revenue."netRevenue" * 100)
+   OR revenue.amount <> revenue."platformFee" + revenue."netRevenue"
+   OR purchase.purchase_count <> 1
+   OR NOT purchase.identity_matches
+   OR (
+     revenue."reversedAt" IS NULL
+     AND (
+       order_row."paymentStatus" <> 'PAID'
+       OR revenue."platformFeeBps" IS NULL
+       OR revenue."feePolicyVersion" IS NULL
+     )
+   )
+   OR (
+     revenue."platformFeeBps" IS NOT NULL
+     AND (
+       revenue."platformFeeBps" NOT BETWEEN 0 AND 10000
+       OR revenue."feePolicyVersion" IS NULL
+       OR revenue."platformFee" IS DISTINCT FROM round(
+         revenue.amount * revenue."platformFeeBps"::numeric / 10000,
+         2
+       )
+     )
+   )
+   OR (
+     revenue."platformFeeBps" IS NULL
+     AND revenue."feePolicyVersion" IS NOT NULL
+   )
+   OR (
+     revenue."reversedAt" IS NOT NULL
+     AND revenue."reversedAt" < revenue."recordedAt"
+   )
+ORDER BY revenue."recordedAt";
+
+SELECT
+  CASE
+    WHEN delivery.id IS NULL
+      OR flag."orderId" IS DISTINCT FROM delivery."orderId"
+      THEN 'FLAG_DELIVERY_IDENTITY_MISMATCH'
+    WHEN resolution.id IS NULL AND hold."fraudFlagId" IS NULL
+      THEN 'UNRESOLVED_FLAG_MISSING_HOLD'
+    WHEN resolution.id IS NULL AND (
+      hold."orderId" IS DISTINCT FROM flag."orderId"
+      OR hold."deliveryVersionId" IS DISTINCT FROM flag."deliveryVersionId"
+      OR hold.type IS DISTINCT FROM flag.type
+      OR hold."createdAt" IS DISTINCT FROM flag."createdAt"
+    ) THEN 'HOLD_FLAG_IDENTITY_MISMATCH'
+    WHEN resolution.id IS NOT NULL AND hold."fraudFlagId" IS NOT NULL
+      THEN 'RESOLVED_FLAG_STILL_HELD'
+    WHEN resolution.id IS NOT NULL AND (
+      resolution."orderId" IS DISTINCT FROM flag."orderId"
+      OR resolution."deliveryVersionId" IS DISTINCT FROM flag."deliveryVersionId"
+    ) THEN 'RESOLUTION_FLAG_IDENTITY_MISMATCH'
+  END AS anomaly,
+  flag.id AS fraud_flag_id,
+  flag."orderId" AS flag_order_id,
+  delivery."orderId" AS delivery_order_id,
+  flag."deliveryVersionId",
+  flag.type,
+  hold."fraudFlagId" AS current_hold_flag_id,
+  resolution.id AS resolution_id,
+  resolution.kind AS resolution_kind,
+  resolution."resolvedByUserId",
+  resolution."resolvedByRole",
+  resolution."evidenceId",
+  resolution."createdAt" AS resolved_at
+FROM "DeliveryFraudFlag" flag
+LEFT JOIN "OrderDeliveryVersion" delivery
+  ON delivery.id = flag."deliveryVersionId"
+LEFT JOIN "DeliveryFraudHold" hold
+  ON hold."fraudFlagId" = flag.id
+LEFT JOIN "DeliveryFraudFlagResolution" resolution
+  ON resolution."fraudFlagId" = flag.id
+WHERE delivery.id IS NULL
+   OR flag."orderId" IS DISTINCT FROM delivery."orderId"
+   OR (
+     resolution.id IS NULL
+     AND (
+       hold."fraudFlagId" IS NULL
+       OR hold."orderId" IS DISTINCT FROM flag."orderId"
+       OR hold."deliveryVersionId" IS DISTINCT FROM flag."deliveryVersionId"
+       OR hold.type IS DISTINCT FROM flag.type
+       OR hold."createdAt" IS DISTINCT FROM flag."createdAt"
+     )
+   )
+   OR (resolution.id IS NOT NULL AND hold."fraudFlagId" IS NOT NULL)
+   OR (
+     resolution.id IS NOT NULL
+     AND (
+       resolution."orderId" IS DISTINCT FROM flag."orderId"
+       OR resolution."deliveryVersionId" IS DISTINCT FROM flag."deliveryVersionId"
+     )
+   )
+ORDER BY flag."createdAt", flag.id;
+```
+
+An unresolved immutable flag must have one exact current `DeliveryFraudHold`;
+a resolved flag must have its immutable adjudication and no hold. Historical
+resolved flags are expected and are not corruption. Any query result blocks
+settlement creation/release and payout sends. Preserve the rows and compare
+the Order, Website, policy version, delivery evidence, ledger, and
+provider/bank evidence before designing a typed compensation.
+
+### Automated-release freshness holds
+
+This query is an operational hold inventory, not authority to repair or release
+money. Every returned settlement must remain unreleased until the normal link
+monitor appends a newer successful observation for the currently active
+delivery. Alert when `freshnessBlocked` remains nonzero across two six-hour
+sweeps; do not suppress the database gate or insert synthetic evidence.
+
+```sql
+SELECT
+  s.id AS settlement_id,
+  s."orderId" AS order_id,
+  o."activeDeliveryVersionId" AS active_delivery_version_id,
+  latest.id AS newest_evidence_id,
+  latest."checkedAt",
+  latest."createdAt",
+  latest."httpStatus",
+  latest."linkFound",
+  latest."targetUrlMatched",
+  latest."anchorFound",
+  CASE
+    WHEN latest.id IS NULL THEN 'MISSING'
+    WHEN latest."checkedAt" > now() OR latest."createdAt" > now()
+      THEN 'FUTURE_DATED'
+    WHEN latest."checkedAt" < now() - interval '12 hours' THEN 'STALE'
+    WHEN latest."httpStatus" NOT IN (200, 301, 302)
+      OR NOT latest."linkFound"
+      OR NOT latest."targetUrlMatched"
+      OR NOT latest."anchorFound" THEN 'FAILED'
+    ELSE 'FRESH_SUCCESS'
+  END AS freshness_state
+FROM "Settlement" s
+JOIN "Order" o ON o.id = s."orderId"
+LEFT JOIN LATERAL (
+  SELECT evidence.*
+  FROM "DeliveryVerificationEvidence" evidence
+  WHERE evidence."deliveryVersionId" = o."activeDeliveryVersionId"
+  ORDER BY evidence."checkedAt" DESC,
+           evidence."createdAt" DESC,
+           evidence.id DESC
+  LIMIT 1
+) latest ON TRUE
+WHERE s.status = 'CUSTOMER_APPROVED'
+  AND s."releasePolicy" = 'AUTO'
+  AND (
+    latest.id IS NULL
+    OR latest."checkedAt" > now()
+    OR latest."createdAt" > now()
+    OR latest."checkedAt" < now() - interval '12 hours'
+    OR latest."httpStatus" NOT IN (200, 301, 302)
+    OR NOT latest."linkFound"
+    OR NOT latest."targetUrlMatched"
+    OR NOT latest."anchorFound"
+  )
+ORDER BY s."updatedAt";
+```
 
 ## Processed dispute events without a case
 

@@ -100,11 +100,14 @@ describe("confirmDelivery — Phase 6.9 race guard (audit #22)", () => {
     // `where: { id: orderId, version: order.version }`. The new form adds
     // `status: "VERIFIED"` — without it, a parallel customer-accept could
     // commit a DELIVERED transition through the same code path.
-    const confirmBlock = src.match(
-      /async confirmDelivery[\s\S]*?return updated/,
+    const confirmStart = src.indexOf("async confirmDelivery(")
+    const confirmEnd = src.indexOf(
+      "async createSettlementForOrder(",
+      confirmStart,
     )
-    expect(confirmBlock).toBeTruthy()
-    const block = confirmBlock?.[0]
+    expect(confirmStart).toBeGreaterThanOrEqual(0)
+    expect(confirmEnd).toBeGreaterThan(confirmStart)
+    const block = src.slice(confirmStart, confirmEnd)
     // Match the updateMany call's where clause.
     expect(block).toMatch(
       /updateMany\(\{[\s\S]*?where:\s*\{[\s\S]*?status:\s*"VERIFIED"[\s\S]*?\}/,
@@ -308,9 +311,10 @@ describe("Phase 6.9 — money-path OWNER||creator gate coverage", () => {
       join(__dirname, "../modules/orders/orders.controller.ts"),
       "utf8",
     )
-    // submitPayment must pass user.customerRole as the 4th arg.
+    // submitPayment must pass user.customerRole as the 4th arg and the
+    // server-bound capture command as the 5th.
     expect(src).toMatch(
-      /payment\.submitPayment\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.customerRole,?\s*\)/,
+      /payment\.submitPayment\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.customerRole\s*,\s*body,?\s*\)/,
     )
     // acceptDelivery must pass user.customerRole as the 4th arg.
     expect(src).toMatch(

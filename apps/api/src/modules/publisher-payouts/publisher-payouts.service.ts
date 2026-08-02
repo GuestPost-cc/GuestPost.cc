@@ -1,9 +1,11 @@
 import { Prisma, type WithdrawalStatus } from "@guestpost/database"
 import {
   getWithdrawalHoldDays,
+  isSupportedMoneyCurrency,
   type PublisherTier,
   QUEUES,
   STRIPE_INITIAL_FEE_POLICY_VERSION,
+  USD_CURRENCY,
 } from "@guestpost/shared"
 import { createFinancialReference } from "@guestpost/shared/dist/financial-reference-server"
 import { finalizePayoutExecution } from "@guestpost/shared/dist/payout-finalization-core"
@@ -47,6 +49,8 @@ const APPROVAL_BLOCK_REASONS = {
     "The withdrawal requester is no longer an eligible publisher owner",
   RESERVATION_INVALID:
     "Withdrawal reservation no longer exactly covers the requested amount",
+  CURRENCY_INVALID:
+    "Withdrawal or its reservation is not denominated in canonical USD",
   PAYOUT_METHOD_INVALID:
     "Payout method is missing, inactive, or does not match the withdrawal",
   ALREADY_EXECUTING: "A payout execution is already in flight",
@@ -113,6 +117,15 @@ export class PublisherPayoutsService {
     })
     if (!balance) {
       throw new NotFoundException("Publisher balance is not provisioned")
+    }
+    if (
+      !isSupportedMoneyCurrency((balance as { currency?: unknown }).currency)
+    ) {
+      throw new ConflictException({
+        code: "PUBLISHER_BALANCE_CURRENCY_INVALID",
+        message:
+          "Publisher balance is not denominated in canonical USD; Finance reconciliation is required",
+      })
     }
     return balance
   }
@@ -575,7 +588,7 @@ export class PublisherPayoutsService {
           account.payoutsEnabled === true &&
           account.detailsSubmitted === true &&
           account.payoutScheduleConfigured === true &&
-          account.defaultCurrency?.toUpperCase() === "USD"
+          account.defaultCurrency === USD_CURRENCY
         if (!ready) {
           throw new ConflictException({
             code: "PAYOUT_METHOD_PROVIDER_NOT_READY",
@@ -654,7 +667,7 @@ export class PublisherPayoutsService {
             withdrawalId,
             sourceType: "CARRY_FORWARD",
             amount: carryUsed,
-            currency: "USD",
+            currency: USD_CURRENCY,
             sequence: sequence++,
           },
         })
@@ -681,6 +694,15 @@ export class PublisherPayoutsService {
           },
         },
       })
+      if (
+        transactions.some((row: any) => !isSupportedMoneyCurrency(row.currency))
+      ) {
+        throw new ConflictException({
+          code: "WITHDRAWAL_SOURCE_CURRENCY_INVALID",
+          message:
+            "Publisher liability contains a non-USD source; Finance reconciliation is required",
+        })
+      }
       const debtBySettlement = new Map<string, Decimal>()
       for (const row of transactions) {
         if (row.type !== "DEBT_REPAYMENT" || !row.settlementId) continue
@@ -711,7 +733,7 @@ export class PublisherPayoutsService {
             settlementId: row.settlementId,
             orderId: row.settlement?.orderId ?? row.orderId,
             amount: use,
-            currency: row.currency ?? "USD",
+            currency: USD_CURRENCY,
             sequence: sequence++,
             serviceType: row.settlement?.serviceType ?? null,
           },
@@ -734,6 +756,12 @@ export class PublisherPayoutsService {
     expectedAmount: Decimal,
     expectedCurrency: string,
   ) {
+    if (!isSupportedMoneyCurrency(expectedCurrency)) {
+      throw new ConflictException({
+        code: "WITHDRAWAL_CURRENCY_INVALID",
+        message: "Withdrawal is not denominated in canonical USD",
+      })
+    }
     const active = await tx.withdrawalAllocation.findMany({
       where: { withdrawalId, releasedAt: null },
       select: {
@@ -753,7 +781,7 @@ export class PublisherPayoutsService {
       active.some(
         (item: any) =>
           new Decimal(item.amount).lessThanOrEqualTo(0) ||
-          item.currency.toUpperCase() !== expectedCurrency.toUpperCase(),
+          item.currency !== USD_CURRENCY,
       )
     ) {
       throw new ConflictException(
@@ -792,7 +820,7 @@ export class PublisherPayoutsService {
       !new Decimal(existing.amount).equals(amount) ||
       existing.method !== method ||
       (existing.payoutMethodId ?? null) !== (payoutMethodId ?? null) ||
-      String(existing.currency).toUpperCase() !== "USD" ||
+      !isSupportedMoneyCurrency(existing.currency) ||
       existing.requestedBy !== requestedBy
     ) {
       throw new ConflictException(
@@ -958,8 +986,8 @@ export class PublisherPayoutsService {
             currentPayoutMethod.providerAccount.detailsSubmitted !== true ||
             currentPayoutMethod.providerAccount.payoutScheduleConfigured !==
               true ||
-            currentPayoutMethod.providerAccount.defaultCurrency?.toUpperCase() !==
-              "USD")
+            currentPayoutMethod.providerAccount.defaultCurrency !==
+              USD_CURRENCY)
         ) {
           throw new BadRequestException(
             "Stripe payout account is not fully enabled or manually scheduled",
@@ -978,6 +1006,17 @@ export class PublisherPayoutsService {
           where: { publisherId },
         })
         if (!balance) throw new NotFoundException("Publisher balance not found")
+        if (
+          !isSupportedMoneyCurrency(
+            (balance as { currency?: unknown }).currency,
+          )
+        ) {
+          throw new ConflictException({
+            code: "PUBLISHER_BALANCE_CURRENCY_INVALID",
+            message:
+              "Publisher balance is not denominated in canonical USD; Finance reconciliation is required",
+          })
+        }
 
         const withdrawable = new Decimal(balance.withdrawableBalance)
         if (withdrawable.lessThan(amountDecimal)) {
@@ -1002,7 +1041,7 @@ export class PublisherPayoutsService {
           data: {
             publisherId,
             amount: amountDecimal,
-            currency: "USD",
+            currency: USD_CURRENCY,
             publicReference,
             payoutFee: 0,
             netAmount: amount,
@@ -1055,6 +1094,7 @@ export class PublisherPayoutsService {
           data: {
             amount: amountDecimal.negated(),
             type: "WITHDRAWAL",
+            currency: USD_CURRENCY,
             publisherId,
             reference: `withdrawal-${created.id}`,
             description: `Withdrawal ${created.publicReference} of ${amount} USD via ${method}`,
@@ -1164,6 +1204,9 @@ export class PublisherPayoutsService {
       if (w.status !== "PENDING") {
         return block("NOT_PENDING")
       }
+      if (!isSupportedMoneyCurrency(w.currency)) {
+        return block("CURRENCY_INVALID")
+      }
       const eligibleApprover = await tx.staffMembership.findFirst({
         where: {
           userId: approvedBy,
@@ -1241,7 +1284,7 @@ export class PublisherPayoutsService {
           (allocation) =>
             allocation.releasedAt === null &&
             new Decimal(allocation.amount).greaterThan(0) &&
-            allocation.currency.toUpperCase() === w.currency.toUpperCase(),
+            allocation.currency === USD_CURRENCY,
         ) &&
         allocatedAmount.equals(new Decimal(w.amount))
       if (!reservationValid) {
@@ -1270,8 +1313,7 @@ export class PublisherPayoutsService {
         stripeAccount.payoutsEnabled &&
         stripeAccount.detailsSubmitted &&
         stripeAccount.payoutScheduleConfigured &&
-        stripeAccount.defaultCurrency?.toUpperCase() ===
-          w.currency.toUpperCase()
+        stripeAccount.defaultCurrency === USD_CURRENCY
       const legacyMethodValid =
         Boolean(method) &&
         method?.type !== "stripe_connect" &&
@@ -1496,6 +1538,12 @@ export class PublisherPayoutsService {
             : "Only approved withdrawals can use safe pre-provider abandonment",
         )
       }
+      if (!isSupportedMoneyCurrency(withdrawal.currency)) {
+        throw new ConflictException({
+          code: "WITHDRAWAL_CURRENCY_INVALID",
+          message: "Withdrawal is not denominated in canonical USD",
+        })
+      }
       const eligibleRejector = await tx.staffMembership.findFirst({
         where: {
           userId: rejectedBy,
@@ -1570,6 +1618,15 @@ export class PublisherPayoutsService {
           "Publisher balance is missing; rejection cannot restore funds",
         )
       }
+      if (
+        !isSupportedMoneyCurrency((balance as { currency?: unknown }).currency)
+      ) {
+        throw new ConflictException({
+          code: "PUBLISHER_BALANCE_CURRENCY_INVALID",
+          message:
+            "Publisher balance is not denominated in canonical USD; rejection cannot restore funds",
+        })
+      }
       const amount = new Decimal(withdrawal.amount)
       const rejectedAt = new Date()
       const isApprovedAbandonment = expectedStatus === "APPROVED"
@@ -1623,6 +1680,7 @@ export class PublisherPayoutsService {
         data: {
           amount,
           type: "WITHDRAWAL_REVERSAL",
+          currency: USD_CURRENCY,
           publisherId: withdrawal.publisherId,
           reference: `withdrawal-reject-${id}`,
           description: `Withdrawal ${id} rejected — funds restored`,
@@ -1638,7 +1696,7 @@ export class PublisherPayoutsService {
           metadata: {
             publisherId: withdrawal.publisherId,
             amount: String(amount),
-            currency: withdrawal.currency,
+            currency: USD_CURRENCY,
             reason: normalizedReason,
             rejectedAt: rejectedAt.toISOString(),
             decision: isApprovedAbandonment

@@ -461,19 +461,20 @@ model User {
   memberships                   Membership[]
   publisherMemberships          PublisherMembership[]
   staffMemberships              StaffMembership[]
-  ownedOrders                   Order[]                @relation("OrderCustomer")
-  assignedOrders                Order[]                @relation("OrderAssignee")
+  ownedOrders                   Order[]                       @relation("OrderCustomer")
+  assignedOrders                Order[]                       @relation("OrderAssignee")
   orderEvents                   OrderEvent[]
-  publications                  Publication[]          @relation("PublicationVerifier")
-  requestedWithdrawals          Withdrawal[]           @relation("WithdrawalRequester")
-  approvedWithdrawals           Withdrawal[]           @relation("WithdrawalApprover")
-  rejectedWithdrawals           Withdrawal[]           @relation("WithdrawalRejector")
-  reversedWithdrawals           Withdrawal[]           @relation("WithdrawalReverser")
-  initiatedPayoutExecutions     PayoutExecution[]      @relation("PayoutExecutionInitiator")
-  payoutExecutionClaims         PayoutExecutionClaim[] @relation("PayoutExecutionClaimActor")
-  completedPayoutExecutions     PayoutExecution[]      @relation("PayoutCompletionActor")
-  cancelledPayoutExecutions     PayoutExecution[]      @relation("PayoutCancellationActor")
-  adminVerifiedDeliveryVersions OrderDeliveryVersion[] @relation("AdminVerifiedVersion")
+  publications                  Publication[]                 @relation("PublicationVerifier")
+  requestedWithdrawals          Withdrawal[]                  @relation("WithdrawalRequester")
+  approvedWithdrawals           Withdrawal[]                  @relation("WithdrawalApprover")
+  rejectedWithdrawals           Withdrawal[]                  @relation("WithdrawalRejector")
+  reversedWithdrawals           Withdrawal[]                  @relation("WithdrawalReverser")
+  initiatedPayoutExecutions     PayoutExecution[]             @relation("PayoutExecutionInitiator")
+  payoutExecutionClaims         PayoutExecutionClaim[]        @relation("PayoutExecutionClaimActor")
+  completedPayoutExecutions     PayoutExecution[]             @relation("PayoutCompletionActor")
+  cancelledPayoutExecutions     PayoutExecution[]             @relation("PayoutCancellationActor")
+  adminVerifiedDeliveryVersions OrderDeliveryVersion[]        @relation("AdminVerifiedVersion")
+  resolvedDeliveryFraudFlags    DeliveryFraudFlagResolution[] @relation("DeliveryFraudResolver")
   tickets                       Ticket[]
   messages                      TicketMessage[]
   notifications                 Notification[]
@@ -483,11 +484,11 @@ model User {
   marketplaceReviews            MarketplaceReview[]
   marketplaceFavorites          MarketplaceFavorite[]
   activeContext                 ActiveContext?
-  managedWebsites               Website[]              @relation("WebsiteManager")
-  assignedTickets               Ticket[]               @relation("TicketAssignee")
+  managedWebsites               Website[]                     @relation("WebsiteManager")
+  assignedTickets               Ticket[]                      @relation("TicketAssignee")
   legalAcceptances              LegalAcceptance[]
-  suspendedBy                   User?                  @relation("UserSuspensionsIssued", fields: [suspendedByUserId], references: [id], onDelete: SetNull)
-  suspensionsIssued             User[]                 @relation("UserSuspensionsIssued")
+  suspendedBy                   User?                         @relation("UserSuspensionsIssued", fields: [suspendedByUserId], references: [id], onDelete: SetNull)
+  suspensionsIssued             User[]                        @relation("UserSuspensionsIssued")
   websiteImportBatches          WebsiteImportBatch[]
 
   @@index([userType, banned])
@@ -960,8 +961,14 @@ model Order {
   websiteId               String?
   organizationId          String
   campaignId              String?
-  idempotencyKey          String?
+  idempotencyKey          String?                     @db.VarChar(200)
+  // SHA-256 of the canonical tenant/user-bound create payload. Required for
+  // new idempotent requests so a reused key cannot replay a different order.
+  requestFingerprint      String?                     @db.VarChar(64)
   version                 Int                         @default(0)
+  // Dedicated serialization fence for settlement-blocking child writes.
+  // PostgreSQL increments it so SERIALIZABLE waiters retry with a fresh view.
+  settlementGateVersion   Int                         @default(0)
   // Points at the current OrderDeliveryVersion (source of truth for delivery).
   // Legacy publishedUrl/verifiedAt/deliveredAt are denormalized mirrors of it.
   activeDeliveryVersionId String?                     @unique
@@ -976,6 +983,9 @@ model Order {
   fulfillmentChannel      FulfillmentChannel?
   turnaroundDays          Int?
   warrantyDays            Int?
+  // Immutable entitlement captured from ListingService at order creation.
+  // Downstream revision policy must never re-read mutable marketplace terms.
+  revisionRoundsSnapshot  Int?
   submittedAt             DateTime?
   acceptedAt              DateTime?
   fulfillmentDueAt        DateTime?
@@ -988,14 +998,14 @@ model Order {
   createdAt               DateTime                    @default(now())
   updatedAt               DateTime                    @updatedAt
 
-  customer               User                       @relation("OrderCustomer", fields: [customerId], references: [id])
-  assignee               User?                      @relation("OrderAssignee", fields: [assigneeId], references: [id])
-  website                Website?                   @relation(fields: [websiteId], references: [id])
-  activeDeliveryVersion  OrderDeliveryVersion?      @relation("ActiveOrderDeliveryVersion", fields: [activeDeliveryVersionId], references: [id])
-  organization           Organization               @relation(fields: [organizationId], references: [id])
-  campaign               Campaign?                  @relation(fields: [campaignId], references: [id])
-  listing                MarketplaceListing?        @relation(fields: [listingId], references: [id])
-  listingService         ListingService?            @relation(fields: [listingServiceId], references: [id])
+  customer               User                          @relation("OrderCustomer", fields: [customerId], references: [id])
+  assignee               User?                         @relation("OrderAssignee", fields: [assigneeId], references: [id])
+  website                Website?                      @relation(fields: [websiteId], references: [id])
+  activeDeliveryVersion  OrderDeliveryVersion?         @relation("ActiveOrderDeliveryVersion", fields: [activeDeliveryVersionId], references: [id])
+  organization           Organization                  @relation(fields: [organizationId], references: [id])
+  campaign               Campaign?                     @relation(fields: [campaignId], references: [id])
+  listing                MarketplaceListing?           @relation(fields: [listingId], references: [id])
+  listingService         ListingService?               @relation(fields: [listingServiceId], references: [id])
   contentOrder           ContentOrder?
   articleVersions        OrderArticleVersion[]
   revisions              Revision[]
@@ -1006,9 +1016,11 @@ model Order {
   settlements            Settlement[]
   dispute                OrderDispute?
   platformRevenue        PlatformRevenue?
-  deliveryVersions       OrderDeliveryVersion[]     @relation("OrderDeliveryVersions")
+  deliveryVersions       OrderDeliveryVersion[]        @relation("OrderDeliveryVersions")
   fulfillmentAssignments FulfillmentAssignment[]
   fraudFlags             DeliveryFraudFlag[]
+  fraudHolds             DeliveryFraudHold[]
+  fraudFlagResolutions   DeliveryFraudFlagResolution[]
   tickets                Ticket[]
   review                 OrderReview?
   cancellationRequests   OrderCancellationRequest[]
@@ -1165,8 +1177,13 @@ model Settlement {
   orderId            String
   publisherId        String
   grossAmount        Decimal
+  currency           String                  @default("USD") @db.VarChar(3)
   platformFee        Decimal                 @default(0)
   publisherAmount    Decimal
+  // Null only for already-released/cancelled legacy rows. Every new or
+  // unreleased settlement snapshots the singleton PlatformSettings version.
+  platformFeeBps     Int?
+  feePolicyVersion   String?                 @db.VarChar(128)
   status             SettlementStatus        @default(PENDING)
   reviewEndsAt       DateTime?
   releasePolicy      SettlementReleasePolicy @default(AUTO)
@@ -1256,6 +1273,11 @@ enum DeliveryInterventionStatus {
   OVERRIDDEN
 }
 
+enum DeliveryFraudResolutionKind {
+  STAFF_CLEARED
+  LINK_RESTORED
+}
+
 // Platform-owned orders enter the Operations queue. Operations claims/assigns
 // and fulfills; identical downstream verification + settlement path as
 // publisher inventory (no bypass for platform inventory).
@@ -1311,12 +1333,14 @@ model OrderDeliveryVersion {
   adminVerifiedNotes        String?
   createdAt                 DateTime                    @default(now())
 
-  order           Order                          @relation("OrderDeliveryVersions", fields: [orderId], references: [id])
-  activeOrder     Order?                         @relation("ActiveOrderDeliveryVersion")
-  evidence        DeliveryVerificationEvidence[]
-  snapshots       DeliverySnapshot[]
-  fraudFlags      DeliveryFraudFlag[]
-  adminVerifiedBy User?                          @relation("AdminVerifiedVersion", fields: [adminVerifiedById], references: [id])
+  order                Order                          @relation("OrderDeliveryVersions", fields: [orderId], references: [id])
+  activeOrder          Order?                         @relation("ActiveOrderDeliveryVersion")
+  evidence             DeliveryVerificationEvidence[]
+  snapshots            DeliverySnapshot[]
+  fraudFlags           DeliveryFraudFlag[]
+  fraudHolds           DeliveryFraudHold[]
+  fraudFlagResolutions DeliveryFraudFlagResolution[]
+  adminVerifiedBy      User?                          @relation("AdminVerifiedVersion", fields: [adminVerifiedById], references: [id])
 
   @@unique([orderId, version])
   @@index([orderId])
@@ -1344,6 +1368,7 @@ model DeliveryVerificationEvidence {
   createdAt          DateTime @default(now())
 
   deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id])
+  fraudResolution DeliveryFraudFlagResolution?
 
   @@index([deliveryVersionId])
 }
@@ -1370,12 +1395,63 @@ model DeliveryFraudFlag {
   details           Json?
   createdAt         DateTime @default(now())
 
-  order           Order                @relation(fields: [orderId], references: [id])
-  deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id])
+  order           Order                        @relation(fields: [orderId], references: [id])
+  deliveryVersion OrderDeliveryVersion         @relation(fields: [deliveryVersionId], references: [id])
+  resolution      DeliveryFraudFlagResolution?
+  hold            DeliveryFraudHold?
 
+  @@index([deliveryVersionId, type])
   @@index([orderId])
   @@index([deliveryVersionId])
   @@index([type])
+}
+
+// Current unresolved-hold projection over immutable fraud flags. Runtime
+// code never writes this model directly: database triggers create/delete it
+// atomically with flag/resolution evidence. The structural unique key is the
+// concurrency-safe one-open-hold invariant used by settlement authorization.
+model DeliveryFraudHold {
+  fraudFlagId       String   @id
+  orderId           String
+  deliveryVersionId String
+  type              String
+  createdAt         DateTime @default(now())
+
+  fraudFlag       DeliveryFraudFlag    @relation(fields: [fraudFlagId], references: [id], onDelete: Restrict)
+  order           Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([deliveryVersionId, type])
+  @@index([orderId])
+}
+
+// Append-only adjudication of an immutable fraud signal. Keeping resolution
+// separate preserves the original evidence while allowing the settlement gate
+// to distinguish an active hold from a staff-cleared or demonstrably restored
+// condition. One flag can be resolved once; later evidence is a new flag/audit.
+model DeliveryFraudFlagResolution {
+  id                String                      @id @default(cuid())
+  fraudFlagId       String                      @unique
+  orderId           String
+  deliveryVersionId String
+  kind              DeliveryFraudResolutionKind
+  reason            String                      @db.VarChar(1000)
+  resolvedByUserId  String?
+  resolvedByRole    StaffRole?
+  evidenceId        String?                     @unique
+  evidence          Json
+  createdAt         DateTime                    @default(now())
+
+  fraudFlag       DeliveryFraudFlag    @relation(fields: [fraudFlagId], references: [id], onDelete: Restrict)
+  order           Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id], onDelete: Restrict)
+  resolvedBy      User?                @relation("DeliveryFraudResolver", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
+  verificationEvidence DeliveryVerificationEvidence? @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([deliveryVersionId])
+  @@index([resolvedByUserId])
+  @@index([kind, createdAt])
 }
 
 // Per-order review left by the customer after completion. One per order; feeds
@@ -1399,6 +1475,7 @@ model OrderReview {
 model PublisherBalance {
   id                         String    @id @default(cuid())
   publisherId                String    @unique
+  currency                   String    @default("USD") @db.VarChar(3)
   pendingBalance             Decimal   @default(0)
   approvedBalance            Decimal   @default(0)
   withdrawableBalance        Decimal   @default(0)
@@ -1707,6 +1784,7 @@ model PayoutBatch {
   id              String            @id @default(cuid())
   name            String
   status          PayoutBatchStatus @default(PENDING)
+  currency        String            @default("USD") @db.VarChar(3)
   totalAmount     Decimal           @default(0)
   totalCount      Int               @default(0)
   completedAmount Decimal           @default(0)
@@ -1827,8 +1905,14 @@ model PlatformRevenue {
   id                 String                @id @default(cuid())
   orderId            String                @unique
   amount             Decimal
+  currency           String                @default("USD") @db.VarChar(3)
   platformFee        Decimal               @default(0)
   netRevenue         Decimal
+  // Versioned fee-policy evidence. Null is reserved for reversed legacy rows
+  // whose original policy cannot be reconstructed honestly. Every new and
+  // every unreversed row is required to carry both fields by PostgreSQL.
+  platformFeeBps     Int?
+  feePolicyVersion   String?               @db.VarChar(128)
   recordedAt         DateTime              @default(now())
   // Set on refund instead of deleting the row — financial records are
   // never destroyed. Revenue queries must filter reversedAt: null.
@@ -2730,6 +2814,7 @@ model ListingFulfillmentRule {
 model PlatformSettings {
   id             String   @id @default(cuid())
   platformFeePct Decimal  @default(20)
+  version        Int      @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -2762,6 +2847,9 @@ model ExternalAccount {
 
   encryptedAccessToken  String
   encryptedRefreshToken String
+  // Version of the keyring entry used for both encrypted token fields. Token
+  // refreshes rotate both ciphertexts and this version atomically.
+  encryptionKeyVersion  Int
   tokenExpiresAt        DateTime
   grantedScopes         String[]
 
@@ -2788,6 +2876,9 @@ model PublisherIntegration {
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 
+  // Raw-SQL migration enforcement additionally requires ownerType/ownerId to
+  // match the credential. Prisma cannot express that trigger-backed aggregate
+  // invariant without replacing this ergonomic single-column relation.
   connection          ExternalAccount        @relation(fields: [connectionId], references: [id])
   schedule            IntegrationSchedule?
   websiteIntegrations WebsiteIntegration[]
@@ -2847,6 +2938,13 @@ model WebsiteIntegration {
   integration PublisherIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   website     Website              @relation(fields: [websiteId], references: [id], onDelete: Cascade)
 
+  // Source mappings are durable provenance. Unlink tombstones this row, and
+  // restrictive raw-SQL-backed relations prevent deletion/id reuse while any
+  // daily metric row references it.
+  searchDailyMetrics    WebsiteSearchDaily[]     @relation("WebsiteSearchDailySource")
+  analyticsDailyMetrics WebsiteAnalyticsDaily[]  @relation("WebsiteAnalyticsDailySource")
+  pageDailyMetrics      WebsitePageSearchDaily[] @relation("WebsitePageSearchDailySource")
+
   @@unique([integrationId, externalResourceId])
   // One property per provider integration per website. GSC and GA4 use
   // different integrationIds, so a website can (and should) link one of each.
@@ -2889,6 +2987,8 @@ model WebsiteSearchDaily {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
+  sourceIntegration WebsiteIntegration @relation("WebsiteSearchDailySource", fields: [sourceIntegrationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
   @@unique([websiteId, sourceIntegrationId, date])
   @@index([websiteId, date])
   @@index([sourceIntegrationId, date])
@@ -2909,6 +3009,8 @@ model WebsiteAnalyticsDaily {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
+  sourceIntegration WebsiteIntegration @relation("WebsiteAnalyticsDailySource", fields: [sourceIntegrationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
   @@unique([websiteId, sourceIntegrationId, date])
   @@index([websiteId, date])
   @@index([sourceIntegrationId, date])
@@ -2927,6 +3029,8 @@ model WebsitePageSearchDaily {
   position            Float    @default(0)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+
+  sourceIntegration WebsiteIntegration @relation("WebsitePageSearchDailySource", fields: [sourceIntegrationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([websiteId, sourceIntegrationId, pageUrl, date])
   @@index([websiteId, date])

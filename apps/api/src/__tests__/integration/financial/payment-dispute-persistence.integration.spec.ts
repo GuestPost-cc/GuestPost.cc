@@ -12,6 +12,7 @@ import {
 } from "@guestpost/shared/dist/reconciliation-core"
 import {
   makeOrder,
+  makeOrderItem,
   makeOrganization,
   makeTransaction,
   makeUser,
@@ -130,6 +131,69 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
       providerSessionId,
       paymentIntentId,
     }
+  }
+
+  async function makeRefundableOrder(
+    fixture: DepositFixture,
+    website: { id: string },
+  ) {
+    const suffix = crypto.randomUUID()
+    const listing = await prisma.marketplaceListing.create({
+      data: {
+        title: `Refund fixture ${suffix}`,
+        slug: `refund-fixture-${suffix}`,
+        description: "Captured refund integration fixture",
+        status: "APPROVED",
+        fulfillmentType: "PUBLISHER",
+        ownerType: "PUBLISHER",
+        currency: "USD",
+        websiteId: website.id,
+        organizationId: fixture.organization.id,
+      },
+    })
+    const listingService = await prisma.listingService.create({
+      data: {
+        listingId: listing.id,
+        serviceType: "GUEST_POST",
+        price: 25,
+        currency: "USD",
+        turnaroundDays: 3,
+        availability: "AVAILABLE",
+      },
+    })
+    const order = await makeOrder(prisma, {
+      organizationId: fixture.organization.id,
+      customerId: fixture.user.id,
+      websiteId: website.id,
+      status: "DRAFT",
+      paymentStatus: "PENDING",
+      amount: 25,
+      fulfillmentChannel: "PUBLISHER",
+      listingId: listing.id,
+      listingServiceId: listingService.id,
+      revisionRoundsSnapshot: listingService.revisionRounds,
+      turnaroundDays: listingService.turnaroundDays,
+    })
+    await makeOrderItem(prisma, {
+      orderId: order.id,
+      websiteId: website.id,
+      price: 25,
+      status: "PENDING_PAYMENT",
+    })
+    await prisma.$transaction(async (tx: any) => {
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: "PAID", paymentStatus: "PAID" },
+      })
+      await makeTransaction(tx, {
+        walletId: fixture.wallet.id,
+        amount: -25,
+        type: "PURCHASE",
+        reference: `refund-purchase-${suffix}`,
+        orderId: order.id,
+      })
+    })
+    return order
   }
 
   async function makeCheckoutProviderEvent(objectId: string): Promise<any> {
@@ -457,14 +521,7 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
     }
 
     const website = await makeWebsite(prisma)
-    const refundOrder = await makeOrder(prisma, {
-      organizationId: fixture.organization.id,
-      customerId: fixture.user.id,
-      websiteId: website.id,
-      status: "PAID",
-      paymentStatus: "PAID",
-      amount: 25,
-    })
+    const refundOrder = await makeRefundableOrder(fixture, website)
     const spendOrder = await makeOrder(prisma, {
       organizationId: fixture.organization.id,
       customerId: fixture.user.id,
@@ -533,14 +590,7 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
     )
 
     const website = await makeWebsite(prisma)
-    const refundOrder = await makeOrder(prisma, {
-      organizationId: fixture.organization.id,
-      customerId: fixture.user.id,
-      websiteId: website.id,
-      status: "PAID",
-      paymentStatus: "PAID",
-      amount: 25,
-    })
+    const refundOrder = await makeRefundableOrder(fixture, website)
     const spendOrder = await makeOrder(prisma, {
       organizationId: fixture.organization.id,
       customerId: fixture.user.id,

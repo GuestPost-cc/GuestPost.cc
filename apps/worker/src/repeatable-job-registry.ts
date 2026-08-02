@@ -31,6 +31,7 @@ const JOB_NAMES = [
   "reconciliation-run",
   "website-reverify-sweep",
   "domain-metrics-refresh",
+  "delivery-verification-dispatch-sweep",
   "settlement-hold-sweep",
   "settlement-auto-approve",
   "settlement-auto-release",

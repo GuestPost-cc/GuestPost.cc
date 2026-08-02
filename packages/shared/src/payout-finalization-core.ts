@@ -590,7 +590,13 @@ async function finalizeInTransaction(
     }
     evidenceAt = webhookEvent.receivedAt
     providerAmountMinor = normalizedMinorAmount(webhookEvent.payoutAmountMinor)
-    providerCurrency = normalizedCurrency(webhookEvent.payoutCurrency) || null
+    // The signed webhook parser already normalizes at the external boundary;
+    // persisted inbox currency is immutable internal evidence and must never
+    // be repaired here by trim/uppercase.
+    providerCurrency =
+      typeof webhookEvent.payoutCurrency === "string"
+        ? webhookEvent.payoutCurrency
+        : null
   }
 
   if (!(evidenceAt instanceof Date) || !Number.isFinite(evidenceAt.getTime())) {
@@ -674,7 +680,7 @@ async function finalizeInTransaction(
     if (
       expectedMinorAmount === null ||
       providerAmountMinor !== expectedMinorAmount ||
-      providerCurrency !== normalizedCurrency(execution.destinationCurrency)
+      providerCurrency !== execution.destinationCurrency
     ) {
       return deterministicConflict(
         tx,
@@ -799,6 +805,9 @@ async function finalizeInTransaction(
 
   const expectedDestinationAmount = withdrawal.netAmount ?? withdrawal.amount
   if (
+    withdrawal.currency !== "USD" ||
+    execution.sourceCurrency !== "USD" ||
+    execution.destinationCurrency !== "USD" ||
     !decimalsEqual(execution.amount, withdrawal.amount) ||
     !decimalsEqual(
       execution.destinationAmount ?? execution.amount,
@@ -830,8 +839,8 @@ async function finalizeInTransaction(
     allocationTotal !== scaledDecimal(withdrawal.amount) ||
     activeAllocations.some(
       (allocation: any) =>
-        normalizedCurrency(allocation.currency) !==
-          normalizedCurrency(withdrawal.currency) ||
+        allocation.currency !== "USD" ||
+        allocation.currency !== withdrawal.currency ||
         scaledDecimal(allocation.amount) <= 0n,
     )
   ) {

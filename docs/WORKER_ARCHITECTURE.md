@@ -126,6 +126,7 @@ and one `WORKER_TASK`:
 
 | `WORKER_TASK` | Recommended cron (UTC) | Notes |
 |---|---:|---|
+| `delivery-verification-dispatch` | `*/5 * * * *` | Recover active PENDING delivery rows whose post-commit queue dispatch failed; deterministic generation-scoped job IDs |
 | `payout-reconcile` | `*/10 * * * *` | Inbox + provider status safety net |
 | `settlement-auto-approve` | `*/15 * * * *` | Review-window approvals |
 | `settlement-auto-release` | `5,20,35,50 * * * *` | Offset from approval |

@@ -46,10 +46,10 @@ describe("[INTEGRATION] Financial — settlement transaction rollback", () => {
         settlementId: settlement.id,
         settlementStatus: SettlementStatus.PENDING,
         orderStatus: OrderStatus.DELIVERED,
-        walletAvailableBalance: 100,
+        walletAvailableBalance: 0,
         publisherWithdrawableBalance: 0,
-        transactionCount: 1,
-        transactionSum: 100,
+        transactionCount: 2,
+        transactionSum: 0,
       })
     } finally {
       await cleanup()
@@ -85,9 +85,9 @@ describe("[INTEGRATION] Financial — settlement transaction rollback", () => {
 
       await expectFinancialState(ctx, {
         orderStatus: OrderStatus.PAID,
-        walletAvailableBalance: 100,
-        transactionCount: 1,
-        transactionSum: 100,
+        walletAvailableBalance: 0,
+        transactionCount: 2,
+        transactionSum: 0,
       })
     } finally {
       await cleanup()

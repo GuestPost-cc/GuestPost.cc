@@ -6,8 +6,8 @@
 //     { field, oldValue, newValue, reason }
 //   - identical value short-circuits (no audit, no write) with BadRequest
 //   - optimistic-lock conflict surfaces as ConflictException
-//   - the DTO-bound clamping also runs in the service so an internal caller
-//     that bypassed the pipe still can't persist a 200% fee
+//   - invalid values are rejected in the service so internal callers cannot
+//     bypass the DTO or silently alter a financial policy value
 //   - the audit log is wired through the transaction (`tx` argument) so a
 //     failed audit insert aborts the write — matching the financial-invariant
 //     pattern used everywhere else for money writes.
@@ -64,7 +64,7 @@ describe("AdminService — PlatformSettings (FIN-08)", () => {
       const freshRow = {
         id: "ps-fresh",
         platformFeePct: new Decimal(20),
-        version: 0,
+        version: 1,
       }
       prismaMock.platformSettings.findFirst.mockResolvedValueOnce(null)
       prismaMock.platformSettings.create.mockResolvedValueOnce(freshRow)
@@ -118,29 +118,35 @@ describe("AdminService — PlatformSettings (FIN-08)", () => {
       expect(auditMock.log).not.toHaveBeenCalled()
     })
 
-    it("clamps out-of-range values defensively even if the pipe was bypassed", async () => {
-      // An internal caller that skipped the DTO (and any future writer) still
-      // can't persist a 200% fee — the service clamps to [0, 100].
-      const result = await service.updatePlatformFee(
-        200,
-        "Internally bad call",
-        {
+    it.each([
+      200,
+      -5,
+      20.001,
+      Number.NaN,
+    ])("rejects an invalid internal fee value (%p)", async (value) => {
+      await expect(
+        service.updatePlatformFee(value, "Administrative error", {
           id: "staff-1",
-        },
-      )
-      expect(result.platformFeePct).toBe(100)
-      expect(auditMock.log.mock.calls[0][0].metadata.newValue).toBe(100)
+        }),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(prismaMock.$transaction).not.toHaveBeenCalled()
+      expect(prismaMock.platformSettings.updateMany).not.toHaveBeenCalled()
+      expect(auditMock.log).not.toHaveBeenCalled()
     })
 
-    it("clamps negative values to 0", async () => {
+    it("stores an exact basis-point fee without floating-point drift", async () => {
       const result = await service.updatePlatformFee(
-        -5,
-        "Administrative error",
-        {
-          id: "staff-1",
-        },
+        17.25,
+        "Approved pricing change",
+        { id: "staff-1" },
       )
-      expect(result.platformFeePct).toBe(0)
+
+      expect(result.platformFeePct).toBe(17.25)
+      expect(prismaMock.platformSettings.updateMany).toHaveBeenCalledWith({
+        where: { id: "ps-1", version: 1 },
+        data: { platformFeePct: 17.25, version: { increment: 1 } },
+      })
     })
 
     it("surfaces a concurrent modification as ConflictException (optimistic lock)", async () => {

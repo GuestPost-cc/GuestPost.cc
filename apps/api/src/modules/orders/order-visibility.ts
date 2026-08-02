@@ -157,53 +157,241 @@ export function projectOrderEvent(
   }
 }
 
+function pickOwnDefined(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+): Record<string, unknown> {
+  const projected: Record<string, unknown> = {}
+  for (const key of keys) {
+    if (Object.hasOwn(value, key) && value[key] !== undefined) {
+      projected[key] = value[key]
+    }
+  }
+  return projected
+}
+
+const EXTERNAL_ORDER_SCALAR_KEYS = [
+  "id",
+  "customerId",
+  "version",
+  "type",
+  "status",
+  "amount",
+  "currency",
+  "paymentStatus",
+  "title",
+  "instructions",
+  "targetUrl",
+  "anchorText",
+  "publishedUrl",
+  "campaignId",
+  "autoAcceptAt",
+  "verifyMethod",
+  "deliveryAcceptedMethod",
+  "turnaroundDays",
+  "submittedAt",
+  "acceptedAt",
+  "fulfillmentDueAt",
+  "warrantyEndsAt",
+  "briefData",
+  "fulfillmentChannel",
+  "createdAt",
+  "updatedAt",
+] as const
+
+const EXTERNAL_ORDER_ITEM_KEYS = [
+  "id",
+  "websiteId",
+  "targetUrl",
+  "anchorText",
+  "price",
+  "status",
+] as const
+
+const EXTERNAL_PUBLICATION_KEYS = [
+  "id",
+  "publishedUrl",
+  "targetUrl",
+  "anchorText",
+  "screenshotUrl",
+  "publicationDate",
+  "verificationStatus",
+] as const
+
+const EXTERNAL_ARTICLE_VERSION_KEYS = [
+  "id",
+  "version",
+  "source",
+  "purpose",
+  "title",
+  "body",
+  "format",
+  "checksum",
+  "wordCount",
+  "supersedesId",
+  "createdAt",
+] as const
+
+const EXTERNAL_REVISION_KEYS = [
+  "id",
+  "notes",
+  "files",
+  "status",
+  "createdAt",
+] as const
+
+const EXTERNAL_DISPUTE_KEYS = [
+  "id",
+  "reason",
+  "status",
+  "resolvedAt",
+  "resolution",
+  "createdAt",
+  "updatedAt",
+] as const
+
+const EXTERNAL_CANCELLATION_REQUEST_KEYS = [
+  "id",
+  "orderId",
+  "requesterType",
+  "reasonCode",
+  "note",
+  "status",
+  "responsibility",
+  "responseDeadlineAt",
+  "responseNote",
+  "createdAt",
+] as const
+
+function projectExternalWebsite(value: any, websiteUnlocked: boolean) {
+  if (value == null) return value
+  const projected = pickOwnDefined(value, ["id", "name"])
+  if (websiteUnlocked) {
+    if (Object.hasOwn(value, "url")) projected.url = value.url
+    return projected
+  }
+  return {
+    ...projected,
+    url: null,
+    access: {
+      unlocked: false,
+      reason: "FIRST_DEPOSIT_REQUIRED",
+    },
+  }
+}
+
+function projectExternalPublication(value: any) {
+  return pickOwnDefined(value, EXTERNAL_PUBLICATION_KEYS)
+}
+
+function projectExternalOrderItem(value: any, websiteUnlocked: boolean) {
+  const projected = pickOwnDefined(value, EXTERNAL_ORDER_ITEM_KEYS)
+  projected.website = projectExternalWebsite(value.website, websiteUnlocked)
+  if (Object.hasOwn(value, "publications")) {
+    projected.publications = Array.isArray(value.publications)
+      ? value.publications.map(projectExternalPublication)
+      : []
+  }
+  return projected
+}
+
+export function projectExternalCancellationRequest(value: any) {
+  if (value == null) return value
+  return pickOwnDefined(value, EXTERNAL_CANCELLATION_REQUEST_KEYS)
+}
+
+export function projectExternalOrderDispute(value: any) {
+  if (value == null) return value
+  return pickOwnDefined(value, EXTERNAL_DISPUTE_KEYS)
+}
+
+export function projectExternalOrderReview(value: any) {
+  if (value == null) return value
+  return pickOwnDefined(value, [
+    "id",
+    "rating",
+    "comment",
+    "createdAt",
+    "updatedAt",
+  ])
+}
+
 export function projectExternalOrder(
   order: any,
   actor: ExternalOrderActor,
   websiteUnlocked = actor === "PUBLISHER",
-) {
-  const {
-    reports: _reports,
-    settlements,
-    events,
-    website,
-    items,
-    ...publicOrder
-  } = order
-  const projectWebsite = (value: any) => {
-    if (!value || actor === "PUBLISHER" || websiteUnlocked) return value
-    const { url: _url, ...safeWebsite } = value
-    return {
-      ...safeWebsite,
-      url: null,
-      access: {
-        unlocked: false,
-        reason: "FIRST_DEPOSIT_REQUIRED",
-      },
-    }
+): any {
+  const canViewWebsite = actor === "PUBLISHER" || websiteUnlocked
+  const projected = pickOwnDefined(order, EXTERNAL_ORDER_SCALAR_KEYS)
+
+  if (Object.hasOwn(order, "campaign")) {
+    projected.campaign =
+      order.campaign == null
+        ? order.campaign
+        : pickOwnDefined(order.campaign, ["id", "name"])
   }
+  if (Object.hasOwn(order, "contentOrder")) {
+    projected.contentOrder =
+      order.contentOrder == null
+        ? order.contentOrder
+        : pickOwnDefined(order.contentOrder, [
+            "id",
+            "title",
+            "brief",
+            "deliverable",
+            "status",
+          ])
+  }
+  if (Object.hasOwn(order, "articleVersions")) {
+    projected.articleVersions = Array.isArray(order.articleVersions)
+      ? order.articleVersions.map((article: any) =>
+          pickOwnDefined(article, EXTERNAL_ARTICLE_VERSION_KEYS),
+        )
+      : []
+  }
+  if (Object.hasOwn(order, "revisions")) {
+    projected.revisions = Array.isArray(order.revisions)
+      ? order.revisions.map((revision: any) =>
+          pickOwnDefined(revision, EXTERNAL_REVISION_KEYS),
+        )
+      : []
+  }
+  if (Object.hasOwn(order, "dispute")) {
+    projected.dispute = projectExternalOrderDispute(order.dispute)
+  }
+  if (Object.hasOwn(order, "cancellationRequests")) {
+    projected.cancellationRequests = Array.isArray(order.cancellationRequests)
+      ? order.cancellationRequests.map(projectExternalCancellationRequest)
+      : []
+  }
+
   return {
-    ...publicOrder,
-    website: projectWebsite(website),
-    items: (items ?? []).map((item: any) => ({
-      ...item,
-      website: projectWebsite(item.website),
-    })),
-    events: (events ?? []).map((event: any) => projectOrderEvent(event, actor)),
+    ...projected,
+    website: projectExternalWebsite(order.website, canViewWebsite),
+    items: Array.isArray(order.items)
+      ? order.items.map((item: any) =>
+          projectExternalOrderItem(item, canViewWebsite),
+        )
+      : [],
+    events: Array.isArray(order.events)
+      ? order.events.map((event: any) => projectOrderEvent(event, actor))
+      : [],
     settlements:
       actor === "PUBLISHER"
-        ? (settlements ?? []).map((settlement: any) => ({
-            id: settlement.id,
-            status: settlement.status,
-            grossAmount: settlement.grossAmount,
-            platformFee: settlement.platformFee,
-            publisherAmount: settlement.publisherAmount,
-            releasePolicy: settlement.releasePolicy,
-            reviewEndsAt: settlement.reviewEndsAt,
-            releasedAt: settlement.releasedAt,
-            createdAt: settlement.createdAt,
-            updatedAt: settlement.updatedAt,
-          }))
+        ? (Array.isArray(order.settlements) ? order.settlements : []).map(
+            (settlement: any) => ({
+              id: settlement.id,
+              status: settlement.status,
+              grossAmount: settlement.grossAmount,
+              platformFee: settlement.platformFee,
+              publisherAmount: settlement.publisherAmount,
+              releasePolicy: settlement.releasePolicy,
+              reviewEndsAt: settlement.reviewEndsAt,
+              releasedAt: settlement.releasedAt,
+              createdAt: settlement.createdAt,
+              updatedAt: settlement.updatedAt,
+            }),
+          )
         : [],
   }
 }

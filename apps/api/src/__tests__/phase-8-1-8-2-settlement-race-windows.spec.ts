@@ -36,7 +36,21 @@ function makeTxMock() {
       findUnique: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
-    orderDeliveryVersion: { findUnique: jest.fn().mockResolvedValue(null) },
+    orderDeliveryVersion: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: "dv-1",
+        orderId: "ord-1",
+        verificationStatus: "VERIFIED",
+        interventionStatus: "NONE",
+        submittedByUserId: "publisher-user",
+      }),
+    },
+    orderDispute: { findFirst: jest.fn().mockResolvedValue(null) },
+    revision: { findFirst: jest.fn().mockResolvedValue(null) },
+    orderCancellationRequest: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    deliveryFraudFlag: { count: jest.fn().mockResolvedValue(0) },
     // releaseFundsInternal touches publisherBalance for tier accounting; mocked
     // null + happy-path create so the method reaches the order.updateMany line.
     publisherBalance: {
@@ -149,7 +163,10 @@ describe("Phase 8.2 (audit #2) — releaseFundsInternal Order.status version gua
     tx.order.findUnique.mockResolvedValue({
       id: "ord-1",
       version: orderVersion,
-      activeDeliveryVersionId: null,
+      status: "DELIVERED",
+      currency: "USD",
+      paymentStatus: "PAID",
+      activeDeliveryVersionId: "dv-1",
       fulfillmentChannel: "PUBLISHER",
       organizationId: "org-1",
       website: { ownershipType: "PUBLISHER" },
@@ -166,6 +183,7 @@ describe("Phase 8.2 (audit #2) — releaseFundsInternal Order.status version gua
       publisherAmount: "90.00",
       grossAmount: "100.00",
       platformFee: "10.00",
+      currency: "USD",
       status: "ADMIN_APPROVED",
     }
     return { tx, service, settlement }
@@ -183,7 +201,9 @@ describe("Phase 8.2 (audit #2) — releaseFundsInternal Order.status version gua
       where: {
         id: "ord-1",
         version: 3,
-        status: { notIn: ["CANCELLED", "REFUNDED", "DISPUTED"] },
+        status: "DELIVERED",
+        currency: "USD",
+        paymentStatus: "PAID",
       },
       data: {
         status: "COMPLETED",

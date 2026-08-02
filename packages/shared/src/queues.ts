@@ -55,6 +55,7 @@ export const QUEUE_JOBS = {
   },
   [QUEUES.DELIVERY_VERIFICATION]: {
     VERIFY: "delivery-verify",
+    DISPATCH_SWEEP: "delivery-verification-dispatch-sweep",
     HOLD_LINK_SWEEP: "settlement-hold-sweep",
   },
   [QUEUES.PUBLISHER_TRUST]: {
@@ -95,3 +96,16 @@ export const QUEUE_JOBS = {
     SYNC: "domain-metrics-sync",
   },
 } as const
+
+export function deliveryVerificationJobId(
+  deliveryVersionId: string,
+  verificationVersion: number,
+): string {
+  if (!deliveryVersionId || deliveryVersionId.includes(":")) {
+    throw new Error("A BullMQ-safe delivery version ID is required")
+  }
+  if (!Number.isSafeInteger(verificationVersion) || verificationVersion < 0) {
+    throw new Error("A non-negative verification version is required")
+  }
+  return `delivery-verify-${deliveryVersionId}-v${verificationVersion}`
+}

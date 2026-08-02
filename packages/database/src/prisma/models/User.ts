@@ -278,6 +278,7 @@ export type UserWhereInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionListRelationFilter
   cancelledPayoutExecutions?: Prisma.PayoutExecutionListRelationFilter
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionListRelationFilter
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
   messages?: Prisma.TicketMessageListRelationFilter
   notifications?: Prisma.NotificationListRelationFilter
@@ -327,6 +328,7 @@ export type UserOrderByWithRelationInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionOrderByRelationAggregateInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionOrderByRelationAggregateInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionOrderByRelationAggregateInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionOrderByRelationAggregateInput
   tickets?: Prisma.TicketOrderByRelationAggregateInput
   messages?: Prisma.TicketMessageOrderByRelationAggregateInput
   notifications?: Prisma.NotificationOrderByRelationAggregateInput
@@ -379,6 +381,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   completedPayoutExecutions?: Prisma.PayoutExecutionListRelationFilter
   cancelledPayoutExecutions?: Prisma.PayoutExecutionListRelationFilter
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionListRelationFilter
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
   messages?: Prisma.TicketMessageListRelationFilter
   notifications?: Prisma.NotificationListRelationFilter
@@ -469,6 +472,7 @@ export type UserCreateInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -518,6 +522,7 @@ export type UserUncheckedCreateInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -565,6 +570,7 @@ export type UserUpdateInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -614,6 +620,7 @@ export type UserUncheckedUpdateInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1053,6 +1060,22 @@ export type UserUpdateOneWithoutAdminVerifiedDeliveryVersionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAdminVerifiedDeliveryVersionsInput, Prisma.UserUpdateWithoutAdminVerifiedDeliveryVersionsInput>, Prisma.UserUncheckedUpdateWithoutAdminVerifiedDeliveryVersionsInput>
 }
 
+export type UserCreateNestedOneWithoutResolvedDeliveryFraudFlagsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutResolvedDeliveryFraudFlagsInput, Prisma.UserUncheckedCreateWithoutResolvedDeliveryFraudFlagsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutResolvedDeliveryFraudFlagsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutResolvedDeliveryFraudFlagsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutResolvedDeliveryFraudFlagsInput, Prisma.UserUncheckedCreateWithoutResolvedDeliveryFraudFlagsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutResolvedDeliveryFraudFlagsInput
+  upsert?: Prisma.UserUpsertWithoutResolvedDeliveryFraudFlagsInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutResolvedDeliveryFraudFlagsInput, Prisma.UserUpdateWithoutResolvedDeliveryFraudFlagsInput>, Prisma.UserUncheckedUpdateWithoutResolvedDeliveryFraudFlagsInput>
+}
+
 export type UserCreateNestedOneWithoutRequestedWithdrawalsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutRequestedWithdrawalsInput, Prisma.UserUncheckedCreateWithoutRequestedWithdrawalsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutRequestedWithdrawalsInput
@@ -1316,6 +1339,7 @@ export type UserCreateWithoutSuspensionsIssuedInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1364,6 +1388,7 @@ export type UserUncheckedCreateWithoutSuspensionsIssuedInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1415,6 +1440,7 @@ export type UserCreateWithoutSuspendedByInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1462,6 +1488,7 @@ export type UserUncheckedCreateWithoutSuspendedByInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1530,6 +1557,7 @@ export type UserUpdateWithoutSuspensionsIssuedInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -1578,6 +1606,7 @@ export type UserUncheckedUpdateWithoutSuspensionsIssuedInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1661,6 +1690,7 @@ export type UserCreateWithoutLegalAcceptancesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1709,6 +1739,7 @@ export type UserUncheckedCreateWithoutLegalAcceptancesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1771,6 +1802,7 @@ export type UserUpdateWithoutLegalAcceptancesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -1819,6 +1851,7 @@ export type UserUncheckedUpdateWithoutLegalAcceptancesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1865,6 +1898,7 @@ export type UserCreateWithoutSessionsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1913,6 +1947,7 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1975,6 +2010,7 @@ export type UserUpdateWithoutSessionsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2023,6 +2059,7 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2069,6 +2106,7 @@ export type UserCreateWithoutAccountsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2117,6 +2155,7 @@ export type UserUncheckedCreateWithoutAccountsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2179,6 +2218,7 @@ export type UserUpdateWithoutAccountsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2227,6 +2267,7 @@ export type UserUncheckedUpdateWithoutAccountsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2273,6 +2314,7 @@ export type UserCreateWithoutActiveContextInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2321,6 +2363,7 @@ export type UserUncheckedCreateWithoutActiveContextInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2383,6 +2426,7 @@ export type UserUpdateWithoutActiveContextInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2431,6 +2475,7 @@ export type UserUncheckedUpdateWithoutActiveContextInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2476,6 +2521,7 @@ export type UserCreateWithoutMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2524,6 +2570,7 @@ export type UserUncheckedCreateWithoutMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2586,6 +2633,7 @@ export type UserUpdateWithoutMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2634,6 +2682,7 @@ export type UserUncheckedUpdateWithoutMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2680,6 +2729,7 @@ export type UserCreateWithoutPublisherMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2728,6 +2778,7 @@ export type UserUncheckedCreateWithoutPublisherMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2790,6 +2841,7 @@ export type UserUpdateWithoutPublisherMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2838,6 +2890,7 @@ export type UserUncheckedUpdateWithoutPublisherMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2884,6 +2937,7 @@ export type UserCreateWithoutStaffMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2932,6 +2986,7 @@ export type UserUncheckedCreateWithoutStaffMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2994,6 +3049,7 @@ export type UserUpdateWithoutStaffMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -3042,6 +3098,7 @@ export type UserUncheckedUpdateWithoutStaffMembershipsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3089,6 +3146,7 @@ export type UserCreateWithoutManagedWebsitesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -3137,6 +3195,7 @@ export type UserUncheckedCreateWithoutManagedWebsitesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -3199,6 +3258,7 @@ export type UserUpdateWithoutManagedWebsitesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -3247,6 +3307,7 @@ export type UserUncheckedUpdateWithoutManagedWebsitesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3293,6 +3354,7 @@ export type UserCreateWithoutWebsiteImportBatchesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -3341,6 +3403,7 @@ export type UserUncheckedCreateWithoutWebsiteImportBatchesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -3403,6 +3466,7 @@ export type UserUpdateWithoutWebsiteImportBatchesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -3451,6 +3515,7 @@ export type UserUncheckedUpdateWithoutWebsiteImportBatchesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3496,6 +3561,7 @@ export type UserCreateWithoutOwnedOrdersInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -3544,6 +3610,7 @@ export type UserUncheckedCreateWithoutOwnedOrdersInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -3595,6 +3662,7 @@ export type UserCreateWithoutAssignedOrdersInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -3643,6 +3711,7 @@ export type UserUncheckedCreateWithoutAssignedOrdersInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -3705,6 +3774,7 @@ export type UserUpdateWithoutOwnedOrdersInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -3753,6 +3823,7 @@ export type UserUncheckedUpdateWithoutOwnedOrdersInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3810,6 +3881,7 @@ export type UserUpdateWithoutAssignedOrdersInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -3858,6 +3930,7 @@ export type UserUncheckedUpdateWithoutAssignedOrdersInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3904,6 +3977,7 @@ export type UserCreateWithoutOrderEventsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -3952,6 +4026,7 @@ export type UserUncheckedCreateWithoutOrderEventsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -4014,6 +4089,7 @@ export type UserUpdateWithoutOrderEventsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -4062,6 +4138,7 @@ export type UserUncheckedUpdateWithoutOrderEventsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -4108,6 +4185,7 @@ export type UserCreateWithoutPublicationsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -4156,6 +4234,7 @@ export type UserUncheckedCreateWithoutPublicationsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -4218,6 +4297,7 @@ export type UserUpdateWithoutPublicationsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -4266,6 +4346,7 @@ export type UserUncheckedUpdateWithoutPublicationsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -4312,6 +4393,7 @@ export type UserCreateWithoutAdminVerifiedDeliveryVersionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimCreateNestedManyWithoutClaimedByInput
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -4360,6 +4442,7 @@ export type UserUncheckedCreateWithoutAdminVerifiedDeliveryVersionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimUncheckedCreateNestedManyWithoutClaimedByInput
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -4422,6 +4505,7 @@ export type UserUpdateWithoutAdminVerifiedDeliveryVersionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimUpdateManyWithoutClaimedByNestedInput
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -4470,6 +4554,215 @@ export type UserUncheckedUpdateWithoutAdminVerifiedDeliveryVersionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimUncheckedUpdateManyWithoutClaimedByNestedInput
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
+  messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
+  notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
+  auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
+  managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
+  assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
+  suspensionsIssued?: Prisma.UserUncheckedUpdateManyWithoutSuspendedByNestedInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutActorNestedInput
+}
+
+export type UserCreateWithoutResolvedDeliveryFraudFlagsInput = {
+  id?: string
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  userType?: $Enums.UserType
+  role?: $Enums.UserRole
+  banned?: boolean
+  banReason?: string | null
+  banReasonCode?: $Enums.AccountSuspensionReason | null
+  banExpires?: Date | string | null
+  suspendedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutUserInput
+  staffMemberships?: Prisma.StaffMembershipCreateNestedManyWithoutUserInput
+  ownedOrders?: Prisma.OrderCreateNestedManyWithoutCustomerInput
+  assignedOrders?: Prisma.OrderCreateNestedManyWithoutAssigneeInput
+  orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
+  publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
+  requestedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutRequestedByUserInput
+  approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  rejectedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutRejectedByUserInput
+  reversedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutReversedByUserInput
+  initiatedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutInitiatedByInput
+  payoutExecutionClaims?: Prisma.PayoutExecutionClaimCreateNestedManyWithoutClaimedByInput
+  completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
+  cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
+  messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
+  notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
+  auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
+  managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
+  assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
+  suspendedBy?: Prisma.UserCreateNestedOneWithoutSuspensionsIssuedInput
+  suspensionsIssued?: Prisma.UserCreateNestedManyWithoutSuspendedByInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutActorInput
+}
+
+export type UserUncheckedCreateWithoutResolvedDeliveryFraudFlagsInput = {
+  id?: string
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  userType?: $Enums.UserType
+  role?: $Enums.UserRole
+  banned?: boolean
+  banReason?: string | null
+  banReasonCode?: $Enums.AccountSuspensionReason | null
+  banExpires?: Date | string | null
+  suspendedAt?: Date | string | null
+  suspendedByUserId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutUserInput
+  staffMemberships?: Prisma.StaffMembershipUncheckedCreateNestedManyWithoutUserInput
+  ownedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutCustomerInput
+  assignedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssigneeInput
+  orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
+  publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
+  requestedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutRequestedByUserInput
+  approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  rejectedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutRejectedByUserInput
+  reversedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutReversedByUserInput
+  initiatedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutInitiatedByInput
+  payoutExecutionClaims?: Prisma.PayoutExecutionClaimUncheckedCreateNestedManyWithoutClaimedByInput
+  completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
+  cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
+  messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
+  notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
+  auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
+  managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
+  assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
+  suspensionsIssued?: Prisma.UserUncheckedCreateNestedManyWithoutSuspendedByInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutActorInput
+}
+
+export type UserCreateOrConnectWithoutResolvedDeliveryFraudFlagsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutResolvedDeliveryFraudFlagsInput, Prisma.UserUncheckedCreateWithoutResolvedDeliveryFraudFlagsInput>
+}
+
+export type UserUpsertWithoutResolvedDeliveryFraudFlagsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutResolvedDeliveryFraudFlagsInput, Prisma.UserUncheckedUpdateWithoutResolvedDeliveryFraudFlagsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutResolvedDeliveryFraudFlagsInput, Prisma.UserUncheckedCreateWithoutResolvedDeliveryFraudFlagsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutResolvedDeliveryFraudFlagsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutResolvedDeliveryFraudFlagsInput, Prisma.UserUncheckedUpdateWithoutResolvedDeliveryFraudFlagsInput>
+}
+
+export type UserUpdateWithoutResolvedDeliveryFraudFlagsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userType?: Prisma.EnumUserTypeFieldUpdateOperationsInput | $Enums.UserType
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  banned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  banReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  banReasonCode?: Prisma.NullableEnumAccountSuspensionReasonFieldUpdateOperationsInput | $Enums.AccountSuspensionReason | null
+  banExpires?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  suspendedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutUserNestedInput
+  staffMemberships?: Prisma.StaffMembershipUpdateManyWithoutUserNestedInput
+  ownedOrders?: Prisma.OrderUpdateManyWithoutCustomerNestedInput
+  assignedOrders?: Prisma.OrderUpdateManyWithoutAssigneeNestedInput
+  orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
+  publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
+  requestedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutRequestedByUserNestedInput
+  approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  rejectedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutRejectedByUserNestedInput
+  reversedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutReversedByUserNestedInput
+  initiatedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutInitiatedByNestedInput
+  payoutExecutionClaims?: Prisma.PayoutExecutionClaimUpdateManyWithoutClaimedByNestedInput
+  completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
+  cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
+  messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
+  notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
+  auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
+  managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
+  assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
+  suspendedBy?: Prisma.UserUpdateOneWithoutSuspensionsIssuedNestedInput
+  suspensionsIssued?: Prisma.UserUpdateManyWithoutSuspendedByNestedInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutActorNestedInput
+}
+
+export type UserUncheckedUpdateWithoutResolvedDeliveryFraudFlagsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userType?: Prisma.EnumUserTypeFieldUpdateOperationsInput | $Enums.UserType
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  banned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  banReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  banReasonCode?: Prisma.NullableEnumAccountSuspensionReasonFieldUpdateOperationsInput | $Enums.AccountSuspensionReason | null
+  banExpires?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  suspendedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  suspendedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutUserNestedInput
+  staffMemberships?: Prisma.StaffMembershipUncheckedUpdateManyWithoutUserNestedInput
+  ownedOrders?: Prisma.OrderUncheckedUpdateManyWithoutCustomerNestedInput
+  assignedOrders?: Prisma.OrderUncheckedUpdateManyWithoutAssigneeNestedInput
+  orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
+  publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
+  requestedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutRequestedByUserNestedInput
+  approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  rejectedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutRejectedByUserNestedInput
+  reversedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutReversedByUserNestedInput
+  initiatedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutInitiatedByNestedInput
+  payoutExecutionClaims?: Prisma.PayoutExecutionClaimUncheckedUpdateManyWithoutClaimedByNestedInput
+  completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
+  cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -4516,6 +4809,7 @@ export type UserCreateWithoutRequestedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -4564,6 +4858,7 @@ export type UserUncheckedCreateWithoutRequestedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -4615,6 +4910,7 @@ export type UserCreateWithoutApprovedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -4663,6 +4959,7 @@ export type UserUncheckedCreateWithoutApprovedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -4714,6 +5011,7 @@ export type UserCreateWithoutRejectedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -4762,6 +5060,7 @@ export type UserUncheckedCreateWithoutRejectedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -4813,6 +5112,7 @@ export type UserCreateWithoutReversedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -4861,6 +5161,7 @@ export type UserUncheckedCreateWithoutReversedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -4923,6 +5224,7 @@ export type UserUpdateWithoutRequestedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -4971,6 +5273,7 @@ export type UserUncheckedUpdateWithoutRequestedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -5028,6 +5331,7 @@ export type UserUpdateWithoutApprovedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -5076,6 +5380,7 @@ export type UserUncheckedUpdateWithoutApprovedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -5133,6 +5438,7 @@ export type UserUpdateWithoutRejectedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -5181,6 +5487,7 @@ export type UserUncheckedUpdateWithoutRejectedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -5238,6 +5545,7 @@ export type UserUpdateWithoutReversedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -5286,6 +5594,7 @@ export type UserUncheckedUpdateWithoutReversedWithdrawalsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -5332,6 +5641,7 @@ export type UserCreateWithoutInitiatedPayoutExecutionsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -5380,6 +5690,7 @@ export type UserUncheckedCreateWithoutInitiatedPayoutExecutionsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -5431,6 +5742,7 @@ export type UserCreateWithoutCompletedPayoutExecutionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimCreateNestedManyWithoutClaimedByInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -5479,6 +5791,7 @@ export type UserUncheckedCreateWithoutCompletedPayoutExecutionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimUncheckedCreateNestedManyWithoutClaimedByInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -5530,6 +5843,7 @@ export type UserCreateWithoutCancelledPayoutExecutionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimCreateNestedManyWithoutClaimedByInput
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -5578,6 +5892,7 @@ export type UserUncheckedCreateWithoutCancelledPayoutExecutionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimUncheckedCreateNestedManyWithoutClaimedByInput
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -5640,6 +5955,7 @@ export type UserUpdateWithoutInitiatedPayoutExecutionsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -5688,6 +6004,7 @@ export type UserUncheckedUpdateWithoutInitiatedPayoutExecutionsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -5745,6 +6062,7 @@ export type UserUpdateWithoutCompletedPayoutExecutionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimUpdateManyWithoutClaimedByNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -5793,6 +6111,7 @@ export type UserUncheckedUpdateWithoutCompletedPayoutExecutionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimUncheckedUpdateManyWithoutClaimedByNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -5850,6 +6169,7 @@ export type UserUpdateWithoutCancelledPayoutExecutionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimUpdateManyWithoutClaimedByNestedInput
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -5898,6 +6218,7 @@ export type UserUncheckedUpdateWithoutCancelledPayoutExecutionsInput = {
   payoutExecutionClaims?: Prisma.PayoutExecutionClaimUncheckedUpdateManyWithoutClaimedByNestedInput
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -5944,6 +6265,7 @@ export type UserCreateWithoutPayoutExecutionClaimsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -5992,6 +6314,7 @@ export type UserUncheckedCreateWithoutPayoutExecutionClaimsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -6054,6 +6377,7 @@ export type UserUpdateWithoutPayoutExecutionClaimsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -6102,6 +6426,7 @@ export type UserUncheckedUpdateWithoutPayoutExecutionClaimsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -6149,6 +6474,7 @@ export type UserCreateWithoutTicketsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
@@ -6197,6 +6523,7 @@ export type UserUncheckedCreateWithoutTicketsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
@@ -6248,6 +6575,7 @@ export type UserCreateWithoutAssignedTicketsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -6296,6 +6624,7 @@ export type UserUncheckedCreateWithoutAssignedTicketsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -6358,6 +6687,7 @@ export type UserUpdateWithoutTicketsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
@@ -6406,6 +6736,7 @@ export type UserUncheckedUpdateWithoutTicketsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
@@ -6463,6 +6794,7 @@ export type UserUpdateWithoutAssignedTicketsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -6511,6 +6843,7 @@ export type UserUncheckedUpdateWithoutAssignedTicketsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -6557,6 +6890,7 @@ export type UserCreateWithoutMessagesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
@@ -6605,6 +6939,7 @@ export type UserUncheckedCreateWithoutMessagesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
@@ -6667,6 +7002,7 @@ export type UserUpdateWithoutMessagesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
@@ -6715,6 +7051,7 @@ export type UserUncheckedUpdateWithoutMessagesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
@@ -6761,6 +7098,7 @@ export type UserCreateWithoutNotificationsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
@@ -6809,6 +7147,7 @@ export type UserUncheckedCreateWithoutNotificationsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
@@ -6871,6 +7210,7 @@ export type UserUpdateWithoutNotificationsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
@@ -6919,6 +7259,7 @@ export type UserUncheckedUpdateWithoutNotificationsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
@@ -6965,6 +7306,7 @@ export type UserCreateWithoutAuditLogsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -7013,6 +7355,7 @@ export type UserUncheckedCreateWithoutAuditLogsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -7075,6 +7418,7 @@ export type UserUpdateWithoutAuditLogsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -7123,6 +7467,7 @@ export type UserUncheckedUpdateWithoutAuditLogsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -7169,6 +7514,7 @@ export type UserCreateWithoutMarketplaceReviewsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -7217,6 +7563,7 @@ export type UserUncheckedCreateWithoutMarketplaceReviewsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -7279,6 +7626,7 @@ export type UserUpdateWithoutMarketplaceReviewsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -7327,6 +7675,7 @@ export type UserUncheckedUpdateWithoutMarketplaceReviewsInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -7373,6 +7722,7 @@ export type UserCreateWithoutMarketplaceFavoritesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -7421,6 +7771,7 @@ export type UserUncheckedCreateWithoutMarketplaceFavoritesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCompletionActorInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedCreateNestedManyWithoutCancellationActorInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutResolvedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -7483,6 +7834,7 @@ export type UserUpdateWithoutMarketplaceFavoritesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -7531,6 +7883,7 @@ export type UserUncheckedUpdateWithoutMarketplaceFavoritesInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -7594,6 +7947,7 @@ export type UserUpdateWithoutSuspendedByInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -7641,6 +7995,7 @@ export type UserUncheckedUpdateWithoutSuspendedByInput = {
   completedPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCompletionActorNestedInput
   cancelledPayoutExecutions?: Prisma.PayoutExecutionUncheckedUpdateManyWithoutCancellationActorNestedInput
   adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  resolvedDeliveryFraudFlags?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutResolvedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -7696,6 +8051,7 @@ export type UserCountOutputType = {
   completedPayoutExecutions: number
   cancelledPayoutExecutions: number
   adminVerifiedDeliveryVersions: number
+  resolvedDeliveryFraudFlags: number
   tickets: number
   messages: number
   notifications: number
@@ -7728,6 +8084,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   completedPayoutExecutions?: boolean | UserCountOutputTypeCountCompletedPayoutExecutionsArgs
   cancelledPayoutExecutions?: boolean | UserCountOutputTypeCountCancelledPayoutExecutionsArgs
   adminVerifiedDeliveryVersions?: boolean | UserCountOutputTypeCountAdminVerifiedDeliveryVersionsArgs
+  resolvedDeliveryFraudFlags?: boolean | UserCountOutputTypeCountResolvedDeliveryFraudFlagsArgs
   tickets?: boolean | UserCountOutputTypeCountTicketsArgs
   messages?: boolean | UserCountOutputTypeCountMessagesArgs
   notifications?: boolean | UserCountOutputTypeCountNotificationsArgs
@@ -7868,6 +8225,13 @@ export type UserCountOutputTypeCountAdminVerifiedDeliveryVersionsArgs<ExtArgs ex
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountResolvedDeliveryFraudFlagsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.DeliveryFraudFlagResolutionWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountTicketsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.TicketWhereInput
 }
@@ -7989,6 +8353,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   completedPayoutExecutions?: boolean | Prisma.User$completedPayoutExecutionsArgs<ExtArgs>
   cancelledPayoutExecutions?: boolean | Prisma.User$cancelledPayoutExecutionsArgs<ExtArgs>
   adminVerifiedDeliveryVersions?: boolean | Prisma.User$adminVerifiedDeliveryVersionsArgs<ExtArgs>
+  resolvedDeliveryFraudFlags?: boolean | Prisma.User$resolvedDeliveryFraudFlagsArgs<ExtArgs>
   tickets?: boolean | Prisma.User$ticketsArgs<ExtArgs>
   messages?: boolean | Prisma.User$messagesArgs<ExtArgs>
   notifications?: boolean | Prisma.User$notificationsArgs<ExtArgs>
@@ -8081,6 +8446,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   completedPayoutExecutions?: boolean | Prisma.User$completedPayoutExecutionsArgs<ExtArgs>
   cancelledPayoutExecutions?: boolean | Prisma.User$cancelledPayoutExecutionsArgs<ExtArgs>
   adminVerifiedDeliveryVersions?: boolean | Prisma.User$adminVerifiedDeliveryVersionsArgs<ExtArgs>
+  resolvedDeliveryFraudFlags?: boolean | Prisma.User$resolvedDeliveryFraudFlagsArgs<ExtArgs>
   tickets?: boolean | Prisma.User$ticketsArgs<ExtArgs>
   messages?: boolean | Prisma.User$messagesArgs<ExtArgs>
   notifications?: boolean | Prisma.User$notificationsArgs<ExtArgs>
@@ -8124,6 +8490,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     completedPayoutExecutions: Prisma.$PayoutExecutionPayload<ExtArgs>[]
     cancelledPayoutExecutions: Prisma.$PayoutExecutionPayload<ExtArgs>[]
     adminVerifiedDeliveryVersions: Prisma.$OrderDeliveryVersionPayload<ExtArgs>[]
+    resolvedDeliveryFraudFlags: Prisma.$DeliveryFraudFlagResolutionPayload<ExtArgs>[]
     tickets: Prisma.$TicketPayload<ExtArgs>[]
     messages: Prisma.$TicketMessagePayload<ExtArgs>[]
     notifications: Prisma.$NotificationPayload<ExtArgs>[]
@@ -8566,6 +8933,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   completedPayoutExecutions<T extends Prisma.User$completedPayoutExecutionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$completedPayoutExecutionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PayoutExecutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   cancelledPayoutExecutions<T extends Prisma.User$cancelledPayoutExecutionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$cancelledPayoutExecutionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PayoutExecutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   adminVerifiedDeliveryVersions<T extends Prisma.User$adminVerifiedDeliveryVersionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$adminVerifiedDeliveryVersionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderDeliveryVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  resolvedDeliveryFraudFlags<T extends Prisma.User$resolvedDeliveryFraudFlagsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$resolvedDeliveryFraudFlagsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudFlagResolutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tickets<T extends Prisma.User$ticketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$ticketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   messages<T extends Prisma.User$messagesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$messagesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketMessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   notifications<T extends Prisma.User$notificationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$notificationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$NotificationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -9407,6 +9775,30 @@ export type User$adminVerifiedDeliveryVersionsArgs<ExtArgs extends runtime.Types
   take?: number
   skip?: number
   distinct?: Prisma.OrderDeliveryVersionScalarFieldEnum | Prisma.OrderDeliveryVersionScalarFieldEnum[]
+}
+
+/**
+ * User.resolvedDeliveryFraudFlags
+ */
+export type User$resolvedDeliveryFraudFlagsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the DeliveryFraudFlagResolution
+   */
+  select?: Prisma.DeliveryFraudFlagResolutionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the DeliveryFraudFlagResolution
+   */
+  omit?: Prisma.DeliveryFraudFlagResolutionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.DeliveryFraudFlagResolutionInclude<ExtArgs> | null
+  where?: Prisma.DeliveryFraudFlagResolutionWhereInput
+  orderBy?: Prisma.DeliveryFraudFlagResolutionOrderByWithRelationInput | Prisma.DeliveryFraudFlagResolutionOrderByWithRelationInput[]
+  cursor?: Prisma.DeliveryFraudFlagResolutionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.DeliveryFraudFlagResolutionScalarFieldEnum | Prisma.DeliveryFraudFlagResolutionScalarFieldEnum[]
 }
 
 /**

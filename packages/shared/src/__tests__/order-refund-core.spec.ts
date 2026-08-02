@@ -9,6 +9,7 @@ describe("unaccepted order refund core", () => {
     organizationId: "org-1",
     status: "SUBMITTED",
     paymentStatus: "PAID",
+    currency: "USD",
     amount: 100,
     version: 2,
   }
@@ -16,7 +17,11 @@ describe("unaccepted order refund core", () => {
   function setup() {
     const tx = {
       wallet: {
-        findUnique: jest.fn().mockResolvedValue({ id: "wallet-1", version: 4 }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: "wallet-1",
+          version: 4,
+          currency: "USD",
+        }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       order: {
@@ -95,5 +100,34 @@ describe("unaccepted order refund core", () => {
         jest.fn(),
       ),
     ).rejects.toBeInstanceOf(OrderRefundConflictError)
+  })
+
+  it.each([
+    ["order", { ...order, currency: "EUR" }, "USD"],
+    ["wallet", order, "GBP"],
+  ])("fails closed on a non-USD %s", async (_label, candidateOrder, walletCurrency) => {
+    const tx = setup()
+    tx.wallet.findUnique.mockResolvedValue({
+      id: "wallet-1",
+      version: 4,
+      currency: walletCurrency,
+    })
+
+    await expect(
+      refundUnacceptedPaidOrderInTransaction(
+        tx,
+        candidateOrder,
+        {
+          reference: "acceptance-timeout:order-1",
+          reason: "Acceptance deadline missed",
+          responsibility: "PUBLISHER",
+          actorUserId: null,
+          auditAction: "ORDER_ACCEPTANCE_TIMEOUT_REFUND",
+        },
+        jest.fn(),
+      ),
+    ).rejects.toBeInstanceOf(OrderRefundConflictError)
+    expect(tx.wallet.updateMany).not.toHaveBeenCalled()
+    expect(tx.transaction.create).not.toHaveBeenCalled()
   })
 })

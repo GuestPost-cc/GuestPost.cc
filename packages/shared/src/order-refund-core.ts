@@ -17,6 +17,7 @@ export interface UnacceptedPaidOrder {
   organizationId: string
   status: string
   paymentStatus: string
+  currency: string
   amount: unknown
   version: number
 }
@@ -53,6 +54,11 @@ export async function refundUnacceptedPaidOrderInTransaction(
       "Unaccepted refund requires captured payment",
     )
   }
+  if (order.currency !== "USD") {
+    throw new OrderRefundConflictError(
+      `Unaccepted refund requires exact USD order currency, received ${order.currency}`,
+    )
+  }
 
   const wallet = await tx.wallet.findUnique({
     where: { organizationId: order.organizationId },
@@ -60,6 +66,11 @@ export async function refundUnacceptedPaidOrderInTransaction(
   if (!wallet) {
     throw new OrderRefundConflictError(
       `Wallet missing for paid order ${order.id}`,
+    )
+  }
+  if (wallet.currency !== "USD" || wallet.currency !== order.currency) {
+    throw new OrderRefundConflictError(
+      "Unaccepted refund wallet currency does not match the USD order",
     )
   }
 
@@ -107,6 +118,7 @@ export async function refundUnacceptedPaidOrderInTransaction(
   const transaction = await tx.transaction.create({
     data: {
       amount: order.amount ?? 0,
+      currency: "USD",
       type: "REFUND",
       orderId: order.id,
       walletId: wallet.id,

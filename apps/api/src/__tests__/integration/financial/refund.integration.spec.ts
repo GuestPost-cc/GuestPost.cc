@@ -56,7 +56,7 @@ describe("[INTEGRATION] Financial — full refund after settlement release", () 
       expect(refundedOrder.status).toBe(OrderStatus.REFUNDED)
 
       // ── 3. Assert financial invariants ──
-      // Wallet: 100 (deposit) + 100 (refund credit) = 200
+      // Wallet: 0 after PURCHASE capture + 100 refund credit = 100
       // Publisher: withdrawable 80 → 0 (all clawed back), lifetime earnings 80 → 0
       // Settlement: RELEASED → CANCELLED
       // Order: COMPLETED → REFUNDED
@@ -64,27 +64,27 @@ describe("[INTEGRATION] Financial — full refund after settlement release", () 
         settlementId: settlement.id,
         settlementStatus: SettlementStatus.CANCELLED,
         orderStatus: OrderStatus.REFUNDED,
-        walletAvailableBalance: 200,
+        walletAvailableBalance: 100,
         publisherWithdrawableBalance: 0,
         publisherLifetimeEarnings: 0,
-        transactionCount: 4,
-        transactionSum: 200,
+        transactionCount: 5,
+        transactionSum: 100,
       })
 
-      // Verify specific transaction types exist (deposit is linked to the
-      // same orderId by the fixture, so it appears first in chronological order)
+      // Verify the order-specific accounting chain. The deposit funds the
+      // wallet, not one particular order, so it intentionally has no orderId.
       const txnTypes = await prisma.transaction.findMany({
         where: { orderId: ctx.order.id },
         select: { type: true, amount: true },
         orderBy: { createdAt: "asc" },
       })
       expect(txnTypes.map((t: any) => t.type)).toEqual([
-        TransactionType.DEPOSIT,
+        TransactionType.PURCHASE,
         TransactionType.SETTLEMENT_RELEASE,
         TransactionType.SETTLEMENT_CLAWBACK,
         TransactionType.REFUND,
       ])
-      expect(Number(txnTypes[0].amount)).toBe(100)
+      expect(Number(txnTypes[0].amount)).toBe(-100)
       expect(Number(txnTypes[1].amount)).toBe(80)
       expect(Number(txnTypes[2].amount)).toBe(-80)
       expect(Number(txnTypes[3].amount)).toBe(100)

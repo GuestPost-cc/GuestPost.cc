@@ -14,11 +14,17 @@ describe("RefundService", () => {
     status: "DELIVERED",
     paymentStatus: "PAID",
     amount: new Decimal(100),
+    currency: "USD",
     version: 3,
     website: { ownershipType: "PUBLISHER", publisherId: "pub-1" },
   }
 
-  const wallet = { id: "wallet-1", organizationId: "org-1", version: 1 }
+  const wallet = {
+    id: "wallet-1",
+    organizationId: "org-1",
+    currency: "USD",
+    version: 1,
+  }
 
   beforeEach(() => {
     auditMock = { log: jest.fn().mockResolvedValue(undefined) }
@@ -149,6 +155,7 @@ describe("RefundService", () => {
     prismaMock.$queryRaw.mockResolvedValue([
       {
         publisherId: "pub-1",
+        currency: "USD",
         withdrawableBalance: new Decimal(200),
         version: 5,
       },
@@ -171,6 +178,7 @@ describe("RefundService", () => {
     )
     expect(clawbackTx).toBeDefined()
     expect(clawbackTx[0].data.amount.equals(new Decimal(-80))).toBe(true)
+    expect(clawbackTx[0].data.currency).toBe("USD")
     expect(clawbackTx[0].data.reference).toBe("clawback-order-1")
     expect(prismaMock.settlement.updateMany).toHaveBeenCalledWith({
       where: { id: "set-1", status: "RELEASED", version: 2 },
@@ -191,6 +199,7 @@ describe("RefundService", () => {
     prismaMock.$queryRaw.mockResolvedValue([
       {
         publisherId: "pub-1",
+        currency: "USD",
         withdrawableBalance: new Decimal(30),
         version: 5,
       },
@@ -250,7 +259,11 @@ describe("RefundService", () => {
     })
 
     expect(prismaMock.publisherBalance.create).toHaveBeenCalledWith({
-      data: { publisherId: "pub-1", debtBalance: new Decimal(80) },
+      data: {
+        publisherId: "pub-1",
+        currency: "USD",
+        debtBalance: new Decimal(80),
+      },
     })
     expect(prismaMock.notification.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -271,6 +284,25 @@ describe("RefundService", () => {
         responsibility: "SYSTEM",
       }),
     ).rejects.toThrow(BadRequestException)
+  })
+
+  it("rejects a non-USD order before changing any financial state", async () => {
+    prismaMock.order.findUnique.mockResolvedValue({
+      ...baseOrder,
+      currency: "EUR",
+    })
+
+    await expect(
+      service.refundOrder("order-1", "x", "admin-1", undefined, {
+        responsibility: "SYSTEM",
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "ORDER_CURRENCY_UNSUPPORTED",
+      }),
+    })
+    expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
   })
 
   it("requires explicit final responsibility", async () => {

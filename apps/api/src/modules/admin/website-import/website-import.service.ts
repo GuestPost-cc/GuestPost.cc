@@ -431,8 +431,8 @@ export class WebsiteImportService {
         )
       }
       const currency = row.currency
-      if (!(["USD", "EUR", "GBP"] as const).includes(currency as any)) {
-        warnings.push("currency was skipped; use USD, EUR, or GBP")
+      if (currency !== "USD") {
+        errors.push("currency must be USD")
       }
       const turnaroundDays = optionalInteger(
         row.turnaround_days,
@@ -463,7 +463,7 @@ export class WebsiteImportService {
         Number.isFinite(price) &&
         price > 0 &&
         price <= 1_000_000 &&
-        ["USD", "EUR", "GBP"].includes(currency) &&
+        currency === "USD" &&
         turnaroundDays !== null &&
         revisionRounds !== null
       ) {
@@ -776,7 +776,7 @@ export class WebsiteImportService {
               status: ListingStatus.DRAFT,
               fulfillmentType: "PUBLISHER",
               ownerType: "PUBLISHER",
-              currency: data.initialService?.currency ?? "USD",
+              currency: "USD",
               country: data.country,
               language: data.language,
               websiteUrl: data.url,

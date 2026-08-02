@@ -1123,6 +1123,40 @@ export type EnumVerificationOverrideReasonNullableWithAggregatesFilter<$PrismaMo
   _max?: Prisma.NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel>
 }
 
+export type EnumDeliveryFraudResolutionKindFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryFraudResolutionKind | Prisma.EnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryFraudResolutionKind[] | Prisma.ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryFraudResolutionKind[] | Prisma.ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryFraudResolutionKindFilter<$PrismaModel> | $Enums.DeliveryFraudResolutionKind
+}
+
+export type EnumStaffRoleNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.StaffRole | Prisma.EnumStaffRoleFieldRefInput<$PrismaModel> | null
+  in?: $Enums.StaffRole[] | Prisma.ListEnumStaffRoleFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.StaffRole[] | Prisma.ListEnumStaffRoleFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumStaffRoleNullableFilter<$PrismaModel> | $Enums.StaffRole | null
+}
+
+export type EnumDeliveryFraudResolutionKindWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryFraudResolutionKind | Prisma.EnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryFraudResolutionKind[] | Prisma.ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryFraudResolutionKind[] | Prisma.ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryFraudResolutionKindWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryFraudResolutionKind
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryFraudResolutionKindFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryFraudResolutionKindFilter<$PrismaModel>
+}
+
+export type EnumStaffRoleNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.StaffRole | Prisma.EnumStaffRoleFieldRefInput<$PrismaModel> | null
+  in?: $Enums.StaffRole[] | Prisma.ListEnumStaffRoleFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.StaffRole[] | Prisma.ListEnumStaffRoleFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumStaffRoleNullableWithAggregatesFilter<$PrismaModel> | $Enums.StaffRole | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumStaffRoleNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumStaffRoleNullableFilter<$PrismaModel>
+}
+
 export type EnumWithdrawalStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.WithdrawalStatus | Prisma.EnumWithdrawalStatusFieldRefInput<$PrismaModel>
   in?: $Enums.WithdrawalStatus[] | Prisma.ListEnumWithdrawalStatusFieldRefInput<$PrismaModel>
@@ -2861,6 +2895,40 @@ export type NestedEnumVerificationOverrideReasonNullableWithAggregatesFilter<$Pr
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel>
   _max?: Prisma.NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumDeliveryFraudResolutionKindFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryFraudResolutionKind | Prisma.EnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryFraudResolutionKind[] | Prisma.ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryFraudResolutionKind[] | Prisma.ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryFraudResolutionKindFilter<$PrismaModel> | $Enums.DeliveryFraudResolutionKind
+}
+
+export type NestedEnumStaffRoleNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.StaffRole | Prisma.EnumStaffRoleFieldRefInput<$PrismaModel> | null
+  in?: $Enums.StaffRole[] | Prisma.ListEnumStaffRoleFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.StaffRole[] | Prisma.ListEnumStaffRoleFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumStaffRoleNullableFilter<$PrismaModel> | $Enums.StaffRole | null
+}
+
+export type NestedEnumDeliveryFraudResolutionKindWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryFraudResolutionKind | Prisma.EnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryFraudResolutionKind[] | Prisma.ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryFraudResolutionKind[] | Prisma.ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryFraudResolutionKindWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryFraudResolutionKind
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryFraudResolutionKindFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryFraudResolutionKindFilter<$PrismaModel>
+}
+
+export type NestedEnumStaffRoleNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.StaffRole | Prisma.EnumStaffRoleFieldRefInput<$PrismaModel> | null
+  in?: $Enums.StaffRole[] | Prisma.ListEnumStaffRoleFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.StaffRole[] | Prisma.ListEnumStaffRoleFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumStaffRoleNullableWithAggregatesFilter<$PrismaModel> | $Enums.StaffRole | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumStaffRoleNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumStaffRoleNullableFilter<$PrismaModel>
 }
 
 export type NestedEnumWithdrawalStatusFilter<$PrismaModel = never> = {

@@ -25,7 +25,8 @@ export interface FinancialTestContext {
   }
   website: Awaited<ReturnType<typeof makeWebsite>>
   order: Awaited<ReturnType<typeof makeOrder>>
-  depositTransaction: Awaited<ReturnType<typeof makeTransaction>>
+  depositTransaction: Awaited<ReturnType<typeof makeTransaction>> | null
+  purchaseTransaction: Awaited<ReturnType<typeof makeTransaction>>
   deliveryVersion: Awaited<ReturnType<typeof makeOrderDeliveryVersion>>
   prisma: AnyPrisma
 }
@@ -42,7 +43,7 @@ export interface FinancialFixtureOptions {
  *
  *   org → customer + publisher + website
  *       → order (PAID) + orderItem + DELIVERED + activeDeliveryVersion (VERIFIED)
- *       → wallet → deposit transaction
+ *       → wallet → deposit transaction → exact PURCHASE debit
  *
  * Does NOT create a settlement — specs call SettlementService.createSettlement()
  * to test the production code path.
@@ -65,17 +66,46 @@ export async function setupFinancialTest(
     publisherId: pub.id,
     ownershipType: "PUBLISHER",
   })
+  const catalogSuffix = `${process.pid}-${crypto.randomUUID()}`
+  const listing = await prisma.marketplaceListing.create({
+    data: {
+      title: `Financial fixture ${catalogSuffix}`,
+      slug: `financial-fixture-${catalogSuffix}`,
+      description: "Canonical financial integration fixture",
+      status: "APPROVED",
+      fulfillmentType: "PUBLISHER",
+      ownerType: "PUBLISHER",
+      currency: "USD",
+      publisherId: pub.id,
+      websiteId: website.id,
+      organizationId: organization.id,
+    },
+  })
+  const listingService = await prisma.listingService.create({
+    data: {
+      listingId: listing.id,
+      serviceType: "GUEST_POST",
+      price: orderAmount,
+      currency: "USD",
+      turnaroundDays: 3,
+      availability: "AVAILABLE",
+    },
+  })
 
-  // Create order in an intermediate status first, before we add the
-  // delivery version.
+  // Build the unpaid cart first. The database capture guard intentionally
+  // rejects creating a PAID order before its exact pending item exists.
   const order = await makeOrder(prisma, {
     organizationId: organization.id,
     customerId: user.id,
     websiteId: website.id,
     amount: orderAmount,
-    status: "PAID",
-    paymentStatus: "PAID",
+    status: "DRAFT",
+    paymentStatus: "PENDING",
     fulfillmentChannel: "PUBLISHER",
+    listingId: listing.id,
+    listingServiceId: listingService.id,
+    revisionRoundsSnapshot: listingService.revisionRounds,
+    turnaroundDays: listingService.turnaroundDays,
   })
 
   // OrderItem with websiteId so createSettlement can resolve the publisher.
@@ -83,7 +113,55 @@ export async function setupFinancialTest(
     orderId: order.id,
     websiteId: website.id,
     price: orderAmount,
+    status: "PENDING_PAYMENT",
   })
+
+  // Model the wallet immediately before capture. When withDeposit=false, the
+  // balance represents pre-existing funded wallet value rather than a deposit
+  // created by this fixture.
+  const wallet = await makeWallet(prisma, {
+    organizationId: organization.id,
+    availableBalance: orderAmount,
+  })
+
+  let depositTransaction: Awaited<ReturnType<typeof makeTransaction>> | null =
+    null
+  if (opts.withDeposit !== false) {
+    depositTransaction = await makeTransaction(prisma, {
+      walletId: wallet.id,
+      amount: orderAmount,
+      type: "DEPOSIT",
+      reference: `txn-${process.pid}-${crypto.randomUUID()}`,
+      description: "Test deposit",
+    })
+  }
+
+  // Claim + wallet debit + exact PURCHASE are one commit boundary. The
+  // deferred database guard intentionally rejects a PAID header that commits
+  // before its ledger evidence.
+  const purchaseTransaction = await prisma.$transaction(async (tx: any) => {
+    await tx.order.update({
+      where: { id: order.id },
+      data: { status: "PAID", paymentStatus: "PAID" },
+    })
+    await tx.wallet.update({
+      where: { id: wallet.id },
+      data: {
+        availableBalance: { decrement: orderAmount },
+        version: { increment: 1 },
+      },
+    })
+    return makeTransaction(tx, {
+      walletId: wallet.id,
+      amount: -orderAmount,
+      type: "PURCHASE",
+      reference: `purchase-${process.pid}-${crypto.randomUUID()}`,
+      orderId: order.id,
+      description: "Test order wallet capture",
+    })
+  })
+  order.status = "PAID"
+  order.paymentStatus = "PAID"
 
   // DeliveryVersion with VERIFIED status — required by settlement gating.
   const deliveryVersion = await makeOrderDeliveryVersion(prisma, {
@@ -113,24 +191,6 @@ export async function setupFinancialTest(
     order.status = orderStatus
   }
 
-  const wallet = await makeWallet(prisma, {
-    organizationId: organization.id,
-    availableBalance: opts.withDeposit !== false ? orderAmount : 0,
-  })
-
-  let depositTransaction: Awaited<ReturnType<typeof makeTransaction>> | null =
-    null
-  if (opts.withDeposit !== false) {
-    depositTransaction = await makeTransaction(prisma, {
-      walletId: wallet.id,
-      amount: orderAmount,
-      type: "DEPOSIT",
-      reference: `txn-${process.pid}-${crypto.randomUUID()}`,
-      orderId: order.id,
-      description: "Test deposit",
-    })
-  }
-
   const balance = await prisma.publisherBalance.findUnique({
     where: { publisherId: pub.id },
   })
@@ -141,7 +201,8 @@ export async function setupFinancialTest(
     publisher: { publisher: pub, balance },
     website,
     order,
-    depositTransaction: depositTransaction!,
+    depositTransaction,
+    purchaseTransaction,
     deliveryVersion,
     prisma,
   }

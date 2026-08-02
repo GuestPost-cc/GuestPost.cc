@@ -36,6 +36,7 @@ describe("PayoutExecutionService provider routing", () => {
           id: "wd-1",
           status: "APPROVED",
           method,
+          currency: "USD",
           payoutMethod: {
             id: "pm-1",
             publisherId: "pub-1",
@@ -92,6 +93,29 @@ describe("PayoutExecutionService provider routing", () => {
         "Reviewed manual payout before send",
       ),
     ).rejects.toThrow(/no payout provider/i)
+    expect(providerService.getAdapter).not.toHaveBeenCalled()
+  })
+
+  it("rejects a non-canonical withdrawal currency before provider routing", async () => {
+    const { service, providerService, prisma } = setup("stripe_connect")
+    prisma.withdrawal.findUnique.mockResolvedValue({
+      id: "wd-1",
+      method: "stripe_connect",
+      currency: "usd",
+      publicReference: "GP-WD-0001",
+      publisher: { organizationId: "org-1" },
+    })
+
+    await expect(
+      service.executeWithdrawal(
+        "wd-1",
+        "stripe_connect",
+        "staff-1",
+        "Reviewed corrupt payout currency before send",
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "PAYOUT_CURRENCY_INVALID" }),
+    })
     expect(providerService.getAdapter).not.toHaveBeenCalled()
   })
 

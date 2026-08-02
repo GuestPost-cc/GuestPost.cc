@@ -1,6 +1,7 @@
 export * from "./adapters/encryption.adapter"
 export * from "./constants"
 export * from "./errors"
+export * from "./google-metrics-gate"
 export * from "./providers"
 export type {
   DiscoveryProvider,

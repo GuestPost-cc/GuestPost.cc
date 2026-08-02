@@ -19,6 +19,7 @@ describe("PublisherPayoutsService", () => {
   const publisher = { id: "pub-1", tier: "NEW", organizationId: "org-1" }
   const balance = {
     publisherId: "pub-1",
+    currency: "USD",
     withdrawableBalance: new Decimal(500),
     debtBalance: new Decimal(0),
     lifetimePaid: new Decimal(0),
@@ -192,6 +193,19 @@ describe("PublisherPayoutsService", () => {
       )
       expect(prismaMock.publisherBalance.upsert).not.toHaveBeenCalled()
       expect(prismaMock.publisherBalance.create).not.toHaveBeenCalled()
+    })
+
+    it("fails closed when a persisted balance is not canonical USD", async () => {
+      prismaMock.publisherBalance.findUnique.mockResolvedValue({
+        ...balance,
+        currency: "usd",
+      })
+
+      await expect(service.getBalance("pub-1")).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "PUBLISHER_BALANCE_CURRENCY_INVALID",
+        }),
+      })
     })
   })
 
@@ -609,6 +623,7 @@ describe("PublisherPayoutsService", () => {
       expect(txCall.data.type).toBe("WITHDRAWAL")
       expect(txCall.data.reference).toBe("withdrawal-wd-1")
       expect(txCall.data.amount.equals(new Decimal(-100))).toBe(true)
+      expect(txCall.data.currency).toBe("USD")
     })
 
     it("returns existing withdrawal on idempotency key replay without moving balance", async () => {
@@ -686,6 +701,30 @@ describe("PublisherPayoutsService", () => {
       expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
     })
 
+    it("rejects an idempotency replay whose stored currency is not canonical USD", async () => {
+      prismaMock.withdrawal.findFirst.mockResolvedValue({
+        id: "wd-existing",
+        amount: new Decimal(100),
+        currency: "usd",
+        method: "bank_transfer",
+        payoutMethodId: "pm-1",
+        requestedBy: "user-1",
+      })
+
+      await expect(
+        service.requestWithdrawal(
+          "pub-1",
+          100,
+          "bank_transfer",
+          "user-1",
+          "key-lowercase-currency",
+          "pm-1",
+        ),
+      ).rejects.toThrow(ConflictException)
+      expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+    })
+
     it("rejects sub-cent withdrawal amounts at the service boundary", async () => {
       await expect(
         service.requestWithdrawal(
@@ -711,6 +750,31 @@ describe("PublisherPayoutsService", () => {
           "pm-1",
         ),
       ).rejects.toThrow(BadRequestException)
+    })
+
+    it("rejects a non-USD publisher balance before reserving liability", async () => {
+      prismaMock.publisherBalance.findUnique.mockResolvedValue({
+        ...balance,
+        currency: "EUR",
+      })
+
+      await expect(
+        service.requestWithdrawal(
+          "pub-1",
+          100,
+          "bank_transfer",
+          "user-1",
+          "key-invalid-balance-currency",
+          "pm-1",
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "PUBLISHER_BALANCE_CURRENCY_INVALID",
+        }),
+      })
+      expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
+      expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
     })
 
     it("rejects unsupported methods before reserving publisher funds", async () => {
@@ -865,6 +929,20 @@ describe("PublisherPayoutsService", () => {
       expect(prismaMock.payoutExecution.count).toHaveBeenCalledWith(
         expect.objectContaining({ where: { withdrawalId: "wd-1" } }),
       )
+    })
+
+    it("blocks approval when the withdrawal currency is not canonical USD", async () => {
+      prismaMock.withdrawal.findUnique.mockResolvedValue({
+        ...baseWithdrawal,
+        currency: "EUR",
+      })
+
+      await expect(
+        service.approveWithdrawal("wd-1", "staff-1"),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "CURRENCY_INVALID" }),
+      })
+      expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
     })
 
     it("blocks with NOT_PENDING when a concurrent approve/reject already moved the status", async () => {
@@ -1406,6 +1484,7 @@ describe("PublisherPayoutsService", () => {
       const txCall = prismaMock.transaction.create.mock.calls[0][0]
       expect(txCall.data.type).toBe("WITHDRAWAL_REVERSAL")
       expect(txCall.data.reference).toBe("withdrawal-reject-wd-1")
+      expect(txCall.data.currency).toBe("USD")
       const restored = prismaMock.publisherBalance.updateMany.mock.calls[0][0]
       expect(
         restored.data.withdrawableBalance.increment.equals(new Decimal(100)),
@@ -1454,6 +1533,33 @@ describe("PublisherPayoutsService", () => {
       expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
       expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
       expect(auditMock.log).not.toHaveBeenCalled()
+    })
+
+    it("does not restore funds for a non-USD withdrawal", async () => {
+      prismaMock.withdrawal.findUnique.mockResolvedValue({
+        id: "wd-1",
+        status: "PENDING",
+        version: 0,
+        publisherId: "pub-1",
+        amount: new Decimal(100),
+        currency: "EUR",
+        publisher,
+      })
+
+      await expect(
+        service.rejectWithdrawal(
+          "wd-1",
+          "staff-1",
+          "Reject corrupt withdrawal currency safely.",
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "WITHDRAWAL_CURRENCY_INVALID",
+        }),
+      })
+      expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
     })
 
     it("safely abandons an approved withdrawal with only pre-provider-aborted history", async () => {

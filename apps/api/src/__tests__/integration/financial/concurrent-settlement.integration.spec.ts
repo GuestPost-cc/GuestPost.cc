@@ -54,11 +54,11 @@ describe("[INTEGRATION] Financial — concurrent settlement creation", () => {
 
       // Verify no financial records created until approval (wallet untouched)
       await expectFinancialState(ctx, {
-        walletAvailableBalance: 100,
+        walletAvailableBalance: 0,
         publisherWithdrawableBalance: 0,
         publisherLifetimeEarnings: 0,
-        transactionCount: 1, // only the deposit
-        transactionSum: 100,
+        transactionCount: 2, // deposit plus canonical PURCHASE debit
+        transactionSum: 0,
       })
 
       // Verify the winning settlement can be approved + released normally

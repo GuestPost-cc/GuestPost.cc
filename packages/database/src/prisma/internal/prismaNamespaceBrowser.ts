@@ -82,6 +82,8 @@ export const ModelName = {
   DeliveryVerificationEvidence: 'DeliveryVerificationEvidence',
   DeliverySnapshot: 'DeliverySnapshot',
   DeliveryFraudFlag: 'DeliveryFraudFlag',
+  DeliveryFraudHold: 'DeliveryFraudHold',
+  DeliveryFraudFlagResolution: 'DeliveryFraudFlagResolution',
   OrderReview: 'OrderReview',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
@@ -466,13 +468,16 @@ export const OrderScalarFieldEnum = {
   organizationId: 'organizationId',
   campaignId: 'campaignId',
   idempotencyKey: 'idempotencyKey',
+  requestFingerprint: 'requestFingerprint',
   version: 'version',
+  settlementGateVersion: 'settlementGateVersion',
   activeDeliveryVersionId: 'activeDeliveryVersionId',
   listingId: 'listingId',
   listingServiceId: 'listingServiceId',
   fulfillmentChannel: 'fulfillmentChannel',
   turnaroundDays: 'turnaroundDays',
   warrantyDays: 'warrantyDays',
+  revisionRoundsSnapshot: 'revisionRoundsSnapshot',
   submittedAt: 'submittedAt',
   acceptedAt: 'acceptedAt',
   fulfillmentDueAt: 'fulfillmentDueAt',
@@ -598,8 +603,11 @@ export const SettlementScalarFieldEnum = {
   orderId: 'orderId',
   publisherId: 'publisherId',
   grossAmount: 'grossAmount',
+  currency: 'currency',
   platformFee: 'platformFee',
   publisherAmount: 'publisherAmount',
+  platformFeeBps: 'platformFeeBps',
+  feePolicyVersion: 'feePolicyVersion',
   status: 'status',
   reviewEndsAt: 'reviewEndsAt',
   releasePolicy: 'releasePolicy',
@@ -716,6 +724,34 @@ export const DeliveryFraudFlagScalarFieldEnum = {
 export type DeliveryFraudFlagScalarFieldEnum = (typeof DeliveryFraudFlagScalarFieldEnum)[keyof typeof DeliveryFraudFlagScalarFieldEnum]
 
 
+export const DeliveryFraudHoldScalarFieldEnum = {
+  fraudFlagId: 'fraudFlagId',
+  orderId: 'orderId',
+  deliveryVersionId: 'deliveryVersionId',
+  type: 'type',
+  createdAt: 'createdAt'
+} as const
+
+export type DeliveryFraudHoldScalarFieldEnum = (typeof DeliveryFraudHoldScalarFieldEnum)[keyof typeof DeliveryFraudHoldScalarFieldEnum]
+
+
+export const DeliveryFraudFlagResolutionScalarFieldEnum = {
+  id: 'id',
+  fraudFlagId: 'fraudFlagId',
+  orderId: 'orderId',
+  deliveryVersionId: 'deliveryVersionId',
+  kind: 'kind',
+  reason: 'reason',
+  resolvedByUserId: 'resolvedByUserId',
+  resolvedByRole: 'resolvedByRole',
+  evidenceId: 'evidenceId',
+  evidence: 'evidence',
+  createdAt: 'createdAt'
+} as const
+
+export type DeliveryFraudFlagResolutionScalarFieldEnum = (typeof DeliveryFraudFlagResolutionScalarFieldEnum)[keyof typeof DeliveryFraudFlagResolutionScalarFieldEnum]
+
+
 export const OrderReviewScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
@@ -732,6 +768,7 @@ export type OrderReviewScalarFieldEnum = (typeof OrderReviewScalarFieldEnum)[key
 export const PublisherBalanceScalarFieldEnum = {
   id: 'id',
   publisherId: 'publisherId',
+  currency: 'currency',
   pendingBalance: 'pendingBalance',
   approvedBalance: 'approvedBalance',
   withdrawableBalance: 'withdrawableBalance',
@@ -942,6 +979,7 @@ export const PayoutBatchScalarFieldEnum = {
   id: 'id',
   name: 'name',
   status: 'status',
+  currency: 'currency',
   totalAmount: 'totalAmount',
   totalCount: 'totalCount',
   completedAmount: 'completedAmount',
@@ -1036,8 +1074,11 @@ export const PlatformRevenueScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
   amount: 'amount',
+  currency: 'currency',
   platformFee: 'platformFee',
   netRevenue: 'netRevenue',
+  platformFeeBps: 'platformFeeBps',
+  feePolicyVersion: 'feePolicyVersion',
   recordedAt: 'recordedAt',
   reversedAt: 'reversedAt',
   listingServiceId: 'listingServiceId',
@@ -1523,6 +1564,7 @@ export type ListingFulfillmentRuleScalarFieldEnum = (typeof ListingFulfillmentRu
 export const PlatformSettingsScalarFieldEnum = {
   id: 'id',
   platformFeePct: 'platformFeePct',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1540,6 +1582,7 @@ export const ExternalAccountScalarFieldEnum = {
   displayName: 'displayName',
   encryptedAccessToken: 'encryptedAccessToken',
   encryptedRefreshToken: 'encryptedRefreshToken',
+  encryptionKeyVersion: 'encryptionKeyVersion',
   tokenExpiresAt: 'tokenExpiresAt',
   grantedScopes: 'grantedScopes',
   status: 'status',

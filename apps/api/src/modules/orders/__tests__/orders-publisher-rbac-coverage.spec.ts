@@ -20,8 +20,10 @@ describe("OrdersController publisher content RBAC", () => {
     )
   })
 
-  it("enforces the shared 200,000-character article ceiling", () => {
-    const fulfillment = { submitContentForReview: jest.fn() }
+  it("enforces the shared 200,000-character article ceiling", async () => {
+    const fulfillment = {
+      submitContentForReview: jest.fn().mockResolvedValue({ id: "order-1" }),
+    }
     const controller = new OrdersController(
       {} as any,
       {} as any,
@@ -36,20 +38,20 @@ describe("OrdersController publisher content RBAC", () => {
       publisherId: "publisher-1",
     }
 
-    controller.submitContentForReview(
+    await controller.submitContentForReview(
       "order-1",
       { content: "a".repeat(200_000) },
       user,
     )
     expect(fulfillment.submitContentForReview).toHaveBeenCalledTimes(1)
 
-    expect(() =>
+    await expect(
       controller.submitContentForReview(
         "order-1",
         { content: "a".repeat(200_001) },
         user,
       ),
-    ).toThrow(BadRequestException)
+    ).rejects.toThrow(BadRequestException)
     expect(fulfillment.submitContentForReview).toHaveBeenCalledTimes(1)
   })
 })

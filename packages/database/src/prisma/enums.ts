@@ -690,6 +690,14 @@ export const DeliveryInterventionStatus = {
 export type DeliveryInterventionStatus = (typeof DeliveryInterventionStatus)[keyof typeof DeliveryInterventionStatus]
 
 
+export const DeliveryFraudResolutionKind = {
+  STAFF_CLEARED: 'STAFF_CLEARED',
+  LINK_RESTORED: 'LINK_RESTORED'
+} as const
+
+export type DeliveryFraudResolutionKind = (typeof DeliveryFraudResolutionKind)[keyof typeof DeliveryFraudResolutionKind]
+
+
 export const OrderArticleSource = {
   CUSTOMER: 'CUSTOMER',
   PUBLISHER: 'PUBLISHER',

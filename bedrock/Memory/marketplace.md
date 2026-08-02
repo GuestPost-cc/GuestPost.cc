@@ -2,14 +2,14 @@
 note_type: domain-memory
 domain: marketplace
 project: guestpost-platform
-updated: 2026-07-18
+updated: 2026-08-02
 ---
 
 # Marketplace
 
 ## Listing → Service architecture (post-Phase-7)
 
-A `MarketplaceListing` represents a **website** (or an INTERNAL_SERVICE bundle). It owns site-level fields only — title, slug, description, reviewed categories, one primary language, placement policy, Google-sourced performance summaries, country, tags, and `featured` / `verified`. The legacy listing-level `type` / `price` / `turnaroundDays` / `revisionRounds` / `warrantyDays` columns + the `ListingType` enum were **dropped in migration `20260615130000_phase7_listing_columns`** — every per-service attribute now lives on the child `ListingService` row.
+A `MarketplaceListing` represents a **website** (or an INTERNAL_SERVICE bundle). It owns site-level fields only — title, slug, description, reviewed categories, one primary language, placement policy, source-aware buyer-safe metric summaries, country, tags, and `featured` / `verified`. The legacy listing-level `type` / `price` / `turnaroundDays` / `revisionRounds` / `warrantyDays` columns + the `ListingType` enum were **dropped in migration `20260615130000_phase7_listing_columns`** — every per-service attribute now lives on the child `ListingService` row.
 
 `ListingService` is the orderable unit: `(listingId, serviceType, price, currency, turnaroundDays, revisionRounds, warrantyDays?, requirements?, fulfillmentSettings?, availability, version)`. One listing exposes N services; unique on `(listingId, serviceType)`. Availability: `AVAILABLE` (orderable), `PAUSED` (hidden from buyers, kept for historical order references), `WAITLIST` (visible, not orderable; favorites with matching serviceType get notified on flip to AVAILABLE).
 
@@ -27,9 +27,9 @@ Migration `20260718180000_marketplace_taxonomy_and_listing_policies` replaces th
 
 A listing stores exactly one controlled primary language. Search can select multiple languages. The following listing attributes also store one value each: Sports/Gaming allowed, Pharmacy allowed, Crypto allowed, number of backlinks (1/2/3), link type (DoFollow/NoFollow/Sponsored/UGC), link validity (Permanent/5 years/1 year/6 months/3 months), Google News, Marked as Sponsored, and Foreign-language content allowed. These values are required in publisher and platform creation/edit flows and before submission or approval; existing migrated rows remain nullable until an inventory owner reviews them rather than receiving guessed policy values.
 
-Buyer cards/details expose categories, primary language, link policy, and buyer-safe 30-day performance summaries. Filters are multi-select for categories, languages, backlink count, link type, and validity, plus Any/Yes/No selectors for boolean policies. Public projections never expose raw GSC/GA4 provider rows.
+Buyer cards/details expose categories, primary language, link policy, and current source-specific metrics. Filters are multi-select for categories, languages, backlink count, link type, and validity, plus Any/Yes/No selectors for boolean policies. Public projections never expose raw provider rows.
 
-GSC sync denormalizes 30-day clicks and impressions into the listing summary. GA4 sync denormalizes 30-day sessions, users, and pageviews and uses sessions for marketplace traffic filtering/ranking. Publisher and platform listing forms do not accept self-reported authority or traffic values.
+GSC and GA4 metrics are quarantined as untrusted history because property ownership did not prove exact marketplace-domain binding. OAuth initiation/callback, discovery, linking, sync, schedules, daily writes, denormalized summaries, and public projection all fail closed with `GOOGLE_METRICS_DISABLED`; PostgreSQL also rejects stale-writer metric inserts. Marketplace traffic projection, filtering, sorting, ranking, and recommendations use only a `CURRENT`, unexpired `WebsiteMetric.AHREFS_ORGANIC_TRAFFIC` row. Re-enabling Google metrics requires the append-only property/stream/domain evidence contract in `docs/DOMAIN_METRICS_AND_PUBLISHER_IMPORT.md` and ADR 0008.
 
 ## Lifecycle phase (derived UI state)
 
@@ -77,7 +77,7 @@ The July platform-management update makes this assignment an access boundary: OP
 - Reviews and favorites for social proof (favorites can now be scoped per-serviceType for waitlist notifications)
 - Saved lists for user curation
 - Per-service prices on `ListingService`. Listing-level price/range fields removed in Phase 7
-- Verified marketplace performance summaries: GSC clicks/impressions and GA4 sessions/users/pageviews
+- Current source-aware marketplace metrics; GSC/GA4 remain quarantined until exact domain binding exists
 - AI-powered recommendations (`MarketplaceRecommendation`) — now match on AVAILABLE-service overlap, not the dropped listing-level `type`
 - Fraud detection flags (`MarketplaceFlag`)
 - Marketplace stats include `totalServices`, `activeServices`, `servicesByType` (per-`ServiceType` count + avg price)
@@ -85,7 +85,7 @@ The July platform-management update makes this assignment an access boundary: OP
 
 ## Publisher Inventory UX (updated 2026-07-18)
 
-Publisher inventory now follows the same aggregate boundary as platform inventory: the Enlist Website flow creates the publisher website and its single DRAFT listing atomically. The form captures URL/location, buyer-facing title, 1–7 required marketplace categories, one primary language, every placement-policy value, a description of at most 500 characters, and an optional first service. GSC/GA4 supply performance metrics after integration; the form accepts no self-reported metrics. It redirects to the website workspace rather than exposing a second standalone listing-creation path.
+Publisher inventory now follows the same aggregate boundary as platform inventory: the Enlist Website flow creates the publisher website and its single DRAFT listing atomically. The form captures URL/location, buyer-facing title, 1–7 required marketplace categories, one primary language, every placement-policy value, a description of at most 500 characters, and an optional first service. Manual Ahrefs organic traffic and Moz DA are persisted with provenance; Google metrics remain quarantined. It redirects to the website workspace rather than exposing a second standalone listing-creation path.
 
 The publisher website detail page is the management home for its listing. It combines listing metadata, review-readiness checks, DNS ownership status, lifecycle actions, and the complete service menu. Service price, turnaround, revisions, warranty, currency, and availability remain version-guarded per row; historical orders retain their checkout snapshot. Submission requires a verified domain, category, 1–500 character description, and at least one AVAILABLE service. DRAFT, REJECTED, and ARCHIVED listings can enter moderation.
 
@@ -133,7 +133,7 @@ fulfillment.
 
 ## Buyer Marketplace Decision Flow (2026-07-18)
 
-The customer marketplace is service-aware from discovery through checkout. Browse cards prioritize the information needed to compare a purchase: selected-service or starting price, service type, turnaround, categories, primary language, placement policy, GA4 traffic, fulfillment attribution, review evidence, and URL-access state. Discovery supports deferred text search, quick service chips, category/language/policy/service/budget/GA4-traffic/turnaround/country filters, removable active-filter pills, mobile filters, and stable pagination.
+The customer marketplace is service-aware from discovery through checkout. Browse cards prioritize the information needed to compare a purchase: selected-service or starting price, service type, turnaround, categories, primary language, placement policy, current Ahrefs organic traffic, fulfillment attribution, review evidence, and URL-access state. Discovery supports deferred text search, quick service chips, category/language/policy/service/budget/current-traffic/turnaround/country filters, removable active-filter pills, mobile filters, and stable pagination.
 
 Filtering by a service makes each card quote that service rather than an unrelated listing minimum. Price sorting also operates on the minimum matching AVAILABLE `ListingService.price`; it no longer references the removed listing-level price column. Text search includes listing title/description/slug plus category and tag names, and country/language matching is case-insensitive.
 
@@ -147,7 +147,7 @@ Platform websites are created only from `/dashboard/websites`. Creation writes t
 
 `SUPER_ADMIN` controls platform website field edits, reassignment, pause/archive, featured/verified state, and publisher service corrections. `OPERATIONS` can create platform websites, which are always assigned to the creator, and can add/update/pause services only on assigned platform sites. Operations remains read-only for publisher listing services and can perform listing moderation (`APPROVED`, `REJECTED`, `PAUSED`).
 
-Platform websites start `VERIFIED` because DNS ownership verification is not required. GSC and GA4 remain separate OAuth performance-data links. Their credentials use `{ownerType: PLATFORM, ownerId: websiteId}`, so Super Admin and the assigned Operations owner can configure and sync a site without exposing another site's Google account. The chosen Google identity is independent of the GuestPost login identity.
+Platform websites start `VERIFIED` because DNS ownership verification is not required. Existing GSC/GA4 account and link rows are retained only for incident-safe recovery and are disabled; configuration, discovery, linking, and sync fail closed until exact property-to-domain binding is implemented. Credential ownership remains explicit as `{ownerType: PLATFORM, ownerId: websiteId}` so any later repair cannot cross website trust boundaries.
 
 ## Features
 
@@ -155,7 +155,7 @@ Platform websites start `VERIFIED` because DNS ownership verification is not req
 - Reviews and favorites for social proof (favorites can now be scoped per-serviceType for waitlist notifications)
 - Saved lists for user curation
 - Per-service prices on `ListingService`. Listing-level price/range fields removed in Phase 7
-- Verified marketplace performance summaries: GSC clicks/impressions and GA4 sessions/users/pageviews
+- Current source-aware marketplace metrics; GSC/GA4 remain quarantined until exact domain binding exists
 - AI-powered recommendations (`MarketplaceRecommendation`) — now match on AVAILABLE-service overlap, not the dropped listing-level `type`
 - Fraud detection flags (`MarketplaceFlag`)
 - Marketplace stats include `totalServices`, `activeServices`, `servicesByType` (per-`ServiceType` count + avg price)

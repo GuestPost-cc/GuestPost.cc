@@ -9,6 +9,7 @@ import {
   decideOrderCancellation,
   orderEventMetadata,
   resolveOrderCancellationConfig,
+  runLockedOrderSerializableTransaction,
 } from "@guestpost/shared"
 import { FinalRefundResponsibility } from "@guestpost/shared/dist/order-refund-core"
 import {
@@ -254,120 +255,124 @@ export class OrderCancellationService {
     body: CreateCancellationRequestDto,
   ) {
     try {
-      return await this.prisma.$transaction(async (tx: any) => {
-        const order = await this.loadOrder(tx, orderId)
-        this.assertActorCanAccess(order, actor)
-        if (actor.kind === "CUSTOMER") {
-          assertOwnerOrCreator({
-            customerId: order.customerId,
-            actorUserId: actor.userId,
-            actorRole: actor.customerRole,
-            action: "request cancellation",
-          })
-        } else if (actor.kind === "PUBLISHER") {
-          this.assertPublisherOwner(actor, "request cancellation")
-        }
-        this.assertExpectedVersion(order.version, body.expectedVersion)
+      return await runLockedOrderSerializableTransaction(
+        this.prisma,
+        orderId,
+        async (tx: any) => {
+          const order = await this.loadOrder(tx, orderId)
+          this.assertActorCanAccess(order, actor)
+          if (actor.kind === "CUSTOMER") {
+            assertOwnerOrCreator({
+              customerId: order.customerId,
+              actorUserId: actor.userId,
+              actorRole: actor.customerRole,
+              action: "request cancellation",
+            })
+          } else if (actor.kind === "PUBLISHER") {
+            this.assertPublisherOwner(actor, "request cancellation")
+          }
+          this.assertExpectedVersion(order.version, body.expectedVersion)
 
-        const channel = this.channelFor(order)
-        const decision = decideOrderCancellation({
-          status: order.status,
-          paymentStatus: order.paymentStatus,
-          fulfillmentChannel: channel,
-          actor: actor.kind,
-          hasActiveRequest: order.cancellationRequests.length > 0,
-          hasActiveDispute: this.hasActiveDispute(order),
-          fulfillmentDueAt: order.fulfillmentDueAt,
-          warrantyEndsAt: order.warrantyEndsAt,
-        })
-        if (decision.action !== "REQUEST_CANCELLATION") {
-          throw new BadRequestException(decision.message)
-        }
-
-        const { responseWindowHours } = resolveOrderCancellationConfig(
-          process.env,
-        )
-        const responseDeadlineAt = new Date(
-          Date.now() + responseWindowHours * 60 * 60 * 1000,
-        )
-        const responsibility = this.initialResponsibility(
-          actor.kind,
-          body.reasonCode,
-          channel,
-          order,
-        )
-        // Claim the order version without changing its lifecycle status. Any
-        // fulfillment transition racing this request must lose its optimistic
-        // lock, while a transition that committed first makes this request
-        // retry against fresh policy state.
-        const held = await tx.order.updateMany({
-          where: {
-            id: orderId,
-            version: order.version,
+          const channel = this.channelFor(order)
+          const decision = decideOrderCancellation({
             status: order.status,
-          },
-          data: { version: { increment: 1 } },
-        })
-        if (held.count === 0) {
-          throw new ConflictException(
-            "Order changed while cancellation was requested. Refresh and retry.",
-          )
-        }
-        const request = await tx.orderCancellationRequest.create({
-          data: {
-            orderId,
-            requestedByUserId: actor.userId,
-            requesterType: actor.kind,
-            actorSnapshot: {
-              userId: actor.userId,
-              kind: actor.kind,
-              customerRole: actor.customerRole ?? null,
-              publisherRole: actor.publisherRole ?? null,
-              staffRole: actor.staffRole ?? null,
-            },
-            reasonCode: body.reasonCode,
-            note: body.note,
-            previousOrderStatus: order.status,
+            paymentStatus: order.paymentStatus,
             fulfillmentChannel: channel,
-            responsibility,
-            responseDeadlineAt,
-            idempotencyKey: body.idempotencyKey,
-          },
-        })
+            actor: actor.kind,
+            hasActiveRequest: order.cancellationRequests.length > 0,
+            hasActiveDispute: this.hasActiveDispute(order),
+            fulfillmentDueAt: order.fulfillmentDueAt,
+            warrantyEndsAt: order.warrantyEndsAt,
+          })
+          if (decision.action !== "REQUEST_CANCELLATION") {
+            throw new BadRequestException(decision.message)
+          }
 
-        await tx.orderEvent.create({
-          data: {
-            orderId,
-            eventType: "CANCELLATION_REQUESTED",
-            actorId: actor.userId,
-            message: "Cancellation requested; fulfillment is paused",
-            metadata: {
-              requestId: request.id,
-              reasonCode: body.reasonCode,
-              requesterType: actor.kind,
-              responseDeadlineAt: responseDeadlineAt.toISOString(),
+          const { responseWindowHours } = resolveOrderCancellationConfig(
+            process.env,
+          )
+          const responseDeadlineAt = new Date(
+            Date.now() + responseWindowHours * 60 * 60 * 1000,
+          )
+          const responsibility = this.initialResponsibility(
+            actor.kind,
+            body.reasonCode,
+            channel,
+            order,
+          )
+          // Claim the order version without changing its lifecycle status. Any
+          // fulfillment transition racing this request must lose its optimistic
+          // lock, while a transition that committed first makes this request
+          // retry against fresh policy state.
+          const held = await tx.order.updateMany({
+            where: {
+              id: orderId,
+              version: order.version,
+              status: order.status,
             },
-          },
-        })
-        await this.audit.log(
-          {
-            action: "ORDER_CANCELLATION_REQUESTED",
-            entityType: "OrderCancellationRequest",
-            entityId: request.id,
-            metadata: {
+            data: { version: { increment: 1 } },
+          })
+          if (held.count === 0) {
+            throw new ConflictException(
+              "Order changed while cancellation was requested. Refresh and retry.",
+            )
+          }
+          const request = await tx.orderCancellationRequest.create({
+            data: {
               orderId,
-              fromStatus: order.status,
+              requestedByUserId: actor.userId,
+              requesterType: actor.kind,
+              actorSnapshot: {
+                userId: actor.userId,
+                kind: actor.kind,
+                customerRole: actor.customerRole ?? null,
+                publisherRole: actor.publisherRole ?? null,
+                staffRole: actor.staffRole ?? null,
+              },
               reasonCode: body.reasonCode,
-              ...orderEventMetadata(order),
+              note: body.note,
+              previousOrderStatus: order.status,
+              fulfillmentChannel: channel,
+              responsibility,
+              responseDeadlineAt,
+              idempotencyKey: body.idempotencyKey,
             },
-            userId: actor.userId,
-            organizationId: order.organizationId,
-          },
-          tx,
-        )
-        await this.notifyCounterparty(tx, order, actor.kind, request.id)
-        return request
-      })
+          })
+
+          await tx.orderEvent.create({
+            data: {
+              orderId,
+              eventType: "CANCELLATION_REQUESTED",
+              actorId: actor.userId,
+              message: "Cancellation requested; fulfillment is paused",
+              metadata: {
+                requestId: request.id,
+                reasonCode: body.reasonCode,
+                requesterType: actor.kind,
+                responseDeadlineAt: responseDeadlineAt.toISOString(),
+              },
+            },
+          })
+          await this.audit.log(
+            {
+              action: "ORDER_CANCELLATION_REQUESTED",
+              entityType: "OrderCancellationRequest",
+              entityId: request.id,
+              metadata: {
+                orderId,
+                fromStatus: order.status,
+                reasonCode: body.reasonCode,
+                ...orderEventMetadata(order),
+              },
+              userId: actor.userId,
+              organizationId: order.organizationId,
+            },
+            tx,
+          )
+          await this.notifyCounterparty(tx, order, actor.kind, request.id)
+          return request
+        },
+      )
     } catch (error: any) {
       if (error?.code === "P2002") {
         throw new ConflictException(
@@ -386,100 +391,106 @@ export class OrderCancellationService {
   ) {
     let publisherId: string | null = null
     let responsibility: CancellationResponsibility | null = null
-    const result = await this.prisma.$transaction(async (tx: any) => {
-      const request = await tx.orderCancellationRequest.findFirst({
-        where: { id: requestId, orderId },
-        include: {
-          order: {
-            include: {
-              website: {
-                select: { ownershipType: true, publisherId: true },
-              },
-              fulfillmentAssignments: {
-                where: { status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
-                select: { assignedToUserId: true },
-                take: 1,
+    const result = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        const request = await tx.orderCancellationRequest.findFirst({
+          where: { id: requestId, orderId },
+          include: {
+            order: {
+              include: {
+                website: {
+                  select: { ownershipType: true, publisherId: true },
+                },
+                fulfillmentAssignments: {
+                  where: { status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
+                  select: { assignedToUserId: true },
+                  take: 1,
+                },
               },
             },
           },
-        },
-      })
-      if (!request)
-        throw new NotFoundException("Cancellation request not found")
-      if (request.status !== "REQUESTED") {
-        throw new ConflictException("Cancellation request already responded to")
-      }
-      this.assertCounterparty(request, actor)
-      const order = request.order
-      publisherId = order.website?.publisherId ?? null
+        })
+        if (!request)
+          throw new NotFoundException("Cancellation request not found")
+        if (request.status !== "REQUESTED") {
+          throw new ConflictException(
+            "Cancellation request already responded to",
+          )
+        }
+        this.assertCounterparty(request, actor)
+        const order = request.order
+        publisherId = order.website?.publisherId ?? null
 
-      if (body.action === CancellationResponseAction.ACCEPT) {
-        const resolvedResponsibility =
-          request.responsibility === CancellationResponsibility.UNDETERMINED
-            ? CancellationResponsibility.SHARED
-            : request.responsibility
-        responsibility = resolvedResponsibility
-        const refunded = await this.refund.refundOrderInTransaction(
+        if (body.action === CancellationResponseAction.ACCEPT) {
+          const resolvedResponsibility =
+            request.responsibility === CancellationResponsibility.UNDETERMINED
+              ? CancellationResponsibility.SHARED
+              : request.responsibility
+          responsibility = resolvedResponsibility
+          const refunded = await this.refund.refundOrderInTransaction(
+            tx,
+            order,
+            `Mutually accepted cancellation: ${request.reasonCode}${body.note ? ` — ${body.note}` : ""}`,
+            actor.userId,
+            `cancellation-request:${request.id}`,
+            resolvedResponsibility,
+          )
+          const resolved = await tx.orderCancellationRequest.updateMany({
+            where: { id: request.id, status: "REQUESTED" },
+            data: {
+              status: "APPROVED",
+              respondedByUserId: actor.userId,
+              responseNote: body.note,
+              responsibility: resolvedResponsibility,
+              resolution: "FULL_REFUND",
+              resolutionReason: "Counterparty accepted the cancellation",
+              refundTransactionId: refunded.refundTransactionId,
+              resolvedAt: new Date(),
+            },
+          })
+          if (resolved.count === 0) this.concurrentRequestError()
+        } else {
+          const contested = await tx.orderCancellationRequest.updateMany({
+            where: { id: request.id, status: "REQUESTED" },
+            data: {
+              status: "UNDER_REVIEW",
+              respondedByUserId: actor.userId,
+              responseNote: body.note,
+            },
+          })
+          if (contested.count === 0) this.concurrentRequestError()
+        }
+
+        await tx.orderEvent.create({
+          data: {
+            orderId,
+            eventType: "CANCELLATION_RESPONDED",
+            actorId: actor.userId,
+            message:
+              body.action === CancellationResponseAction.ACCEPT
+                ? "Cancellation accepted; full wallet refund issued"
+                : "Cancellation contested; case sent for staff review",
+            metadata: { requestId, action: body.action, note: body.note },
+          },
+        })
+        await this.audit.log(
+          {
+            action: "ORDER_CANCELLATION_RESPONDED",
+            entityType: "OrderCancellationRequest",
+            entityId: requestId,
+            metadata: { orderId, action: body.action },
+            userId: actor.userId,
+            organizationId: order.organizationId,
+          },
           tx,
-          order,
-          `Mutually accepted cancellation: ${request.reasonCode}${body.note ? ` — ${body.note}` : ""}`,
-          actor.userId,
-          `cancellation-request:${request.id}`,
-          resolvedResponsibility,
         )
-        const resolved = await tx.orderCancellationRequest.updateMany({
-          where: { id: request.id, status: "REQUESTED" },
-          data: {
-            status: "APPROVED",
-            respondedByUserId: actor.userId,
-            responseNote: body.note,
-            responsibility: resolvedResponsibility,
-            resolution: "FULL_REFUND",
-            resolutionReason: "Counterparty accepted the cancellation",
-            refundTransactionId: refunded.refundTransactionId,
-            resolvedAt: new Date(),
-          },
+        return tx.orderCancellationRequest.findUniqueOrThrow({
+          where: { id: requestId },
         })
-        if (resolved.count === 0) this.concurrentRequestError()
-      } else {
-        const contested = await tx.orderCancellationRequest.updateMany({
-          where: { id: request.id, status: "REQUESTED" },
-          data: {
-            status: "UNDER_REVIEW",
-            respondedByUserId: actor.userId,
-            responseNote: body.note,
-          },
-        })
-        if (contested.count === 0) this.concurrentRequestError()
-      }
-
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "CANCELLATION_RESPONDED",
-          actorId: actor.userId,
-          message:
-            body.action === CancellationResponseAction.ACCEPT
-              ? "Cancellation accepted; full wallet refund issued"
-              : "Cancellation contested; case sent for staff review",
-          metadata: { requestId, action: body.action, note: body.note },
-        },
-      })
-      await this.audit.log(
-        {
-          action: "ORDER_CANCELLATION_RESPONDED",
-          entityType: "OrderCancellationRequest",
-          entityId: requestId,
-          metadata: { orderId, action: body.action },
-          userId: actor.userId,
-          organizationId: order.organizationId,
-        },
-        tx,
-      )
-      return tx.orderCancellationRequest.findUniqueOrThrow({
-        where: { id: requestId },
-      })
-    })
+      },
+    )
 
     if (responsibility === "PUBLISHER" && publisherId) {
       await this.queue.enqueueTrustRecompute(
@@ -496,121 +507,133 @@ export class OrderCancellationService {
     staffUserId: string,
     body: ReviewCancellationRequestDto,
   ) {
-    return this.prisma.$transaction(async (tx: any) => {
-      const request = await tx.orderCancellationRequest.findUnique({
-        where: { id: requestId },
-        include: { order: true },
-      })
-      if (!request)
-        throw new NotFoundException("Cancellation request not found")
-      if (!["UNDER_REVIEW", "ESCALATED"].includes(request.status)) {
-        throw new BadRequestException(
-          "Cancellation request is not awaiting review",
-        )
-      }
-
-      if (body.resolution === CancellationResolution.FULL_REFUND) {
-        this.assertFinalResponsibility(body.responsibility)
-        await tx.orderCancellationRequest.update({
-          where: { id: requestId },
-          data: {
-            status: "PENDING_FINANCE",
-            reviewedByUserId: staffUserId,
-            responsibility: body.responsibility,
-            resolution: body.resolution,
-            resolutionReason: body.reason,
-          },
-        })
-      } else if (body.resolution === CancellationResolution.CONTINUE_ORDER) {
-        await tx.orderCancellationRequest.update({
-          where: { id: requestId },
-          data: {
-            status: "REJECTED",
-            reviewedByUserId: staffUserId,
-            responsibility: body.responsibility,
-            resolution: body.resolution,
-            resolutionReason: body.reason,
-            resolvedAt: new Date(),
-          },
-        })
-      } else {
-        const existingDispute = await tx.orderDispute.findUnique({
-          where: { orderId: request.orderId },
-        })
-        if (existingDispute) {
-          throw new ConflictException(
-            "This order already has a dispute record; resolve it instead",
-          )
-        }
-        await tx.orderDispute.create({
-          data: {
-            orderId: request.orderId,
-            raisedBy: request.requestedByUserId ?? staffUserId,
-            reason: body.reason,
-            previousStatus: request.order.status,
-          },
-        })
-        const transitioned = await tx.order.updateMany({
-          where: {
-            id: request.orderId,
-            version: request.order.version,
-            status: request.previousOrderStatus,
-          },
-          data: { status: "DISPUTED", version: { increment: 1 } },
-        })
-        if (transitioned.count === 0) {
-          throw new ConflictException(
-            "Order changed while the cancellation was reviewed. Retry.",
-          )
-        }
-        await tx.orderCancellationRequest.update({
-          where: { id: requestId },
-          data: {
-            status: "DISPUTED",
-            reviewedByUserId: staffUserId,
-            responsibility: body.responsibility,
-            resolution: body.resolution,
-            resolutionReason: body.reason,
-            resolvedAt: new Date(),
-          },
-        })
-      }
-
-      await tx.orderEvent.create({
-        data: {
-          orderId: request.orderId,
-          eventType: "CANCELLATION_RESOLVED",
-          actorId: staffUserId,
-          message: `Cancellation review: ${body.resolution}`,
-          metadata: {
-            requestId,
-            resolution: body.resolution,
-            responsibility: body.responsibility,
-            pendingFinance:
-              body.resolution === CancellationResolution.FULL_REFUND,
-          },
-        },
-      })
-      await this.audit.log(
-        {
-          action: "ORDER_CANCELLATION_REVIEWED",
-          entityType: "OrderCancellationRequest",
-          entityId: requestId,
-          metadata: {
-            orderId: request.orderId,
-            resolution: body.resolution,
-            responsibility: body.responsibility,
-            reason: body.reason,
-          },
-          userId: staffUserId,
-          organizationId: request.order.organizationId,
-        },
-        tx,
-      )
-      return tx.orderCancellationRequest.findUniqueOrThrow({
-        where: { id: requestId },
-      })
+    const preflight = await this.prisma.orderCancellationRequest.findUnique({
+      where: { id: requestId },
+      select: { orderId: true },
     })
+    if (!preflight) {
+      throw new NotFoundException("Cancellation request not found")
+    }
+
+    return runLockedOrderSerializableTransaction(
+      this.prisma,
+      preflight.orderId,
+      async (tx: any) => {
+        const request = await tx.orderCancellationRequest.findUnique({
+          where: { id: requestId },
+          include: { order: true },
+        })
+        if (!request)
+          throw new NotFoundException("Cancellation request not found")
+        if (!["UNDER_REVIEW", "ESCALATED"].includes(request.status)) {
+          throw new BadRequestException(
+            "Cancellation request is not awaiting review",
+          )
+        }
+
+        if (body.resolution === CancellationResolution.FULL_REFUND) {
+          this.assertFinalResponsibility(body.responsibility)
+          await tx.orderCancellationRequest.update({
+            where: { id: requestId },
+            data: {
+              status: "PENDING_FINANCE",
+              reviewedByUserId: staffUserId,
+              responsibility: body.responsibility,
+              resolution: body.resolution,
+              resolutionReason: body.reason,
+            },
+          })
+        } else if (body.resolution === CancellationResolution.CONTINUE_ORDER) {
+          await tx.orderCancellationRequest.update({
+            where: { id: requestId },
+            data: {
+              status: "REJECTED",
+              reviewedByUserId: staffUserId,
+              responsibility: body.responsibility,
+              resolution: body.resolution,
+              resolutionReason: body.reason,
+              resolvedAt: new Date(),
+            },
+          })
+        } else {
+          const existingDispute = await tx.orderDispute.findUnique({
+            where: { orderId: request.orderId },
+          })
+          if (existingDispute) {
+            throw new ConflictException(
+              "This order already has a dispute record; resolve it instead",
+            )
+          }
+          await tx.orderDispute.create({
+            data: {
+              orderId: request.orderId,
+              raisedBy: request.requestedByUserId ?? staffUserId,
+              reason: body.reason,
+              previousStatus: request.order.status,
+            },
+          })
+          const transitioned = await tx.order.updateMany({
+            where: {
+              id: request.orderId,
+              version: request.order.version,
+              status: request.previousOrderStatus,
+            },
+            data: { status: "DISPUTED", version: { increment: 1 } },
+          })
+          if (transitioned.count === 0) {
+            throw new ConflictException(
+              "Order changed while the cancellation was reviewed. Retry.",
+            )
+          }
+          await tx.orderCancellationRequest.update({
+            where: { id: requestId },
+            data: {
+              status: "DISPUTED",
+              reviewedByUserId: staffUserId,
+              responsibility: body.responsibility,
+              resolution: body.resolution,
+              resolutionReason: body.reason,
+              resolvedAt: new Date(),
+            },
+          })
+        }
+
+        await tx.orderEvent.create({
+          data: {
+            orderId: request.orderId,
+            eventType: "CANCELLATION_RESOLVED",
+            actorId: staffUserId,
+            message: `Cancellation review: ${body.resolution}`,
+            metadata: {
+              requestId,
+              resolution: body.resolution,
+              responsibility: body.responsibility,
+              pendingFinance:
+                body.resolution === CancellationResolution.FULL_REFUND,
+            },
+          },
+        })
+        await this.audit.log(
+          {
+            action: "ORDER_CANCELLATION_REVIEWED",
+            entityType: "OrderCancellationRequest",
+            entityId: requestId,
+            metadata: {
+              orderId: request.orderId,
+              resolution: body.resolution,
+              responsibility: body.responsibility,
+              reason: body.reason,
+            },
+            userId: staffUserId,
+            organizationId: request.order.organizationId,
+          },
+          tx,
+        )
+        return tx.orderCancellationRequest.findUniqueOrThrow({
+          where: { id: requestId },
+        })
+      },
+    )
   }
 
   async financeApprove(
@@ -620,81 +643,93 @@ export class OrderCancellationService {
   ) {
     let publisherId: string | null = null
     let responsibility: CancellationResponsibility | null = null
-    const result = await this.prisma.$transaction(async (tx: any) => {
-      const request = await tx.orderCancellationRequest.findUnique({
-        where: { id: requestId },
-        include: {
-          order: {
-            include: {
-              website: {
-                select: { ownershipType: true, publisherId: true },
+    const preflight = await this.prisma.orderCancellationRequest.findUnique({
+      where: { id: requestId },
+      select: { orderId: true },
+    })
+    if (!preflight) {
+      throw new NotFoundException("Cancellation request not found")
+    }
+
+    const result = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      preflight.orderId,
+      async (tx: any) => {
+        const request = await tx.orderCancellationRequest.findUnique({
+          where: { id: requestId },
+          include: {
+            order: {
+              include: {
+                website: {
+                  select: { ownershipType: true, publisherId: true },
+                },
               },
             },
           },
-        },
-      })
-      if (!request)
-        throw new NotFoundException("Cancellation request not found")
-      if (request.status !== "PENDING_FINANCE") {
-        throw new BadRequestException(
-          "Cancellation is not pending finance approval",
+        })
+        if (!request)
+          throw new NotFoundException("Cancellation request not found")
+        if (request.status !== "PENDING_FINANCE") {
+          throw new BadRequestException(
+            "Cancellation is not pending finance approval",
+          )
+        }
+        publisherId = request.order.website?.publisherId ?? null
+        const resolvedResponsibility = this.assertFinalResponsibility(
+          request.responsibility,
         )
-      }
-      publisherId = request.order.website?.publisherId ?? null
-      const resolvedResponsibility = this.assertFinalResponsibility(
-        request.responsibility,
-      )
-      responsibility = resolvedResponsibility
-      const refunded = await this.refund.refundOrderInTransaction(
-        tx,
-        request.order,
-        `${request.resolutionReason ?? "Cancellation approved"} — Finance: ${body.reason}`,
-        financeUserId,
-        `cancellation-request:${request.id}`,
-        resolvedResponsibility,
-      )
-      await tx.orderCancellationRequest.update({
-        where: { id: requestId },
-        data: {
-          status: "APPROVED",
-          financeApprovedByUserId: financeUserId,
-          refundTransactionId: refunded.refundTransactionId,
-          resolvedAt: new Date(),
-        },
-      })
-      await tx.orderEvent.create({
-        data: {
-          orderId: request.orderId,
-          eventType: "CANCELLATION_RESOLVED",
-          actorId: financeUserId,
-          message: "Cancellation refund approved by Finance",
-          metadata: {
-            requestId,
-            responsibility,
+        responsibility = resolvedResponsibility
+        const refunded = await this.refund.refundOrderInTransaction(
+          tx,
+          request.order,
+          `${request.resolutionReason ?? "Cancellation approved"} — Finance: ${body.reason}`,
+          financeUserId,
+          `cancellation-request:${request.id}`,
+          resolvedResponsibility,
+        )
+        await tx.orderCancellationRequest.update({
+          where: { id: requestId },
+          data: {
+            status: "APPROVED",
+            financeApprovedByUserId: financeUserId,
             refundTransactionId: refunded.refundTransactionId,
+            resolvedAt: new Date(),
           },
-        },
-      })
-      await this.audit.log(
-        {
-          action: "ORDER_CANCELLATION_FINANCE_APPROVED",
-          entityType: "OrderCancellationRequest",
-          entityId: requestId,
-          metadata: {
+        })
+        await tx.orderEvent.create({
+          data: {
             orderId: request.orderId,
-            responsibility,
-            refundTransactionId: refunded.refundTransactionId,
-            reason: body.reason,
+            eventType: "CANCELLATION_RESOLVED",
+            actorId: financeUserId,
+            message: "Cancellation refund approved by Finance",
+            metadata: {
+              requestId,
+              responsibility,
+              refundTransactionId: refunded.refundTransactionId,
+            },
           },
-          userId: financeUserId,
-          organizationId: request.order.organizationId,
-        },
-        tx,
-      )
-      return tx.orderCancellationRequest.findUniqueOrThrow({
-        where: { id: requestId },
-      })
-    })
+        })
+        await this.audit.log(
+          {
+            action: "ORDER_CANCELLATION_FINANCE_APPROVED",
+            entityType: "OrderCancellationRequest",
+            entityId: requestId,
+            metadata: {
+              orderId: request.orderId,
+              responsibility,
+              refundTransactionId: refunded.refundTransactionId,
+              reason: body.reason,
+            },
+            userId: financeUserId,
+            organizationId: request.order.organizationId,
+          },
+          tx,
+        )
+        return tx.orderCancellationRequest.findUniqueOrThrow({
+          where: { id: requestId },
+        })
+      },
+    )
 
     if (responsibility === "PUBLISHER" && publisherId) {
       await this.queue.enqueueTrustRecompute(

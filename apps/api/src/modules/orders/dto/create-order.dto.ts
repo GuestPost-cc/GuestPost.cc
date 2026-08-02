@@ -64,6 +64,7 @@ export class CreateOrderDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(200)
   idempotencyKey?: string
 
   // Phase 2: the customer's locked pick from the listing detail page.

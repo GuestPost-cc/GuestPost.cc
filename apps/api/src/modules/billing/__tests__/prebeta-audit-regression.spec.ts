@@ -13,6 +13,7 @@
  *      debit it idempotently.
  */
 
+import { createHash } from "node:crypto"
 import { normalizeProviderWebhook } from "@guestpost/shared"
 import {
   type FingerprintablePaymentDisputeEvent,
@@ -67,6 +68,10 @@ function makePrismaMock() {
     "paymentProviderEvent",
     "paymentDispute",
     "orderDispute",
+    "orderDeliveryVersion",
+    "revision",
+    "deliveryFraudFlag",
+    "orderCancellationRequest",
     "auditLog",
     "marketplaceListing",
     "service",
@@ -106,6 +111,7 @@ function makePrismaMock() {
     }
   })
   mock.$queryRawUnsafe = jest.fn().mockResolvedValue([])
+  mock.$queryRaw = jest.fn().mockResolvedValue([])
   mock.depositAttempt.findUniqueOrThrow.mockResolvedValue({
     status: "SUCCEEDED",
   })
@@ -1220,7 +1226,23 @@ describe("F-3: tenant-scoped order idempotency", () => {
   })
 
   it("replays via the composite (organizationId, idempotencyKey) lookup — never key-only", async () => {
-    const existing = { id: "order-A", organizationId: "org-A" }
+    const requestFingerprint = createHash("sha256")
+      .update(
+        JSON.stringify({
+          actorUserId: "u1",
+          customerId: "u1",
+          items: [],
+          organizationId: "org-A",
+          type: "GUEST_POST",
+        }),
+      )
+      .digest("hex")
+    const existing = {
+      id: "order-A",
+      organizationId: "org-A",
+      currency: "USD",
+      requestFingerprint,
+    }
     prisma.order.findUnique.mockResolvedValue(existing)
 
     const result = await service.createOrder(
@@ -1233,7 +1255,14 @@ describe("F-3: tenant-scoped order idempotency", () => {
       "u1",
     )
 
-    expect(result).toBe(existing)
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "order-A",
+        currency: "USD",
+      }),
+    )
+    expect(result).not.toHaveProperty("organizationId")
+    expect(result).not.toHaveProperty("requestFingerprint")
     expect(prisma.order.findUnique).toHaveBeenCalledWith({
       where: {
         organizationId_idempotencyKey: {
@@ -1262,6 +1291,7 @@ describe("F-3: tenant-scoped order idempotency", () => {
       listingId: "listing-B",
       serviceType: "GUEST_POST",
       price: 500,
+      currency: "USD",
       availability: "AVAILABLE",
       turnaroundDays: 7,
       listing: {
@@ -1404,6 +1434,7 @@ describe("F-5: customerApprove cannot corrupt a RELEASED settlement", () => {
     orderId: "order-1",
     publisherId: "pub-1",
     status: "PENDING",
+    currency: "USD",
     publisherAmount: new Decimal(160),
     version: 2,
     order: { organizationId: "org-1", customerId: "u1" },
@@ -1411,6 +1442,24 @@ describe("F-5: customerApprove cannot corrupt a RELEASED settlement", () => {
 
   beforeEach(() => {
     prisma = makePrismaMock()
+    prisma.order.findUnique.mockResolvedValue({
+      id: "order-1",
+      status: "DELIVERED",
+      version: 4,
+      currency: "USD",
+      paymentStatus: "PAID",
+      activeDeliveryVersionId: "delivery-1",
+    })
+    prisma.orderDeliveryVersion.findUnique.mockResolvedValue({
+      id: "delivery-1",
+      orderId: "order-1",
+      verificationStatus: "VERIFIED",
+      interventionStatus: "NONE",
+    })
+    prisma.orderDispute.findFirst.mockResolvedValue(null)
+    prisma.revision.findFirst.mockResolvedValue(null)
+    prisma.orderCancellationRequest.findFirst.mockResolvedValue(null)
+    prisma.deliveryFraudFlag.count.mockResolvedValue(0)
     service = new SettlementsService(
       prisma,
       auditMock() as any,
@@ -1441,6 +1490,7 @@ describe("F-5: customerApprove cannot corrupt a RELEASED settlement", () => {
           id: "set-1",
           status: { in: ["PENDING", "UNDER_REVIEW"] },
           version: 2,
+          currency: "USD",
         },
       }),
     )

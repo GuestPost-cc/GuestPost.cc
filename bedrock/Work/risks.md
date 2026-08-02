@@ -1,12 +1,13 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-07-29
+updated: 2026-08-02
 ---
 
 # Risks
 
-Updated 2026-07-29 after the financial evidence and recovery hardening. All
+Updated 2026-08-02 after the financial evidence, order capture, settlement,
+Google-metric quarantine, and integration-encryption hardening. All
 historical audit findings at Medium severity or above are closed; the remaining
 items are staging gates, strategic/long-horizon risks, and operator-action
 follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
@@ -23,13 +24,29 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   a legacy data-completeness issue rather than an authorization bypass.
 - **The finance evidence release is mixed-version incompatible.** Database
   triggers intentionally reject old payout, dispute, provider-inbox,
-  cancellation, and completion write shapes. A rolling deployment or rollback
-  to the prior application would create an outage. Mitigation: hard-drain all
-  old writers, apply ordered migrations, start only the matching image, keep
-  money gates closed, rehearse on a populated clone, require every financial
-  constraint to be validated, and forward-fix. Short-timeout SHARE barriers
-  make both payout-provenance and aggregate preflights fail rather than race a
+  cancellation, catalog/order capture, revision, delivery/fraud, settlement,
+  and completion write shapes. A rolling deployment or rollback to the prior
+  application would create an outage. Mitigation: hard-drain all old writers,
+  apply the complete ordered chain including `0900` through `0960`, start only
+  the matching image, keep money gates closed, rehearse on a populated clone,
+  require every financial constraint to be validated, and forward-fix.
+  Short-timeout SHARE barriers make preflights fail rather than race a
   still-active old writer.
+- **Google performance metrics are unavailable until exact domain binding is
+  implemented.** GSC/GA4 OAuth, discovery, linking, sync, schedules, daily
+  writes, summaries, and public projection intentionally fail closed. Raw rows
+  are untrusted forensic history. Re-enable only through the append-only GSC
+  property / GA4 web-stream / canonical-domain evidence contract in ADR 0008;
+  do not remove the quarantine as an availability shortcut.
+- **Provider revocation is not yet a durable saga.** Integration disconnect
+  performs the external provider revocation while its database transaction is
+  open. If revocation succeeds and the local commit later rolls back, the row
+  can remain `ACTIVE` while its credential is externally invalid, causing an
+  availability/reconciliation mismatch. Google integrations are quarantined,
+  so this is not a current data-publication or money-path release blocker.
+  Before re-enabling them, move revocation to a durable state machine/outbox or
+  add authenticated reconciliation that converges local status without ever
+  claiming an unproven disconnect.
 - **Historical payout ambiguity cannot be repaired by inventing claims.** The
   migration deliberately classifies pre-reference executions whose predecessor
   may already have called a provider as `LEGACY_PROVIDER_OUTCOME_UNKNOWN`.
@@ -195,7 +212,13 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   order-dispute REFUND path can still split refund and dispute transitions.
   Lower-priority cleanup.
 - **Listing reviews default APPROVED without purchase verification.** Low-volume today; opens fake-review attack vector at scale.
-- **Single-currency only.** `currency` is free-text USD default; non-USD orders today would settle as USD-as-its-own-currency. Stripe Connect onboarding is therefore restricted to accounts whose default currency is USD, and a non-USD account cannot be enabled. Phase 7.1 surfaces a warning (`meta.currencyMismatch`) when any non-USD Order exists in the revenue dashboard range. Multi-currency requires an explicit, end-to-end rollout rather than relaxing this guard.
+- **Single-currency only.** Exact case-sensitive USD is now enforced in
+  services and PostgreSQL across catalog, order, wallet, ledger, settlement,
+  revenue, balance, withdrawal, and payout evidence. Historical non-USD facts
+  block migration instead of being relabelled. Multi-currency requires a new
+  ADR, per-currency balances/liabilities, typed amount-currency identities, FX
+  evidence, provider certification, and a rehearsed migration; never relax one
+  check in isolation.
 
 ### Risks introduced by this batch (new)
 

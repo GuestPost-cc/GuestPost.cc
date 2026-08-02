@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-07-19
+updated: 2026-08-02
 ---
 
 # Infrastructure
@@ -195,6 +195,47 @@ The default of 10 is conservative — suitable for up to ~5 API replicas sharing
 ### Related findings
 - #7 (Critical): pool was hardcoded to `max: 25` with no env-var override → closed by adding `PRISMA_POOL_MAX` + default 10.
 - #30 (Medium): pool config had no validation → closed by adding `parsePoolMax()` + `console.warn` on excess.
+
+## Integration Credential Encryption And Rotation
+
+Integration access and refresh tokens use AES-256-GCM and are encrypted as one
+credential pair. Every configured master key must be exactly 64 hexadecimal
+characters (32 bytes); malformed or explicitly empty values fail in every
+environment, and production has no fallback.
+
+`ExternalAccount.encryptionKeyVersion` records the key version shared by both
+token fields. New versioned deployments use
+`INTEGRATION_ENCRYPTION_KEYS={"1":"<old-64-hex>","2":"<new-64-hex>"}` plus
+`INTEGRATION_ENCRYPTION_ACTIVE_VERSION`. The keyring is bounded to 16 distinct
+positive versions; the active version must exist, be the highest configured
+version, and be at least 2. Do not configure the legacy
+`INTEGRATION_ENCRYPTION_KEY` at the same time.
+
+Version 2+ ciphertext carries a `v{version}:` envelope and AES-GCM additional
+authenticated data bound to provider, external user id, owner type, owner id,
+and token purpose (`access` or `refresh`). Copying ciphertext between accounts
+or token fields therefore fails authentication. OAuth, refresh, reconnect, and
+rotation update both ciphertexts and the stored version atomically; refresh
+uses compare-and-swap so it cannot overwrite a concurrent reconnect or rekey.
+Version 1 remains read-compatible only while its key is present.
+
+Hard rotation procedure:
+
+1. Add a new, distinct 64-hex key under a higher keyring version; keep every
+   version still referenced by an `ExternalAccount` row.
+2. Set that version as `INTEGRATION_ENCRYPTION_ACTIVE_VERSION`, deploy the
+   dual-read/new-write configuration, and stop if startup validation fails.
+3. Run `pnpm tsx scripts/rotate-integration-encryption.ts --verify-only` before
+   mutation, then run the command without `--verify-only`. It processes bounded
+   batches, locks each account, authenticates both old envelopes, and replaces
+   the pair with an exact compare-and-swap update.
+4. Run `--verify-only` again and confirm no active credential row references an
+   older version before removing any old key. A missing key, newer stored
+   version, invalid envelope, or concurrent credential change is a hard
+   failure—not a skipped success.
+
+Never log keys, plaintext tokens, or decrypted payloads. Rotation output is
+limited to row ids and normalized failure classes.
 
 ## Payout Encryption Key Rotation
 

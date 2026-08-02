@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto"
 import type { OwnerContext } from "@guestpost/integrations"
 import {
+  assertGoogleMetricsEnabled,
   DiscoveryService,
   IntegrationService,
   type OAuthStatePayload,
@@ -31,6 +32,9 @@ export class IntegrationsApiService {
     provider: string,
     returnUrl: string,
   ): Promise<{ authorizationUrl: string }> {
+    // Fail before creating one-time OAuth state so a disabled connection
+    // attempt leaves no durable state or credential side effects.
+    assertGoogleMetricsEnabled()
     const nonce = randomBytes(32).toString("hex")
     const statePayload: OAuthStatePayload = {
       ownerType: owner.ownerType,

@@ -4,6 +4,7 @@ import {
   ProviderRateLimitError,
   TokenExpiredError,
 } from "../errors"
+import { assertGoogleMetricsEnabled } from "../google-metrics-gate"
 import type { DiscoveryResource, SyncResult } from "../types"
 import type { DiscoveryProvider, SyncProvider } from "./provider.interface"
 
@@ -38,6 +39,7 @@ export class GoogleSearchConsoleProvider
   private readonly baseUrl = "https://www.googleapis.com/webmasters/v3"
 
   async discoverResources(accessToken: string): Promise<DiscoveryResource[]> {
+    assertGoogleMetricsEnabled()
     const sites = await this.listSites(accessToken)
     return sites.map((site) => ({
       externalResourceId: site.url,
@@ -53,6 +55,7 @@ export class GoogleSearchConsoleProvider
     endDate?: Date,
     websiteIntegrationId?: string,
   ): Promise<SyncResult> {
+    assertGoogleMetricsEnabled()
     const startMs = Date.now()
 
     const end = endDate ?? new Date()

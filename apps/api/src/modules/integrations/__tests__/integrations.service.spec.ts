@@ -51,4 +51,20 @@ describe("IntegrationsApiService OAuth redirects", () => {
       "OAuth return URL is not allowed",
     )
   })
+
+  it("rejects disabled Google OAuth before creating one-time state", async () => {
+    const service = Object.create(IntegrationsApiService.prototype) as any
+    service.oauthStateService = { createState: jest.fn() }
+    service.integrationService = { initiateOAuth: jest.fn() }
+
+    await expect(
+      service.initiateConnect(
+        { ownerType: "PUBLISHER", ownerId: "publisher-1" },
+        "GOOGLE_SEARCH_CONSOLE",
+        "/dashboard",
+      ),
+    ).rejects.toMatchObject({ code: "GOOGLE_METRICS_DISABLED" })
+    expect(service.oauthStateService.createState).not.toHaveBeenCalled()
+    expect(service.integrationService.initiateOAuth).not.toHaveBeenCalled()
+  })
 })

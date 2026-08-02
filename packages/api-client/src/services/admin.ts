@@ -583,7 +583,28 @@ export interface AdminDeliveryVerificationQueueItem {
       redirectChain: unknown
       checkedAt: string
     } | null
-    fraudFlags: Array<{ type: string; details: unknown }>
+    fraudFlags: Array<{
+      id: string
+      deliveryVersionId: string
+      type: string
+      details: unknown
+      createdAt: string
+      deliveryVersion: {
+        id: string
+        version: number
+        publishedUrl: string
+        verificationStatus: string
+        supersededByVersion: number | null
+        evidence: {
+          httpStatus: number
+          resolvedUrl: string
+          anchorFound: boolean
+          linkFound: boolean
+          targetUrlMatched: boolean
+          checkedAt: string
+        } | null
+      }
+    }>
   } | null
   priority: {
     score: number
@@ -1795,6 +1816,11 @@ export class AdminService {
       json: { targetStatus, reason },
     })
   }
+  resolveDeliveryFraudFlag(fraudFlagId: string, reason: string) {
+    return this.client.post(`/fraud-flags/${fraudFlagId}/resolve`, {
+      json: { reason },
+    })
+  }
 
   moderateReview(reviewId: string, status: "APPROVED" | "REJECTED") {
     return this.client.patch(
@@ -2046,8 +2072,8 @@ export class AdminService {
    * a same-duration previous-period comparison and `deltaPct` (null when the
    * previous window has zero gross — UI hides the delta cap instead of
    * showing "+∞%" / "NaN%"). `meta.currencyMismatch` is populated when any
-   * Order in the range was non-USD (PlatformRevenue itself has no currency
-   * column today; the safety check lives at the Order layer).
+   * source Order in the range was non-USD. Both Order and PlatformRevenue are
+   * USD-constrained today; the source scan remains a defense-in-depth check.
    */
   getRevenue(params: {
     from?: string

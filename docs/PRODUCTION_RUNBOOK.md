@@ -31,6 +31,9 @@ evidence while refusing money mutations.
 | `PAYOUT_LEGACY_METHODS_ENABLED` | false for Stripe rollout; only enable after the selected legacy provider is certified |
 | `WISE_API_KEY`, `WISE_WEBHOOK_PUBLIC_KEY` | Reserved for Wise certification/webhook verification; automated Wise sends remain disabled until typed settlement and recovery evidence are approved |
 | `PAYOUT_ENCRYPTION_KEY` | Exactly 64 hexadecimal characters (32 bytes); malformed configured keys fail startup in every environment, and payout-details encryption refuses the dev-derived fallback in production |
+| `INTEGRATION_ENCRYPTION_KEY` | Legacy integration-token key registered as version 1; exactly 64 hexadecimal characters; mutually exclusive with the keyring variables |
+| `INTEGRATION_ENCRYPTION_KEYS` | Bounded JSON object mapping positive integer versions to distinct exact 64-hex keys; production rotation mode; an explicitly empty value is invalid |
+| `INTEGRATION_ENCRYPTION_ACTIVE_VERSION` | Highest version present in `INTEGRATION_ENCRYPTION_KEYS`, and at least 2; all new OAuth/token-refresh writes use it |
 | `CORS_ORIGIN` | comma-separated frontend origins |
 | `WEBHOOK_INGRESS_RATE_LIMIT_MAX` | optional exact signed-webhook per-IP/minute cap; production default 600, valid range 1..10,000; never use a prefix exemption |
 | `WORKER_MODE` | `realtime` for the continuous service; job modes are documented in `WORKER_ARCHITECTURE.md` |
@@ -69,6 +72,68 @@ preserve the old key in the incident vault, and require a separately reviewed
 dual-key/keyring migration with complete verification and rollback rehearsal.
 The detailed engineering contract is in
 `bedrock/Memory/infrastructure.md#payout-encryption-key-rotation`.
+
+### Integration OAuth-token key rotation
+
+`ExternalAccount.encryptionKeyVersion` identifies the master-key entry used
+for both authenticated token ciphertexts. Decrypt never guesses a version.
+Version 2+ envelopes carry a database-readable version prefix and AES-GCM
+additional authenticated data binds each ciphertext to the immutable account
+provider/external-user/owner identity and to its access-versus-refresh purpose.
+The database rejects version relabeling, one-sided rotation, version decrease,
+and a stale unprefixed v1 writer targeting a v2+ row. Use this sequence for a
+hard rotation:
+
+Before applying `20260802093000`, validate the **currently deployed** legacy
+secret in the secret manager without printing or copying it into build logs.
+The former runtime accepted any value of at least 64 characters and passed its
+first 64 characters to Node's hex decoder, which could silently stop at
+non-hex material:
+
+- Exactly 64 hexadecimal characters: register that material as v1 and proceed.
+- More than 64 characters with an all-hex first 64: normalize v1 to exactly
+  those first 64 characters, then prove every row decrypts with `--verify-only`.
+- Any non-hex character within the first 64: stop the cutover. Never pad,
+  reinterpret, or guess the key. Preserve the secret and ciphertext backup,
+  keep Google metrics quarantined, and use a separately reviewed isolated
+  remediation or require affected owners to reconnect OAuth. Only after
+  preserving incident evidence may an unreadable account be moved to the
+  documented `ERROR` + two-empty-token sentinel for reconnection.
+
+The migration backfills historical rows to v1 and intentionally installs no
+database default. This is a hard-drain boundary: every new writer must persist
+the version returned by encryption. After a row reaches v2, its required
+versioned envelope also prevents an old image from silently replacing it with
+v1 ciphertext under the retained v2 label.
+
+1. Set `FINANCE_RUNTIME_MODE=locked`, pause integration on-demand workers, and
+   retain the old 64-hex key in the incident/release vault.
+2. With only the old key configured, run
+   `pnpm tsx scripts/rotate-integration-encryption.ts --verify-only`. Any
+   unknown version, malformed envelope, or decrypt failure blocks the release.
+3. Replace `INTEGRATION_ENCRYPTION_KEY` with
+   `INTEGRATION_ENCRYPTION_KEYS={"1":"<old-64-hex>","2":"<new-64-hex>"}`
+   and set `INTEGRATION_ENCRYPTION_ACTIVE_VERSION=2`. Never configure the
+   legacy and keyring variables together. The active version must always be the
+   highest configured version; the runtime and rotator reject downgrade
+   configurations.
+4. Restart only the API and integration-capable on-demand lane. New OAuth and
+   refresh writes now use v2 while both versions remain readable.
+5. Run `pnpm tsx scripts/rotate-integration-encryption.ts`. The bounded scanner
+   locks and rotates each row atomically, decrypts with the stored version and
+   account/purpose context, and uses a CAS so a concurrent refresh/reconnect
+   wins safely. A corrupt row is reported by safe account ID without preventing
+   later rows from being attempted; any reported failure blocks completion.
+6. Run `--verify-only` again and query the version distribution. Remove v1
+   from the keyring only after the non-active row count is zero, canaries pass,
+   and the prior key remains recoverable from the release vault.
+
+The command never prints plaintext or ciphertext. Each failed row rolls back
+completely and the command exits non-zero after reporting safe row IDs. Do not
+rotate by direct SQL and do not delete an old key while any row still
+references it. Historical `ERROR` accounts with the documented pair
+of empty missing-credential sentinels carry no ciphertext/key dependency; the
+verifier and rotator skip them, and only a fresh OAuth callback may repair them.
 
 `packages/database/prisma.config.ts` uses `DIRECT_DATABASE_URL` for migration
 commands and falls back to `DATABASE_URL` only for local development. In
@@ -121,6 +186,44 @@ processed exact replay is a mutation-free 2xx no-op in every mode.
 The mode does not protect against an old image that does not implement it.
 Remove money-route access at the gateway, drain old writers, and prove their
 replica count is zero before applying the guards.
+
+The `20260802090000`–`20260802096000` boundary is also a hard-drain cutover.
+Before applying it, stop API, finance workers, auto-accept/settlement workers,
+and integration on-demand workers. The USD preflight must return no non-USD
+fact; do not edit a failing row to USD. The migration then installs relational
+settlement guards, quarantines Google old-writer paths, and adds persisted
+integration key versions. Restart only the matching image in
+`FINANCE_RUNTIME_MODE=recovery_only`; run migration assertions, reconciliation,
+and sandbox canaries before deliberately returning finance to `normal`.
+The final three migrations add append-only fraud-hold adjudication,
+payload-bound order idempotency/contract snapshots, and the one-active-revision
+backstop. Legacy snapshot values stay `NULL` because current catalog terms are
+not historical evidence. Old API and worker images do not understand those
+guards and must remain drained.
+
+Before this boundary, run `pnpm test:migrations:finance` against the maintained
+populated historical fixture and against a sanitized production clone. Also run
+the paid-order/settlement queries in `docs/FINANCIAL_INCIDENT_QUERIES.md` and
+require: one exact USD `PURCHASE` for every paid Order; one
+`PlatformSettings` row; every active Settlement split matching the current
+versioned fee policy; every Settlement publisher matching
+`Order.websiteId -> Website.publisherId`; every unresolved fraud flag having
+one exact current hold, every resolved flag having no hold, and every
+resolution bound to its immutable flag;
+positive cent-exact ListingService/Order/OrderItem amounts and exact captured
+Order item count, total, status, website identity, and canonical
+ListingService -> MarketplaceListing -> Website attribution; captured and
+refunded Orders have exactly one matching PURCHASE, and no unpaid/failed Order
+retains PURCHASE evidence;
+automated release has newest successful active-delivery evidence within the
+fixed 12-hour window, with `freshnessBlocked` alerted across two sweeps;
+every unreversed PlatformRevenue row matching its exact PLATFORM
+Order/PURCHASE and carrying a whole-cent versioned fee split; and no non-USD
+financial fact. Never synthesize a `PURCHASE`, change a Website publisher, or
+edit a fee split merely to pass preflight—preserve the rows and reconcile the
+underlying money and attribution evidence. Reversed legacy PlatformRevenue may
+remain explicitly unversioned; do not label it with the current policy unless
+its original policy is independently proven.
 
 1. `git pull` the release tag; `pnpm install --frozen-lockfile`.
 2. **Backup first**: `scripts/backup-db.sh /var/backups/guestpost` (verifies dump readability).
@@ -284,9 +387,13 @@ The rehearsal and production verification must both run the
 `docs/FINANCIAL_INCIDENT_QUERIES.md` and return zero rows. A constraint present
 with `convalidated = false` is not a passed release gate. Also compare
 before/after counts for `PayoutExecutionClaim`, `PaymentProviderEvent`,
-`PaymentDispute`, withdrawals, executions, allocations, and money ledger rows;
-explain every migration classification rather than treating matching totals as
-provider truth.
+`PaymentDispute`, paid Orders, `PURCHASE` rows, Settlements,
+`PlatformSettings` versions, `PlatformRevenue`, `OrderDeliveryVersion`,
+`DeliveryVerificationEvidence`, `DeliverySnapshot`, `DeliveryFraudFlag`,
+`DeliveryFraudHold`, `DeliveryFraudFlagResolution`, `Revision`,
+withdrawals, executions, allocations, and money ledger rows; explain every
+migration classification rather than treating matching totals as provider
+truth.
 
 ### CRITICAL: exactly one worker code version
 Realtime and short-lived job modes may overlap only when they use the same

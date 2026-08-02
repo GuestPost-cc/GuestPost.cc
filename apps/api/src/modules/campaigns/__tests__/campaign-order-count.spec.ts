@@ -17,7 +17,12 @@ describe("CampaignsService.listCampaigns", () => {
         Promise.all(operations),
       ),
     }
-    const service = new CampaignsService(prisma, {} as any, {} as any)
+    const service = new CampaignsService(
+      prisma,
+      {} as any,
+      {} as any,
+      {} as any,
+    )
 
     const result = await service.listCampaigns("org-1", 25, 0)
 
@@ -42,5 +47,41 @@ describe("CampaignsService.listCampaigns", () => {
       take: 25,
       skip: 0,
     })
+  })
+
+  it("delegates the legacy campaign revision route to the canonical order state machine", async () => {
+    const orderReview = {
+      requestRevision: jest.fn().mockResolvedValue({ id: "revision-1" }),
+    }
+    const prisma = { order: { findFirst: jest.fn() } }
+    const service = new CampaignsService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      orderReview as any,
+    )
+
+    await expect(
+      service.requestRevision(
+        "order-1",
+        "org-1",
+        "Please update the requested content.",
+        "user-1",
+      ),
+    ).resolves.toEqual({
+      id: "revision-1",
+      website: undefined,
+      items: [],
+      events: [],
+      settlements: [],
+    })
+
+    expect(orderReview.requestRevision).toHaveBeenCalledWith(
+      "order-1",
+      "org-1",
+      "user-1",
+      "Please update the requested content.",
+    )
+    expect(prisma.order.findFirst).not.toHaveBeenCalled()
   })
 })

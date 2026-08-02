@@ -1,13 +1,16 @@
-import { prisma } from "@guestpost/database"
+import { Prisma, prisma } from "@guestpost/database"
 import {
   ACTIVE_CANCELLATION_REQUEST_STATUSES,
+  assertCanonicalPlatformRevenueFundingCore,
   assertFinanceOperationAllowed,
   defaultWorkflowConfig,
+  evaluateLockedSettlementEligibility,
   getSettlementReviewDays,
   QUEUE_JOBS,
   QUEUES,
   resolveOrderCancellationConfig,
-  resolvePlatformFeeFractionCore,
+  resolvePlatformFeePolicyCore,
+  runLockedOrderSerializableTransaction,
   WorkflowDecisionService,
 } from "@guestpost/shared"
 import {
@@ -90,33 +93,38 @@ async function runCancellationResponseTimeoutSweep() {
   })
   let escalated = 0
   for (const request of expired) {
-    const changed = await prisma.$transaction(async (tx: any) => {
-      const updated = await tx.orderCancellationRequest.updateMany({
-        where: { id: request.id, status: "REQUESTED" },
-        data: { status: "ESCALATED" },
-      })
-      if (updated.count === 0) return false
-      await tx.orderEvent.create({
-        data: {
-          orderId: request.orderId,
-          eventType: "CANCELLATION_RESPONDED",
-          actorId: null,
-          message: "Cancellation response deadline expired; escalated to staff",
-          metadata: { requestId: request.id, automatic: true },
-        },
-      })
-      await tx.auditLog.create({
-        data: {
-          action: "ORDER_CANCELLATION_ESCALATED",
-          entityType: "OrderCancellationRequest",
-          entityId: request.id,
-          metadata: { orderId: request.orderId, automatic: true },
-          userId: null,
-          organizationId: null,
-        },
-      })
-      return true
-    })
+    const changed = await runLockedOrderSerializableTransaction(
+      prisma,
+      request.orderId,
+      async (tx: any) => {
+        const updated = await tx.orderCancellationRequest.updateMany({
+          where: { id: request.id, status: "REQUESTED" },
+          data: { status: "ESCALATED" },
+        })
+        if (updated.count === 0) return false
+        await tx.orderEvent.create({
+          data: {
+            orderId: request.orderId,
+            eventType: "CANCELLATION_RESPONDED",
+            actorId: null,
+            message:
+              "Cancellation response deadline expired; escalated to staff",
+            metadata: { requestId: request.id, automatic: true },
+          },
+        })
+        await tx.auditLog.create({
+          data: {
+            action: "ORDER_CANCELLATION_ESCALATED",
+            entityType: "OrderCancellationRequest",
+            entityId: request.id,
+            metadata: { orderId: request.orderId, automatic: true },
+            userId: null,
+            organizationId: null,
+          },
+        })
+        return true
+      },
+    )
     if (changed) escalated++
   }
   return { scanned: expired.length, escalated }
@@ -220,13 +228,6 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
       activeDeliveryVersion: {
         select: { id: true, publishedUrl: true },
       },
-      items: {
-        where: { websiteId: { not: null } },
-        take: 1,
-        include: {
-          website: { select: { publisherId: true, ownershipType: true } },
-        },
-      },
     },
   })
 
@@ -252,172 +253,271 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
     }
 
     try {
-      const didAccept = await prisma.$transaction(async (tx: any) => {
-        const upd = await tx.order.updateMany({
-          where: {
-            id: order.id,
-            status: "VERIFIED",
-            version: order.version,
-          },
-          data: {
-            status: "DELIVERED",
-            deliveredAt: now,
-            deliveryAcceptedMethod: "AUTO_TIMEOUT",
-            version: { increment: 1 },
-          },
-        })
-        if (upd.count === 0) return false
-
-        await tx.orderEvent.create({
-          data: {
-            orderId: order.id,
-            eventType: "AUTO_ACCEPTED",
-            actorId: null,
-            message: `Review window expired — order auto-accepted at ${now.toISOString()}`,
-            metadata: {
-              deliveryVersionId: order.activeDeliveryVersion!.id,
-              autoAcceptAt: order.autoAcceptAt?.toISOString(),
+      const didAccept = await runLockedOrderSerializableTransaction(
+        prisma,
+        order.id,
+        async (tx: any) => {
+          const upd = await tx.order.updateMany({
+            where: {
+              id: order.id,
+              status: "VERIFIED",
+              version: order.version,
             },
-          },
-        })
-
-        // Create settlement with computed release policy
-        const publisherId =
-          order.items?.[0]?.website?.publisherId ?? order.website?.publisherId
-        const ownerType =
-          order.items?.[0]?.website?.ownershipType ??
-          order.website?.ownershipType ??
-          null
-        const channel =
-          order.fulfillmentChannel ??
-          (ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
-
-        if (channel === "PLATFORM") {
-          const feeFraction = await resolvePlatformFeeFractionCore(
-            tx,
-            process.env.PLATFORM_FEE_PERCENT,
-          )
-          const amount = Number(order.amount ?? 0)
-          const fee = Math.round(amount * feeFraction * 100) / 100
-          const net = Math.round((amount - fee) * 100) / 100
-          const existingRevenue = await tx.platformRevenue.findUnique({
-            where: { orderId: order.id },
-          })
-          if (!existingRevenue) {
-            await tx.platformRevenue.create({
-              data: {
-                orderId: order.id,
-                amount,
-                platformFee: fee,
-                netRevenue: net,
-                listingServiceId: order.listingServiceId ?? null,
-                serviceType: order.type,
-                ownerType,
-                fulfillmentChannel: "PLATFORM",
-                unitPrice: await resolveListingUnitPrice(
-                  tx,
-                  order.listingServiceId,
-                ),
-              },
-            })
-          }
-          const completed = await tx.order.updateMany({
-            where: { id: order.id, status: "DELIVERED" },
             data: {
-              status: "COMPLETED",
-              warrantyEndsAt: order.warrantyDays
-                ? new Date(now.getTime() + order.warrantyDays * 86_400_000)
-                : null,
+              status: "DELIVERED",
+              deliveredAt: now,
+              deliveryAcceptedMethod: "AUTO_TIMEOUT",
               version: { increment: 1 },
             },
           })
-          if (completed.count === 0) {
-            throw new Error(
-              `Order ${order.id} changed during platform auto-accept`,
-            )
-          }
-          await tx.orderEvent.create({
-            data: {
-              orderId: order.id,
-              eventType: "SETTLEMENT_CREATED",
-              actorId: null,
-              message: `Platform revenue recognized after auto-accept — amount: ${amount}`,
-              metadata: { platformRevenue: true, amount, platformFee: fee },
-            },
-          })
-        } else if (publisherId && order.amount) {
-          const publisherTierRow = await tx.publisher.findUnique({
-            where: { id: publisherId },
-            select: { tier: true },
-          })
+          if (upd.count === 0) return false
 
-          const feeFraction = await resolvePlatformFeeFractionCore(
+          const eligibility = await evaluateLockedSettlementEligibility(
             tx,
-            process.env.PLATFORM_FEE_PERCENT,
+            order.id,
           )
-          const amount =
-            typeof order.amount === "number"
-              ? order.amount
-              : Number(order.amount)
-          const fee = Math.round(amount * feeFraction * 100) / 100
-          const net = Math.round((amount - fee) * 100) / 100
+          if (!eligibility.eligible) {
+            const blocked = new Error(
+              `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+            )
+            blocked.name = "SettlementEligibilityBlockedError"
+            throw blocked
+          }
 
-          const releasePolicy = decision.computeSettlementReleasePolicy(
-            { verifyMethod: "AUTO", amount },
-            publisherTierRow ? { tier: publisherTierRow.tier } : null,
-            [],
-            null,
-          )
-
-          const reviewDays = getSettlementReviewDays(
-            (publisherTierRow?.tier ?? "NEW") as any,
-            process.env.SETTLEMENT_REVIEW_DAYS,
-          )
-
-          const settlement = await tx.settlement.create({
-            data: {
-              orderId: order.id,
-              publisherId,
-              grossAmount: amount,
-              platformFee: fee,
-              publisherAmount: net,
-              status: "PENDING",
-              reviewEndsAt: new Date(
-                Date.now() + reviewDays * 24 * 60 * 60 * 1000,
-              ),
-              releasePolicy,
-              listingServiceId: order.listingServiceId ?? null,
-              serviceType: order.type,
-              ownerType,
-              fulfillmentChannel: order.fulfillmentChannel ?? null,
-              unitPrice: await resolveListingUnitPrice(
-                tx,
-                order.listingServiceId,
-              ),
-            },
-          })
-
-          await tx.orderEvent.create({
-            data: {
-              orderId: order.id,
-              eventType: "SETTLEMENT_CREATED",
-              actorId: null,
-              message: `Settlement auto-created after auto-accept — amount: ${amount}`,
-              metadata: {
-                settlementId: settlement.id,
-                releasePolicy,
-                publisherAmount: net,
-                platformFee: fee,
+          const canonicalOrder = await tx.order.findUnique({
+            where: { id: order.id },
+            include: {
+              website: {
+                select: { publisherId: true, ownershipType: true },
               },
             },
           })
-        }
+          if (!canonicalOrder) return false
+          const grossAmount = canonicalOrder.amount
+            ? new Prisma.Decimal(canonicalOrder.amount)
+            : null
+          if (
+            canonicalOrder.currency !== "USD" ||
+            canonicalOrder.paymentStatus !== "PAID" ||
+            !grossAmount ||
+            grossAmount.lessThanOrEqualTo(0) ||
+            grossAmount.decimalPlaces() > 2
+          ) {
+            throw new Error(
+              `Order ${canonicalOrder.id} has no valid exact-USD amount for auto-accept`,
+            )
+          }
 
-        return true
-      })
+          await tx.orderEvent.create({
+            data: {
+              orderId: order.id,
+              eventType: "AUTO_ACCEPTED",
+              actorId: null,
+              message: `Review window expired — order auto-accepted at ${now.toISOString()}`,
+              metadata: {
+                deliveryVersionId: eligibility.snapshot.activeDeliveryVersionId,
+                autoAcceptAt: order.autoAcceptAt?.toISOString(),
+              },
+            },
+          })
+
+          // Create settlement with computed release policy
+          const publisherId = canonicalOrder.website?.publisherId ?? null
+          const ownerType = canonicalOrder.website?.ownershipType ?? null
+          const channel =
+            canonicalOrder.fulfillmentChannel ??
+            (ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+
+          if (channel === "PLATFORM") {
+            if (canonicalOrder.fulfillmentChannel !== "PLATFORM") {
+              throw new Error(
+                `Order ${canonicalOrder.id} lacks an explicit PLATFORM channel snapshot`,
+              )
+            }
+            await assertCanonicalPlatformRevenueFundingCore(tx, canonicalOrder)
+            const existingRevenue = await tx.platformRevenue.findUnique({
+              where: { orderId: canonicalOrder.id },
+            })
+            let recognizedFee: Prisma.Decimal
+            if (existingRevenue) {
+              const existingAmount = new Prisma.Decimal(existingRevenue.amount)
+              const existingFee = new Prisma.Decimal(
+                existingRevenue.platformFee,
+              )
+              const existingNet = new Prisma.Decimal(existingRevenue.netRevenue)
+              const existingFeeBps = existingRevenue.platformFeeBps
+              const expectedFee = Number.isInteger(existingFeeBps)
+                ? existingAmount
+                    .mul(existingFeeBps)
+                    .div(10_000)
+                    .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+                : null
+              if (
+                existingRevenue.reversedAt !== null ||
+                existingRevenue.currency !== "USD" ||
+                existingRevenue.fulfillmentChannel !== "PLATFORM" ||
+                existingFeeBps == null ||
+                existingFeeBps < 0 ||
+                existingFeeBps > 10_000 ||
+                !existingRevenue.feePolicyVersion ||
+                !existingAmount.equals(grossAmount) ||
+                !expectedFee?.equals(existingFee) ||
+                !existingFee.plus(existingNet).equals(existingAmount)
+              ) {
+                throw new Error(
+                  `Order ${canonicalOrder.id} has conflicting platform revenue evidence`,
+                )
+              }
+              recognizedFee = existingFee
+            } else {
+              const feePolicy = await resolvePlatformFeePolicyCore(tx)
+              const fee = grossAmount
+                .mul(feePolicy.fraction)
+                .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+              const net = grossAmount.minus(fee)
+              await tx.platformRevenue.create({
+                data: {
+                  orderId: canonicalOrder.id,
+                  amount: grossAmount,
+                  currency: "USD",
+                  platformFee: fee,
+                  netRevenue: net,
+                  platformFeeBps: feePolicy.basisPoints,
+                  feePolicyVersion: feePolicy.policyVersion,
+                  listingServiceId: canonicalOrder.listingServiceId ?? null,
+                  serviceType: canonicalOrder.type,
+                  ownerType,
+                  fulfillmentChannel: "PLATFORM",
+                  unitPrice: await resolveListingUnitPrice(
+                    tx,
+                    canonicalOrder.listingServiceId,
+                  ),
+                },
+              })
+              recognizedFee = fee
+            }
+            const completed = await tx.order.updateMany({
+              where: { id: canonicalOrder.id, status: "DELIVERED" },
+              data: {
+                status: "COMPLETED",
+                warrantyEndsAt: canonicalOrder.warrantyDays
+                  ? new Date(
+                      now.getTime() + canonicalOrder.warrantyDays * 86_400_000,
+                    )
+                  : null,
+                version: { increment: 1 },
+              },
+            })
+            if (completed.count === 0) {
+              throw new Error(
+                `Order ${canonicalOrder.id} changed during platform auto-accept`,
+              )
+            }
+            await tx.orderEvent.create({
+              data: {
+                orderId: canonicalOrder.id,
+                eventType: "SETTLEMENT_CREATED",
+                actorId: null,
+                message: `Platform revenue recognized after auto-accept — amount: ${grossAmount}`,
+                metadata: {
+                  platformRevenue: true,
+                  amount: grossAmount.toNumber(),
+                  platformFee: recognizedFee.toNumber(),
+                },
+              },
+            })
+          } else if (publisherId && canonicalOrder.amount) {
+            const publisherTierRow = await tx.publisher.findUnique({
+              where: { id: publisherId },
+              select: { tier: true },
+            })
+
+            const feePolicy = await resolvePlatformFeePolicyCore(tx)
+            const fee = grossAmount
+              .mul(feePolicy.fraction)
+              .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+            const net = grossAmount.minus(fee)
+            if (net.lessThanOrEqualTo(0)) {
+              throw new Error(
+                `Order ${canonicalOrder.id} would create a non-positive publisher liability`,
+              )
+            }
+
+            const releasePolicy = decision.computeSettlementReleasePolicy(
+              { verifyMethod: "AUTO", amount: grossAmount.toNumber() },
+              publisherTierRow ? { tier: publisherTierRow.tier } : null,
+              [],
+              null,
+            )
+
+            const reviewDays = getSettlementReviewDays(
+              (publisherTierRow?.tier ?? "NEW") as any,
+              process.env.SETTLEMENT_REVIEW_DAYS,
+            )
+
+            const settlement = await tx.settlement.create({
+              data: {
+                orderId: canonicalOrder.id,
+                publisherId,
+                grossAmount,
+                currency: "USD",
+                platformFee: fee,
+                publisherAmount: net,
+                platformFeeBps: feePolicy.basisPoints,
+                feePolicyVersion: feePolicy.policyVersion,
+                status: "PENDING",
+                reviewEndsAt: new Date(
+                  Date.now() + reviewDays * 24 * 60 * 60 * 1000,
+                ),
+                releasePolicy,
+                listingServiceId: canonicalOrder.listingServiceId ?? null,
+                serviceType: canonicalOrder.type,
+                ownerType,
+                fulfillmentChannel: canonicalOrder.fulfillmentChannel ?? null,
+                unitPrice: await resolveListingUnitPrice(
+                  tx,
+                  canonicalOrder.listingServiceId,
+                ),
+              },
+            })
+
+            await tx.orderEvent.create({
+              data: {
+                orderId: canonicalOrder.id,
+                eventType: "SETTLEMENT_CREATED",
+                actorId: null,
+                message: `Settlement auto-created after auto-accept — amount: ${grossAmount}`,
+                metadata: {
+                  settlementId: settlement.id,
+                  releasePolicy,
+                  publisherAmount: net.toNumber(),
+                  platformFee: fee.toNumber(),
+                },
+              },
+            })
+          } else {
+            throw new Error(
+              `Order ${canonicalOrder.id} has no canonical publisher for auto-accept settlement`,
+            )
+          }
+
+          return true
+        },
+      )
       if (didAccept) accepted++
       else skipped++
     } catch (err) {
+      if (
+        err instanceof Error &&
+        err.name === "SettlementEligibilityBlockedError"
+      ) {
+        logger.warn("auto-accept skipped by settlement eligibility gate", {
+          orderId: order.id,
+          reason: err.message,
+        })
+        skipped++
+        continue
+      }
       logger.error("auto-accept transaction failed", {
         orderId: order.id,
         err: err instanceof Error ? err.message : String(err),

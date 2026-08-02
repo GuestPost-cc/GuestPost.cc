@@ -213,6 +213,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
         findUnique: jest.fn().mockResolvedValue({
           id: withdrawal.id,
           method: "stripe_connect",
+          currency: "USD",
           publicReference: withdrawal.publicReference,
           publisher: withdrawal.publisher,
         }),
@@ -395,6 +396,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
         findUnique: jest.fn().mockResolvedValue({
           id: withdrawal.id,
           method: "stripe_connect",
+          currency: "USD",
           publicReference: withdrawal.publicReference,
           publisher: withdrawal.publisher,
         }),
@@ -837,6 +839,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
       $queryRaw: jest.fn().mockResolvedValue([
         {
           publisherId: "publisher-1",
+          currency: "USD",
           debtBalance: new Decimal(0),
         },
       ]),
@@ -918,11 +921,13 @@ describe("PayoutExecutionService claimed-send recovery", () => {
     }
     const tx: any = {
       $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: "locked" }]),
-      $queryRaw: jest
-        .fn()
-        .mockResolvedValue([
-          { publisherId: "publisher-1", debtBalance: new Decimal(0) },
-        ]),
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          publisherId: "publisher-1",
+          currency: "USD",
+          debtBalance: new Decimal(0),
+        },
+      ]),
       payoutExecution: {
         findUnique: jest.fn().mockResolvedValue(fresh),
         updateMany: jest.fn(),
@@ -979,11 +984,13 @@ describe("PayoutExecutionService claimed-send recovery", () => {
     }
     const tx: any = {
       $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: "locked" }]),
-      $queryRaw: jest
-        .fn()
-        .mockResolvedValue([
-          { publisherId: "publisher-1", debtBalance: new Decimal(0) },
-        ]),
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          publisherId: "publisher-1",
+          currency: "USD",
+          debtBalance: new Decimal(0),
+        },
+      ]),
       payoutExecution: {
         findUnique: jest.fn().mockResolvedValue(fresh),
         updateMany: jest.fn(),
@@ -1038,11 +1045,13 @@ describe("PayoutExecutionService claimed-send recovery", () => {
     }
     const tx: any = {
       $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: "locked" }]),
-      $queryRaw: jest
-        .fn()
-        .mockResolvedValue([
-          { publisherId: "publisher-1", debtBalance: new Decimal(0) },
-        ]),
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          publisherId: "publisher-1",
+          currency: "USD",
+          debtBalance: new Decimal(0),
+        },
+      ]),
       payoutExecution: {
         findUnique: jest.fn().mockResolvedValue(fresh),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -1186,11 +1195,13 @@ describe("PayoutExecutionService claimed-send recovery", () => {
     }
     const tx: any = {
       $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: "locked" }]),
-      $queryRaw: jest
-        .fn()
-        .mockResolvedValue([
-          { publisherId: "publisher-1", debtBalance: new Decimal(0) },
-        ]),
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          publisherId: "publisher-1",
+          currency: "USD",
+          debtBalance: new Decimal(0),
+        },
+      ]),
       payoutExecution: {
         findUnique: jest.fn().mockResolvedValue(fresh),
         updateMany: jest.fn(),

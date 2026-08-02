@@ -1,4 +1,13 @@
-import { orderEventMetadata } from "@guestpost/shared"
+import {
+  isSupportedMoneyCurrency,
+  lockOrderAggregate,
+  normalizePositiveUsdMoney,
+  orderEventMetadata,
+} from "@guestpost/shared"
+import {
+  isRetryablePrismaTransactionError,
+  prismaTransactionRetryDelayMs,
+} from "@guestpost/shared/dist/prisma-transaction-retry"
 import {
   BadRequestException,
   ConflictException,
@@ -9,7 +18,48 @@ import { Decimal } from "@prisma/client/runtime/client"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { BillingService } from "../../billing/billing.service"
+import { projectExternalOrder } from "../order-visibility"
 import { assertOwnerOrCreator } from "./owner-or-creator"
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms))
+}
+
+function assertUsdFinancialRow(
+  currency: unknown,
+  code: string,
+  message: string,
+) {
+  if (!isSupportedMoneyCurrency(currency)) {
+    throw new ConflictException({ code, message })
+  }
+}
+
+export interface SubmitPaymentCommand {
+  expectedVersion: number
+  expectedAmount: string
+  expectedCurrency: string
+}
+
+function validateSubmitPaymentCommand(command?: SubmitPaymentCommand) {
+  const expectedAmount = normalizePositiveUsdMoney(command?.expectedAmount)
+  if (
+    !command ||
+    !Number.isInteger(command.expectedVersion) ||
+    command.expectedVersion < 0 ||
+    command.expectedVersion > 2_147_483_647 ||
+    typeof command.expectedAmount !== "string" ||
+    expectedAmount !== command.expectedAmount ||
+    !isSupportedMoneyCurrency(command.expectedCurrency)
+  ) {
+    throw new BadRequestException({
+      code: "CHECKOUT_EVIDENCE_INVALID",
+      message:
+        "Payment requires the exact canonical order version, USD amount, and currency that were reviewed",
+    })
+  }
+  return expectedAmount
+}
 
 @Injectable()
 export class OrderPaymentService {
@@ -19,17 +69,46 @@ export class OrderPaymentService {
     private readonly billing: BillingService,
   ) {}
 
-  // Phase 6.9 — actorRole is the acting user's customerRole in `userOrgId`
-  // ("OWNER" | "MEMBER" | null). Used to enforce the OWNER||creator gate
-  // before money moves. Default `undefined` keeps tests / legacy callers
-  // from breaking — but the controller always passes user.customerRole now.
+  private async runSerializable<T>(operation: (tx: any) => Promise<T>) {
+    const maxAttempts = 5
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(operation, {
+          isolationLevel: "Serializable",
+        })
+      } catch (error: unknown) {
+        if (!isRetryablePrismaTransactionError(error)) throw error
+        if (attempt === maxAttempts) {
+          throw new ConflictException({
+            code: "ORDER_PAYMENT_CONCURRENCY_CONFLICT",
+            message:
+              "Financial state changed concurrently. Refresh and retry payment.",
+          })
+        }
+        await sleep(prismaTransactionRetryDelayMs(attempt))
+      }
+    }
+    throw new ConflictException({
+      code: "ORDER_PAYMENT_CONCURRENCY_CONFLICT",
+      message:
+        "Financial state changed concurrently. Refresh and retry payment.",
+    })
+  }
+
+  // Capture is bound to the exact cart state the buyer reviewed. A stale
+  // request may never adopt a concurrent re-price or item mutation.
   async submitPayment(
     orderId: string,
     userId: string,
     userOrgId: string,
-    actorRole?: string | null,
+    actorRole: string | null | undefined,
+    command: SubmitPaymentCommand,
   ) {
-    return this.prisma.$transaction(async (tx: any) => {
+    const expectedAmount = validateSubmitPaymentCommand(command)
+    const result = await this.runSerializable(async (tx: any) => {
+      // Every cart mutation and capture takes the parent Order first. This is
+      // the aggregate serialization boundary shared with the database trigger.
+      await lockOrderAggregate(tx, orderId)
       const order = await tx.order.findFirst({
         where: { id: orderId, organizationId: userOrgId },
       })
@@ -43,70 +122,197 @@ export class OrderPaymentService {
         actorRole,
         action: "submit payment",
       })
-      if (order.status !== "DRAFT")
+      const currentAmount = normalizePositiveUsdMoney(order.amount)
+      if (
+        order.version !== command?.expectedVersion ||
+        currentAmount !== expectedAmount ||
+        order.currency !== command?.expectedCurrency
+      ) {
+        throw new ConflictException({
+          code: "ORDER_CHECKOUT_STATE_CHANGED",
+          message:
+            "Order price or contents changed after review. Refresh checkout and confirm the current total.",
+        })
+      }
+      if (order.status !== "DRAFT" || order.paymentStatus !== "PENDING")
         throw new BadRequestException("Order must be DRAFT to submit payment")
+      assertUsdFinancialRow(
+        order.currency,
+        "ORDER_CURRENCY_UNSUPPORTED",
+        "Order currency is not supported by USD-only checkout",
+      )
 
       const wallet = await tx.wallet.findFirst({
         where: { organizationId: userOrgId },
       })
       if (!wallet)
         throw new BadRequestException("No wallet found for organization")
+      assertUsdFinancialRow(
+        wallet.currency,
+        "WALLET_CURRENCY_MISMATCH",
+        "Organization wallet is not a canonical USD wallet",
+      )
 
-      const amount = order.amount ? Number(order.amount) : 0
-      if (amount <= 0)
+      const amount = new Decimal(order.amount ?? 0)
+      if (!amount.isFinite() || amount.lessThanOrEqualTo(0))
         throw new BadRequestException("Order has zero amount — add items first")
+      if (!normalizePositiveUsdMoney(amount)) {
+        throw new ConflictException({
+          code: "ORDER_AMOUNT_INVALID",
+          message: "Order amount is not a valid USD amount",
+        })
+      }
 
-      if (Number(wallet.availableBalance) < amount) {
+      const items = await tx.orderItem.findMany({ where: { orderId } })
+      if (items.length === 0) {
+        throw new ConflictException({
+          code: "ORDER_ITEMS_INVALID",
+          message: "Order has no priced placement items",
+        })
+      }
+
+      let itemTotal = new Decimal(0)
+      for (const item of items) {
+        const itemPrice = normalizePositiveUsdMoney(item.price)
+        if (!itemPrice || item.status !== "PENDING_PAYMENT") {
+          throw new ConflictException({
+            code: "ORDER_ITEMS_INVALID",
+            message:
+              "Every checkout item must be pending payment with a positive whole-cent price",
+          })
+        }
+        if (!order.websiteId || item.websiteId !== order.websiteId) {
+          throw new ConflictException({
+            code: "ORDER_ITEM_WEBSITE_MISMATCH",
+            message: "Order item website identity does not match its order",
+          })
+        }
+        itemTotal = itemTotal.plus(itemPrice)
+      }
+      if (!itemTotal.equals(amount)) {
+        throw new ConflictException({
+          code: "ORDER_TOTAL_MISMATCH",
+          message:
+            "Order total does not match its immutable placement-item total",
+        })
+      }
+
+      if (new Decimal(wallet.availableBalance).lessThan(amount)) {
         throw new BadRequestException("Insufficient available balance")
       }
 
-      // Verify listing still available and price matches. The customer is
-      // NEVER silently charged a drifted price — they approved the cart at
-      // the old price, so any drift fails with 409 and the items are updated
-      // for an explicit re-confirmation on the next attempt.
-      //
-      // Drift source preference: when the order has a listingServiceId snapshot
-      // we read THAT row's live price (the per-service price the customer
-      // picked); otherwise we fall back to the listing's flat price
-      // (legacy orders that predate the snapshot).
-      const items = await tx.orderItem.findMany({ where: { orderId } })
+      // Verify the selected catalog row only after proving the persisted cart
+      // is internally exact. A price change commits an atomic DRAFT re-price
+      // and returns 409 outside the transaction so the buyer must reconfirm.
+      if (!order.listingServiceId) {
+        throw new BadRequestException(
+          "Order has no listingServiceId snapshot — cannot price",
+        )
+      }
+      // Lock the complete catalog attribution chain. FOR SHARE conflicts with
+      // pause/archive/revoke writers, so a SERIALIZABLE retry observes the
+      // winner instead of capturing from a stale availability snapshot.
+      await tx.$queryRaw`
+        SELECT service."id"
+        FROM "ListingService" service
+        JOIN "MarketplaceListing" listing
+          ON listing."id" = service."listingId"
+        JOIN "Website" website
+          ON website."id" = listing."websiteId"
+        WHERE service."id" = ${order.listingServiceId}
+        FOR SHARE OF service, listing, website
+      `
+      const listingService = await tx.listingService.findUnique({
+        where: { id: order.listingServiceId },
+        select: {
+          id: true,
+          listingId: true,
+          serviceType: true,
+          price: true,
+          availability: true,
+          currency: true,
+          listing: {
+            select: {
+              id: true,
+              status: true,
+              currency: true,
+              websiteId: true,
+              website: {
+                select: {
+                  id: true,
+                  isActive: true,
+                  verificationStatus: true,
+                },
+              },
+            },
+          },
+        },
+      })
+      if (!listingService) {
+        throw new BadRequestException("Listing service no longer available")
+      }
+      if (listingService.availability !== "AVAILABLE") {
+        throw new ConflictException({
+          code: "SERVICE_UNAVAILABLE",
+          message: "Service is no longer available — refresh and try again",
+        })
+      }
+      if (
+        !order.listingId ||
+        listingService.listingId !== order.listingId ||
+        listingService.listing.id !== order.listingId ||
+        !order.websiteId ||
+        listingService.listing.websiteId !== order.websiteId ||
+        listingService.listing.website?.id !== order.websiteId ||
+        listingService.serviceType !== order.type
+      ) {
+        throw new ConflictException({
+          code: "CATALOG_CONTRACT_MISMATCH",
+          message:
+            "Order catalog and website attribution do not match the selected service",
+        })
+      }
+      if (listingService.listing.status !== "APPROVED") {
+        throw new ConflictException({
+          code: "LISTING_UNAVAILABLE",
+          message: "Marketplace listing is no longer approved for checkout",
+        })
+      }
+      if (
+        !listingService.listing.website.isActive ||
+        listingService.listing.website.verificationStatus !== "VERIFIED"
+      ) {
+        throw new ConflictException({
+          code: "WEBSITE_UNAVAILABLE",
+          message:
+            "Marketplace website is inactive or no longer ownership-verified",
+        })
+      }
+      assertUsdFinancialRow(
+        listingService.currency,
+        "LISTING_SERVICE_CURRENCY_MISMATCH",
+        "Listing service is not priced in canonical USD",
+      )
+      assertUsdFinancialRow(
+        listingService.listing.currency,
+        "MARKETPLACE_LISTING_CURRENCY_MISMATCH",
+        "Marketplace listing is not priced in canonical USD",
+      )
+      const serverPriceText = normalizePositiveUsdMoney(listingService.price)
+      if (!serverPriceText) {
+        throw new ConflictException({
+          code: "LISTING_SERVICE_PRICE_INVALID",
+          message: "Listing service price is not a valid USD amount",
+        })
+      }
+      const serverPrice = new Decimal(serverPriceText)
       const driftedItems: Array<{
         itemId: string
         oldPrice: number
         newPrice: number
       }> = []
       for (const item of items) {
-        let serverPrice: any
-        // Post-Phase-4: order.listingServiceId is the only drift source.
-        // Pre-snapshot legacy orders are out of band — they were backfilled,
-        // and any order created today is guaranteed to have a snapshot
-        // (orders.service.ts asserts).
-        if (!order.listingServiceId) {
-          throw new BadRequestException(
-            "Order has no listingServiceId snapshot — cannot price",
-          )
-        }
-        const ls = await tx.listingService.findUnique({
-          where: { id: order.listingServiceId },
-          select: { price: true, availability: true },
-        })
-        if (!ls)
-          throw new BadRequestException("Listing service no longer available")
-        if (ls.availability !== "AVAILABLE") {
-          throw new ConflictException({
-            code: "SERVICE_UNAVAILABLE",
-            message: "Service is no longer available — refresh and try again",
-          })
-        }
-        serverPrice = ls.price
         if (!new Decimal(item.price ?? 0).equals(serverPrice)) {
-          // Sync via the NON-transactional client: the 409 below aborts this
-          // transaction, and the corrected prices must survive the rollback
-          // so the customer's retry sees the new total.
-          await this.prisma.orderItem.update({
-            where: { id: item.id },
-            data: { price: serverPrice },
-          })
           driftedItems.push({
             itemId: item.id,
             oldPrice: Number(item.price),
@@ -116,19 +322,38 @@ export class OrderPaymentService {
       }
 
       if (driftedItems.length > 0) {
-        const newTotal = await this.prisma.orderItem.aggregate({
-          where: { orderId },
-          _sum: { price: true },
+        const repriced = await tx.orderItem.updateMany({
+          where: {
+            orderId,
+            id: { in: driftedItems.map((item) => item.itemId) },
+            status: "PENDING_PAYMENT",
+          },
+          data: { price: serverPrice },
         })
-        await this.prisma.order.update({
-          where: { id: orderId },
-          data: { amount: newTotal._sum.price ?? 0 },
+        if (repriced.count !== driftedItems.length) {
+          throw new ConflictException(
+            "Order items were modified by another request. Refresh and retry.",
+          )
+        }
+        const newTotal = serverPrice.mul(items.length)
+        const updated = await tx.order.updateMany({
+          where: {
+            id: orderId,
+            version: order.version,
+            status: "DRAFT",
+            paymentStatus: "PENDING",
+          },
+          data: { amount: newTotal, version: { increment: 1 } },
         })
-        throw new ConflictException({
-          message:
-            "Prices changed since the order was created. Review the updated total and submit payment again.",
+        if (updated.count !== 1) {
+          throw new ConflictException(
+            "Order was modified by another request. Refresh and retry.",
+          )
+        }
+        return {
+          kind: "REQUOTE" as const,
           driftedItems,
-        })
+        }
       }
 
       // Claim the order BEFORE any money moves. Under concurrent
@@ -137,7 +362,12 @@ export class OrderPaymentService {
       // debit happened first, so every parallel request debited and only the
       // order guard deduped — a double-charge.)
       const captured = await tx.order.updateMany({
-        where: { id: orderId, version: order.version, status: "DRAFT" },
+        where: {
+          id: orderId,
+          version: order.version,
+          status: "DRAFT",
+          paymentStatus: "PENDING",
+        },
         data: {
           paymentStatus: "PAID",
           status: "PAID",
@@ -173,7 +403,7 @@ export class OrderPaymentService {
           eventType: "PAYMENT_CAPTURED",
           actorId: userId,
           message: `Payment captured — order submitted`,
-          metadata: { capturedAmount: amount },
+          metadata: { capturedAmount: amount.toFixed(2) },
         },
       })
 
@@ -203,7 +433,7 @@ export class OrderPaymentService {
           // Phase 6.9 — uniform snapshot trio across every Order-scoped audit.
           metadata: {
             ...orderEventMetadata(order),
-            amount,
+            amount: amount.toFixed(2),
             from: "DRAFT",
             to: "SUBMITTED",
           },
@@ -213,7 +443,20 @@ export class OrderPaymentService {
         tx,
       )
 
-      return tx.order.findUnique({ where: { id: orderId } })
+      return {
+        kind: "CAPTURED" as const,
+        order: await tx.order.findUnique({ where: { id: orderId } }),
+      }
     })
+
+    if (result.kind === "REQUOTE") {
+      throw new ConflictException({
+        code: "REQUOTE_REQUIRED",
+        message:
+          "Prices changed since the order was created. Review the updated total and submit payment again.",
+        driftedItems: result.driftedItems,
+      })
+    }
+    return projectExternalOrder(result.order, "CUSTOMER")
   }
 }

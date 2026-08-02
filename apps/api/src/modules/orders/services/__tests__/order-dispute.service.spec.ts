@@ -35,6 +35,7 @@ describe("OrderDisputeService refund authorization", () => {
         }),
       },
       orderEvent: { create: jest.fn().mockResolvedValue({}) },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
     }
     const prisma: any = {
       ...tx,
@@ -62,10 +63,41 @@ describe("OrderDisputeService refund authorization", () => {
         refund as any,
         queue as any,
       ),
+      prisma,
       tx,
+      audit,
       refund,
     }
   }
+
+  it("locks the parent order before claiming a dispute for review", async () => {
+    const { service, prisma, tx, audit } = setup()
+    tx.orderDispute.findUnique.mockResolvedValue({
+      id: "dispute-1",
+      orderId: "order-1",
+      status: "OPEN",
+    })
+    tx.orderDispute.findUniqueOrThrow.mockResolvedValue({
+      id: "dispute-1",
+      orderId: "order-1",
+      status: "UNDER_REVIEW",
+    })
+
+    await service.markUnderReview("dispute-1", "ops-1")
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1)
+    expect(tx.orderDispute.updateMany).toHaveBeenCalledWith({
+      where: { id: "dispute-1", status: "OPEN" },
+      data: { status: "UNDER_REVIEW" },
+    })
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.orderDispute.updateMany.mock.invocationCallOrder[0],
+    )
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "DISPUTE_UNDER_REVIEW" }),
+      tx,
+    )
+  })
 
   it("requires Finance or Super Admin for a dispute refund", async () => {
     const { service } = setup()

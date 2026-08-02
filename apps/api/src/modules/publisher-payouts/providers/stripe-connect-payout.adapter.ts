@@ -1,3 +1,4 @@
+import { isSupportedMoneyCurrency, USD_CURRENCY } from "@guestpost/shared"
 import { Injectable } from "@nestjs/common"
 import type Stripe from "stripe"
 import {
@@ -57,7 +58,8 @@ function reversalMatchesCommand(
     reversal.object === "transfer_reversal" &&
     reversalTransfer === input.transferId &&
     reversal.amount === input.amountMinor &&
-    reversal.currency.toUpperCase() === input.currency &&
+    reversal.currency === "usd" &&
+    input.currency === USD_CURRENCY &&
     reversal.metadata?.withdrawal_reference === input.publicReference &&
     reversal.metadata?.payout_execution_id === input.payoutExecutionId
   )
@@ -110,13 +112,13 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
     const connectedAccountId = params.recipientDetails.connectedAccountId
     const publicReference = params.recipientDetails.publicReference
     const expectedAmountMinor = toMinorUnits(params.amount)
-    const expectedCurrency = params.currency.trim().toUpperCase()
+    const expectedCurrency = params.currency
     if (
       typeof connectedAccountId !== "string" ||
       !connectedAccountId ||
       typeof publicReference !== "string" ||
       !publicReference ||
-      !/^[A-Z]{3}$/.test(expectedCurrency)
+      !isSupportedMoneyCurrency(expectedCurrency)
     ) {
       throw new Error(
         "Immutable Stripe account, amount, currency, and reference are required for transfer creation",
@@ -126,7 +128,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
     const transfer = await stripe.transfers.create(
       {
         amount: expectedAmountMinor,
-        currency: expectedCurrency.toLowerCase(),
+        currency: "usd",
         destination: connectedAccountId,
         description: params.description,
         metadata: { withdrawal_reference: publicReference },
@@ -138,13 +140,13 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
       typeof transfer.destination === "string"
         ? transfer.destination
         : transfer.destination?.id
-    const transferCurrency = String(transfer.currency ?? "").toUpperCase()
+    const transferCurrency = transfer.currency === "usd" ? USD_CURRENCY : null
     if (
       typeof transfer.id !== "string" ||
       !transfer.id.startsWith("tr_") ||
       transferDestination !== connectedAccountId ||
       transfer.amount !== expectedAmountMinor ||
-      transferCurrency !== expectedCurrency ||
+      transferCurrency !== USD_CURRENCY ||
       transfer.metadata?.withdrawal_reference !== publicReference
     ) {
       throw new PayoutProviderResponseMismatchError(
@@ -176,11 +178,11 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
     params: CreateBankPayoutParams,
   ): Promise<CreateBankPayoutResult> {
     const expectedAmountMinor = toMinorUnits(params.amount)
-    const expectedCurrency = params.currency.trim().toUpperCase()
+    const expectedCurrency = params.currency
     if (
       !params.connectedAccountId ||
       !params.publicReference ||
-      !/^[A-Z]{3}$/.test(expectedCurrency)
+      !isSupportedMoneyCurrency(expectedCurrency)
     ) {
       throw new Error(
         "Immutable Stripe account, amount, currency, and reference are required for bank payout creation",
@@ -190,7 +192,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
     const payout = await stripe.payouts.create(
       {
         amount: expectedAmountMinor,
-        currency: expectedCurrency.toLowerCase(),
+        currency: "usd",
         description: params.description,
         statement_descriptor: params.statementDescriptor,
         metadata: { withdrawal_reference: params.publicReference },
@@ -201,12 +203,12 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
       },
     )
     assertStripeObjectMode(payout.livemode, "Stripe payout")
-    const payoutCurrency = String(payout.currency ?? "").toUpperCase()
+    const payoutCurrency = payout.currency === "usd" ? USD_CURRENCY : null
     if (
       typeof payout.id !== "string" ||
       !payout.id.startsWith("po_") ||
       payout.amount !== expectedAmountMinor ||
-      payoutCurrency !== expectedCurrency ||
+      payoutCurrency !== USD_CURRENCY ||
       payout.metadata?.withdrawal_reference !== params.publicReference
     ) {
       throw new PayoutProviderResponseMismatchError(
@@ -251,7 +253,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
       !context?.connectedAccountId ||
       !Number.isSafeInteger(context.expectedAmountMinor) ||
       Number(context.expectedAmountMinor) <= 0 ||
-      !context.expectedCurrency ||
+      !isSupportedMoneyCurrency(context.expectedCurrency) ||
       !context.expectedPublicReference
     ) {
       throw new Error(
@@ -269,8 +271,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
     if (
       payout.id !== providerExecutionId ||
       payout.amount !== context.expectedAmountMinor ||
-      payout.currency.toUpperCase() !==
-        context.expectedCurrency.toUpperCase() ||
+      payout.currency !== "usd" ||
       payout.metadata?.withdrawal_reference !== context.expectedPublicReference
     ) {
       throw new Error(
@@ -281,7 +282,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
       status: payoutStatus(payout.status),
       providerExecutionId,
       providerAmountMinor: payout.amount,
-      providerCurrency: payout.currency.toUpperCase(),
+      providerCurrency: USD_CURRENCY,
       livemode: payout.livemode,
       errorMessage:
         payout.status === "failed" ? "Stripe bank payout failed" : undefined,
@@ -291,7 +292,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
         arrivalDate: payout.arrival_date,
         connectedAccountId: context.connectedAccountId,
         providerAmountMinor: payout.amount,
-        providerCurrency: payout.currency.toUpperCase(),
+        providerCurrency: USD_CURRENCY,
         providerPublicReference: payout.metadata?.withdrawal_reference ?? "",
         livemode: payout.livemode,
       },
@@ -313,7 +314,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
       context?.providerTransferId ??
       (providerExecutionId.startsWith("tr_") ? providerExecutionId : undefined)
     const expectedAmountMinor = context?.expectedAmountMinor
-    const expectedCurrency = context?.expectedCurrency?.toUpperCase()
+    const expectedCurrency = context?.expectedCurrency
     const expectedPublicReference = context?.expectedPublicReference
     if (
       !context?.connectedAccountId ||
@@ -321,8 +322,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
       !transferId ||
       !Number.isSafeInteger(expectedAmountMinor) ||
       Number(expectedAmountMinor) <= 0 ||
-      !expectedCurrency ||
-      !/^[A-Z]{3}$/.test(expectedCurrency) ||
+      !isSupportedMoneyCurrency(expectedCurrency) ||
       !expectedPublicReference
     ) {
       throw new Error(
@@ -344,7 +344,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
     if (
       transfer.id !== transferId ||
       transfer.amount !== expectedAmountMinor ||
-      transfer.currency.toUpperCase() !== expectedCurrency ||
+      transfer.currency !== "usd" ||
       transferDestination !== context.connectedAccountId ||
       transfer.metadata?.withdrawal_reference !== expectedPublicReference
     ) {
@@ -400,7 +400,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
         payout.livemode !== transferLivemode ||
         payout.id !== payoutId ||
         payout.amount !== expectedAmountMinor ||
-        payout.currency.toUpperCase() !== expectedCurrency ||
+        payout.currency !== "usd" ||
         payout.metadata?.withdrawal_reference !== expectedPublicReference
       ) {
         throw new Error(
@@ -416,7 +416,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
             payoutId,
             payoutStatus: "paid",
             providerAmountMinor: payout.amount,
-            providerCurrency: payout.currency.toUpperCase(),
+            providerCurrency: USD_CURRENCY,
             providerPublicReference: expectedPublicReference,
             payoutObservedAt: new Date().toISOString(),
             connectedAccountId: context.connectedAccountId,
@@ -444,7 +444,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
           terminalPayout?.id !== payoutId ||
           terminalPayout?.status !== "canceled" ||
           terminalPayout?.amount !== expectedAmountMinor ||
-          terminalPayout?.currency?.toUpperCase() !== expectedCurrency ||
+          terminalPayout?.currency !== "usd" ||
           terminalPayout?.metadata?.withdrawal_reference !==
             expectedPublicReference
         ) {
@@ -504,7 +504,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
           providerAmountMinor: terminalPayout?.amount ?? expectedAmountMinor,
           providerCurrency:
             typeof terminalPayout?.currency === "string"
-              ? terminalPayout.currency.toUpperCase()
+              ? USD_CURRENCY
               : expectedCurrency,
           providerPublicReference: expectedPublicReference,
           payoutObservedAt: payoutId ? new Date().toISOString() : null,

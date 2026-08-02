@@ -232,6 +232,10 @@ equality.
 - It has exactly one unreversed `PlatformRevenue` record.
 - `order.amount == PlatformRevenue.amount`.
 - `PlatformRevenue.amount == platformFee + netRevenue`.
+- The Order has exactly one matching internal USD `PURCHASE`, and recognition
+  snapshots `platformFeeBps` plus the versioned singleton fee-policy identity.
+- The recognition row is immutable; a refund appends `reversedAt` once instead
+  of deleting or rewriting it.
 - `grossAmount` is a publisher-settlement concept and is not used to reconcile
   platform revenue.
 
