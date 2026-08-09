@@ -15,8 +15,8 @@
     "@guestpost/database": "workspace:*",
     "@guestpost/integrations": "workspace:*",
     "@guestpost/shared": "workspace:*",
-    "@sentry/node": "10.65.0",
-    "bullmq": "^5.80.2",
+    "@sentry/node": "10.67.0",
+    "bullmq": "^5.80.12",
     "dotenv": "^17.4.2",
     "ioredis": "^5.11.1",
     "nodemailer": "^9.0.3"
