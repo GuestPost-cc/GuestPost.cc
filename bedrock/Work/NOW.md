@@ -153,6 +153,11 @@ merged or deployed. GitHub `main` through dependency consolidation commit
   20 checks without new reconciliation drift. After restoring the verified
   pre-test local backup, fresh customer, publisher, and Super Admin browser
   logins and dashboards loaded without runtime console errors.
+  GitHub then surfaced two high-severity development-tool alerts for the same
+  `js-yaml` advisory. Major-line-specific workspace floors now resolve 3.15.1
+  through Jest coverage tooling and 4.3.1 through the Nest CLI; dependency
+  policy enforces both and the full development-plus-production audit reports
+  no known vulnerabilities.
   Populated staging migration evidence, signed Stripe deposit/payout canaries,
   and recorded Finance/Security approval remain mandatory before the draft can
   be marked ready or merged.

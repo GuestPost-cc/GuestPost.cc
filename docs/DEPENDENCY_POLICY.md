@@ -166,4 +166,5 @@ upstream range catches up. Current advisory floors are:
 - shell-quote 1.9.0 for GHSA-395f-4hp3-45gv
 - brace-expansion 5.0.8 for GHSA-3jxr-9vmj-r5cp and
   GHSA-mh99-v99m-4gvg
+- js-yaml 3.15.1 and 4.3.1 for GHSA-5p4m-2wfm-xmqj
 - Valibot 1.4.2 for GHSA-5qjj-4xww-7phc
