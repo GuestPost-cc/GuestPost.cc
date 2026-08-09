@@ -9,6 +9,7 @@ import { PublisherPayoutsService } from "../publisher-payouts.service"
 describe("PublisherPayoutsService", () => {
   const originalNodeEnv = process.env.NODE_ENV
   const originalFinanceRuntimeMode = process.env.FINANCE_RUNTIME_MODE
+  const originalStripeConnectEnabled = process.env.STRIPE_CONNECT_ENABLED
   let service: PublisherPayoutsService
   let prismaMock: any
   let auditMock: any
@@ -176,6 +177,11 @@ describe("PublisherPayoutsService", () => {
     } else {
       process.env.FINANCE_RUNTIME_MODE = originalFinanceRuntimeMode
     }
+    if (originalStripeConnectEnabled === undefined) {
+      delete process.env.STRIPE_CONNECT_ENABLED
+    } else {
+      process.env.STRIPE_CONNECT_ENABLED = originalStripeConnectEnabled
+    }
   })
 
   describe("getBalance", () => {
@@ -248,6 +254,11 @@ describe("PublisherPayoutsService", () => {
         id: "pm-new",
         type: "bank_transfer",
         isDefault: true,
+        withdrawalEligibility: {
+          executable: true,
+          canReactivate: false,
+          code: "READY",
+        },
       })
 
       expect(prismaMock.$transaction).toHaveBeenCalledWith(
@@ -310,6 +321,22 @@ describe("PublisherPayoutsService", () => {
             ...validInput.details,
             accessToken: "must-never-be-stored",
           },
+        } as any),
+      ).rejects.toThrow(BadRequestException)
+
+      expect(prismaMock.$transaction).not.toHaveBeenCalled()
+      expect(encryptionMock.encrypt).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      "paypal",
+      "wise",
+    ])("rejects creation of the uncertified %s route before opening a transaction", async (type) => {
+      await expect(
+        service.createPayoutMethod("pub-1", "owner-1", {
+          type,
+          label: "Unsupported route",
+          details: { email: "publisher@example.test" },
         } as any),
       ).rejects.toThrow(BadRequestException)
 
@@ -419,6 +446,10 @@ describe("PublisherPayoutsService", () => {
   })
 
   describe("reactivatePayoutMethod", () => {
+    beforeEach(() => {
+      process.env.STRIPE_CONNECT_ENABLED = "true"
+    })
+
     const inactiveManagedMethod = {
       id: "pm-1",
       publisherId: "pub-1",
@@ -561,7 +592,6 @@ describe("PublisherPayoutsService", () => {
       ).rejects.toMatchObject({
         response: expect.objectContaining({
           code: "FINANCE_OPERATION_BLOCKED",
-          mode: "recovery_only",
         }),
       })
       expect(prismaMock.publisherMembership.findFirst).not.toHaveBeenCalled()
@@ -574,7 +604,6 @@ describe("PublisherPayoutsService", () => {
       ).rejects.toMatchObject({
         response: expect.objectContaining({
           code: "FINANCE_OPERATION_BLOCKED",
-          mode: "recovery_only",
         }),
       })
       expect(prismaMock.$transaction).not.toHaveBeenCalled()
@@ -586,7 +615,6 @@ describe("PublisherPayoutsService", () => {
       ).rejects.toMatchObject({
         response: expect.objectContaining({
           code: "FINANCE_OPERATION_BLOCKED",
-          mode: "recovery_only",
         }),
       })
       expect(prismaMock.$transaction).not.toHaveBeenCalled()

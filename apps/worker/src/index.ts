@@ -22,6 +22,7 @@ import {
   resolveOrderCancellationConfig,
 } from "@guestpost/shared"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
+import { assertObjectStorageReady } from "@guestpost/shared/dist/object-storage"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { Queue, QueueEvents } from "bullmq"
 import { type HealthServerHandle, startHealthServer } from "./lib/health-server"
@@ -535,6 +536,13 @@ function positiveInt(value: string | undefined, fallback: number): number {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
+async function assertObjectStorageReadiness(): Promise<void> {
+  const storage = await assertObjectStorageReady()
+  logger.info("object storage readiness validated", {
+    provider: storage.provider,
+  })
+}
+
 function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
   const cancellation = resolveOrderCancellationConfig(process.env)
   const tasks: Record<string, ScheduledTaskConfig> = {
@@ -726,6 +734,12 @@ async function runScheduledTask(taskName: string): Promise<void> {
   const task = getScheduledTask(taskName)
   if (!task) {
     throw new Error(`Unknown WORKER_TASK=${taskName}`)
+  }
+
+  // These scheduled tasks share the delivery-verification queue with snapshot
+  // writes, so their temporary worker needs storage before it consumes.
+  if (task.queue === QUEUES.DELIVERY_VERIFICATION) {
+    await assertObjectStorageReadiness()
   }
 
   if (taskName === "payout-reconcile") {
@@ -939,6 +953,7 @@ async function bootstrap() {
   logger.info("worker runtime selected", { mode })
 
   if (mode === "all") {
+    await assertObjectStorageReadiness()
     healthServer = await startHealthServer()
     workers.push(
       createEmailWorker(),
@@ -979,6 +994,7 @@ async function bootstrap() {
   }
 
   if (mode === "realtime") {
+    await assertObjectStorageReadiness()
     await removeHybridRepeatables()
     healthServer = await startHealthServer()
     workers.push(...REALTIME_WORKERS.map((createWorker) => createWorker()))

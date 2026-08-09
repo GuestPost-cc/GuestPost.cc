@@ -34,6 +34,7 @@ evidence while refusing money mutations.
 | `INTEGRATION_ENCRYPTION_KEY` | Legacy integration-token key registered as version 1; exactly 64 hexadecimal characters; mutually exclusive with the keyring variables |
 | `INTEGRATION_ENCRYPTION_KEYS` | Bounded JSON object mapping positive integer versions to distinct exact 64-hex keys; production rotation mode; an explicitly empty value is invalid |
 | `INTEGRATION_ENCRYPTION_ACTIVE_VERSION` | Highest version present in `INTEGRATION_ENCRYPTION_KEYS`, and at least 2; all new OAuth/token-refresh writes use it |
+| `OBJECT_STORAGE_PROVIDER`, selected `R2_*`/`S3_*` bundle | Delivery-evidence storage; R2 requires a 32-hex `R2_ACCOUNT_ID` and its exact canonical endpoint. Provision the fixed `.guestpost/evidence-storage-ready-v1` object before rollout; API and delivery-capable workers must pass the bounded read-only startup check. This check does not prove write permission: an audited upload/retrieve/checksum canary with the exact runtime role is a separate release gate. |
 | `CORS_ORIGIN` | comma-separated frontend origins |
 | `WEBHOOK_INGRESS_RATE_LIMIT_MAX` | optional exact signed-webhook per-IP/minute cap; production default 600, valid range 1..10,000; never use a prefix exemption |
 | `WORKER_MODE` | `realtime` for the continuous service; job modes are documented in `WORKER_ARCHITECTURE.md` |
@@ -187,7 +188,7 @@ The mode does not protect against an old image that does not implement it.
 Remove money-route access at the gateway, drain old writers, and prove their
 replica count is zero before applying the guards.
 
-The `20260802090000`–`20260802097000` boundary is also a hard-drain cutover.
+The `20260802090000`–`20260803098000` boundary is also a hard-drain cutover.
 Before applying it, stop API, finance workers, auto-accept/settlement workers,
 and integration on-demand workers. The USD preflight must return no non-USD
 fact; do not edit a failing row to USD. The migration then installs relational
@@ -195,14 +196,18 @@ settlement guards, quarantines Google old-writer paths, and adds persisted
 integration key versions. Restart only the matching image in
 `FINANCE_RUNTIME_MODE=recovery_only`; run migration assertions, reconciliation,
 and sandbox canaries before deliberately returning finance to `normal`.
-The final four migrations add append-only fraud-hold adjudication,
+The final five migrations add append-only fraud-hold adjudication,
 payload-bound order idempotency/contract snapshots, the one-active-revision
-backstop, and exact-evidence reconstruction for legacy withdrawal reservations.
+backstop, exact-evidence reconstruction for legacy withdrawal reservations,
+and categorical pre-checkout deposit-failure evidence.
 Legacy snapshot values stay `NULL` because current catalog terms are not
 historical evidence. Old API and worker images do not understand those guards
-and must remain drained. For this release, migration status must report all 58
-migrations current through
-`20260802097000_legacy_withdrawal_reservation_evidence`.
+and must remain drained. In particular, an old checkout writer can set a
+deposit attempt to `FAILED` without its required `failureCode`; the database
+rejects that legacy shape after `20260803098000`. Keep deposit ingress disabled
+and every old API replica drained until the matching image is running. For this
+release, migration status must report all 59 migrations current through
+`20260803098000_deposit_provider_failure_evidence`.
 
 Migration `20260802097000` is a narrow accounting-evidence repair, not a
 general balance backfill. A missing legacy `PENDING` reservation qualifies
@@ -384,18 +389,19 @@ behavior. Before applying these migrations to a shared environment:
 3. Run `prisma migrate deploy` while recording duration, blocked locks,
    before/after row counts, backfill classifications, trigger inventory, and
    `pg_constraint.convalidated`.
-   The atomic dispute and payout migrations set a 5-second `lock_timeout` and
-   15-minute `statement_timeout`. The payout migration takes a stable SHARE
-   lock barrier across every provenance/preflight table before its first
-   snapshot. The aggregate-provisioning migration uses the same lock timeout,
+   The atomic dispute, payout, and deposit-failure-evidence migrations set a
+   5-second `lock_timeout` and 15-minute `statement_timeout`. The payout
+   migration takes a stable SHARE lock barrier across every
+   provenance/preflight table before its first snapshot. The
+   aggregate-provisioning migration uses the same lock timeout,
    a 120-second statement timeout, and a stable SHARE lock barrier across every
    parent, aggregate, and history table it reads. These barriers prevent an old
    writer from racing either corruption preflight. Any timeout rolls back the
    entire migration. Treat it as proof that an old writer or unexpected
-   workload was not drained: keep finance sends disabled, stop/drain the
-   blocker, verify no partial migration was recorded, and retry the unchanged
-   migration. Never increase the lock timeout merely to deploy through an
-   active old writer.
+   workload was not drained: keep finance sends and deposit ingress disabled,
+   stop/drain the blocker, verify no partial migration was recorded, and retry
+   the unchanged migration. Never increase the lock timeout merely to deploy
+   through an active old writer.
 4. Run every query in `docs/FINANCIAL_INCIDENT_QUERIES.md`; unexplained rows
    block deployment.
 5. Exercise the `recovery_only` gateway/worker matrix and a forward-fix drill.
@@ -639,7 +645,12 @@ case correctness.
 ## 5. Clean-environment bring-up checklist
 1. Postgres + Redis up (compose healthchecks green).
 2. `npx prisma migrate deploy` (creates full schema incl. CHECK constraints/partial indexes from the squashed baseline).
-3. `pnpm seed` for staging; production starts empty — first SUPER_ADMIN is provisioned via DB insert into `StaffMembership` (documented bootstrap, no self-promote API by design).
+3. Never run `pnpm seed` outside a local development/test stack; it is
+   fail-closed to local targets because it creates known-password identities
+   and synthetic wallet money. Staging and production start without those
+   fixtures. Provision the first SUPER_ADMIN through the separately reviewed
+   database bootstrap into `StaffMembership` (no self-promote API exists by
+   design).
 4. API boots only with the full env contract (above) — missing vars are an immediate, loud failure, not a degraded state.
 5. Realtime worker boots; Northflank scheduled jobs and the on-demand catch-up
    cron are enabled per `docs/WORKER_ARCHITECTURE.md`.

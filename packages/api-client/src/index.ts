@@ -12,6 +12,15 @@ export type {
 export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, HttpClient } from "./client"
 export type {
+  DepositCommandIdentity,
+  DepositIdempotencyState,
+} from "./deposit-command"
+export {
+  bindDepositIdempotencyKey,
+  depositErrorPresentation,
+} from "./deposit-command"
+export { payoutErrorPresentation } from "./payout-command"
+export type {
   AccountSuspensionMutationResponse,
   AccountSuspensionReason,
   AdminCancellationRequestResponse,
@@ -58,6 +67,7 @@ export type {
 export { AdminService } from "./services/admin"
 export type { ApiKeyCreatedResponse, ApiKeyResponse } from "./services/api-keys"
 export { ApiKeysService } from "./services/api-keys"
+export type { DepositCapabilityResponse } from "./services/billing"
 export { BillingService } from "./services/billing"
 export type { Campaign } from "./services/campaigns"
 export { CampaignsService } from "./services/campaigns"

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 import {
   assertStripeFinancialObjectMode,
   classifyStripeKeyMode,
+  evaluatePayoutMethodEligibility,
   isSupportedMoneyCurrency,
   publisherPayoutStatementDescriptor,
   USD_CURRENCY,
@@ -25,6 +26,7 @@ import { PrismaService } from "../../common/prisma.service"
 import { lockPublisherBalanceForUpdate } from "../../common/publisher-balance-lock"
 import { AuditService } from "../audit/audit.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
+import { currentPayoutMethodRuntime } from "./payout-method-runtime"
 import { PayoutProviderService } from "./payout-provider.service"
 import { decodePayoutProviderConfig } from "./payout-provider-config"
 import {
@@ -165,14 +167,6 @@ function newPayoutSendsEnabled(): boolean {
   return process.env.NODE_ENV !== "production"
 }
 
-function legacyPayoutMethodsEnabled(): boolean {
-  return (
-    process.env.PAYOUT_LEGACY_METHODS_ENABLED === "true" ||
-    process.env.NODE_ENV === "development" ||
-    process.env.NODE_ENV === "test"
-  )
-}
-
 function currentStripePayoutLivemode(): boolean {
   const keyMode = classifyStripeKeyMode(process.env.STRIPE_SECRET_KEY)
   const livemode =
@@ -205,6 +199,29 @@ function assertCanonicalUsdPayoutCurrency(
       `${entity} is not denominated in canonical USD`,
     )
   }
+}
+
+function assertCurrentPayoutMethodExecutable(
+  method: any,
+  publisherId: string,
+): void {
+  const eligibility = evaluatePayoutMethodEligibility(
+    {
+      publisherId,
+      type: method?.type,
+      isActive: method?.isActive === true,
+      providerAccountId: method?.providerAccountId,
+      providerAccount: method?.providerAccount,
+    },
+    currentPayoutMethodRuntime(),
+  )
+  if (eligibility.executable) return
+
+  throw new ConflictException({
+    code: "PAYOUT_METHOD_NOT_EXECUTABLE",
+    eligibilityCode: eligibility.code,
+    message: eligibility.message,
+  })
 }
 
 @Injectable()
@@ -442,7 +459,7 @@ export class PayoutExecutionService {
     expectedStages: string[]
     claimedStage: string
     requireAgedClaim: boolean
-    allowWhenSendsDisabled: boolean
+    claimPurpose: "NEW_SEND" | "EXACT_RECOVERY"
     requireTransferWithoutPayout?: boolean
     userId: string
     auditAction: string
@@ -509,6 +526,39 @@ export class PayoutExecutionService {
         )
       }
       this.assertProviderModeForExecution(fresh, params.providerName)
+      if (params.claimPurpose === "NEW_SEND") {
+        if (params.requireAgedClaim) {
+          throw payoutConflict(
+            "PAYOUT_NEW_SEND_CLAIM_INVALID",
+            "A new payout send cannot use durable-claim recovery semantics",
+          )
+        }
+        // This is the final runtime/routing policy boundary before a durable
+        // claim authorizes provider I/O. Exact recovery deliberately skips
+        // current rollout switches because it can only replay an immutable
+        // claim or continue from a persisted Transfer recovery stage.
+        assertCurrentPayoutMethodExecutable(
+          fresh.withdrawal.payoutMethod,
+          fresh.withdrawal.publisherId,
+        )
+        if (!newPayoutSendsEnabled()) {
+          throw new ConflictException(
+            "External payout calls are disabled by the financial safety switch",
+          )
+        }
+      } else if (
+        !params.requireAgedClaim &&
+        !(
+          params.claimedStage === "BANK_PAYOUT_RESUME_CLAIMED" &&
+          params.expectedStages.length === 1 &&
+          params.expectedStages[0] === "TRANSFER_RECOVERY_REQUIRED"
+        )
+      ) {
+        throw payoutConflict(
+          "PAYOUT_RECOVERY_CLAIM_INVALID",
+          "Exact payout recovery claims require an existing durable claim or a persisted Transfer recovery stage",
+        )
+      }
       if (
         params.requireTransferWithoutPayout &&
         (!fresh.providerTransferId || fresh.providerPayoutId)
@@ -660,11 +710,6 @@ export class PayoutExecutionService {
         throw payoutConflict(
           "PAYOUT_CLAIM_IDENTITY_MISSING",
           "Payout idempotency identity is missing; external call is blocked",
-        )
-      }
-      if (!params.allowWhenSendsDisabled && !newPayoutSendsEnabled()) {
-        throw new ConflictException(
-          "External payout calls are disabled by the financial safety switch",
         )
       }
       if (!balance) {
@@ -1131,13 +1176,6 @@ export class PayoutExecutionService {
           `Provider ${providerName} is not certified for external payout sends`,
         )
       }
-      const executionLivemode =
-        providerName === "stripe_connect" ? currentStripePayoutLivemode() : null
-      if (providerName === "manual" && !legacyPayoutMethodsEnabled()) {
-        throw new ConflictException(
-          "Legacy manual payout initiation is disabled",
-        )
-      }
       if (
         !adapter.capabilities.supportedCurrencies.includes(withdrawal.currency)
       ) {
@@ -1157,23 +1195,10 @@ export class PayoutExecutionService {
           "Payout method is missing, inactive, or does not match the withdrawal",
         )
       }
+      assertCurrentPayoutMethodExecutable(payoutMethod, withdrawal.publisherId)
       const account = payoutMethod.providerAccount
-      if (
-        providerName === "stripe_connect" &&
-        (account?.provider !== "stripe_connect" ||
-          account.publisherId !== withdrawal.publisherId ||
-          !account.isActive ||
-          account.status !== "ENABLED" ||
-          !account.transfersEnabled ||
-          !account.payoutsEnabled ||
-          !account.detailsSubmitted ||
-          account.defaultCurrency !== USD_CURRENCY ||
-          !account.payoutScheduleConfigured)
-      ) {
-        throw new BadRequestException(
-          "Stripe connected payout account is not fully enabled",
-        )
-      }
+      const executionLivemode =
+        providerName === "stripe_connect" ? currentStripePayoutLivemode() : null
 
       const currentProvider = await tx.payoutProvider.findUnique({
         where: { name: providerName },
@@ -1468,7 +1493,7 @@ export class PayoutExecutionService {
         expectedStages: ["DESTINATION_VALIDATED"],
         claimedStage: "PROVIDER_SEND_CLAIMED",
         requireAgedClaim: false,
-        allowWhenSendsDisabled: false,
+        claimPurpose: "NEW_SEND",
         requireTransferWithoutPayout: false,
         userId,
         auditAction: "PAYOUT_PROVIDER_SEND_CLAIMED",
@@ -1591,7 +1616,7 @@ export class PayoutExecutionService {
           expectedStages: ["TRANSFER_CREATED"],
           claimedStage: "BANK_PAYOUT_SEND_CLAIMED",
           requireAgedClaim: false,
-          allowWhenSendsDisabled: false,
+          claimPurpose: "NEW_SEND",
           requireTransferWithoutPayout: true,
           userId,
           auditAction: "PAYOUT_BANK_SEND_CLAIMED",
@@ -1934,6 +1959,11 @@ export class PayoutExecutionService {
       )
     }
     const adapter = this.providerService.getAdapter("stripe_connect")
+    if (!adapter.recoverClaimedTransfer) {
+      throw new ConflictException(
+        "Stripe claimed-transfer recovery is unavailable",
+      )
+    }
     const claim = await this.claimExternalCall({
       executionId: execution.id,
       withdrawalId: execution.withdrawalId,
@@ -1945,7 +1975,7 @@ export class PayoutExecutionService {
       expectedStages: ["PROVIDER_SEND_CLAIMED"],
       claimedStage: "PROVIDER_SEND_CLAIMED",
       requireAgedClaim: true,
-      allowWhenSendsDisabled: true,
+      claimPurpose: "EXACT_RECOVERY",
       requireTransferWithoutPayout: false,
       userId,
       auditAction: "PAYOUT_PROVIDER_SEND_REPLAY_CLAIMED",
@@ -1970,7 +2000,7 @@ export class PayoutExecutionService {
     let recoveredExecution: any = null
     try {
       this.assertProviderModeForExecution(claim.execution, "stripe_connect")
-      transfer = await adapter.createTransfer({
+      transfer = await adapter.recoverClaimedTransfer({
         amount: Number(claim.withdrawal.netAmount ?? claim.withdrawal.amount),
         currency: USD_CURRENCY,
         recipientDetails: claim.recipientDetails,
@@ -2099,10 +2129,7 @@ export class PayoutExecutionService {
           version: { increment: 1 },
         },
       })
-      if (error && typeof error === "object") {
-        error.message = safeMessage
-      }
-      throw error
+      throw new ConflictException(safeMessage)
     }
     return this.resumeStripeBankPayout(recoveredExecution, userId)
   }
@@ -2138,7 +2165,7 @@ export class PayoutExecutionService {
       )
     }
     const adapter = this.providerService.getAdapter("stripe_connect")
-    if (!adapter.createBankPayout) {
+    if (!adapter.recoverClaimedBankPayout) {
       throw new ConflictException("Stripe bank-payout recovery is unavailable")
     }
     const claim = await this.claimExternalCall({
@@ -2152,7 +2179,7 @@ export class PayoutExecutionService {
       expectedStages: [claimedStage],
       claimedStage,
       requireAgedClaim: true,
-      allowWhenSendsDisabled: true,
+      claimPurpose: "EXACT_RECOVERY",
       requireTransferWithoutPayout: true,
       userId,
       auditAction: "PAYOUT_BANK_SEND_REPLAY_CLAIMED",
@@ -2172,7 +2199,7 @@ export class PayoutExecutionService {
     let payout: any = null
     try {
       this.assertProviderModeForExecution(claim.execution, "stripe_connect")
-      payout = await adapter.createBankPayout({
+      payout = await adapter.recoverClaimedBankPayout({
         amount: Number(claim.withdrawal.netAmount ?? claim.withdrawal.amount),
         currency: USD_CURRENCY,
         connectedAccountId,
@@ -2295,10 +2322,7 @@ export class PayoutExecutionService {
           version: { increment: 1 },
         },
       })
-      if (error && typeof error === "object") {
-        error.message = safeMessage
-      }
-      throw error
+      throw new ConflictException(safeMessage)
     }
 
     if (payout.status === "COMPLETED") {
@@ -2478,8 +2502,8 @@ export class PayoutExecutionService {
 
   private async resumeStripeBankPayout(execution: any, userId: string) {
     const adapter = this.providerService.getAdapter("stripe_connect")
-    if (!adapter.createBankPayout) {
-      throw new Error("Stripe adapter cannot create a bank payout")
+    if (!adapter.recoverClaimedBankPayout) {
+      throw new ConflictException("Stripe bank-payout recovery is unavailable")
     }
     const payoutMethod = execution.withdrawal.payoutMethod
     const account = payoutMethod?.providerAccount
@@ -2500,7 +2524,7 @@ export class PayoutExecutionService {
       expectedStages: ["TRANSFER_RECOVERY_REQUIRED"],
       claimedStage: "BANK_PAYOUT_RESUME_CLAIMED",
       requireAgedClaim: false,
-      allowWhenSendsDisabled: true,
+      claimPurpose: "EXACT_RECOVERY",
       requireTransferWithoutPayout: true,
       userId,
       auditAction: "PAYOUT_BANK_STAGE_RESUME_CLAIMED",
@@ -2528,7 +2552,7 @@ export class PayoutExecutionService {
     try {
       const withdrawal = claimed.execution.withdrawal
       this.assertProviderModeForExecution(claimed.execution, "stripe_connect")
-      payout = await adapter.createBankPayout({
+      payout = await adapter.recoverClaimedBankPayout({
         amount: Number(withdrawal.netAmount ?? withdrawal.amount),
         currency: USD_CURRENCY,
         connectedAccountId: claimed.immutableConnectedAccountId,
@@ -2666,8 +2690,7 @@ export class PayoutExecutionService {
           version: { increment: 1 },
         },
       })
-      if (error && typeof error === "object") error.message = safeMessage
-      throw error
+      throw new ConflictException(safeMessage)
     }
   }
 

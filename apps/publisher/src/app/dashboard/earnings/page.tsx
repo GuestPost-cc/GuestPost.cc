@@ -1,5 +1,11 @@
 "use client"
 
+import { payoutErrorPresentation } from "@guestpost/api-client"
+import {
+  type CertifiedWithdrawalMethodType,
+  isPaidWithdrawalStatus,
+  selectExecutablePayoutMethods,
+} from "@guestpost/shared"
 import {
   Badge,
   Button,
@@ -113,10 +119,22 @@ export default function EarningsPage() {
     enabled: !!user?.publisherId,
   })
 
-  const { data: payoutMethods } = useQuery({
+  const {
+    data: payoutMethodsRaw,
+    isLoading: payoutMethodsLoading,
+    error: payoutMethodsError,
+    refetch: refetchPayoutMethods,
+  } = useQuery({
     queryKey: ["payout-methods"],
     queryFn: () => api.publisherPayouts.listPayoutMethods(),
   })
+  const payoutMethods = selectExecutablePayoutMethods(payoutMethodsRaw)
+  const payoutMethodsFailure = payoutMethodsError
+    ? payoutErrorPresentation(
+        payoutMethodsError,
+        "Payout methods could not be verified.",
+      )
+    : null
   const withdrawalIdempotencyRef = useRef<{
     fingerprint: string
     key: string
@@ -145,7 +163,7 @@ export default function EarningsPage() {
   const withdrawMutation = useMutation({
     mutationFn: (request: {
       amount: number
-      method: string
+      method: CertifiedWithdrawalMethodType
       payoutMethodId: string
       idempotencyKey: string
     }) => api.publisherPayouts.requestWithdrawal(request),
@@ -157,12 +175,32 @@ export default function EarningsPage() {
       refetch()
       refetchTxns()
     },
-    onError: (error: any) => {
-      toast.error(error?.message ?? "Failed to request withdrawal")
+    onError: (error: unknown) => {
+      const presentation = payoutErrorPresentation(
+        error,
+        "Failed to request withdrawal",
+      )
+      toast.error(presentation.message, {
+        description: presentation.requestId
+          ? `Request ID: ${presentation.requestId}`
+          : undefined,
+      })
     },
   })
 
   const handleWithdraw = (data: WithdrawFormData) => {
+    if (payoutMethodsLoading || payoutMethodsError) {
+      toast.error(
+        "Payout eligibility could not be verified. Retry loading payout methods before submitting.",
+      )
+      return
+    }
+    if (balance && Number(balance.debtBalance) > 0) {
+      toast.error(
+        "Withdrawals are unavailable while outstanding publisher debt remains. Future settlements must repay it first.",
+      )
+      return
+    }
     if (balance && data.amount > balance.withdrawableBalance) {
       toast.error("Amount exceeds withdrawable balance")
       return
@@ -217,7 +255,7 @@ export default function EarningsPage() {
       case "withdrawable":
         return txn.status === "APPROVED"
       case "paid":
-        return txn.status === "PAID" || txn.type === "PAYOUT"
+        return isPaidWithdrawalStatus(txn.status)
       default:
         return true
     }
@@ -226,7 +264,32 @@ export default function EarningsPage() {
   const pendingAmount = balance ? Number(balance.pendingBalance) : 0
   const approvedAmount = balance ? Number(balance.approvedBalance) : 0
   const withdrawableAmount = balance ? Number(balance.withdrawableBalance) : 0
+  const debtAmount = balance ? Number(balance.debtBalance) : 0
   const lifetimeAmount = balance ? Number(balance.lifetimeEarnings) : 0
+  const withdrawalBlockedReason = isLoading
+    ? "Checking your withdrawable balance…"
+    : payoutMethodsLoading
+      ? "Checking your eligible payout methods…"
+      : payoutMethodsError
+        ? `${payoutMethodsFailure?.message ?? "Payout methods could not be verified."} Retry before requesting a withdrawal.${
+            payoutMethodsFailure?.requestId
+              ? ` Request ID: ${payoutMethodsFailure.requestId}`
+              : ""
+          }`
+        : debtAmount > 0
+          ? "Withdrawals are unavailable while outstanding publisher debt remains. Future settlements must repay it first."
+          : withdrawableAmount < 1
+            ? "No withdrawable balance is currently available."
+            : payoutMethods.length === 0
+              ? "No active, executable payout method is available. Complete or review payout setup first."
+              : null
+  const canRequestWithdrawal =
+    !isLoading &&
+    !payoutMethodsLoading &&
+    !payoutMethodsError &&
+    debtAmount <= 0 &&
+    payoutMethods.length > 0 &&
+    withdrawableAmount >= 1
 
   const balanceError = error ?? txnError
   if (balanceError)
@@ -251,16 +314,52 @@ export default function EarningsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => refetch()}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              void refetch()
+              void refetchTxns()
+              void refetchPayoutMethods()
+            }}
+          >
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Button onClick={() => setShowWithdrawDialog(true)}>
+          <Button
+            onClick={() => setShowWithdrawDialog(true)}
+            disabled={!canRequestWithdrawal}
+          >
             <Wallet className="mr-2 h-4 w-4" />
             Withdraw
           </Button>
         </div>
       </div>
+
+      {withdrawalBlockedReason ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-4 text-sm">
+          <p className="text-muted-foreground">{withdrawalBlockedReason}</p>
+          {payoutMethodsError ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void refetchPayoutMethods()}
+            >
+              Retry payout methods
+            </Button>
+          ) : payoutMethods.length === 0 &&
+            !payoutMethodsLoading &&
+            debtAmount <= 0 &&
+            withdrawableAmount >= 1 ? (
+            <a
+              href="/dashboard/payout-methods"
+              className="font-medium underline"
+            >
+              Review payout setup
+            </a>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-4">
         <KPICard
@@ -363,7 +462,7 @@ export default function EarningsPage() {
                     <TableCell>
                       <Badge
                         variant={
-                          txn.status === "PAID"
+                          isPaidWithdrawalStatus(txn.status)
                             ? "success"
                             : txn.status === "APPROVED"
                               ? "info"
@@ -445,6 +544,52 @@ export default function EarningsPage() {
                 Max
               </Button>
             </div>
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              {payoutMethodsLoading ? (
+                <p className="text-muted-foreground">
+                  Checking eligible payout methods…
+                </p>
+              ) : payoutMethodsError ? (
+                <div className="space-y-2 text-destructive">
+                  <p>
+                    {payoutMethodsFailure?.message ??
+                      "Payout methods could not be verified."}{" "}
+                    A withdrawal cannot be submitted safely.
+                    {payoutMethodsFailure?.requestId
+                      ? ` Request ID: ${payoutMethodsFailure.requestId}`
+                      : ""}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void refetchPayoutMethods()}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : payoutMethods.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No active, executable payout method is available. Review{" "}
+                  <a href="/dashboard/payout-methods" className="underline">
+                    Payout Methods
+                  </a>
+                  .
+                </p>
+              ) : (
+                <p>
+                  Payout destination:{" "}
+                  <span className="font-medium">
+                    {
+                      (
+                        payoutMethods.find((method) => method.isDefault) ??
+                        payoutMethods[0]
+                      )?.label
+                    }
+                  </span>
+                </p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -455,7 +600,7 @@ export default function EarningsPage() {
             </Button>
             <Button
               onClick={handleFormSubmit(handleWithdraw)}
-              disabled={withdrawMutation.isPending}
+              disabled={withdrawMutation.isPending || !canRequestWithdrawal}
             >
               {withdrawMutation.isPending
                 ? "Processing..."

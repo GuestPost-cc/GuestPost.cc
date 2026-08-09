@@ -526,6 +526,82 @@ describe("Provider adapters — idempotency and production safety", () => {
     )
   })
 
+  it("uses the recovery client only for exact claimed-send replay while new Stripe sends are disabled", async () => {
+    process.env.STRIPE_CONNECT_ENABLED = "false"
+    const createTransfer = jest.fn().mockResolvedValue({
+      id: "tr_recovered",
+      amount: 10_000,
+      currency: "usd",
+      livemode: false,
+      destination: "acct_1",
+      metadata: { withdrawal_reference: "GP-WD-0001" },
+    })
+    const createPayout = jest.fn().mockResolvedValue({
+      id: "po_recovered",
+      amount: 10_000,
+      currency: "usd",
+      livemode: false,
+      status: "pending",
+      statement_descriptor: "GPWD0001",
+      metadata: { withdrawal_reference: "GP-WD-0001" },
+    })
+    const getRecoveryClient = jest
+      .spyOn(stripeClient, "getStripeRecoveryClient")
+      .mockReturnValue({
+        transfers: { create: createTransfer },
+        payouts: { create: createPayout },
+      } as any)
+    const adapter = new StripeConnectPayoutAdapter()
+    const command = {
+      amount: 100,
+      currency: "USD",
+      recipientDetails: {
+        connectedAccountId: "acct_1",
+        publicReference: "GP-WD-0001",
+      },
+      providerConfig: {},
+      idempotencyKey: "payout-wd-1-v4",
+      description: "test",
+    }
+
+    await expect(adapter.createTransfer(command)).rejects.toThrow(/disabled/i)
+    await expect(
+      adapter.recoverClaimedTransfer(command),
+    ).resolves.toMatchObject({
+      providerExecutionId: "tr_recovered",
+      providerTransferId: "tr_recovered",
+      status: "PROCESSING",
+    })
+    const bankCommand = {
+      amount: 100,
+      currency: "USD",
+      connectedAccountId: "acct_1",
+      idempotencyKey: "payout-bank-wd-1-v4",
+      description: "test",
+      statementDescriptor: "GPWD0001",
+      publicReference: "GP-WD-0001",
+    }
+    await expect(adapter.createBankPayout(bankCommand)).rejects.toThrow(
+      /disabled/i,
+    )
+    await expect(
+      adapter.recoverClaimedBankPayout(bankCommand),
+    ).resolves.toMatchObject({
+      providerExecutionId: "po_recovered",
+      providerPayoutId: "po_recovered",
+      status: "PROCESSING",
+    })
+
+    expect(getRecoveryClient).toHaveBeenCalledTimes(2)
+    expect(createTransfer).toHaveBeenCalledWith(expect.any(Object), {
+      idempotencyKey: "payout-wd-1-v4",
+    })
+    expect(createPayout).toHaveBeenCalledWith(expect.any(Object), {
+      stripeAccount: "acct_1",
+      idempotencyKey: "payout-bank-wd-1-v4",
+    })
+  })
+
   it("rejects a non-canonical payout command currency before calling Stripe", async () => {
     const create = jest.fn()
     jest.spyOn(stripeClient, "getStripeClient").mockReturnValue({

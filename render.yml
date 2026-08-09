@@ -117,6 +117,10 @@ services:
         sync: false
       - key: EMAIL_FROM
         value: GuestPost <noreply@guestpost.pro.bd>
+      - key: OBJECT_STORAGE_PROVIDER
+        value: r2
+      - key: R2_ACCOUNT_ID
+        sync: false
       - key: R2_ENDPOINT
         sync: false
       - key: R2_BUCKET
@@ -125,8 +129,6 @@ services:
         sync: false
       - key: R2_SECRET_ACCESS_KEY
         sync: false
-      - key: S3_REGION
-        value: auto
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET

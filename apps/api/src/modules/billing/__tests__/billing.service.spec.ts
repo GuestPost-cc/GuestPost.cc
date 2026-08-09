@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { BillingService } from "../billing.service"
+import { DepositProviderError } from "../providers/deposit-provider.interface"
 
 describe("BillingService", () => {
   let service: BillingService
@@ -88,24 +89,81 @@ describe("BillingService", () => {
 
   describe("Stripe deposit attempts", () => {
     const previousFlag = process.env.STRIPE_DEPOSITS_ENABLED
+    const previousStripeKey = process.env.STRIPE_SECRET_KEY
+
+    const depositAttemptFixture = (
+      overrides: Record<string, unknown> = {},
+    ) => ({
+      id: "dp-1",
+      publicReference: "GP-DP-ABCD2345",
+      walletId: "wallet-1",
+      organizationId: "org-1",
+      createdByUserId: "user-1",
+      method: "CARD",
+      provider: "stripe",
+      amount: new Decimal(25),
+      walletCredit: new Decimal(25),
+      customerFee: new Decimal(0),
+      providerFee: null,
+      currency: "USD",
+      status: "CREATED",
+      idempotencyKey: "request-1",
+      providerSessionId: null,
+      providerPaymentId: null,
+      providerChargeId: null,
+      intendedOrderId: null,
+      ledgerTransactionId: null,
+      expiresAt: null,
+      completedAt: null,
+      failedAt: null,
+      failureCode: null,
+      ...overrides,
+    })
+
+    const depositSessionFixture = (
+      overrides: Record<string, unknown> = {},
+    ) => ({
+      providerSessionId: "cs_1",
+      providerObjectType: "checkout.session",
+      providerPaymentId: "pi_1",
+      clientReferenceId: "dp-1",
+      metadata: {
+        depositAttemptId: "dp-1",
+        publicReference: "GP-DP-ABCD2345",
+        walletId: "wallet-1",
+        userId: "user-1",
+        organizationId: "org-1",
+      },
+      amountTotalMinor: 2500,
+      currency: "USD",
+      mode: "payment",
+      status: "open",
+      url: "https://checkout.stripe.test/session",
+      expiresAt: new Date("2026-08-04T00:00:00.000Z"),
+      livemode: false,
+      ...overrides,
+    })
 
     beforeEach(() => {
       process.env.STRIPE_DEPOSITS_ENABLED = "true"
+      process.env.STRIPE_SECRET_KEY = "sk_test_example"
       prismaMock.wallet.findUnique.mockResolvedValue(mockWallet)
     })
 
     afterAll(() => {
       if (previousFlag == null) delete process.env.STRIPE_DEPOSITS_ENABLED
       else process.env.STRIPE_DEPOSITS_ENABLED = previousFlag
+      if (previousStripeKey == null) delete process.env.STRIPE_SECRET_KEY
+      else process.env.STRIPE_SECRET_KEY = previousStripeKey
     })
 
     it("rejects idempotency-key reuse with a different amount", async () => {
-      prismaMock.depositAttempt.findUnique.mockResolvedValue({
-        id: "dp-1",
-        amount: new Decimal(10),
-        currency: "USD",
-        providerSessionId: "cs_1",
-      })
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(
+        depositAttemptFixture({
+          amount: new Decimal(10),
+          walletCredit: new Decimal(10),
+        }),
+      )
       ;(service as any).depositProvider = {
         capabilities: { supportedCurrencies: ["USD"] },
         retrieveSession: jest.fn(),
@@ -119,21 +177,134 @@ describe("BillingService", () => {
       ).not.toHaveBeenCalled()
     })
 
-    it("creates a server-owned fee/reference snapshot before Checkout", async () => {
-      prismaMock.depositAttempt.findUnique.mockResolvedValue(null)
-      prismaMock.depositAttempt.create.mockResolvedValue({
-        id: "dp-1",
-        publicReference: "GP-DP-ABCD2345",
-      })
-      prismaMock.depositAttempt.update.mockResolvedValue({})
+    it.each([
+      ["blank", "   "],
+      ["oversized", "a".repeat(192)],
+      ["unsafe characters", "deposit:key"],
+    ])("rejects an explicitly %s idempotency key before provider I/O", async (_name, key) => {
       ;(service as any).depositProvider = {
         capabilities: { supportedCurrencies: ["USD"] },
-        createSession: jest.fn().mockResolvedValue({
-          providerSessionId: "cs_1",
-          providerPaymentId: null,
-          url: "https://checkout.stripe.test/session",
-          expiresAt: new Date(),
+        createSession: jest.fn(),
+        retrieveSession: jest.fn(),
+      }
+
+      await expect(
+        service.createCheckoutSession("wallet-1", 25, mockUser, key),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DEPOSIT_IDEMPOTENCY_KEY_INVALID",
         }),
+      })
+      expect(prismaMock.depositAttempt.findUnique).not.toHaveBeenCalled()
+      expect(
+        (service as any).depositProvider.createSession,
+      ).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ["non-numeric", "not-money" as unknown as number],
+      ["not finite", Number.NaN],
+      ["zero", 0],
+      ["negative", -1],
+      ["fractional cent", 1.001],
+    ])("rejects an invalid %s amount before persistence or provider I/O", async (_name, amount) => {
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest.fn(),
+        retrieveSession: jest.fn(),
+      }
+
+      await expect(
+        service.createCheckoutSession(
+          "wallet-1",
+          amount,
+          mockUser,
+          "request-1",
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "MONEY_AMOUNT_INVALID" }),
+      })
+      expect(prismaMock.depositAttempt.findUnique).not.toHaveBeenCalled()
+      expect(
+        (service as any).depositProvider.createSession,
+      ).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ["actor", { createdByUserId: "user-2" }],
+      ["organization", { organizationId: "org-2" }],
+      ["method", { method: "BANK_TRANSFER" }],
+      ["provider", { provider: "manual" }],
+      ["wallet credit", { walletCredit: new Decimal(24) }],
+      ["customer fee", { customerFee: new Decimal(1) }],
+      ["provider fee", { providerFee: new Decimal(1) }],
+      ["order linkage", { intendedOrderId: "order-1" }],
+      ["ledger linkage", { ledgerTransactionId: "txn-1" }],
+      ["terminal status", { status: "SUCCEEDED" }],
+    ])("rejects idempotency replay with mismatched %s evidence", async (_name, mismatch) => {
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(
+        depositAttemptFixture(mismatch),
+      )
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        retrieveSession: jest.fn(),
+      }
+
+      await expect(
+        service.createCheckoutSession("wallet-1", 25, mockUser, "request-1"),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DEPOSIT_IDEMPOTENCY_CONFLICT",
+        }),
+      })
+      expect(
+        (service as any).depositProvider.retrieveSession,
+      ).not.toHaveBeenCalled()
+    })
+
+    it("applies the same exact evidence check after a P2002 reread", async () => {
+      prismaMock.depositAttempt.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(
+          depositAttemptFixture({ createdByUserId: "user-2" }),
+        )
+      prismaMock.depositAttempt.create.mockRejectedValue(
+        Object.assign(new Error("unique"), { code: "P2002" }),
+      )
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest.fn(),
+      }
+
+      await expect(
+        service.createCheckoutSession("wallet-1", 25, mockUser, "request-1"),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DEPOSIT_IDEMPOTENCY_CONFLICT",
+        }),
+      })
+      expect(
+        (service as any).depositProvider.createSession,
+      ).not.toHaveBeenCalled()
+    })
+
+    it("creates a server-owned fee/reference snapshot before Checkout", async () => {
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(null)
+      prismaMock.depositAttempt.create.mockResolvedValue(
+        depositAttemptFixture({
+          amount: new Decimal(20.5),
+          walletCredit: new Decimal(20.5),
+        }),
+      )
+      prismaMock.depositAttempt.updateMany.mockResolvedValue({ count: 1 })
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest.fn().mockResolvedValue(
+          depositSessionFixture({
+            providerPaymentId: null,
+            amountTotalMinor: 2050,
+          }),
+        ),
       }
 
       const result = await service.createCheckoutSession(
@@ -161,6 +332,541 @@ describe("BillingService", () => {
           netMinor: 2050,
         },
       })
+      expect(prismaMock.depositAttempt.updateMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          id: "dp-1",
+          providerSessionId: null,
+          status: { in: ["CREATED", "FAILED"] },
+        }),
+        data: expect.objectContaining({
+          status: "PENDING_CUSTOMER_ACTION",
+          failedAt: null,
+          failureCode: null,
+        }),
+      })
+    })
+
+    it("fails the capability closed when the explicit flag or finance mode blocks deposits", () => {
+      const previousMode = process.env.FINANCE_RUNTIME_MODE
+      process.env.STRIPE_DEPOSITS_ENABLED = "false"
+      expect(service.getDepositCapability()).toMatchObject({
+        available: false,
+        code: "CARD_DEPOSITS_DISABLED",
+      })
+
+      try {
+        process.env.STRIPE_DEPOSITS_ENABLED = "true"
+        process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+        expect(service.getDepositCapability()).toMatchObject({
+          available: false,
+          code: "FINANCE_OPERATIONS_UNAVAILABLE",
+        })
+      } finally {
+        if (previousMode == null) delete process.env.FINANCE_RUNTIME_MODE
+        else process.env.FINANCE_RUNTIME_MODE = previousMode
+      }
+    })
+
+    it("persists only a categorical provider failure and returns a stable 503", async () => {
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(null)
+      prismaMock.depositAttempt.create.mockResolvedValue(
+        depositAttemptFixture({
+          id: "dp-failed",
+          publicReference: "GP-DP-FAILED",
+          idempotencyKey: "provider-auth-failure",
+        }),
+      )
+      prismaMock.depositAttempt.updateMany.mockResolvedValue({ count: 1 })
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest
+          .fn()
+          .mockRejectedValue(
+            new DepositProviderError("PROVIDER_AUTHENTICATION_FAILED", false),
+          ),
+      }
+
+      await expect(
+        service.createCheckoutSession(
+          "wallet-1",
+          25,
+          mockUser,
+          "provider-auth-failure",
+        ),
+      ).rejects.toMatchObject({
+        status: 503,
+        response: expect.objectContaining({
+          code: "DEPOSIT_PROVIDER_UNAVAILABLE",
+        }),
+      })
+      expect(prismaMock.depositAttempt.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "dp-failed",
+          providerSessionId: null,
+          status: { in: ["CREATED", "FAILED"] },
+        },
+        data: {
+          status: "FAILED",
+          failureCode: "PROVIDER_AUTHENTICATION_FAILED",
+          failedAt: expect.any(Date),
+        },
+      })
+      expect(
+        JSON.stringify(prismaMock.depositAttempt.updateMany.mock.calls),
+      ).not.toContain("api_key")
+    })
+
+    it("recovers an exact FAILED attempt and clears stale failure evidence", async () => {
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(
+        depositAttemptFixture({
+          id: "dp-retry",
+          publicReference: "GP-DP-RETRY",
+          status: "FAILED",
+          idempotencyKey: "exact-retry",
+          failureCode: "PROVIDER_AUTHENTICATION_FAILED",
+          failedAt: new Date("2026-08-03T00:00:00.000Z"),
+        }),
+      )
+      prismaMock.depositAttempt.updateMany.mockResolvedValue({ count: 1 })
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest.fn().mockResolvedValue(
+          depositSessionFixture({
+            providerSessionId: "cs_recovered",
+            providerPaymentId: null,
+            clientReferenceId: "dp-retry",
+            metadata: {
+              depositAttemptId: "dp-retry",
+              publicReference: "GP-DP-RETRY",
+              walletId: "wallet-1",
+              userId: "user-1",
+              organizationId: "org-1",
+            },
+            url: "https://checkout.stripe.test/recovered",
+          }),
+        ),
+      }
+
+      await expect(
+        service.createCheckoutSession("wallet-1", 25, mockUser, "exact-retry"),
+      ).resolves.toMatchObject({
+        url: "https://checkout.stripe.test/recovered",
+      })
+      expect(prismaMock.depositAttempt.create).not.toHaveBeenCalled()
+      expect(prismaMock.depositAttempt.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: "dp-retry",
+            providerSessionId: null,
+            status: { in: ["CREATED", "FAILED"] },
+          }),
+          data: expect.objectContaining({
+            status: "PENDING_CUSTOMER_ACTION",
+            failedAt: null,
+            failureCode: null,
+          }),
+        }),
+      )
+    })
+
+    it("accepts an attachment CAS race only for the exact canonical pending session", async () => {
+      const runAttachmentRace = async (current: Record<string, unknown>) => {
+        prismaMock.depositAttempt.findUnique
+          .mockReset()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(current)
+        prismaMock.depositAttempt.create.mockReset().mockResolvedValue(
+          depositAttemptFixture({
+            id: "dp-race",
+            publicReference: "GP-DP-RACE",
+            idempotencyKey: "attachment-race",
+          }),
+        )
+        prismaMock.depositAttempt.updateMany
+          .mockReset()
+          .mockResolvedValue({ count: 0 })
+        ;(service as any).depositProvider = {
+          capabilities: { supportedCurrencies: ["USD"] },
+          createSession: jest.fn().mockResolvedValue(
+            depositSessionFixture({
+              providerSessionId: "cs-race",
+              providerPaymentId: "pi-race",
+              clientReferenceId: "dp-race",
+              metadata: {
+                depositAttemptId: "dp-race",
+                publicReference: "GP-DP-RACE",
+                walletId: "wallet-1",
+                userId: "user-1",
+                organizationId: "org-1",
+              },
+              url: "https://checkout.stripe.test/race",
+            }),
+          ),
+        }
+
+        return service.createCheckoutSession(
+          "wallet-1",
+          25,
+          mockUser,
+          "attachment-race",
+        )
+      }
+
+      await expect(
+        runAttachmentRace(
+          depositAttemptFixture({
+            id: "dp-race",
+            publicReference: "GP-DP-RACE",
+            idempotencyKey: "attachment-race",
+            providerSessionId: "cs-race",
+            providerPaymentId: "pi-race",
+            status: "PENDING_CUSTOMER_ACTION",
+            expiresAt: new Date("2026-08-04T00:00:00.000Z"),
+          }),
+        ),
+      ).resolves.toMatchObject({
+        url: "https://checkout.stripe.test/race",
+        publicReference: "GP-DP-RACE",
+      })
+
+      await expect(
+        runAttachmentRace(
+          depositAttemptFixture({
+            id: "dp-race",
+            publicReference: "GP-DP-RACE",
+            idempotencyKey: "attachment-race",
+            providerSessionId: "cs-other",
+            providerPaymentId: "pi-race",
+            status: "PENDING_CUSTOMER_ACTION",
+            expiresAt: new Date("2026-08-04T00:00:00.000Z"),
+          }),
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DEPOSIT_SESSION_ATTACHMENT_RACE",
+        }),
+      })
+
+      await expect(
+        runAttachmentRace(
+          depositAttemptFixture({
+            id: "dp-race",
+            publicReference: "GP-DP-RACE",
+            idempotencyKey: "attachment-race",
+            providerSessionId: "cs-race",
+            providerPaymentId: "pi-race",
+            status: "FAILED",
+            expiresAt: new Date("2026-08-04T00:00:00.000Z"),
+            failureCode: "PROVIDER_UNAVAILABLE",
+            failedAt: new Date("2026-08-03T00:00:00.000Z"),
+          }),
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DEPOSIT_SESSION_ATTACHMENT_RACE",
+        }),
+      })
+      expect(prismaMock.wallet.update).not.toHaveBeenCalled()
+      expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+    })
+
+    it("returns a sanitized state error when failure evidence cannot be persisted", async () => {
+      const rawProviderText = "provider response contained sk_test_do_not_leak"
+      const rawDatabaseText =
+        "database failure at postgresql://money-writer:secret@internal"
+      const loggerError = jest.fn()
+      ;(service as any).logger.error = loggerError
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(null)
+      prismaMock.depositAttempt.create.mockResolvedValue(
+        depositAttemptFixture({
+          id: "dp-state-failure",
+          publicReference: "GP-DP-STATE",
+          idempotencyKey: "failure-evidence-write",
+        }),
+      )
+      prismaMock.depositAttempt.updateMany.mockRejectedValue(
+        new Error(rawDatabaseText),
+      )
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest.fn().mockRejectedValue(new Error(rawProviderText)),
+      }
+
+      let caught: unknown
+      try {
+        await service.createCheckoutSession(
+          "wallet-1",
+          25,
+          mockUser,
+          "failure-evidence-write",
+        )
+      } catch (error) {
+        caught = error
+      }
+
+      expect(caught).toBeInstanceOf(ServiceUnavailableException)
+      expect(
+        (caught as ServiceUnavailableException).getResponse(),
+      ).toMatchObject({
+        code: "DEPOSIT_STATE_UNAVAILABLE",
+        message:
+          "Secure card checkout could not be recorded safely. Please try again later.",
+      })
+      const observable = JSON.stringify({
+        response: (caught as ServiceUnavailableException).getResponse(),
+        logs: loggerError.mock.calls,
+        writes: prismaMock.depositAttempt.updateMany.mock.calls,
+      })
+      expect(observable).not.toContain(rawProviderText)
+      expect(observable).not.toContain(rawDatabaseText)
+      expect(observable).not.toContain("sk_test_do_not_leak")
+      expect(observable).not.toContain("money-writer:secret")
+      expect(prismaMock.wallet.update).not.toHaveBeenCalled()
+      expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+      expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+    })
+
+    it("maps an idempotent provider-session recovery failure without mutating the attempt", async () => {
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(
+        depositAttemptFixture({
+          id: "dp-existing-session",
+          publicReference: "GP-DP-EXISTING",
+          status: "PENDING_CUSTOMER_ACTION",
+          providerSessionId: "cs_existing",
+          providerPaymentId: "pi_existing",
+          expiresAt: new Date("2026-08-04T00:00:00.000Z"),
+          idempotencyKey: "existing-session",
+        }),
+      )
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        retrieveSession: jest
+          .fn()
+          .mockRejectedValue(
+            new DepositProviderError("PROVIDER_UNAVAILABLE", true),
+          ),
+      }
+
+      await expect(
+        service.createCheckoutSession(
+          "wallet-1",
+          25,
+          mockUser,
+          "existing-session",
+        ),
+      ).rejects.toMatchObject({
+        status: 503,
+        response: expect.objectContaining({
+          code: "DEPOSIT_PROVIDER_UNAVAILABLE",
+        }),
+      })
+      expect(prismaMock.depositAttempt.updateMany).not.toHaveBeenCalled()
+    })
+
+    it("returns only a remotely revalidated exact open Checkout session", async () => {
+      const expiresAt = new Date("2026-08-04T00:00:00.000Z")
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(
+        depositAttemptFixture({
+          id: "dp-existing-session",
+          publicReference: "GP-DP-EXISTING",
+          status: "PENDING_CUSTOMER_ACTION",
+          providerSessionId: "cs_existing",
+          providerPaymentId: "pi_existing",
+          expiresAt,
+          idempotencyKey: "existing-session",
+        }),
+      )
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        retrieveSession: jest.fn().mockResolvedValue(
+          depositSessionFixture({
+            providerSessionId: "cs_existing",
+            providerPaymentId: "pi_existing",
+            clientReferenceId: "dp-existing-session",
+            metadata: {
+              depositAttemptId: "dp-existing-session",
+              publicReference: "GP-DP-EXISTING",
+              walletId: "wallet-1",
+              userId: "user-1",
+              organizationId: "org-1",
+            },
+            expiresAt,
+          }),
+        ),
+      }
+
+      await expect(
+        service.createCheckoutSession(
+          "wallet-1",
+          25,
+          mockUser,
+          "existing-session",
+        ),
+      ).resolves.toMatchObject({
+        url: "https://checkout.stripe.test/session",
+        publicReference: "GP-DP-EXISTING",
+      })
+      expect(prismaMock.depositAttempt.updateMany).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ["provider identity", { providerSessionId: "cs_other" }],
+      ["client reference", { clientReferenceId: "dp-other" }],
+      [
+        "metadata wallet binding",
+        {
+          metadata: {
+            depositAttemptId: "dp-existing-session",
+            publicReference: "GP-DP-EXISTING",
+            walletId: "wallet-other",
+            userId: "user-1",
+            organizationId: "org-1",
+          },
+        },
+      ],
+      ["amount", { amountTotalMinor: 2499 }],
+      ["currency", { currency: "EUR" }],
+      ["Checkout mode", { mode: "subscription" }],
+      ["Stripe environment", { livemode: true }],
+      ["HTTPS return URL", { url: "http://checkout.stripe.test/session" }],
+      ["Stripe Checkout host", { url: "https://attacker.invalid/session" }],
+    ])("rejects recovered Checkout with mismatched %s evidence", async (_name, mismatch) => {
+      const expiresAt = new Date("2026-08-04T00:00:00.000Z")
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(
+        depositAttemptFixture({
+          id: "dp-existing-session",
+          publicReference: "GP-DP-EXISTING",
+          status: "PENDING_CUSTOMER_ACTION",
+          providerSessionId: "cs_existing",
+          providerPaymentId: "pi_existing",
+          expiresAt,
+          idempotencyKey: "existing-session",
+        }),
+      )
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        retrieveSession: jest.fn().mockResolvedValue(
+          depositSessionFixture({
+            providerSessionId: "cs_existing",
+            providerPaymentId: "pi_existing",
+            clientReferenceId: "dp-existing-session",
+            metadata: {
+              depositAttemptId: "dp-existing-session",
+              publicReference: "GP-DP-EXISTING",
+              walletId: "wallet-1",
+              userId: "user-1",
+              organizationId: "org-1",
+            },
+            expiresAt,
+            ...mismatch,
+          }),
+        ),
+      }
+
+      await expect(
+        service.createCheckoutSession(
+          "wallet-1",
+          25,
+          mockUser,
+          "existing-session",
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DEPOSIT_PROVIDER_UNAVAILABLE",
+        }),
+      })
+      expect(prismaMock.depositAttempt.updateMany).not.toHaveBeenCalled()
+    })
+
+    it("rejects malformed new Checkout evidence before attaching it", async () => {
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(null)
+      prismaMock.depositAttempt.create.mockResolvedValue(
+        depositAttemptFixture({ idempotencyKey: "malformed-checkout" }),
+      )
+      prismaMock.depositAttempt.updateMany.mockResolvedValue({ count: 1 })
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest.fn().mockResolvedValue(
+          depositSessionFixture({
+            amountTotalMinor: 2499,
+            url: "http://attacker.invalid/checkout",
+          }),
+        ),
+      }
+
+      await expect(
+        service.createCheckoutSession(
+          "wallet-1",
+          25,
+          mockUser,
+          "malformed-checkout",
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DEPOSIT_PROVIDER_UNAVAILABLE",
+        }),
+      })
+      expect(prismaMock.depositAttempt.updateMany).toHaveBeenCalledTimes(1)
+      expect(prismaMock.depositAttempt.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "FAILED",
+            failureCode: "PROVIDER_RESPONSE_INVALID",
+          }),
+        }),
+      )
+    })
+
+    it.each([
+      ["exact", false],
+      ["mismatched", true],
+    ])("handles a provider-failure CAS loser only after an %s successor reread", async (_name, mismatched) => {
+      const successor = depositAttemptFixture({
+        id: "dp-failure-race",
+        publicReference: "GP-DP-FAILRACE",
+        idempotencyKey: "provider-failure-race",
+        status: "PENDING_CUSTOMER_ACTION",
+        providerSessionId: "cs_successor",
+        providerPaymentId: "pi_successor",
+        expiresAt: new Date("2026-08-04T00:00:00.000Z"),
+        ...(mismatched ? { createdByUserId: "user-other" } : {}),
+      })
+      prismaMock.depositAttempt.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(successor)
+      prismaMock.depositAttempt.create.mockResolvedValue(
+        depositAttemptFixture({
+          id: "dp-failure-race",
+          publicReference: "GP-DP-FAILRACE",
+          idempotencyKey: "provider-failure-race",
+        }),
+      )
+      prismaMock.depositAttempt.updateMany.mockResolvedValue({ count: 0 })
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest
+          .fn()
+          .mockRejectedValue(
+            new DepositProviderError("PROVIDER_UNAVAILABLE", true),
+          ),
+      }
+
+      await expect(
+        service.createCheckoutSession(
+          "wallet-1",
+          25,
+          mockUser,
+          "provider-failure-race",
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: mismatched
+            ? "DEPOSIT_STATE_UNAVAILABLE"
+            : "DEPOSIT_PROVIDER_UNAVAILABLE",
+        }),
+      })
+      expect(prismaMock.depositAttempt.findUnique).toHaveBeenCalledTimes(2)
     })
 
     it("rejects a non-canonical wallet currency before creating a deposit attempt", async () => {

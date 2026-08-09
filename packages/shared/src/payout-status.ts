@@ -12,6 +12,10 @@ import {
 
 export type ProviderTransferStatus = "PROCESSING" | "COMPLETED" | "FAILED"
 
+export function isPaidWithdrawalStatus(status: unknown): status is "COMPLETED" {
+  return status === "COMPLETED"
+}
+
 export interface ProviderStatusResult {
   status: ProviderTransferStatus
   providerAmountMinor?: number

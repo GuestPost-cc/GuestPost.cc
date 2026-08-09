@@ -1,6 +1,12 @@
 "use client"
 
 import {
+  ApiError,
+  bindDepositIdempotencyKey,
+  type DepositIdempotencyState,
+  depositErrorPresentation,
+} from "@guestpost/api-client"
+import {
   Button,
   Card,
   CardContent,
@@ -85,7 +91,11 @@ function TransactionsSkeleton() {
 }
 
 const depositSchema = z.object({
-  amount: z.coerce.number().min(1, "Minimum deposit is $1.00"),
+  amount: z.coerce
+    .number()
+    .min(1, "Minimum deposit is $1.00")
+    .max(1_000_000, "Amount is too large")
+    .multipleOf(0.01, "Use no more than two decimal places"),
 })
 
 type DepositForm = z.infer<typeof depositSchema>
@@ -105,10 +115,13 @@ export default function BillingPage() {
   const [showDepositDialog, setShowDepositDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [processingPayment, setProcessingPayment] = useState(false)
+  const [depositRuntimeUnavailable, setDepositRuntimeUnavailable] = useState<
+    string | null
+  >(null)
   const pollTimer = useRef<ReturnType<typeof setInterval> | undefined>(
     undefined,
   )
-  const depositRequestKey = useRef<string | null>(null)
+  const depositRequest = useRef<DepositIdempotencyState | null>(null)
   // Set when checkout sends the customer here to top up; we return them after.
   const [returnTo, setReturnTo] = useState<string | null>(null)
 
@@ -132,6 +145,30 @@ export default function BillingPage() {
     queryFn: () => api.billing.getWallet(),
     enabled: isOwner,
   })
+
+  const {
+    data: depositCapability,
+    isLoading: depositCapabilityLoading,
+    error: depositCapabilityError,
+    refetch: refetchDepositCapability,
+  } = useQuery({
+    queryKey: ["deposit-capability"],
+    queryFn: () => api.billing.getDepositCapability(),
+    enabled: isOwner,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+  })
+
+  const depositAvailable =
+    depositCapability?.available === true && !depositRuntimeUnavailable
+  const depositUnavailableMessage = depositRuntimeUnavailable
+    ? depositRuntimeUnavailable
+    : depositCapabilityError
+      ? "Card-deposit availability could not be verified."
+      : depositCapability?.available === false
+        ? depositCapability.message
+        : null
 
   const {
     data: transactionsData,
@@ -170,7 +207,7 @@ export default function BillingPage() {
         sessionStorage.removeItem("deposit_publicReference")
         sessionStorage.removeItem("deposit_expectedAmount")
         sessionStorage.removeItem("deposit_timestamp")
-        depositRequestKey.current = null
+        depositRequest.current = null
         toast.success(
           `Deposit ${result.publicReference} completed. Your statement should show ${result.statementDescriptor}.`,
         )
@@ -240,12 +277,24 @@ export default function BillingPage() {
   const depositMutation = useMutation({
     mutationFn: async (amount: number) => {
       if (!walletData?.id) throw new Error("Wallet not loaded")
+      if (!depositAvailable) {
+        throw new Error(
+          depositUnavailableMessage ?? "Card deposits are unavailable",
+        )
+      }
+      depositRequest.current = bindDepositIdempotencyKey(
+        depositRequest.current,
+        {
+          walletId: walletData.id,
+          amount,
+          currency: walletData.currency,
+        },
+        () => crypto.randomUUID(),
+      )
       const session = await api.billing.createCheckoutSession({
         walletId: walletData.id,
         amount,
-        idempotencyKey:
-          depositRequestKey.current ??
-          (depositRequestKey.current = crypto.randomUUID()),
+        idempotencyKey: depositRequest.current.key,
       })
       if (session?.url) {
         // Preserve returnTo and expected amount through Stripe redirect cycle
@@ -263,8 +312,21 @@ export default function BillingPage() {
         throw new Error("No checkout URL returned")
       }
     },
-    onError: () => {
-      toast.error("Failed to initiate deposit")
+    onError: (error: unknown) => {
+      const presentation = depositErrorPresentation(error)
+      if (
+        error instanceof ApiError &&
+        ["DEPOSIT_PROVIDER_UNAVAILABLE", "DEPOSIT_STATE_UNAVAILABLE"].includes(
+          error.code,
+        )
+      ) {
+        setDepositRuntimeUnavailable(presentation.message)
+      }
+      toast.error(presentation.message, {
+        description: presentation.requestId
+          ? `Request ID: ${presentation.requestId}`
+          : undefined,
+      })
     },
   })
 
@@ -345,11 +407,44 @@ export default function BillingPage() {
             Manage your wallet and payments
           </p>
         </div>
-        <Button onClick={() => setShowDepositDialog(true)}>
+        <Button
+          onClick={() => setShowDepositDialog(true)}
+          disabled={!depositAvailable || depositCapabilityLoading}
+        >
           <Plus className="mr-2 h-4 w-4" />
-          Deposit Funds
+          {depositCapabilityLoading
+            ? "Checking deposits..."
+            : depositAvailable
+              ? "Deposit Funds"
+              : "Deposits unavailable"}
         </Button>
       </div>
+
+      {depositUnavailableMessage ? (
+        <div
+          role="status"
+          className="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <p className="font-medium">Card deposits are unavailable</p>
+            <p className="text-muted-foreground">
+              {depositUnavailableMessage} Your existing wallet balance and
+              transaction history are unaffected.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setDepositRuntimeUnavailable(null)
+              void refetchDepositCapability()
+            }}
+          >
+            Retry availability
+          </Button>
+        </div>
+      ) : null}
 
       {/* Wallet Cards */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -515,7 +610,10 @@ export default function BillingPage() {
       </Card>
 
       {/* Deposit Dialog */}
-      <Dialog open={showDepositDialog} onOpenChange={setShowDepositDialog}>
+      <Dialog
+        open={showDepositDialog && depositAvailable}
+        onOpenChange={setShowDepositDialog}
+      >
         <DialogContent className="sm:max-w-[400px]">
           <form
             onSubmit={handleSubmit((data) =>

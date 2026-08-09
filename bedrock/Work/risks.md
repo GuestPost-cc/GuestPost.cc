@@ -28,7 +28,7 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   cancellation, catalog/order capture, revision, delivery/fraud, settlement,
   and completion write shapes. A rolling deployment or rollback to the prior
   application would create an outage. Mitigation: hard-drain all old writers,
-  apply all 58 migrations in the complete ordered chain through `0970`, start
+  apply all 59 migrations in the complete ordered chain through `0980`, start
   only the matching image, keep money gates closed, rehearse on a populated
   clone, require every financial constraint to be validated, and forward-fix.
   Short-timeout SHARE barriers make preflights fail rather than race a

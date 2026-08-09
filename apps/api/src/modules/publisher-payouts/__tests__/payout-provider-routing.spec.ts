@@ -10,6 +10,8 @@ describe("PayoutExecutionService provider routing", () => {
   const originalFinanceRuntimeMode = process.env.FINANCE_RUNTIME_MODE
   const originalLegacyMethodsEnabled = process.env.PAYOUT_LEGACY_METHODS_ENABLED
   const originalPayoutExecutionEnabled = process.env.PAYOUT_EXECUTION_ENABLED
+  const originalStripeConnectEnabled = process.env.STRIPE_CONNECT_ENABLED
+  const originalNodeEnv = process.env.NODE_ENV
 
   afterEach(() => {
     if (originalFinanceRuntimeMode === undefined) {
@@ -26,6 +28,16 @@ describe("PayoutExecutionService provider routing", () => {
       delete process.env.PAYOUT_EXECUTION_ENABLED
     } else {
       process.env.PAYOUT_EXECUTION_ENABLED = originalPayoutExecutionEnabled
+    }
+    if (originalStripeConnectEnabled === undefined) {
+      delete process.env.STRIPE_CONNECT_ENABLED
+    } else {
+      process.env.STRIPE_CONNECT_ENABLED = originalStripeConnectEnabled
+    }
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV
+    } else {
+      process.env.NODE_ENV = originalNodeEnv
     }
   })
 
@@ -62,6 +74,56 @@ describe("PayoutExecutionService provider routing", () => {
       providerService as any,
     )
     return { service, providerService, prisma }
+  }
+
+  function configureLockedExecution(
+    service: PayoutExecutionService,
+    providerService: { getAdapter: jest.Mock },
+    method: "bank_transfer" | "stripe_connect",
+    payoutMethod: Record<string, unknown>,
+  ) {
+    const lockedWithdrawal = {
+      id: "wd-1",
+      status: "APPROVED",
+      method,
+      currency: "USD",
+      publicReference: "GP-WD-0001",
+      payoutMethodId: "pm-1",
+      payoutMethod,
+      publisherId: "pub-1",
+      requestedBy: "publisher-owner-1",
+      approvedBy: "finance-approver-1",
+      publisher: { organizationId: "org-1" },
+      allocations: [],
+    }
+    const tx = {
+      $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: "wd-1" }]),
+      withdrawal: {
+        findUnique: jest.fn().mockResolvedValue(lockedWithdrawal),
+      },
+      staffMembership: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { userId: "finance-approver-1" },
+            { userId: "finance-initiator-1" },
+          ]),
+      },
+      publisherMembership: {
+        findFirst: jest.fn().mockResolvedValue({ id: "owner-membership-1" }),
+      },
+      payoutProvider: { findUnique: jest.fn() },
+      payoutExecution: { findFirst: jest.fn(), create: jest.fn() },
+    }
+    ;(service as any).recordOperatorIntent = jest
+      .fn()
+      .mockResolvedValue(undefined)
+    ;(service as any).runSerializable = jest.fn(async (work: any) => work(tx))
+    providerService.getAdapter.mockReturnValue({
+      capabilities: { supportedCurrencies: ["USD"] },
+      createTransfer: jest.fn(),
+    })
+    return tx
   }
 
   it.each([
@@ -190,5 +252,93 @@ describe("PayoutExecutionService provider routing", () => {
     expect(prisma.payoutExecution.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "exec-1" } }),
     )
+  })
+
+  it("rechecks the canonical locked gate and blocks manual sends during Stripe rollout", async () => {
+    process.env.NODE_ENV = "production"
+    process.env.FINANCE_RUNTIME_MODE = "normal"
+    process.env.PAYOUT_EXECUTION_ENABLED = "true"
+    process.env.PAYOUT_LEGACY_METHODS_ENABLED = "true"
+    process.env.STRIPE_CONNECT_ENABLED = "true"
+    const { service, providerService } = setup("bank_transfer")
+    const tx = configureLockedExecution(
+      service,
+      providerService,
+      "bank_transfer",
+      {
+        id: "pm-1",
+        publisherId: "pub-1",
+        type: "bank_transfer",
+        isActive: true,
+        providerAccountId: null,
+        providerAccount: null,
+      },
+    )
+
+    await expect(
+      service.executeWithdrawal(
+        "wd-1",
+        "manual",
+        "finance-initiator-1",
+        "Reviewed locked manual payout eligibility",
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "PAYOUT_METHOD_NOT_EXECUTABLE",
+        eligibilityCode: "MANUAL_BANK_DISABLED",
+      }),
+    })
+    expect(tx.payoutProvider.findUnique).not.toHaveBeenCalled()
+    expect(tx.payoutExecution.create).not.toHaveBeenCalled()
+  })
+
+  it("rechecks the canonical locked gate before claiming a disabled Stripe send", async () => {
+    process.env.NODE_ENV = "production"
+    process.env.FINANCE_RUNTIME_MODE = "normal"
+    process.env.PAYOUT_EXECUTION_ENABLED = "true"
+    process.env.STRIPE_CONNECT_ENABLED = "false"
+    const account = {
+      id: "account-row-1",
+      publisherId: "pub-1",
+      provider: "stripe_connect",
+      providerAccountId: "acct_immutable",
+      isActive: true,
+      status: "ENABLED",
+      transfersEnabled: true,
+      payoutsEnabled: true,
+      detailsSubmitted: true,
+      payoutScheduleConfigured: true,
+      defaultCurrency: "USD",
+    }
+    const { service, providerService } = setup("stripe_connect")
+    const tx = configureLockedExecution(
+      service,
+      providerService,
+      "stripe_connect",
+      {
+        id: "pm-1",
+        publisherId: "pub-1",
+        type: "stripe_connect",
+        isActive: true,
+        providerAccountId: account.id,
+        providerAccount: account,
+      },
+    )
+
+    await expect(
+      service.executeWithdrawal(
+        "wd-1",
+        "stripe_connect",
+        "finance-initiator-1",
+        "Reviewed locked Stripe payout eligibility",
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "PAYOUT_METHOD_NOT_EXECUTABLE",
+        eligibilityCode: "STRIPE_CONNECT_DISABLED",
+      }),
+    })
+    expect(tx.payoutProvider.findUnique).not.toHaveBeenCalled()
+    expect(tx.payoutExecution.create).not.toHaveBeenCalled()
   })
 })

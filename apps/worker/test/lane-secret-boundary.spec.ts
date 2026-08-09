@@ -39,3 +39,32 @@ test("integration workers are loaded only by lanes that consume their queues", (
   )
   assert.doesNotMatch(scheduled, /createIntegrationWorkers/)
 })
+
+test("object storage is required only by lanes that can consume delivery evidence", () => {
+  const all = source.slice(
+    source.indexOf('if (mode === "all")'),
+    source.indexOf('if (mode === "realtime")'),
+  )
+  assert.match(all, /await assertObjectStorageReadiness\(\)/)
+
+  const realtime = source.slice(
+    source.indexOf('if (mode === "realtime")'),
+    source.indexOf('if (mode === "on-demand")'),
+  )
+  assert.match(realtime, /await assertObjectStorageReadiness\(\)/)
+
+  const onDemand = source.slice(
+    source.indexOf('if (mode === "on-demand")'),
+    source.indexOf("const taskName = process.env.WORKER_TASK"),
+  )
+  assert.doesNotMatch(onDemand, /assertObjectStorageReadiness/)
+
+  const scheduledRunner = source.slice(
+    source.indexOf("async function runScheduledTask"),
+    source.indexOf("function isMaintenanceTaskDisabled"),
+  )
+  assert.match(
+    scheduledRunner,
+    /if \(task\.queue === QUEUES\.DELIVERY_VERIFICATION\) \{\s*await assertObjectStorageReadiness\(\)/,
+  )
+})

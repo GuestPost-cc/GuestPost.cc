@@ -33,6 +33,7 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
   let previousDatabaseUrl: string | undefined
   let previousStripeKey: string | undefined
   let previousStripeLiveMode: string | undefined
+  let previousStripeConnectEnabled: string | undefined
   let prisma: any
 
   beforeAll(async () => {
@@ -40,12 +41,21 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
     previousDatabaseUrl = process.env.DATABASE_URL
     previousStripeKey = process.env.STRIPE_SECRET_KEY
     previousStripeLiveMode = process.env.STRIPE_LIVE_MODE_ENABLED
+    previousStripeConnectEnabled = process.env.STRIPE_CONNECT_ENABLED
     process.env.DATABASE_URL = database.url
     process.env.STRIPE_SECRET_KEY = "sk_test_payout_persistence"
     process.env.STRIPE_LIVE_MODE_ENABLED = "false"
     const { PrismaService } = require("../../../common/prisma.service") as any
     prisma = new PrismaService()
     await prisma.$connect()
+  })
+
+  afterEach(() => {
+    if (previousStripeConnectEnabled !== undefined) {
+      process.env.STRIPE_CONNECT_ENABLED = previousStripeConnectEnabled
+    } else {
+      delete process.env.STRIPE_CONNECT_ENABLED
+    }
   })
 
   afterAll(async () => {
@@ -67,6 +77,11 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
         process.env.STRIPE_LIVE_MODE_ENABLED = previousStripeLiveMode
       } else {
         delete process.env.STRIPE_LIVE_MODE_ENABLED
+      }
+      if (previousStripeConnectEnabled !== undefined) {
+        process.env.STRIPE_CONNECT_ENABLED = previousStripeConnectEnabled
+      } else {
+        delete process.env.STRIPE_CONNECT_ENABLED
       }
     }
   })
@@ -3296,6 +3311,7 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
   }, 30_000)
 
   it("keeps managed routing identities immutable and reactivation readiness-gated", async () => {
+    process.env.STRIPE_CONNECT_ENABLED = "true"
     const fixture = await makeReadyReservationFixture(25)
     const { service } = makePublisherPayoutsService()
 
@@ -3395,7 +3411,12 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
         idempotencyKey,
         fixture.methodId,
       ),
-    ).rejects.toThrow(/not fully enabled or manually scheduled/i)
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "PAYOUT_METHOD_PROVIDER_NOT_READY",
+        eligibilityCode: "STRIPE_ACCOUNT_NOT_READY",
+      }),
+    })
     await expect(
       prisma.withdrawal.count({
         where: { publisherId: fixture.publisherId, idempotencyKey },
@@ -3609,6 +3630,7 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
   }, 30_000)
 
   it("keeps request and provider-claim writers on a deadlock-free Balance-to-Method suffix", async () => {
+    process.env.STRIPE_CONNECT_ENABLED = "true"
     const fixture = await makePayoutFixture({ leaveExecutionAtCreated: true })
     await addReservedCapacity(fixture, 25)
     const created = await prisma.payoutExecution.findUniqueOrThrow({

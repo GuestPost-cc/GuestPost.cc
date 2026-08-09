@@ -16,6 +16,9 @@ DECLARE
   wallet_withdrawal_count INTEGER;
   backfilled_balance_count INTEGER;
   backfilled_wallet_count INTEGER;
+  deposit_failure_constraint_validated BOOLEAN;
+  legacy_deposit_failure_code TEXT;
+  rejection_constraint TEXT;
 BEGIN
   SELECT convalidated
     INTO dispute_constraint_validated
@@ -135,6 +138,54 @@ BEGIN
     RAISE EXCEPTION
       'History-free organization wallet aggregate was not backfilled exactly';
   END IF;
+
+  SELECT convalidated
+    INTO deposit_failure_constraint_validated
+    FROM pg_constraint
+   WHERE conrelid = '"DepositAttempt"'::regclass
+     AND conname = 'DepositAttempt_failure_evidence_check';
+  IF deposit_failure_constraint_validated IS DISTINCT FROM TRUE THEN
+    RAISE EXCEPTION
+      'DepositAttempt_failure_evidence_check is missing or not validated';
+  END IF;
+
+  SELECT "failureCode"::TEXT
+    INTO legacy_deposit_failure_code
+    FROM "DepositAttempt"
+   WHERE id = 'migration-rehearsal-failed-deposit-attempt';
+  IF legacy_deposit_failure_code IS DISTINCT FROM 'LEGACY_UNCLASSIFIED' THEN
+    RAISE EXCEPTION
+      'Historical failed deposit did not retain an honest legacy classification';
+  END IF;
+
+  BEGIN
+    UPDATE "DepositAttempt"
+       SET "failureCode" = NULL
+     WHERE id = 'migration-rehearsal-failed-deposit-attempt';
+    RAISE EXCEPTION 'FAILED DepositAttempt accepted missing failure evidence';
+  EXCEPTION
+    WHEN check_violation THEN
+      GET STACKED DIAGNOSTICS rejection_constraint = CONSTRAINT_NAME;
+      IF rejection_constraint IS DISTINCT FROM
+         'DepositAttempt_failure_evidence_check' THEN
+        RAISE;
+      END IF;
+  END;
+
+  BEGIN
+    UPDATE "DepositAttempt"
+       SET "failureCode" = 'PROVIDER_UNAVAILABLE'
+     WHERE id = 'migration-rehearsal-deposit-attempt';
+    RAISE EXCEPTION
+      'Non-failed DepositAttempt accepted contradictory failure evidence';
+  EXCEPTION
+    WHEN check_violation THEN
+      GET STACKED DIAGNOSTICS rejection_constraint = CONSTRAINT_NAME;
+      IF rejection_constraint IS DISTINCT FROM
+         'DepositAttempt_failure_evidence_check' THEN
+        RAISE;
+      END IF;
+  END;
 END;
 $$;
 

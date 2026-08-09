@@ -54,13 +54,16 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     container_name: gp-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-guestpost}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-guestpost123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-guestpost}
+      GUESTPOST_MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-guestpost}
+      GUESTPOST_MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-guestpost123}
     ports:
       - "9000:9000"
       - "9001:9001"

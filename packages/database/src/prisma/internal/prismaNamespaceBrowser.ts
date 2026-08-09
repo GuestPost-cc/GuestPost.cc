@@ -1149,6 +1149,7 @@ export const DepositAttemptScalarFieldEnum = {
   expiresAt: 'expiresAt',
   completedAt: 'completedAt',
   failedAt: 'failedAt',
+  failureCode: 'failureCode',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

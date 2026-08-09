@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from "@nestjs/common"
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { PermissionsGuard } from "../../../common/guards/permissions.guard"
 import { PayoutEncryptionService } from "../payout-encryption.service"
@@ -413,16 +417,71 @@ describe("PublisherPayoutsService — decrypt access path", () => {
     expect(result[0].isActive).toBe(true)
   })
 
-  it("listPayoutMethods includes inactive lifecycle rows only when requested", async () => {
-    prismaMock.payoutMethod.findMany.mockResolvedValue([])
+  it("keeps active but uncertified legacy rows out of the withdrawal selector", async () => {
+    prismaMock.payoutMethod.findMany.mockResolvedValue([
+      {
+        id: "pm-paypal-legacy",
+        type: "paypal",
+        label: "Historical PayPal",
+        displayDetails: { maskedEmail: "p***@example.test" },
+        isDefault: true,
+        isActive: true,
+        providerAccountId: null,
+        providerAccount: null,
+      },
+      {
+        id: "pm-bank",
+        type: "bank_transfer",
+        label: "Manual bank",
+        displayDetails: { bankName: "Test Bank", last4: "3000" },
+        isDefault: false,
+        isActive: true,
+        providerAccountId: null,
+        providerAccount: null,
+      },
+    ])
 
-    await service.listPayoutMethods("pub-1", "user-1", true)
+    const result = await service.listPayoutMethods("pub-1", "user-1")
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      id: "pm-bank",
+      withdrawalEligibility: { executable: true, code: "READY" },
+    })
+  })
+
+  it("listPayoutMethods includes inactive lifecycle rows only when requested", async () => {
+    prismaMock.payoutMethod.findMany.mockResolvedValue([
+      {
+        id: "pm-paypal-legacy",
+        type: "paypal",
+        label: "Historical PayPal",
+        displayDetails: { maskedEmail: "p***@example.test" },
+        isDefault: false,
+        isActive: true,
+        providerAccountId: null,
+        providerAccount: null,
+      },
+    ])
+
+    const result = await service.listPayoutMethods("pub-1", "user-1", true)
 
     expect(prismaMock.payoutMethod.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { publisherId: "pub-1" },
       }),
     )
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: "pm-paypal-legacy",
+        isActive: true,
+        withdrawalEligibility: expect.objectContaining({
+          executable: false,
+          canReactivate: false,
+          code: "METHOD_NOT_CERTIFIED",
+        }),
+      }),
+    ])
   })
 })
 
@@ -493,7 +552,7 @@ describe("PayoutExecutionService — provider error redaction", () => {
     const providerMock = {
       getAdapter: jest.fn().mockReturnValue({
         validateRecipient: jest.fn().mockResolvedValue({ valid: true }),
-        createTransfer: jest.fn().mockRejectedValue(leakyError),
+        recoverClaimedTransfer: jest.fn().mockRejectedValue(leakyError),
       }),
     }
 
@@ -516,9 +575,19 @@ describe("PayoutExecutionService — provider error redaction", () => {
       claimedVersion: 2,
     })
 
-    await expect(
-      service.recoverClaimedProviderSend(execution, "staff-1"),
-    ).rejects.toThrow(/outcome remains unknown/i)
+    let rejection: unknown
+    try {
+      await service.recoverClaimedProviderSend(execution, "staff-1")
+    } catch (error) {
+      rejection = error
+    }
+    expect(rejection).toBeInstanceOf(ConflictException)
+    expect(String((rejection as Error).message)).toMatch(
+      /outcome remains unknown/i,
+    )
+    expect(String((rejection as Error).stack)).not.toContain(
+      "DE89370400440532013000",
+    )
 
     expect(
       JSON.stringify(prismaMock.payoutExecution.updateMany.mock.calls),

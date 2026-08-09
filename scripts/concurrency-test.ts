@@ -7,14 +7,27 @@
  * Requires: API on :4000, seeded DB, and manual payouts enabled in this
  * development/test environment.
  */
-import { prisma } from "../packages/database/src"
+
+import { normalizePositiveUsdMoney } from "../packages/shared/src/money"
+import { loadRootEnv } from "./env"
 import { fundExistingWalletForTest } from "./test-wallet-funding"
+
+let prisma: typeof import("../packages/database/src")["prisma"]
 
 const API = process.env.API_URL ?? "http://localhost:4000"
 const H = {
   "Content-Type": "application/json",
   Origin: "http://localhost:3001",
 }
+type Portal = "customer" | "publisher" | "staff"
+type Session = { cookie: string; origin: string; portal: Portal }
+const activeSessions: Session[] = []
+const SESSION_COOKIE_NAMES = new Set([
+  "guestpost.session_token",
+  "__Secure-guestpost.session_token",
+  "guestpost-session_token",
+  "__Secure-guestpost-session_token",
+])
 const PAR = 10 // parallel requests per attack
 
 let passed = 0
@@ -34,12 +47,24 @@ function check(name: string, cond: boolean, detail?: unknown) {
 async function call(
   method: string,
   path: string,
-  token?: string,
+  session?: Session,
   body?: unknown,
+  requestHeaders?: Record<string, string>,
 ) {
   const res = await fetch(`${API}/api/v1${path}`, {
     method,
-    headers: { ...H, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      ...H,
+      ...(session
+        ? {
+            Cookie: session.cookie,
+            Origin: session.origin,
+            "x-csrf-protection": "1",
+            "x-portal-type": session.portal,
+          }
+        : {}),
+      ...requestHeaders,
+    },
     body: body ? JSON.stringify(body) : undefined,
   })
   let data: any
@@ -49,19 +74,89 @@ async function call(
   } catch {
     data = text
   }
-  return { status: res.status, data }
+  return { status: res.status, data, headers: res.headers }
 }
 
-async function signIn(email: string, password: string) {
-  const r = await call("POST", "/auth/sign-in/email", undefined, {
-    email,
-    password,
-  })
+function portalOrigin(portal: Portal): string {
+  if (portal === "staff") return "http://localhost:3003"
+  if (portal === "publisher") return "http://localhost:3002"
+  return "http://localhost:3001"
+}
+
+async function signIn(email: string, password: string, portal: Portal) {
+  const r = await call(
+    "POST",
+    "/auth/sign-in/email",
+    undefined,
+    {
+      email,
+      password,
+    },
+    {
+      Origin: portalOrigin(portal),
+      "x-portal-type": portal,
+    },
+  )
   if (r.status !== 200) throw new Error(`sign-in failed: ${email}`)
-  return r.data.token as string
+  const setCookies =
+    (
+      r.headers as Headers & {
+        getSetCookie?: () => string[]
+      }
+    ).getSetCookie?.() ?? []
+  const sessionCookies = setCookies
+    .map((value) => value.split(";", 1)[0] ?? "")
+    .filter((value) => SESSION_COOKIE_NAMES.has(value.split("=", 1)[0] ?? ""))
+  if (sessionCookies.length !== 1) {
+    throw new Error(`sign-in did not establish one session for ${email}`)
+  }
+  const session = {
+    cookie: sessionCookies[0],
+    origin: portalOrigin(portal),
+    portal,
+  }
+  activeSessions.push(session)
+  return session
 }
 
-async function ensureManualPayoutMethod(publisherToken: string) {
+async function cleanupSessions() {
+  const sessions = activeSessions.splice(0)
+  const results = await Promise.allSettled(
+    sessions.map((session) =>
+      call("POST", "/auth/sign-out", session, undefined, {
+        Origin: session.origin,
+        "x-portal-type": session.portal,
+      }),
+    ),
+  )
+  if (
+    results.some(
+      (result) =>
+        result.status === "rejected" ||
+        (result.status === "fulfilled" && result.value.status >= 400),
+    )
+  ) {
+    throw new Error("one or more concurrency-test sessions could not be closed")
+  }
+}
+
+function paymentEvidence(order: any) {
+  const expectedAmount = normalizePositiveUsdMoney(order?.amount)
+  if (
+    !Number.isInteger(order?.version) ||
+    expectedAmount === null ||
+    order?.currency !== "USD"
+  ) {
+    throw new Error("order response is missing canonical USD capture evidence")
+  }
+  return {
+    expectedVersion: order.version,
+    expectedAmount,
+    expectedCurrency: order.currency,
+  }
+}
+
+async function ensureManualPayoutMethod(publisherToken: Session) {
   const listed = await call(
     "GET",
     "/publisher-payouts/payout-methods",
@@ -106,9 +201,9 @@ async function ensureManualPayoutMethod(publisherToken: string) {
 
 /** Drive one order from DRAFT to DELIVERED, return its settlement id. */
 async function orderToSettlement(
-  client: string,
-  publisher: string,
-  admin: string,
+  client: Session,
+  publisher: Session,
+  admin: Session,
   websiteId: string,
   listingService: {
     id: string
@@ -140,7 +235,7 @@ async function orderToSettlement(
     })
   ).data
   for (const [actor, path, body] of [
-    [client, "submit-payment", undefined],
+    [client, "submit-payment", paymentEvidence(order)],
     [publisher, "accept", undefined],
     [publisher, "submit-content", { content: "ctest content" }],
     [publisher, "mark-content-ready", undefined],
@@ -151,13 +246,15 @@ async function orderToSettlement(
     const r = await call(
       "POST",
       `/orders/${order.id}/${path}`,
-      actor as string,
+      actor,
       body as any,
     )
     if (r.status >= 400)
       throw new Error(`setup ${path} failed: ${JSON.stringify(r.data)}`)
   }
-  await call("POST", `/admin/orders/${order.id}/manual-verify`, admin)
+  await call("POST", `/admin/orders/${order.id}/manual-verify`, admin, {
+    method: "MANUAL_ADMIN",
+  })
   await call("POST", `/orders/${order.id}/confirm-delivery`, client)
   const settlement = await prisma.settlement.findFirst({
     where: { orderId: order.id, status: { not: "CANCELLED" } },
@@ -167,13 +264,29 @@ async function orderToSettlement(
 }
 
 async function main() {
-  const client = await signIn("client@guestpost.local", "Client123!")
-  const publisher = await signIn("publisher@guestpost.local", "Publisher123!")
-  const admin = await signIn("admin@guestpost.local", "Admin123!")
-  const finance = await signIn("finance@guestpost.local", "Finance123!")
+  loadRootEnv({ required: ["NODE_ENV", "DATABASE_URL"] })
+  ;({ prisma } = await import("../packages/database/src"))
+
+  const client = await signIn(
+    "client@guestpost.local",
+    "Client123!",
+    "customer",
+  )
+  const publisher = await signIn(
+    "publisher@guestpost.local",
+    "Publisher123!",
+    "publisher",
+  )
+  const admin = await signIn("admin@guestpost.local", "Admin123!", "staff")
+  const finance = await signIn(
+    "finance@guestpost.local",
+    "Finance123!",
+    "staff",
+  )
   const financeChecker = await signIn(
     "finance-checker@guestpost.local",
     "FinanceChecker123!",
+    "staff",
   )
   const payoutMethod = await ensureManualPayoutMethod(publisher)
 
@@ -227,7 +340,12 @@ async function main() {
   ).data
   const payResults = await Promise.all(
     Array.from({ length: PAR }, () =>
-      call("POST", `/orders/${order1.id}/submit-payment`, client),
+      call(
+        "POST",
+        `/orders/${order1.id}/submit-payment`,
+        client,
+        paymentEvidence(order1),
+      ),
     ),
   )
   const paySuccesses = payResults.filter((r) => r.status < 400).length
@@ -252,7 +370,7 @@ async function main() {
   )
   const affordable = Math.floor(w2 / price)
   const attempts = affordable + 3
-  const orderIds: string[] = []
+  const orders: any[] = []
   for (let i = 0; i < attempts; i++) {
     const o = (
       await call("POST", "/orders", client, {
@@ -278,10 +396,17 @@ async function main() {
         ],
       })
     ).data
-    orderIds.push(o.id)
+    orders.push(o)
   }
   const overspendResults = await Promise.all(
-    orderIds.map((id) => call("POST", `/orders/${id}/submit-payment`, client)),
+    orders.map((order) =>
+      call(
+        "POST",
+        `/orders/${order.id}/submit-payment`,
+        client,
+        paymentEvidence(order),
+      ),
+    ),
   )
   const overspendOk = overspendResults.filter((r) => r.status < 400).length
   const w3 = Number(
@@ -570,12 +695,14 @@ async function main() {
   )
 
   console.log(`\n${passed} passed, ${failed} failed`)
+  await cleanupSessions()
   await prisma.$disconnect()
   process.exit(failed > 0 ? 1 : 0)
 }
 
 main().catch(async (err) => {
   console.error(err)
-  await prisma.$disconnect()
+  await cleanupSessions().catch((cleanupError) => console.error(cleanupError))
+  await prisma?.$disconnect()
   process.exit(1)
 })

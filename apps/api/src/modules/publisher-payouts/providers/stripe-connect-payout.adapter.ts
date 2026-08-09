@@ -109,6 +109,21 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
   async createTransfer(
     params: CreateTransferParams,
   ): Promise<CreateTransferResult> {
+    return this.createTransferWithClient(params, () =>
+      getStripeClient("connect"),
+    )
+  }
+
+  async recoverClaimedTransfer(
+    params: CreateTransferParams,
+  ): Promise<CreateTransferResult> {
+    return this.createTransferWithClient(params, getStripeRecoveryClient)
+  }
+
+  private async createTransferWithClient(
+    params: CreateTransferParams,
+    getClient: () => Stripe,
+  ): Promise<CreateTransferResult> {
     const connectedAccountId = params.recipientDetails.connectedAccountId
     const publicReference = params.recipientDetails.publicReference
     const expectedAmountMinor = toMinorUnits(params.amount)
@@ -124,7 +139,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
         "Immutable Stripe account, amount, currency, and reference are required for transfer creation",
       )
     }
-    const stripe = getStripeClient("connect")
+    const stripe = getClient()
     const transfer = await stripe.transfers.create(
       {
         amount: expectedAmountMinor,
@@ -177,6 +192,21 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
   async createBankPayout(
     params: CreateBankPayoutParams,
   ): Promise<CreateBankPayoutResult> {
+    return this.createBankPayoutWithClient(params, () =>
+      getStripeClient("connect"),
+    )
+  }
+
+  async recoverClaimedBankPayout(
+    params: CreateBankPayoutParams,
+  ): Promise<CreateBankPayoutResult> {
+    return this.createBankPayoutWithClient(params, getStripeRecoveryClient)
+  }
+
+  private async createBankPayoutWithClient(
+    params: CreateBankPayoutParams,
+    getClient: () => Stripe,
+  ): Promise<CreateBankPayoutResult> {
     const expectedAmountMinor = toMinorUnits(params.amount)
     const expectedCurrency = params.currency
     if (
@@ -188,7 +218,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
         "Immutable Stripe account, amount, currency, and reference are required for bank payout creation",
       )
     }
-    const stripe = getStripeClient("connect")
+    const stripe = getClient()
     const payout = await stripe.payouts.create(
       {
         amount: expectedAmountMinor,

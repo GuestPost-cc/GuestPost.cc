@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   GoneException,
+  Header,
   Headers,
   Param,
   Post,
@@ -26,8 +27,9 @@ export class BillingController {
   constructor(private readonly billing: BillingService) {}
 
   @Get("wallet")
-  @UseGuards(ActorTypeGuard)
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER")
+  @MemberRoles("OWNER")
   getWallet(@CurrentUser() user: any) {
     return this.billing.getWallet(user.organizationId ?? null, user.id)
   }
@@ -47,6 +49,15 @@ export class BillingController {
       user,
       body.idempotencyKey,
     )
+  }
+
+  @Get("deposit-capability")
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER")
+  @Header("Cache-Control", "private, no-store")
+  getDepositCapability() {
+    return this.billing.getDepositCapability()
   }
 
   @Get("deposits/:reference/status")
@@ -98,8 +109,9 @@ export class BillingController {
   }
 
   @Get("transactions")
-  @UseGuards(ActorTypeGuard)
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER")
+  @MemberRoles("OWNER")
   listTransactions(@CurrentUser() user: any) {
     return this.billing.listTransactions(user.organizationId ?? null, user.id)
   }

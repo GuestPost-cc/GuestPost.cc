@@ -16,9 +16,14 @@ import {
   isOrderLifecycleException,
   platformFeePercentToBasisPoints,
   QUEUES,
+  runSerializableTransactionWithRetry,
   StaffRole,
   validateWebsiteEnlistmentInput,
 } from "@guestpost/shared"
+import {
+  isPrismaUniqueConstraintError,
+  isRetryablePrismaTransactionError,
+} from "@guestpost/shared/dist/prisma-transaction-retry"
 import {
   BadRequestException,
   ConflictException,
@@ -423,14 +428,36 @@ export class AdminService {
     private readonly queue: QueueService,
   ) {}
 
-  private async activeSuperAdminCount() {
-    return this.prisma.user.count({
-      where: {
-        userType: "STAFF",
-        banned: false,
-        staffMemberships: { some: { role: "SUPER_ADMIN" } },
-      },
-    })
+  /**
+   * Global lock order for commands that can remove staff authority:
+   *
+   *   every Staff User (id ASC), then the target User
+   *
+   * The first query is an intentionally small staff-access aggregate lock.
+   * It makes demotion-vs-demotion and demotion-vs-suspension use the same
+   * coordination rows. Keep this order identical in every caller: taking the
+   * target lock first would allow two commands for different Super Admins to
+   * deadlock while they subsequently try to lock the aggregate.
+   */
+  private async lockStaffAccessMutationScope(tx: any, userId: string) {
+    await tx.$queryRaw`
+      SELECT "id"
+      FROM "User"
+      WHERE "userType" = 'STAFF'
+      ORDER BY "id" ASC
+      FOR UPDATE
+    `
+
+    const lockedTarget = (await tx.$queryRaw`
+      SELECT "id"
+      FROM "User"
+      WHERE "id" = ${userId}
+      FOR UPDATE
+    `) as Array<{ id: string }>
+
+    if (lockedTarget.length !== 1) {
+      throw new NotFoundException("User not found")
+    }
   }
 
   async listUsers(params: {
@@ -842,194 +869,338 @@ export class AdminService {
   }
 
   async updateUserRole(userId: string, role: string, user?: any) {
-    const u = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!u) throw new NotFoundException("User not found")
-    // Role/type changes must take effect immediately, not after cache TTL
-    invalidateAuthContext(userId)
-
     const CUSTOMER_ROLES = ["OWNER", "MEMBER"] as const
     const PUBLISHER_ROLES = ["PUBLISHER_OWNER"] as const
+    const customerRole = (CUSTOMER_ROLES as readonly string[]).includes(role)
+    const publisherRole = (PUBLISHER_ROLES as readonly string[]).includes(role)
 
-    if ((CUSTOMER_ROLES as readonly string[]).includes(role)) {
-      if (u.userType !== "CUSTOMER") {
+    if (!customerRole && !publisherRole) {
+      const target = await this.prisma.user.findUnique({
+        where: { id: userId },
+      })
+      if (!target) throw new NotFoundException("User not found")
+      if (target.userType === "STAFF") {
         throw new BadRequestException(
-          "ACCOUNT_TYPE_IMMUTABLE: publisher and staff accounts cannot be converted to customers",
+          "Use /staff-role endpoint for staff users",
         )
       }
-      let membership = await this.prisma.membership.findFirst({
-        where: { userId },
-        orderBy: { createdAt: "asc" },
-      })
-      if (!membership) {
-        const orgName = `Org for ${u.email}`
-        const orgSlug = `org-${userId.slice(0, 8)}`
-        // A freshly created personal org's sole member is its OWNER — never
-        // the passed role. An org whose only member is a MEMBER is
-        // ownerless and administratively dead (nobody can deposit/invite).
-        // MEMBER is only meaningful when joining an EXISTING org via invite.
-        const org = await this.prisma.organization.create({
-          data: {
-            name: orgName,
-            slug: orgSlug,
-            memberships: { create: { userId, role: "OWNER" } },
-            wallets: {
-              create: {
-                userId,
-                currency: "USD",
-              },
-            },
-          },
-        })
-        membership = await this.prisma.membership.findFirstOrThrow({
-          where: { userId, organizationId: org.id },
-        })
-      } else {
-        membership = await this.prisma.membership.update({
-          where: { id: membership.id },
-          data: { role: role as any },
-        })
-      }
-      await this.audit.log({
-        action: "CUSTOMER_ROLE_UPDATE",
-        entityType: "CustomerMembership",
-        entityId: membership.id,
-        metadata: { newRole: role, userId },
-        userId: user.id,
-        organizationId: membership.organizationId,
-      })
-      return membership
+      throw new BadRequestException(`Invalid role: ${role}`)
     }
 
-    if ((PUBLISHER_ROLES as readonly string[]).includes(role)) {
-      if (u.userType !== "PUBLISHER") {
-        throw new BadRequestException(
-          "ACCOUNT_TYPE_IMMUTABLE: customer and staff accounts cannot be converted to publishers",
-        )
-      }
-      let pubMembership = await this.prisma.publisherMembership.findFirst({
-        where: { userId },
-        orderBy: { createdAt: "asc" },
-      })
-      if (!pubMembership) {
-        // A user with no publisher membership gets a FRESH publisher entity.
-        // Never attach to an existing publisher here — picking one (e.g. the
-        // oldest) hands this user control of someone else's listings,
-        // balance, and withdrawals.
-        let orgId = (
-          await this.prisma.membership.findFirst({
+    try {
+      const result = await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx: any) => {
+          // User is the first aggregate lock for every customer/publisher role
+          // command. It serializes first-time provisioning and is also the
+          // global lock order used by member removal: User(s), then Org.
+          const lockedUsers = (await tx.$queryRaw`
+            SELECT "id"
+            FROM "User"
+            WHERE "id" = ${userId}
+            FOR UPDATE
+          `) as Array<{ id: string }>
+          if (lockedUsers.length !== 1) {
+            throw new NotFoundException("User not found")
+          }
+
+          const target = await tx.user.findUnique({ where: { id: userId } })
+          if (!target) throw new NotFoundException("User not found")
+
+          if (customerRole) {
+            if (target.userType !== "CUSTOMER") {
+              throw new BadRequestException(
+                "ACCOUNT_TYPE_IMMUTABLE: publisher and staff accounts cannot be converted to customers",
+              )
+            }
+
+            let membership = await tx.membership.findFirst({
+              where: { userId },
+              orderBy: { createdAt: "asc" },
+            })
+            if (!membership) {
+              // A freshly created personal org's sole member is its OWNER —
+              // never the requested MEMBER role. MEMBER is meaningful only
+              // when joining an existing organization through an invitation.
+              const organization = await tx.organization.create({
+                data: {
+                  name: `Org for ${target.email}`,
+                  slug: `org-${userId.slice(0, 8)}`,
+                  memberships: { create: { userId, role: "OWNER" } },
+                  wallets: {
+                    create: {
+                      userId,
+                      currency: "USD",
+                    },
+                  },
+                },
+              })
+              membership = await tx.membership.findFirstOrThrow({
+                where: { userId, organizationId: organization.id },
+              })
+            } else {
+              const membershipId = membership.id
+              const organizationId = membership.organizationId
+              // All existing-organization role changes take this aggregate
+              // lock after the User lock so they serialize with member removal.
+              await tx.$queryRaw`
+                SELECT "id"
+                FROM "Organization"
+                WHERE "id" = ${organizationId}
+                FOR UPDATE
+              `
+
+              const currentMembership = await tx.membership.findUnique({
+                where: { id: membershipId },
+              })
+              if (
+                !currentMembership ||
+                currentMembership.userId !== userId ||
+                currentMembership.organizationId !== organizationId
+              ) {
+                throw new ConflictException(
+                  "Organization membership changed concurrently. Review the latest state and try again.",
+                )
+              }
+
+              if (
+                role === "MEMBER" &&
+                currentMembership.role === "OWNER" &&
+                currentMembership.status === "ACTIVE"
+              ) {
+                const activeOwnerCount = await tx.membership.count({
+                  where: {
+                    organizationId,
+                    role: "OWNER",
+                    status: "ACTIVE",
+                  },
+                })
+                if (activeOwnerCount <= 1) {
+                  throw new ConflictException(
+                    "Promote another active organization owner before demoting this owner",
+                  )
+                }
+              }
+
+              membership = await tx.membership.update({
+                where: { id: membershipId },
+                data: { role: role as any },
+              })
+            }
+
+            await this.audit.log(
+              {
+                action: "CUSTOMER_ROLE_UPDATE",
+                entityType: "CustomerMembership",
+                entityId: membership.id,
+                metadata: {
+                  newRole: membership.role,
+                  requestedRole: role,
+                  userId,
+                },
+                userId: user.id,
+                organizationId: membership.organizationId,
+              },
+              tx,
+            )
+            return membership
+          }
+
+          if (target.userType !== "PUBLISHER") {
+            throw new BadRequestException(
+              "ACCOUNT_TYPE_IMMUTABLE: customer and staff accounts cannot be converted to publishers",
+            )
+          }
+
+          let publisherMembership = await tx.publisherMembership.findFirst({
             where: { userId },
             orderBy: { createdAt: "asc" },
-            select: { organizationId: true },
           })
-        )?.organizationId
-        if (!orgId) {
-          const org = await this.prisma.organization.create({
-            data: {
-              name: `Org for ${u.email}`,
-              slug: `org-${userId.slice(0, 8)}`,
-              wallets: {
-                create: {
-                  userId,
-                  currency: "USD",
+          if (!publisherMembership) {
+            // A user with no publisher membership gets a fresh publisher.
+            // The User lock prevents concurrent role commands from creating
+            // multiple publisher identities for the same account.
+            let organizationId = (
+              await tx.membership.findFirst({
+                where: { userId },
+                orderBy: { createdAt: "asc" },
+                select: { organizationId: true },
+              })
+            )?.organizationId
+            if (organizationId) {
+              await tx.$queryRaw`
+                SELECT "id"
+                FROM "Organization"
+                WHERE "id" = ${organizationId}
+                FOR UPDATE
+              `
+            } else {
+              const organization = await tx.organization.create({
+                data: {
+                  name: `Org for ${target.email}`,
+                  slug: `org-${userId.slice(0, 8)}`,
+                  wallets: {
+                    create: {
+                      userId,
+                      currency: "USD",
+                    },
+                  },
                 },
+              })
+              organizationId = organization.id
+            }
+            const publisher = await tx.publisher.create({
+              data: {
+                name: target.name ?? `${target.email}'s Publisher`,
+                email: target.email,
+                organizationId,
+                balance: { create: {} },
               },
-            },
-          })
-          orgId = org.id
-        }
-        const publisher = await this.prisma.publisher.create({
-          data: {
-            name: u.name ?? `${u.email}'s Publisher`,
-            email: u.email,
-            organizationId: orgId,
-            balance: { create: {} },
-          },
-        })
-        pubMembership = await this.prisma.publisherMembership.create({
-          data: { userId, publisherId: publisher.id, role: "PUBLISHER_OWNER" },
-        })
-      } else {
-        pubMembership = await this.prisma.publisherMembership.update({
-          where: { id: pubMembership.id },
-          data: { role: "PUBLISHER_OWNER" },
-        })
-      }
-      await this.audit.log({
-        action: "PUBLISHER_ROLE_UPDATE",
-        entityType: "PublisherMembership",
-        entityId: pubMembership.id,
-        metadata: { newRole: role, userId },
-        userId: user.id,
-        organizationId: null,
-      })
-      return pubMembership
-    }
+            })
+            publisherMembership = await tx.publisherMembership.create({
+              data: {
+                userId,
+                publisherId: publisher.id,
+                role: "PUBLISHER_OWNER",
+              },
+            })
+          } else {
+            publisherMembership = await tx.publisherMembership.update({
+              where: { id: publisherMembership.id },
+              data: { role: "PUBLISHER_OWNER" },
+            })
+          }
 
-    if (u.userType === "STAFF") {
-      throw new BadRequestException("Use /staff-role endpoint for staff users")
+          await this.audit.log(
+            {
+              action: "PUBLISHER_ROLE_UPDATE",
+              entityType: "PublisherMembership",
+              entityId: publisherMembership.id,
+              metadata: { newRole: publisherMembership.role, userId },
+              userId: user.id,
+              organizationId: null,
+            },
+            tx,
+          )
+          return publisherMembership
+        },
+      )
+
+      // Role changes must take effect immediately, but only after both the
+      // mutation and its audit evidence commit.
+      invalidateAuthContext(userId)
+      return result
+    } catch (error: any) {
+      if (isRetryablePrismaTransactionError(error)) {
+        throw new ConflictException(
+          "User role changed concurrently. Review the latest state and try again.",
+        )
+      }
+      if (isPrismaUniqueConstraintError(error)) {
+        throw new ConflictException(
+          "User role provisioning conflicted with existing identity data. Review the account and try again.",
+        )
+      }
+      throw error
     }
-    throw new BadRequestException(`Invalid role: ${role}`)
   }
 
   async updateStaffRole(userId: string, role: string, user?: any) {
-    const target = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!target) throw new NotFoundException("User not found")
-    if (target.userType !== "STAFF") {
-      throw new BadRequestException(
-        "Customer and publisher accounts cannot be converted to staff",
-      )
-    }
-
     if (!VALID_STAFF_ROLES.includes(role as StaffRole)) {
       throw new BadRequestException(`Invalid staff role: ${role}`)
     }
+    if (!user?.id) throw new ForbiddenException("Administrator required")
 
-    const existing = await this.prisma.staffMembership.findUnique({
-      where: { userId },
-    })
-    if (!existing) throw new NotFoundException("Staff membership not found")
-    if (user?.id === userId && existing.role !== role) {
-      throw new ForbiddenException(
-        "A different Super Admin must change your staff role",
-      )
-    }
-    if (
-      existing.role === "SUPER_ADMIN" &&
-      role !== "SUPER_ADMIN" &&
-      (await this.activeSuperAdminCount()) <= 1
-    ) {
-      throw new ConflictException("At least one active Super Admin is required")
-    }
-    if (existing.role === "OPERATIONS" && role !== "OPERATIONS") {
-      const activeAssignments = await this.prisma.fulfillmentAssignment.count({
-        where: {
-          assignedToUserId: userId,
-          status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+    try {
+      const result = await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx: any) => {
+          await this.lockStaffAccessMutationScope(tx, userId)
+
+          // Re-read every decision input after acquiring the coordination and
+          // target locks. Cached/request identity is never authoritative here.
+          const target = await tx.user.findUnique({
+            where: { id: userId },
+            include: { staffMemberships: true },
+          })
+          if (!target) throw new NotFoundException("User not found")
+          if (target.userType !== "STAFF") {
+            throw new BadRequestException(
+              "Customer and publisher accounts cannot be converted to staff",
+            )
+          }
+
+          const existing = target.staffMemberships[0]
+          if (!existing) {
+            throw new NotFoundException("Staff membership not found")
+          }
+          if (user.id === userId && existing.role !== role) {
+            throw new ForbiddenException(
+              "A different Super Admin must change your staff role",
+            )
+          }
+          if (
+            !target.banned &&
+            existing.role === "SUPER_ADMIN" &&
+            role !== "SUPER_ADMIN"
+          ) {
+            const activeSuperAdmins = await tx.user.count({
+              where: {
+                userType: "STAFF",
+                banned: false,
+                staffMemberships: { some: { role: "SUPER_ADMIN" } },
+              },
+            })
+            if (activeSuperAdmins <= 1) {
+              throw new ConflictException(
+                "At least one active Super Admin is required",
+              )
+            }
+          }
+          if (existing.role === "OPERATIONS" && role !== "OPERATIONS") {
+            const activeAssignments = await tx.fulfillmentAssignment.count({
+              where: {
+                assignedToUserId: userId,
+                status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+              },
+            })
+            if (activeAssignments > 0) {
+              throw new ConflictException(
+                "Reassign active fulfillment orders before changing this Operations role",
+              )
+            }
+          }
+
+          const updated = await tx.staffMembership.update({
+            where: { id: existing.id },
+            data: { role: role as StaffRole },
+          })
+          await this.audit.log(
+            {
+              action: "STAFF_ROLE_UPDATE",
+              entityType: "StaffMembership",
+              entityId: updated.id,
+              metadata: { newRole: role, userId },
+              userId: user.id,
+              organizationId: null,
+            },
+            tx,
+          )
+          return updated
         },
-      })
-      if (activeAssignments > 0) {
+      )
+
+      // Cached authority changes only after mutation and audit both commit.
+      invalidateAuthContext(userId)
+      return result
+    } catch (error: any) {
+      if (isRetryablePrismaTransactionError(error)) {
         throw new ConflictException(
-          "Reassign active fulfillment orders before changing this Operations role",
+          "Staff role changed concurrently. Review the latest state and try again.",
         )
       }
+      throw error
     }
-
-    const result = await this.prisma.staffMembership.update({
-      where: { id: existing.id },
-      data: { role: role as StaffRole },
-    })
-    invalidateAuthContext(userId)
-
-    await this.audit.log({
-      action: "STAFF_ROLE_UPDATE",
-      entityType: "StaffMembership",
-      entityId: result.id,
-      metadata: { newRole: role, userId },
-      userId: user.id,
-      organizationId: null,
-    })
-
-    return result
   }
 
   async suspendUser(userId: string, input: SuspendUserInput, actor: any) {
@@ -1046,8 +1217,11 @@ export class AdminService {
     }
 
     try {
-      const result = await this.prisma.$transaction(
+      const result = await runSerializableTransactionWithRetry(
+        this.prisma,
         async (tx: any) => {
+          await this.lockStaffAccessMutationScope(tx, userId)
+
           const target = await tx.user.findUnique({
             where: { id: userId },
             include: { staffMemberships: true },
@@ -1126,12 +1300,11 @@ export class AdminService {
           )
           return { ...suspended, sessionsRevoked: revoked.count }
         },
-        { isolationLevel: "Serializable" },
       )
       invalidateAuthContext(userId)
       return result
     } catch (error: any) {
-      if (error?.code === "P2034") {
+      if (isRetryablePrismaTransactionError(error)) {
         throw new ConflictException(
           "Account access changed concurrently. Review the latest status and try again.",
         )
@@ -2025,7 +2198,7 @@ export class AdminService {
     return { orders: visibleOrders, pagination: { take, skip, total } }
   }
 
-  async manualVerify(orderId: string, method: string, userId: string) {
+  async manualVerify(orderId: string, method: "MANUAL_ADMIN", userId: string) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "PUBLISHED")

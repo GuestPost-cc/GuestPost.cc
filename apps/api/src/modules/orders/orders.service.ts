@@ -1173,7 +1173,15 @@ export class OrdersService {
   }
 
   async listPublisherOrders(publisherId: string, take = 50, skip = 0) {
-    const where = { website: { publisherId } }
+    // Publishers must not learn the buyer's brief or targeting details before
+    // checkout commits. Keep the list boundary aligned with getOrder(), which
+    // deliberately returns 404 for these unpaid states.
+    const where: Prisma.OrderWhereInput = {
+      website: { publisherId },
+      status: {
+        notIn: [OrderStatus.DRAFT, OrderStatus.PENDING_PAYMENT],
+      },
+    }
     const [items, total] = await this.prisma.$transaction([
       this.prisma.order.findMany({
         where,

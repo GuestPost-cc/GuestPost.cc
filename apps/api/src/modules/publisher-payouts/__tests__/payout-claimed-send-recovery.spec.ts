@@ -117,6 +117,185 @@ function makeRecoveryService(adapter: Record<string, jest.Mock>) {
   return { audit, service, prisma, providerService, tx }
 }
 
+function validStripeFinalClaim(
+  stage:
+    | "DESTINATION_VALIDATED"
+    | "PROVIDER_SEND_CLAIMED"
+    | "TRANSFER_CREATED"
+    | "TRANSFER_RECOVERY_REQUIRED",
+) {
+  const account = {
+    id: "account-row-1",
+    publisherId: "publisher-1",
+    provider: "stripe_connect",
+    providerAccountId: "acct_immutable",
+    status: "ENABLED",
+    isActive: true,
+    transfersEnabled: true,
+    payoutsEnabled: true,
+    detailsSubmitted: true,
+    payoutScheduleConfigured: true,
+    defaultCurrency: "USD",
+  }
+  const payoutMethod = {
+    id: "method-1",
+    publisherId: "publisher-1",
+    type: "stripe_connect",
+    isActive: true,
+    version: 3,
+    encryptionKeyVersion: 2,
+    details: "ciphertext",
+    providerAccountId: account.id,
+    providerAccount: account,
+  }
+  const publicReference = "GP-WD-0001"
+  const recipientDetails = {
+    connectedAccountId: account.providerAccountId,
+    providerAccountStatus: account.status,
+    payoutScheduleConfigured: account.payoutScheduleConfigured,
+    publicReference,
+  }
+  const provider = {
+    id: "provider-1",
+    name: "stripe_connect",
+    isActive: true,
+    version: 4,
+    configEncryptionKeyVersion: 1,
+    config: {},
+  }
+  const destinationSnapshot = {
+    payoutMethodVersion: payoutMethod.version,
+    encryptionKeyVersion: payoutMethod.encryptionKeyVersion,
+    encryptedDetailsFingerprint: canonicalFingerprint({
+      details: payoutMethod.details,
+      encryptionKeyVersion: payoutMethod.encryptionKeyVersion,
+    }),
+    providerAccountRowId: account.id,
+    providerAccountFingerprint: canonicalFingerprint(account),
+    providerAccountExternalId: account.providerAccountId,
+    recipientFingerprint: canonicalFingerprint(recipientDetails),
+  }
+  const providerSnapshot = {
+    providerId: provider.id,
+    providerName: provider.name,
+    providerVersion: provider.version,
+    configEncryptionKeyVersion: provider.configEncryptionKeyVersion,
+    configFingerprint: canonicalFingerprint(provider.config),
+  }
+  const withdrawal = {
+    id: "withdrawal-1",
+    status: "PROCESSING",
+    method: "stripe_connect",
+    payoutMethodId: payoutMethod.id,
+    publisherId: "publisher-1",
+    requestedBy: "publisher-owner-1",
+    approvedBy: "finance-approver-1",
+    publicReference,
+    publisher: { organizationId: "organization-1" },
+    payoutMethod,
+    allocations: [
+      { amount: new Decimal(100), currency: "USD", releasedAt: null },
+    ],
+    amount: new Decimal(100),
+    netAmount: new Decimal(97),
+    currency: "USD",
+  }
+  const hasTransfer = [
+    "TRANSFER_CREATED",
+    "TRANSFER_RECOVERY_REQUIRED",
+  ].includes(stage)
+  return {
+    id: "execution-1",
+    withdrawalId: withdrawal.id,
+    providerId: provider.id,
+    provider,
+    withdrawal,
+    status: "PROCESSING",
+    stage,
+    livemode: false,
+    version: 7,
+    updatedAt: new Date(Date.now() - 20 * 60 * 1000),
+    idempotencyKey: "payout-withdrawal-1-v12",
+    amount: new Decimal(100),
+    destinationAmount: new Decimal(97),
+    sourceCurrency: "USD",
+    destinationCurrency: "USD",
+    providerExecutionId: hasTransfer ? "tr_original" : null,
+    providerTransferId: hasTransfer ? "tr_original" : null,
+    providerPayoutId: null,
+    providerMetadata: { destinationSnapshot, providerSnapshot },
+    fee: new Decimal(0),
+  }
+}
+
+function makeFinalClaimHarness(
+  fresh: ReturnType<typeof validStripeFinalClaim>,
+) {
+  const createTransfer = jest.fn()
+  const tx: any = {
+    $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: "locked" }]),
+    $queryRaw: jest.fn().mockResolvedValue([
+      {
+        publisherId: fresh.withdrawal.publisherId,
+        currency: "USD",
+        debtBalance: new Decimal(0),
+      },
+    ]),
+    payoutExecution: {
+      findUnique: jest.fn().mockResolvedValue(fresh),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    payoutExecutionClaim: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: "claim-1" }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    publisherMembership: {
+      findFirst: jest.fn().mockResolvedValue({ id: "publisher-member-1" }),
+    },
+    staffMembership: {
+      findFirst: jest.fn().mockResolvedValue({ id: "staff-member-1" }),
+    },
+  }
+  const audit = { log: jest.fn().mockResolvedValue(undefined) }
+  const providerService = {
+    getAdapter: jest.fn().mockReturnValue({ createTransfer }),
+  }
+  const service: any = new PayoutExecutionService(
+    {
+      $transaction: jest.fn(async (work: any) => work(tx)),
+    } as any,
+    audit as any,
+    { decrypt: jest.fn() } as any,
+    providerService as any,
+  )
+  return { audit, createTransfer, providerService, service, tx }
+}
+
+function finalClaimParams(
+  fresh: ReturnType<typeof validStripeFinalClaim>,
+  claimPurpose: "NEW_SEND" | "EXACT_RECOVERY",
+  requireAgedClaim: boolean,
+) {
+  return {
+    executionId: fresh.id,
+    withdrawalId: fresh.withdrawalId,
+    publisherId: fresh.withdrawal.publisherId,
+    payoutMethodId: fresh.withdrawal.payoutMethod.id,
+    providerAccountRowId:
+      fresh.withdrawal.payoutMethod.providerAccount?.id ?? null,
+    providerId: fresh.provider.id,
+    providerName: fresh.provider.name,
+    expectedStages: [fresh.stage],
+    claimedStage: fresh.stage,
+    requireAgedClaim,
+    claimPurpose,
+    requireTransferWithoutPayout: false,
+    userId: "finance-actor-1",
+    auditAction: "PAYOUT_PROVIDER_SEND_CLAIMED",
+  }
+}
+
 describe("PayoutExecutionService claimed-send recovery", () => {
   beforeEach(() => {
     process.env.STRIPE_SECRET_KEY = "rk_test_claim_recovery"
@@ -531,7 +710,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
     process.env.NODE_ENV = "production"
     process.env.PAYOUT_EXECUTION_ENABLED = "false"
     const execution = stripeClaimedExecution("PROVIDER_SEND_CLAIMED")
-    const createTransfer = jest
+    const recoverClaimedTransfer = jest
       .fn()
       .mockRejectedValueOnce(new Error("connection reset after request"))
       .mockResolvedValueOnce({
@@ -552,7 +731,8 @@ describe("PayoutExecutionService claimed-send recovery", () => {
       })
     const adapter = {
       validateRecipient: jest.fn().mockResolvedValue({ valid: true }),
-      createTransfer,
+      createTransfer: jest.fn(),
+      recoverClaimedTransfer,
     }
     const { service } = makeRecoveryService(adapter)
     const claimExternalCall = jest.fn().mockResolvedValue({
@@ -580,14 +760,15 @@ describe("PayoutExecutionService claimed-send recovery", () => {
       service.recoverClaimedProviderSend(execution, "finance-1"),
     ).resolves.toMatchObject({ status: "PROCESSING" })
 
-    expect(createTransfer).toHaveBeenCalledTimes(2)
+    expect(recoverClaimedTransfer).toHaveBeenCalledTimes(2)
     expect(
-      createTransfer.mock.calls.map(([input]) => input.idempotencyKey),
+      recoverClaimedTransfer.mock.calls.map(([input]) => input.idempotencyKey),
     ).toEqual(["payout-withdrawal-1-v12", "payout-withdrawal-1-v12"])
+    expect(adapter.createTransfer).not.toHaveBeenCalled()
     expect(claimExternalCall).toHaveBeenCalledWith(
       expect.objectContaining({
         requireAgedClaim: true,
-        allowWhenSendsDisabled: true,
+        claimPurpose: "EXACT_RECOVERY",
         claimedStage: "PROVIDER_SEND_CLAIMED",
       }),
     )
@@ -600,7 +781,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
     process.env.NODE_ENV = "production"
     process.env.PAYOUT_EXECUTION_ENABLED = "false"
     const execution = stripeClaimedExecution(stage)
-    const createBankPayout = jest
+    const recoverClaimedBankPayout = jest
       .fn()
       .mockRejectedValueOnce(new Error("response lost"))
       .mockResolvedValueOnce({
@@ -620,7 +801,11 @@ describe("PayoutExecutionService claimed-send recovery", () => {
           livemode: false,
         },
       })
-    const { service } = makeRecoveryService({ createBankPayout })
+    const createBankPayout = jest.fn()
+    const { service } = makeRecoveryService({
+      createBankPayout,
+      recoverClaimedBankPayout,
+    })
     const claimExternalCall = jest.fn().mockResolvedValue({
       kind: "claimed",
       execution,
@@ -641,14 +826,17 @@ describe("PayoutExecutionService claimed-send recovery", () => {
       providerExecutionId: "po_original",
     })
 
-    expect(createBankPayout).toHaveBeenCalledTimes(2)
+    expect(recoverClaimedBankPayout).toHaveBeenCalledTimes(2)
     expect(
-      createBankPayout.mock.calls.map(([input]) => input.idempotencyKey),
+      recoverClaimedBankPayout.mock.calls.map(
+        ([input]) => input.idempotencyKey,
+      ),
     ).toEqual(["payout-bank-withdrawal-1-v12", "payout-bank-withdrawal-1-v12"])
+    expect(createBankPayout).not.toHaveBeenCalled()
     expect(claimExternalCall).toHaveBeenCalledWith(
       expect.objectContaining({
         requireAgedClaim: true,
-        allowWhenSendsDisabled: true,
+        claimPurpose: "EXACT_RECOVERY",
         claimedStage: stage,
         requireTransferWithoutPayout: true,
       }),
@@ -675,7 +863,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
     }
     const adapter = {
       validateRecipient: jest.fn().mockResolvedValue({ valid: true }),
-      createTransfer: jest.fn().mockResolvedValue(untrustedResponse),
+      recoverClaimedTransfer: jest.fn().mockResolvedValue(untrustedResponse),
     }
     const { audit, service, tx } = makeRecoveryService(adapter)
     service.claimExternalCall = jest.fn().mockResolvedValue({
@@ -724,7 +912,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
   it("atomically quarantines a mismatched replayed bank Payout without attaching its response", async () => {
     const execution = stripeClaimedExecution("BANK_PAYOUT_SEND_CLAIMED")
     const adapter = {
-      createBankPayout: jest.fn().mockResolvedValue({
+      recoverClaimedBankPayout: jest.fn().mockResolvedValue({
         providerExecutionId: "po_untrusted",
         providerPayoutId: "po_untrusted",
         providerAmountMinor: 9_700,
@@ -784,7 +972,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
       stage: "TRANSFER_RECOVERY_REQUIRED",
     }
     const adapter = {
-      createBankPayout: jest.fn().mockResolvedValue({
+      recoverClaimedBankPayout: jest.fn().mockResolvedValue({
         providerExecutionId: "po_untrusted_resume",
         providerPayoutId: "po_untrusted_resume",
         providerAmountMinor: 9_700,
@@ -890,7 +1078,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
         expectedStages: ["BANK_PAYOUT_SEND_CLAIMED"],
         claimedStage: "BANK_PAYOUT_SEND_CLAIMED",
         requireAgedClaim: true,
-        allowWhenSendsDisabled: true,
+        claimPurpose: "EXACT_RECOVERY",
         requireTransferWithoutPayout: true,
         userId: "finance-1",
         auditAction: "PAYOUT_BANK_SEND_REPLAY_CLAIMED",
@@ -967,7 +1155,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
         expectedStages: ["PROVIDER_SEND_CLAIMED"],
         claimedStage: "PROVIDER_SEND_CLAIMED",
         requireAgedClaim: true,
-        allowWhenSendsDisabled: true,
+        claimPurpose: "EXACT_RECOVERY",
         userId: "finance-1",
         auditAction: "PAYOUT_PROVIDER_SEND_REPLAY_CLAIMED",
       }),
@@ -1024,7 +1212,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
         expectedStages: ["PROVIDER_SEND_CLAIMED"],
         claimedStage: "PROVIDER_SEND_CLAIMED",
         requireAgedClaim: true,
-        allowWhenSendsDisabled: true,
+        claimPurpose: "EXACT_RECOVERY",
         userId: "finance-1",
         auditAction: "PAYOUT_PROVIDER_SEND_REPLAY_CLAIMED",
       }),
@@ -1096,7 +1284,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
         expectedStages: ["PROVIDER_SEND_CLAIMED"],
         claimedStage: "PROVIDER_SEND_CLAIMED",
         requireAgedClaim: true,
-        allowWhenSendsDisabled: true,
+        claimPurpose: "EXACT_RECOVERY",
         userId: "finance-1",
         auditAction: "PAYOUT_PROVIDER_SEND_REPLAY_CLAIMED",
       }),
@@ -1123,7 +1311,224 @@ describe("PayoutExecutionService claimed-send recovery", () => {
     )
   })
 
+  it.each([
+    {
+      name: "Finance enters recovery-only mode",
+      expectedEligibilityCode: "FINANCE_OPERATIONS_PAUSED",
+      configureReady: () => {
+        process.env.FINANCE_RUNTIME_MODE = "normal"
+        process.env.STRIPE_CONNECT_ENABLED = "true"
+      },
+      flipRuntime: () => {
+        process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+      },
+      useManualMethod: false,
+    },
+    {
+      name: "Stripe Connect rollout is disabled",
+      expectedEligibilityCode: "STRIPE_CONNECT_DISABLED",
+      configureReady: () => {
+        process.env.FINANCE_RUNTIME_MODE = "normal"
+        process.env.STRIPE_CONNECT_ENABLED = "true"
+      },
+      flipRuntime: () => {
+        process.env.STRIPE_CONNECT_ENABLED = "false"
+      },
+      useManualMethod: false,
+    },
+    {
+      name: "manual-bank rollout is disabled",
+      expectedEligibilityCode: "MANUAL_BANK_DISABLED",
+      configureReady: () => {
+        process.env.FINANCE_RUNTIME_MODE = "normal"
+        process.env.STRIPE_CONNECT_ENABLED = "false"
+        process.env.PAYOUT_LEGACY_METHODS_ENABLED = "true"
+      },
+      flipRuntime: () => {
+        process.env.PAYOUT_LEGACY_METHODS_ENABLED = "false"
+      },
+      useManualMethod: true,
+    },
+  ])("blocks a new final send claim before durable mutation when $name", async ({
+    configureReady,
+    expectedEligibilityCode,
+    flipRuntime,
+    useManualMethod,
+  }) => {
+    process.env.NODE_ENV = "production"
+    process.env.PAYOUT_EXECUTION_ENABLED = "true"
+    configureReady()
+    const fresh: any = validStripeFinalClaim("DESTINATION_VALIDATED")
+    if (useManualMethod) {
+      fresh.livemode = null
+      fresh.provider = { ...fresh.provider, name: "manual" }
+      fresh.withdrawal.method = "bank_transfer"
+      fresh.withdrawal.payoutMethod = {
+        ...fresh.withdrawal.payoutMethod,
+        type: "bank_transfer",
+        providerAccountId: null,
+        providerAccount: null,
+      }
+    }
+    const { audit, createTransfer, providerService, service, tx } =
+      makeFinalClaimHarness(fresh)
+
+    // The execution was created while the route was ready. Simulate the
+    // operations switch changing before the locked external-send claim.
+    flipRuntime()
+
+    await expect(
+      service.claimExternalCall(finalClaimParams(fresh, "NEW_SEND", false)),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "PAYOUT_METHOD_NOT_EXECUTABLE",
+        eligibilityCode: expectedEligibilityCode,
+      }),
+    })
+
+    expect(tx.payoutExecutionClaim.findUnique).not.toHaveBeenCalled()
+    expect(tx.payoutExecutionClaim.create).not.toHaveBeenCalled()
+    expect(tx.payoutExecutionClaim.updateMany).not.toHaveBeenCalled()
+    expect(tx.payoutExecution.updateMany).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+    expect(providerService.getAdapter).not.toHaveBeenCalled()
+    expect(createTransfer).not.toHaveBeenCalled()
+  })
+
+  it("rechecks a Stripe rollout flip after destination validation and before provider I/O", async () => {
+    process.env.NODE_ENV = "production"
+    process.env.FINANCE_RUNTIME_MODE = "normal"
+    process.env.PAYOUT_EXECUTION_ENABLED = "true"
+    process.env.STRIPE_CONNECT_ENABLED = "true"
+    const fresh = validStripeFinalClaim("DESTINATION_VALIDATED")
+    const { service, tx } = makeFinalClaimHarness(fresh)
+    const createTransfer = jest.fn()
+    const adapter = {
+      capabilities: { supportedCurrencies: ["USD"] },
+      validateRecipient: jest.fn().mockResolvedValue({ valid: true }),
+      createTransfer,
+    }
+    const providerService = {
+      getAdapter: jest.fn().mockReturnValue(adapter),
+    }
+    ;(service as any).providerService = providerService
+    ;(service as any).prisma.withdrawal = {
+      findUnique: jest.fn().mockResolvedValue({
+        id: fresh.withdrawal.id,
+        method: fresh.withdrawal.method,
+        currency: fresh.withdrawal.currency,
+        publicReference: fresh.withdrawal.publicReference,
+        publisher: fresh.withdrawal.publisher,
+      }),
+    }
+    ;(service as any).prisma.payoutMethod = {
+      findUnique: jest.fn().mockResolvedValue(fresh.withdrawal.payoutMethod),
+    }
+    const initialClaim = {
+      execution: { ...fresh, stage: "CREATED", version: 0 },
+      withdrawal: fresh.withdrawal,
+      payoutMethod: fresh.withdrawal.payoutMethod,
+      account: fresh.withdrawal.payoutMethod.providerAccount,
+      destinationSnapshot: fresh.providerMetadata.destinationSnapshot,
+      providerSnapshot: fresh.providerMetadata.providerSnapshot,
+      providerRecord: fresh.provider,
+    }
+    service.recordOperatorIntent = jest.fn().mockResolvedValue(undefined)
+    service.runSerializable = jest
+      .fn()
+      .mockResolvedValueOnce(initialClaim)
+      .mockImplementation(async (work: any) => work(tx))
+    service.updateExecutionWithParentLock = jest
+      .fn()
+      .mockImplementation(async () => {
+        process.env.STRIPE_CONNECT_ENABLED = "false"
+        return { count: 1 }
+      })
+    service.abortPreProviderExecution = jest.fn().mockResolvedValue(undefined)
+
+    await expect(
+      service.executeWithdrawal(
+        fresh.withdrawal.id,
+        "stripe_connect",
+        "finance-actor-1",
+        "Reviewed final Stripe rollout gate before provider send",
+      ),
+    ).rejects.toThrow("Payout validation failed before provider send")
+
+    expect(adapter.validateRecipient).toHaveBeenCalledTimes(1)
+    expect(createTransfer).not.toHaveBeenCalled()
+    expect(tx.payoutExecutionClaim.findUnique).not.toHaveBeenCalled()
+    expect(tx.payoutExecutionClaim.create).not.toHaveBeenCalled()
+    expect(tx.payoutExecution.updateMany).not.toHaveBeenCalled()
+    expect(service.abortPreProviderExecution).toHaveBeenCalledTimes(1)
+  })
+
+  it("preserves exact aged-claim recovery while new sends and Stripe rollout are disabled", async () => {
+    process.env.NODE_ENV = "production"
+    process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+    process.env.PAYOUT_EXECUTION_ENABLED = "false"
+    process.env.STRIPE_CONNECT_ENABLED = "false"
+    const fresh = validStripeFinalClaim("PROVIDER_SEND_CLAIMED")
+    const { audit, service, tx } = makeFinalClaimHarness(fresh)
+    const claimedAt = new Date(Date.now() - 20 * 60 * 1000)
+    tx.payoutExecutionClaim.findUnique.mockResolvedValue({
+      id: "claim-1",
+      executionId: fresh.id,
+      kind: "PROVIDER_SEND",
+      idempotencyKey: fresh.idempotencyKey,
+      idempotencyKeyFingerprint: idempotencyFingerprint(fresh.idempotencyKey),
+      claimedAt,
+      lastClaimedAt: claimedAt,
+    })
+
+    await expect(
+      service.claimExternalCall(
+        finalClaimParams(fresh, "EXACT_RECOVERY", true),
+      ),
+    ).resolves.toMatchObject({
+      kind: "claimed",
+      execution: { stage: "PROVIDER_SEND_CLAIMED" },
+      claimedVersion: fresh.version + 1,
+    })
+
+    expect(tx.payoutExecutionClaim.updateMany).toHaveBeenCalledTimes(1)
+    expect(tx.payoutExecutionClaim.create).not.toHaveBeenCalled()
+    expect(tx.payoutExecution.updateMany).toHaveBeenCalledTimes(1)
+    expect(audit.log).toHaveBeenCalledTimes(1)
+  })
+
+  it("preserves the persisted Transfer-to-bank recovery continuation while new sends are disabled", async () => {
+    process.env.NODE_ENV = "production"
+    process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+    process.env.PAYOUT_EXECUTION_ENABLED = "false"
+    process.env.STRIPE_CONNECT_ENABLED = "false"
+    const fresh = validStripeFinalClaim("TRANSFER_RECOVERY_REQUIRED")
+    const { audit, service, tx } = makeFinalClaimHarness(fresh)
+
+    await expect(
+      service.claimExternalCall({
+        ...finalClaimParams(fresh, "EXACT_RECOVERY", false),
+        claimedStage: "BANK_PAYOUT_RESUME_CLAIMED",
+        requireTransferWithoutPayout: true,
+        auditAction: "PAYOUT_BANK_STAGE_RESUME_CLAIMED",
+      }),
+    ).resolves.toMatchObject({
+      kind: "claimed",
+      execution: { stage: "BANK_PAYOUT_RESUME_CLAIMED" },
+      claimedVersion: fresh.version + 1,
+    })
+
+    expect(tx.payoutExecutionClaim.create).toHaveBeenCalledTimes(1)
+    expect(tx.payoutExecutionClaim.updateMany).not.toHaveBeenCalled()
+    expect(tx.payoutExecution.updateMany).toHaveBeenCalledTimes(1)
+    expect(audit.log).toHaveBeenCalledTimes(1)
+  })
+
   it("fails the final locked claim when routing changed after validation", async () => {
+    process.env.NODE_ENV = "production"
+    process.env.FINANCE_RUNTIME_MODE = "normal"
+    process.env.PAYOUT_EXECUTION_ENABLED = "true"
+    process.env.STRIPE_CONNECT_ENABLED = "true"
     const execution = stripeClaimedExecution("PROVIDER_SEND_CLAIMED")
     const account = {
       id: "account-row-1",
@@ -1189,6 +1594,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
           version: 2,
           encryptionKeyVersion: 1,
           details: "ciphertext",
+          providerAccountId: account.id,
           providerAccount: account,
         },
       },
@@ -1237,7 +1643,7 @@ describe("PayoutExecutionService claimed-send recovery", () => {
         expectedStages: ["DESTINATION_VALIDATED"],
         claimedStage: "PROVIDER_SEND_CLAIMED",
         requireAgedClaim: false,
-        allowWhenSendsDisabled: true,
+        claimPurpose: "NEW_SEND",
         userId: "finance-1",
         auditAction: "PAYOUT_PROVIDER_SEND_CLAIMED",
       }),

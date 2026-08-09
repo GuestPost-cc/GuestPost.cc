@@ -7960,6 +7960,7 @@ export const DepositAttemptScalarFieldEnum = {
   expiresAt: 'expiresAt',
   completedAt: 'completedAt',
   failedAt: 'failedAt',
+  failureCode: 'failureCode',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -9450,6 +9451,20 @@ export type EnumDepositAttemptStatusFieldRefInput<$PrismaModel> = FieldRefInputT
  * Reference to a field of type 'DepositAttemptStatus[]'
  */
 export type ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DepositAttemptStatus[]'>
+
+
+
+/**
+ * Reference to a field of type 'DepositFailureCode'
+ */
+export type EnumDepositFailureCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DepositFailureCode'>
+
+
+
+/**
+ * Reference to a field of type 'DepositFailureCode[]'
+ */
+export type ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DepositFailureCode[]'>
 
 
 

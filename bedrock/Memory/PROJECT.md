@@ -246,9 +246,27 @@ Open/partial items require architectural design discussion.
 - Creates 7 dev users via the API (real password hashing), including an
   independent Finance checker for payout maker-checker testing, then
   bootstraps staff roles via DB
-- Expects `.env.development` with `DATABASE_URL` (creates from `.env.example` if missing)
+- Expects an existing `.env.development` or `.env` with explicit
+  `NODE_ENV=development|test` and `DATABASE_URL`; it never creates an env file
 - Uses `scripts/env.ts` `loadRootEnv()` to load `.env.development`, stripping inline `#` comments (dotenv-compatible)
 - API must be running on `:4000`
-- Phases: (1) sign-up users via API, (1b) verify emails via DB, (2) staff bootstrap, (3) roles via admin API, (4) orgs + invites, (5) fund wallet via DB, (6) publisher inventory + marketplace listings (with `ListingService` rows), (7) payout providers
-- Wallet funding is test/seed-only and writes the balance plus ledger row
-  directly through Prisma; no direct-deposit API endpoint or feature flag exists.
+- Requires the fixed loopback database/API boundary, the Compose database
+  sentinel, and an exact PostgreSQL system/database identity match between the
+  API connection and the seed's direct Prisma connection
+- Every fixture credential is verified against its intended portal through an
+  authoritative session round-trip; signup and sign-in sessions are revoked
+  by the seed
+- Phases: (1) sign-up users via API, (1b) verify emails via DB, (2) atomic
+  staff bootstrap, (2b) credential/portal verification, (3) publisher-role
+  verification via admin API, (4) org-scoped customer membership + invite,
+  (5) fund wallet via DB, (6) publisher inventory + marketplace listings (with
+  canonical `ListingService` rows), (7) payout provider registry rows
+- Wallet funding is test/seed-only and atomically writes one unique USD deposit
+  ledger row plus the matching balance increment in a retry-bounded serializable
+  transaction. Repeated/concurrent seeds do not increment again, and conflicting
+  evidence aborts. No direct synthetic-deposit API endpoint exists.
+- Reserved `.example` demo websites use an explicit audited, expiring
+  `SUPER_ADMIN_OVERRIDE`; the seed never records fake DNS proof and preserves
+  genuine DNS verification. The fixture reconciles canonical catalog/service
+  rows but deliberately creates no payout method, provider account, settlement,
+  withdrawal allocation, or withdrawable publisher balance.

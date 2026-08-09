@@ -1,7 +1,10 @@
 import { Prisma, type WithdrawalStatus } from "@guestpost/database"
 import {
+  evaluatePayoutMethodEligibility,
   getWithdrawalHoldDays,
+  isCertifiedWithdrawalMethodType,
   isSupportedMoneyCurrency,
+  type PayoutMethodEligibility,
   type PublisherTier,
   QUEUES,
   STRIPE_INITIAL_FEE_POLICY_VERSION,
@@ -26,7 +29,6 @@ import { Decimal } from "@prisma/client/runtime/client"
 import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
 import { PrismaService } from "../../common/prisma.service"
 import { checkPublisherBalanceInvariant } from "../../common/publisher-balance-invariants"
-import { isStripeFeatureEnabled } from "../../common/stripe-client"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import type { CompleteManualWithdrawalDto } from "./dto/complete-manual-withdrawal.dto"
@@ -34,6 +36,7 @@ import type { CreatePayoutMethodDto } from "./dto/create-payout-method.dto"
 import { PayoutEncryptionService } from "./payout-encryption.service"
 import { PayoutExecutionService } from "./payout-execution.service"
 import { normalizePayoutMethodInput } from "./payout-method-input"
+import { currentPayoutMethodRuntime } from "./payout-method-runtime"
 
 const APPROVAL_BLOCK_REASONS = {
   NOT_PENDING: "Withdrawal is no longer pending",
@@ -79,14 +82,6 @@ export class PublisherPayoutsService {
     readonly _execution: PayoutExecutionService,
   ) {}
 
-  private legacyPayoutMethodsEnabled() {
-    return (
-      process.env.PAYOUT_LEGACY_METHODS_ENABLED === "true" ||
-      process.env.NODE_ENV === "development" ||
-      process.env.NODE_ENV === "test"
-    )
-  }
-
   private async runSerializable<T>(
     operation: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
@@ -109,6 +104,43 @@ export class PublisherPayoutsService {
     throw new ConflictException(
       "Financial state changed concurrently. Retry the operation.",
     )
+  }
+
+  private assertPayoutMethodExecutable(
+    method: any,
+    publisherId: string,
+  ): PayoutMethodEligibility {
+    const eligibility = evaluatePayoutMethodEligibility(
+      {
+        publisherId,
+        type: method?.type,
+        isActive: method?.isActive === true,
+        providerAccountId: method?.providerAccountId,
+        providerAccount: method?.providerAccount,
+      },
+      currentPayoutMethodRuntime(),
+    )
+    if (eligibility.executable) return eligibility
+
+    if (eligibility.code === "STRIPE_ACCOUNT_NOT_READY") {
+      throw new ConflictException({
+        code: "PAYOUT_METHOD_PROVIDER_NOT_READY",
+        eligibilityCode: eligibility.code,
+        message: eligibility.message,
+      })
+    }
+    if (eligibility.code === "PROVIDER_BINDING_INVALID") {
+      throw new ConflictException({
+        code: "PAYOUT_METHOD_PROVIDER_BINDING_INVALID",
+        eligibilityCode: eligibility.code,
+        message: eligibility.message,
+      })
+    }
+    throw new BadRequestException({
+      code: "PAYOUT_METHOD_NOT_EXECUTABLE",
+      eligibilityCode: eligibility.code,
+      message: eligibility.message,
+    })
   }
 
   async getBalance(publisherId: string) {
@@ -157,7 +189,11 @@ export class PublisherPayoutsService {
     dto: CreatePayoutMethodDto,
   ) {
     assertApiFinanceOperationAllowed("new_liability")
-    if (!this.legacyPayoutMethodsEnabled()) {
+    const runtime = currentPayoutMethodRuntime()
+    if (
+      !runtime.manualBankPayoutsEnabled ||
+      runtime.stripeConnectPayoutsEnabled
+    ) {
       throw new BadRequestException(
         "Direct payout-method entry is disabled. Connect a verified provider account instead.",
       )
@@ -247,6 +283,16 @@ export class PublisherPayoutsService {
         isDefault: method.isDefault,
         isActive: method.isActive,
         displayDetails,
+        withdrawalEligibility: evaluatePayoutMethodEligibility(
+          {
+            publisherId,
+            type: method.type,
+            isActive: method.isActive,
+            providerAccountId: null,
+            providerAccount: null,
+          },
+          runtime,
+        ),
       }
     })
   }
@@ -267,18 +313,46 @@ export class PublisherPayoutsService {
         displayDetails: true,
         isDefault: true,
         isActive: true,
+        providerAccountId: true,
+        providerAccount: {
+          select: {
+            publisherId: true,
+            provider: true,
+            isActive: true,
+            status: true,
+            transfersEnabled: true,
+            payoutsEnabled: true,
+            detailsSubmitted: true,
+            payoutScheduleConfigured: true,
+            defaultCurrency: true,
+          },
+        },
         createdAt: true,
         updatedAt: true,
       },
     })
-    return methods.map((m: any) => ({
-      id: m.id,
-      type: m.type,
-      label: m.label,
-      isDefault: m.isDefault,
-      isActive: m.isActive,
-      displayDetails: m.displayDetails ?? {},
+    const runtime = currentPayoutMethodRuntime()
+    const projected = methods.map((method: any) => ({
+      id: method.id,
+      type: method.type,
+      label: method.label,
+      isDefault: method.isDefault,
+      isActive: method.isActive,
+      displayDetails: method.displayDetails ?? {},
+      withdrawalEligibility: evaluatePayoutMethodEligibility(
+        {
+          publisherId,
+          type: method.type,
+          isActive: method.isActive,
+          providerAccountId: method.providerAccountId,
+          providerAccount: method.providerAccount,
+        },
+        runtime,
+      ),
     }))
+    return includeInactive
+      ? projected
+      : projected.filter((method) => method.withdrawalEligibility.executable)
   }
 
   async decryptPayoutMethod(
@@ -556,6 +630,10 @@ export class PublisherPayoutsService {
             "Payout method changed concurrently; refresh before reactivating",
         })
       }
+      this.assertPayoutMethodExecutable(
+        { ...method, isActive: true, providerAccount: account },
+        publisherId,
+      )
       if (method.isActive) {
         await this.audit.log(
           {
@@ -576,30 +654,6 @@ export class PublisherPayoutsService {
           message:
             "Inactive payout method has reserved withdrawal liability and cannot be reactivated",
         })
-      }
-
-      if (managed) {
-        const ready =
-          account?.publisherId === publisherId &&
-          account.provider === "stripe_connect" &&
-          account.isActive === true &&
-          account.status === "ENABLED" &&
-          account.transfersEnabled === true &&
-          account.payoutsEnabled === true &&
-          account.detailsSubmitted === true &&
-          account.payoutScheduleConfigured === true &&
-          account.defaultCurrency === USD_CURRENCY
-        if (!ready) {
-          throw new ConflictException({
-            code: "PAYOUT_METHOD_PROVIDER_NOT_READY",
-            message:
-              "Stripe payout account must be fully enabled and manually scheduled before reactivation",
-          })
-        }
-      } else if (!this.legacyPayoutMethodsEnabled()) {
-        throw new BadRequestException(
-          "Legacy payout methods cannot be reactivated during the Stripe rollout",
-        )
       }
 
       const reactivated = await tx.payoutMethod.updateMany({
@@ -860,10 +914,6 @@ export class PublisherPayoutsService {
         "Withdrawal amount must be between 1 and 1,000,000 with no more than two decimal places",
       )
     }
-    if (!["bank_transfer", "wise", "stripe_connect"].includes(method)) {
-      throw new BadRequestException("Unsupported payout method")
-    }
-
     if (!payoutMethodId) {
       throw new BadRequestException(
         "Select an active payout method before requesting a withdrawal",
@@ -886,6 +936,15 @@ export class PublisherPayoutsService {
         userId,
       )
       return committed
+    }
+
+    if (!isCertifiedWithdrawalMethodType(method)) {
+      throw new BadRequestException({
+        code: "PAYOUT_METHOD_NOT_EXECUTABLE",
+        eligibilityCode: "METHOD_NOT_CERTIFIED",
+        message:
+          "Unsupported payout method: this route is not certified for new withdrawals. Select a supported payout method.",
+      })
     }
 
     assertApiFinanceOperationAllowed("new_liability")
@@ -957,50 +1016,20 @@ export class PublisherPayoutsService {
           where: {
             id: payoutMethodId,
             publisherId,
-            isActive: true,
-            type: method,
           },
           include: { providerAccount: true },
         })
         if (!currentPayoutMethod) {
           throw new BadRequestException(
-            "Payout method changed or became inactive; review and retry",
+            "Payout method no longer exists; review your payout settings and retry",
           )
         }
-        if (
-          !this.legacyPayoutMethodsEnabled() &&
-          currentPayoutMethod.type !== "stripe_connect"
-        ) {
+        if (currentPayoutMethod.type !== method) {
           throw new BadRequestException(
-            "This payout method is not available during the Stripe rollout",
+            "Payout method type changed or does not match the request",
           )
         }
-        if (
-          currentPayoutMethod.type === "stripe_connect" &&
-          (currentPayoutMethod.providerAccount?.publisherId !== publisherId ||
-            currentPayoutMethod.providerAccount.provider !== "stripe_connect" ||
-            currentPayoutMethod.providerAccount.isActive !== true ||
-            currentPayoutMethod.providerAccount.status !== "ENABLED" ||
-            currentPayoutMethod.providerAccount.transfersEnabled !== true ||
-            currentPayoutMethod.providerAccount.payoutsEnabled !== true ||
-            currentPayoutMethod.providerAccount.detailsSubmitted !== true ||
-            currentPayoutMethod.providerAccount.payoutScheduleConfigured !==
-              true ||
-            currentPayoutMethod.providerAccount.defaultCurrency !==
-              USD_CURRENCY)
-        ) {
-          throw new BadRequestException(
-            "Stripe payout account is not fully enabled or manually scheduled",
-          )
-        }
-        if (
-          isStripeFeatureEnabled("connect") &&
-          currentPayoutMethod.type !== "stripe_connect"
-        ) {
-          throw new BadRequestException(
-            "Select a verified Stripe payout method before requesting a withdrawal",
-          )
-        }
+        this.assertPayoutMethodExecutable(currentPayoutMethod, publisherId)
 
         const balance = await tx.publisherBalance.findUnique({
           where: { publisherId },
@@ -1302,23 +1331,12 @@ export class PublisherPayoutsService {
             include: { providerAccount: true },
           })
         : null
-      const stripeAccount = method?.providerAccount
-      const stripeMethodValid =
-        method?.type === "stripe_connect" &&
-        stripeAccount?.provider === "stripe_connect" &&
-        stripeAccount.publisherId === w.publisherId &&
-        stripeAccount.isActive &&
-        stripeAccount.status === "ENABLED" &&
-        stripeAccount.transfersEnabled &&
-        stripeAccount.payoutsEnabled &&
-        stripeAccount.detailsSubmitted &&
-        stripeAccount.payoutScheduleConfigured &&
-        stripeAccount.defaultCurrency === USD_CURRENCY
-      const legacyMethodValid =
-        Boolean(method) &&
-        method?.type !== "stripe_connect" &&
-        this.legacyPayoutMethodsEnabled()
-      if (!method || (!stripeMethodValid && !legacyMethodValid)) {
+      if (!method) {
+        return block("PAYOUT_METHOD_INVALID")
+      }
+      try {
+        this.assertPayoutMethodExecutable(method, w.publisherId)
+      } catch {
         return block("PAYOUT_METHOD_INVALID")
       }
 

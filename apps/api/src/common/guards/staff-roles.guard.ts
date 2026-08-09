@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
 import { STAFF_ROLES_KEY } from "../decorators/staff-roles.decorator"
+import { PrismaService } from "../prisma.service"
 
 // Phase 6.7 — Audit finding #2 remediation.
 //
@@ -28,9 +29,12 @@ import { STAFF_ROLES_KEY } from "../decorators/staff-roles.decorator"
 // PRs that add a route get caught at test time, not at runtime as a leak.
 @Injectable()
 export class StaffRolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredRoles = this.reflector.getAllAndOverride<StaffRole[]>(
       STAFF_ROLES_KEY,
       [context.getHandler(), context.getClass()],
@@ -49,13 +53,31 @@ export class StaffRolesGuard implements CanActivate {
       throw new ForbiddenException("Only staff can access this resource")
     }
 
-    if (!user.staffRole) {
+    // Staff role is security-sensitive and must never be authorized from the
+    // per-process auth-context projection. A Redis outage or missed pub/sub
+    // message may make that projection stale, while this durable read makes a
+    // demotion effective on the very next protected request on every pod.
+    const membership = await this.prisma.staffMembership.findUnique({
+      where: { userId: user.id },
+      select: {
+        role: true,
+        user: { select: { banned: true, userType: true } },
+      },
+    })
+
+    if (
+      !membership ||
+      membership.user.banned ||
+      membership.user.userType !== "STAFF"
+    ) {
       throw new ForbiddenException("No staff role assigned")
     }
 
-    if (!requiredRoles.includes(user.staffRole)) {
+    if (!requiredRoles.includes(membership.role)) {
       throw new ForbiddenException("Insufficient staff permissions")
     }
+
+    user.staffRole = membership.role
 
     return true
   }

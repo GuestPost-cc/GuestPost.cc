@@ -2,10 +2,10 @@
 // active org/publisher + roles). AuthGuard otherwise costs 3-5 DB queries on
 // EVERY request — the hottest path in the API.
 //
-// Correctness: any mutation that changes what the guard would resolve
+// Projection freshness: any mutation that changes what the guard would resolve
 // (context switch, membership/role change, ban) must call invalidate(userId).
-// The TTL is only a backstop for mutations we missed or that happened on
-// another instance.
+// Security-sensitive MemberRolesGuard/StaffRolesGuard authorization is always
+// re-read from PostgreSQL; this cache is never the authority for those grants.
 //
 // Cross-pod invalidation (M-1): when invalidateAuthContext is called, it
 // publishes a message to Redis. Every pod's subscriber receives it and evicts
@@ -15,7 +15,7 @@
 
 import { Logger } from "@nestjs/common"
 
-import { getRedisSubscriber } from "./redis-client"
+import { getRedisClient, getRedisSubscriber } from "./redis-client"
 
 const logger = new Logger("AuthContextCache")
 const CHANNEL = "auth-context:invalidate"
@@ -29,6 +29,17 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>()
 
+// Cache entries are process-global while request.user is request-local and may
+// be decorated by downstream guards/interceptors. Clone at both boundaries so
+// neither the object originally inserted nor any cache-hit consumer can mutate
+// the canonical value observed by another concurrent request. structuredClone
+// preserves the Date fields returned by Prisma, unlike JSON serialization.
+function cloneAuthContext(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  return structuredClone(value)
+}
+
 export function getCachedAuthContext(
   userId: string,
 ): Record<string, unknown> | null {
@@ -38,7 +49,7 @@ export function getCachedAuthContext(
     cache.delete(userId)
     return null
   }
-  return entry.value
+  return cloneAuthContext(entry.value)
 }
 
 export function setCachedAuthContext(
@@ -54,7 +65,10 @@ export function setCachedAuthContext(
       if (++dropped >= excess) break
     }
   }
-  cache.set(userId, { value, expiresAt: Date.now() + TTL_MS })
+  cache.set(userId, {
+    value: cloneAuthContext(value),
+    expiresAt: Date.now() + TTL_MS,
+  })
 }
 
 export function invalidateAuthContext(userId: string) {
@@ -65,8 +79,8 @@ export function invalidateAuthContext(userId: string) {
   // If Redis is unavailable, the publish fails silently (logged below)
   // and other pods rely on the 30s TTL backstop.
   try {
-    const sub = getRedisSubscriber()
-    sub.publish(`${CHANNEL}:${userId}`, "").catch((err: unknown) => {
+    const publisher = getRedisClient()
+    publisher.publish(`${CHANNEL}:${userId}`, "").catch((err: unknown) => {
       logger.warn(
         { userId, error: err instanceof Error ? err.message : String(err) },
         "auth-context-cache: Redis publish failed (cross-pod invalidation degraded)",
@@ -87,10 +101,8 @@ export function clearAuthContextCache() {
 // Called once at app startup (main.ts). Subscribes to auth-context
 // invalidation messages from other pods and evicts the local cache entry.
 // Must be called after the Redis subscriber connection is established.
-export function initAuthContextSubscriber() {
+export async function initAuthContextSubscriber(): Promise<void> {
   const sub = getRedisSubscriber()
-
-  sub.psubscribe(`${CHANNEL}:*`)
 
   sub.on("pmessage", (_pattern: string, channel: string, _message: string) => {
     if (channel.startsWith(CHANNEL)) {
@@ -107,4 +119,14 @@ export function initAuthContextSubscriber() {
       "auth-context-cache: Redis subscriber error (cross-pod invalidation degraded)",
     )
   })
+
+  try {
+    await sub.psubscribe(`${CHANNEL}:*`)
+  } catch (err) {
+    logger.warn(
+      { error: err instanceof Error ? err.message : String(err) },
+      "auth-context-cache: Redis subscription failed during startup",
+    )
+    throw err
+  }
 }

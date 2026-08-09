@@ -9,6 +9,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common"
 import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
 import { PrismaService } from "../../common/prisma.service"
@@ -19,6 +20,7 @@ import {
 } from "../../common/stripe-client"
 import { AuditService } from "../audit/audit.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
+import { currentPayoutMethodRuntime } from "./payout-method-runtime"
 
 const SERIALIZABLE_ATTEMPTS = 5
 
@@ -77,16 +79,52 @@ export class StripeConnectService {
           isolationLevel: "Serializable",
         })
       } catch (error) {
-        if (
-          !isRetryablePrismaTransactionError(error) ||
-          attempt === SERIALIZABLE_ATTEMPTS
-        ) {
-          throw error
+        if (!isRetryablePrismaTransactionError(error)) throw error
+        if (attempt === SERIALIZABLE_ATTEMPTS) {
+          throw new ConflictException({
+            code: "STRIPE_CONNECT_CONCURRENCY_RETRY",
+            message:
+              "Stripe payout state changed concurrently. Refresh and retry the operation.",
+          })
         }
         await sleep(prismaTransactionRetryDelayMs(attempt))
       }
     }
-    throw new Error("Stripe account persistence retries exhausted")
+    throw new ConflictException({
+      code: "STRIPE_CONNECT_CONCURRENCY_RETRY",
+      message:
+        "Stripe payout state changed concurrently. Refresh and retry the operation.",
+    })
+  }
+
+  private stripeUnavailable(): ServiceUnavailableException {
+    return new ServiceUnavailableException({
+      code: "STRIPE_CONNECT_UNAVAILABLE",
+      message:
+        "Stripe payout setup could not be confirmed. No withdrawal was submitted. Retry or refresh the provider status later.",
+    })
+  }
+
+  private publisherStripeClient() {
+    try {
+      return getStripeClient("connect")
+    } catch {
+      throw this.stripeUnavailable()
+    }
+  }
+
+  private async callStripeForContext<T>(
+    context: StripeAccountSyncContext,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await operation()
+    } catch (error) {
+      if (context.source === "publisher_refresh") {
+        throw this.stripeUnavailable()
+      }
+      throw error
+    }
   }
 
   async getStatus(publisherId: string, userId: string) {
@@ -135,24 +173,32 @@ export class StripeConnectService {
     })
     if (!publisher) throw new NotFoundException("Publisher not found")
 
-    const stripe = getStripeClient("connect")
+    const stripe = this.publisherStripeClient()
     let local = await this.prisma.publisherProviderAccount.findUnique({
       where: {
         publisherId_provider: { publisherId, provider: "stripe_connect" },
       },
     })
     if (!local) {
-      const account = await stripe.accounts.create(
+      const account = await this.callStripeForContext(
         {
-          type: "express",
-          email: publisher.email ?? undefined,
-          capabilities: { transfers: { requested: true } },
-          business_profile: {
-            product_description: "GuestPost publisher marketplace services",
-          },
-          metadata: { publisher_id: publisher.id },
+          source: "publisher_refresh",
+          actorUserId: userId,
+          publisherId,
         },
-        { idempotencyKey: `stripe-connect-account-${publisherId}` },
+        () =>
+          stripe.accounts.create(
+            {
+              type: "express",
+              email: publisher.email ?? undefined,
+              capabilities: { transfers: { requested: true } },
+              business_profile: {
+                product_description: "GuestPost publisher marketplace services",
+              },
+              metadata: { publisher_id: publisher.id },
+            },
+            { idempotencyKey: `stripe-connect-account-${publisherId}` },
+          ),
       )
       const createLocalAccount = async (tx: any) => {
         // Stripe is outside the database transaction. Revalidate after that
@@ -213,12 +259,20 @@ export class StripeConnectService {
     const baseUrl = (
       process.env.NEXT_PUBLIC_PUBLISHER_URL ?? "http://localhost:3002"
     ).replace(/\/$/, "")
-    const link = await stripe.accountLinks.create({
-      account: local.providerAccountId,
-      refresh_url: `${baseUrl}/dashboard/payout-methods?stripe=refresh`,
-      return_url: `${baseUrl}/dashboard/payout-methods?stripe=return`,
-      type: "account_onboarding",
-    })
+    const link = await this.callStripeForContext(
+      {
+        source: "publisher_refresh",
+        actorUserId: userId,
+        publisherId,
+      },
+      () =>
+        stripe.accountLinks.create({
+          account: local.providerAccountId,
+          refresh_url: `${baseUrl}/dashboard/payout-methods?stripe=refresh`,
+          return_url: `${baseUrl}/dashboard/payout-methods?stripe=return`,
+          type: "account_onboarding",
+        }),
+    )
     // The URL is a single-use routing credential. Recheck both actor authority
     // and the exact local/provider binding after Stripe creates it and
     // immediately before returning it. A revoked actor receives no URL.
@@ -296,10 +350,24 @@ export class StripeConnectService {
       )
     }
 
-    const stripe = getStripeRecoveryClient()
-    const account = await stripe.accounts.retrieve(providerAccountId)
+    let stripe: ReturnType<typeof getStripeRecoveryClient>
+    try {
+      stripe = getStripeRecoveryClient()
+    } catch (error) {
+      if (context.source === "publisher_refresh") {
+        throw this.stripeUnavailable()
+      }
+      throw error
+    }
+    const account = await this.callStripeForContext(context, () =>
+      stripe.accounts.retrieve(providerAccountId),
+    )
     if (account.id !== localIdentity.providerAccountId) {
-      throw new Error("Stripe account identity changed during refresh")
+      throw new ConflictException({
+        code: "STRIPE_ACCOUNT_EVIDENCE_MISMATCH",
+        message:
+          "Stripe returned account evidence that does not match the saved payout account.",
+      })
     }
     const stripeAccount = account as any
     const accountDeleted = stripeAccount.deleted === true
@@ -325,18 +393,23 @@ export class StripeConnectService {
     ) {
       const balanceSettings = (stripe as any).balanceSettings
       if (!balanceSettings?.update) {
+        if (context.source === "publisher_refresh") {
+          throw this.stripeUnavailable()
+        }
         throw new Error("Stripe Balance Settings API is unavailable")
       }
-      await balanceSettings.update(
-        {
-          payments: {
-            payouts: {
-              schedule: { interval: "manual" },
-              statement_descriptor: "GPOST",
+      await this.callStripeForContext(context, () =>
+        balanceSettings.update(
+          {
+            payments: {
+              payouts: {
+                schedule: { interval: "manual" },
+                statement_descriptor: "GPOST",
+              },
             },
           },
-        },
-        { stripeAccount: stripeAccount.id },
+          { stripeAccount: stripeAccount.id },
+        ),
       )
       payoutScheduleConfigured = true
     }
@@ -605,8 +678,14 @@ export class StripeConnectService {
   }
 
   private publicStatus(account: any | null) {
+    const runtime = currentPayoutMethodRuntime()
     return {
-      available: isStripeFeatureEnabled("connect"),
+      available: runtime.stripeConnectPayoutsEnabled,
+      payoutActionsAvailable: runtime.newLiabilityOperationsEnabled,
+      manualBankPayoutsAvailable:
+        runtime.newLiabilityOperationsEnabled &&
+        runtime.manualBankPayoutsEnabled &&
+        !runtime.stripeConnectPayoutsEnabled,
       connected: Boolean(account),
       status: account?.status ?? "NOT_CONNECTED",
       country: account?.country ?? null,

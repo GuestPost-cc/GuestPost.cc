@@ -198,6 +198,17 @@ enum DepositAttemptStatus {
   CHARGEBACK
 }
 
+// Sanitized pre-checkout failure evidence. Raw provider responses and
+// credential/configuration details must never be persisted.
+enum DepositFailureCode {
+  LEGACY_UNCLASSIFIED
+  PROVIDER_AUTHENTICATION_FAILED
+  PROVIDER_RATE_LIMITED
+  PROVIDER_UNAVAILABLE
+  PROVIDER_REQUEST_REJECTED
+  PROVIDER_RESPONSE_INVALID
+}
+
 // Durable inbox shared by payment providers. A provider webhook is
 // acknowledged only after one of these rows commits.
 enum PaymentProviderEventStatus {
@@ -2046,6 +2057,7 @@ model DepositAttempt {
   expiresAt           DateTime?
   completedAt         DateTime?
   failedAt            DateTime?
+  failureCode         DepositFailureCode?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 

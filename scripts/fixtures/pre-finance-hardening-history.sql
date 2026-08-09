@@ -508,6 +508,30 @@ INSERT INTO "DepositAttempt" (
   CURRENT_TIMESTAMP - INTERVAL '30 days'
 );
 
+-- Migration 0980 must classify this legacy provider failure and flush the
+-- deferred DepositAttempt dispute-projection event raised by its backfill
+-- before adding the failure-evidence constraint.
+INSERT INTO "DepositAttempt" (
+  "id", "publicReference", "walletId", "createdByUserId", "method", "provider",
+  "amount", "walletCredit", "currency", "status", "idempotencyKey",
+  "failedAt", "createdAt", "updatedAt"
+) VALUES (
+  'migration-rehearsal-failed-deposit-attempt',
+  'DEP-REHEARSAL-FAILED',
+  'migration-rehearsal-wallet',
+  'migration-rehearsal-publisher-owner',
+  'card',
+  'stripe',
+  25,
+  25,
+  'USD',
+  'FAILED',
+  'migration-rehearsal-failed-deposit',
+  CURRENT_TIMESTAMP - INTERVAL '20 days',
+  CURRENT_TIMESTAMP - INTERVAL '20 days',
+  CURRENT_TIMESTAMP - INTERVAL '20 days'
+);
+
 INSERT INTO "PaymentProviderEvent" (
   "id", "provider", "providerEventId", "eventType", "objectId",
   "depositAttemptId", "status", "attempts", "processedAt", "receivedAt",

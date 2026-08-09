@@ -16,6 +16,14 @@ import "./instrument"
 import { createAuth, toNodeHandler } from "@guestpost/auth"
 import { QUEUES, resolveFinanceRuntimeMode } from "@guestpost/shared"
 import {
+  assertDevelopmentSeedDatabaseSentinel,
+  isDevelopmentSeedApiRequestAllowed,
+} from "@guestpost/shared/dist/development-seed-safety"
+import {
+  assertObjectStorageReady,
+  resolveObjectStorageConfig,
+} from "@guestpost/shared/dist/object-storage"
+import {
   generateRequestId,
   isValidRequestId,
   runWithRequestId,
@@ -119,10 +127,27 @@ function validateEnv(): void {
     })
     process.exit(1)
   }
+
+  try {
+    const storage = resolveObjectStorageConfig()
+    bootstrapLogger.info("object storage configuration validated", {
+      provider: storage.provider,
+    })
+  } catch (error) {
+    bootstrapLogger.error("Object storage configuration validation failed", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    process.exit(1)
+  }
 }
 
 async function bootstrap() {
   validateEnv()
+
+  const storage = await assertObjectStorageReady()
+  bootstrapLogger.info("object storage readiness validated", {
+    provider: storage.provider,
+  })
 
   const server = express()
 
@@ -545,16 +570,48 @@ async function bootstrap() {
   })
 
   // M-1 — cross-pod auth-context invalidation subscriber (Redis pub/sub).
-  // Must be called after Redis connection is available but before any
-  // auth-dependent requests arrive. Subscription is fire-and-forget;
-  // Redis unavailability is logged but does not block startup.
-  initAuthContextSubscriber()
+  // Must be established after Redis connection is available and before any
+  // auth-dependent request can arrive. A startup without the projection
+  // subscriber would create a silent cross-pod freshness gap, so await the
+  // subscription and let bootstrap fail explicitly when it cannot be opened.
+  await initAuthContextSubscriber()
   authLogger.info("Auth context cache subscriber initialized")
 
   // Phase A3 — dependency-checked readiness endpoint. Runs after Nest init
   // so PrismaService connection is established. Redis PING uses the HTTP
   // client (getRedisClient). Returns 503 when any dependency is down.
   const prismaService: PrismaService = app.get(PrismaService)
+
+  // The privileged local fixture uses both HTTP and direct Prisma writes. This
+  // preflight proves the API itself is non-production, reached over loopback,
+  // and connected to a database marked by the fixed local Compose bootstrap
+  // before the first known-password account can be created.
+  server.get("/api/v1/health/development-seed-ready", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store")
+    if (
+      !isDevelopmentSeedApiRequestAllowed(
+        process.env.NODE_ENV,
+        req.socket.remoteAddress,
+      )
+    ) {
+      res.status(404).json({ status: "not_found" })
+      return
+    }
+
+    try {
+      const databaseIdentity =
+        await assertDevelopmentSeedDatabaseSentinel(prismaService)
+      res.status(200).json({
+        status: "ok",
+        environment: process.env.NODE_ENV,
+        database: "local-development",
+        databaseIdentity,
+      })
+    } catch {
+      res.status(503).json({ status: "unavailable" })
+    }
+  })
+
   server.get("/api/v1/health/ready", async (_req, res) => {
     const checks: { redis: string; database: string } = {
       redis: "ok",

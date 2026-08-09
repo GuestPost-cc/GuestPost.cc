@@ -18,6 +18,7 @@ export * from "./order-cancellation-policy"
 export * from "./order-priority"
 // NOT re-exported: job-signing uses Node crypto (HMAC) — server-only.
 // Consumer deep-import via `@guestpost/shared/dist/job-signing`.
+export * from "./payout-method-eligibility"
 export * from "./payout-status"
 export * from "./payout-webhook"
 export * from "./platform-fee-core"

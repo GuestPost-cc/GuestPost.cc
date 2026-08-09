@@ -1,4 +1,8 @@
-import type { WithdrawalStatus } from "@guestpost/shared"
+import type {
+  CertifiedWithdrawalMethodType,
+  PayoutMethodEligibility,
+  WithdrawalStatus,
+} from "@guestpost/shared"
 import type { HttpClient, RequestOptions } from "../client"
 
 export interface PaginatedResponse<T> {
@@ -48,10 +52,13 @@ export interface PayoutMethodResponse {
   isDefault: boolean
   isActive: boolean
   displayDetails: Record<string, unknown>
+  withdrawalEligibility: PayoutMethodEligibility
 }
 
 export interface StripeConnectStatusResponse {
   available: boolean
+  payoutActionsAvailable: boolean
+  manualBankPayoutsAvailable: boolean
   connected: boolean
   status:
     | "NOT_CONNECTED"
@@ -117,7 +124,7 @@ export class PublisherPayoutsService {
 
   async requestWithdrawal(data: {
     amount: number
-    method: string
+    method: CertifiedWithdrawalMethodType
     payoutMethodId: string
     idempotencyKey: string
   }) {
@@ -165,7 +172,7 @@ export class PublisherPayoutsService {
   }
 
   createPayoutMethod(data: {
-    type: string
+    type: "bank_transfer"
     label: string
     details: Record<string, unknown>
     isDefault?: boolean

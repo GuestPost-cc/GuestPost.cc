@@ -351,6 +351,20 @@ import { ForbiddenException } from "@nestjs/common"
 import { StaffRolesGuard } from "../../../common/guards/staff-roles.guard"
 
 describe("StaffRolesGuard — fail-closed contract", () => {
+  const prisma = (role: string | null = null) =>
+    ({
+      staffMembership: {
+        findUnique: jest.fn().mockResolvedValue(
+          role
+            ? {
+                role,
+                user: { banned: false, userType: "STAFF" },
+              }
+            : null,
+        ),
+      },
+    }) as any
+
   function makeCtx(_metadata: string[] | undefined, user: any) {
     return {
       getHandler: () => (() => {}) as any,
@@ -359,64 +373,77 @@ describe("StaffRolesGuard — fail-closed contract", () => {
     } as any
   }
 
-  it("refuses a route with no @StaffRoles metadata (fail-closed)", () => {
+  it("refuses a route with no @StaffRoles metadata (fail-closed)", async () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(undefined),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector)
-    expect(() =>
+    const guard = new StaffRolesGuard(reflector, prisma("SUPER_ADMIN"))
+    await expect(
       guard.canActivate(
-        makeCtx(undefined, { userType: "STAFF", staffRole: "SUPER_ADMIN" }),
+        makeCtx(undefined, {
+          id: "staff-1",
+          userType: "STAFF",
+          staffRole: "SUPER_ADMIN",
+        }),
       ),
-    ).toThrow(ForbiddenException)
+    ).rejects.toThrow(ForbiddenException)
   })
 
-  it("refuses a route with empty @StaffRoles array (also fail-closed)", () => {
+  it("refuses a route with empty @StaffRoles array (also fail-closed)", async () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue([]),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector)
-    expect(() =>
+    const guard = new StaffRolesGuard(reflector, prisma("SUPER_ADMIN"))
+    await expect(
       guard.canActivate(
-        makeCtx([], { userType: "STAFF", staffRole: "SUPER_ADMIN" }),
+        makeCtx([], {
+          id: "staff-1",
+          userType: "STAFF",
+          staffRole: "SUPER_ADMIN",
+        }),
       ),
-    ).toThrow(ForbiddenException)
+    ).rejects.toThrow(ForbiddenException)
   })
 
-  it("refuses a non-STAFF user even when role declared", () => {
+  it("refuses a non-STAFF user even when role declared", async () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN"]),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector)
-    expect(() =>
+    const guard = new StaffRolesGuard(reflector, prisma("SUPER_ADMIN"))
+    await expect(
       guard.canActivate(makeCtx(["SUPER_ADMIN"], { userType: "CUSTOMER" })),
-    ).toThrow(ForbiddenException)
+    ).rejects.toThrow(ForbiddenException)
   })
 
-  it("refuses a STAFF user whose role is not in the allowlist", () => {
+  it("refuses a STAFF user whose durable role is not in the allowlist", async () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN"]),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector)
-    expect(() =>
+    const guard = new StaffRolesGuard(reflector, prisma("FINANCE"))
+    await expect(
       guard.canActivate(
-        makeCtx(["SUPER_ADMIN"], { userType: "STAFF", staffRole: "FINANCE" }),
+        makeCtx(["SUPER_ADMIN"], {
+          id: "staff-1",
+          userType: "STAFF",
+          staffRole: "SUPER_ADMIN",
+        }),
       ),
-    ).toThrow(ForbiddenException)
+    ).rejects.toThrow(ForbiddenException)
   })
 
-  it("allows a STAFF user whose role is in the allowlist", () => {
+  it("allows a STAFF user whose durable role is in the allowlist", async () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN", "FINANCE"]),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector)
-    expect(
+    const guard = new StaffRolesGuard(reflector, prisma("FINANCE"))
+    await expect(
       guard.canActivate(
         makeCtx(["SUPER_ADMIN", "FINANCE"], {
+          id: "staff-1",
           userType: "STAFF",
-          staffRole: "FINANCE",
+          staffRole: "OPERATIONS",
         }),
       ),
-    ).toBe(true)
+    ).resolves.toBe(true)
   })
 })

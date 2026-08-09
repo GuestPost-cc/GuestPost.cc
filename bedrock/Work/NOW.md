@@ -47,6 +47,16 @@ merged or deployed. The branch was created from and re-fetched against GitHub
   allowlists so nested actor, reviewer, finance, refund, cancellation
   idempotency, and other internal evidence cannot escape via a newly selected
   Prisma relation.
+- Publisher list and detail reads now both exclude DRAFT/PENDING_PAYMENT
+  orders, so an unpaid buyer brief cannot leak through the work queue before
+  capture. Customer wallet and ledger reads require a fresh active OWNER
+  membership rather than only an actor-type snapshot.
+- Derived auth cache entries are deep-cloned on insert and every hit; concurrent
+  requests cannot mutate one another's context. Role-protected guards re-read
+  current user/membership authority from PostgreSQL, and API startup awaits the
+  dedicated invalidation subscriber. Staff demotion and suspension share a
+  bounded serializable stable-lock critical section that preserves at least one
+  active Super Admin and commits its audit atomically.
 - Local authenticated 500s were traced to 13 committed migrations missing from
   the development database. `dev:all` now fails closed on pending, failed, or
   unreachable Prisma migration state before launching any application writer;
@@ -65,18 +75,58 @@ merged or deployed. The branch was created from and re-fetched against GitHub
   rejected repairs add only carry-forward. Withdrawable balance and lifetime
   paid never change, and ambiguous history aborts instead of being guessed or
   repaired with ad hoc SQL.
+- Migration `0980` makes a bounded categorical failure code mandatory for a
+  failed deposit attempt. Checkout creation is explicitly flag-gated, exact
+  retries bind every command and normalized Stripe fact, redirect hosts are
+  allowlisted, and raw provider diagnostics never become stored or returned
+  financial evidence.
 - The shared password form has a native POST fallback, preventing a
   pre-hydration submit from leaking credential fields into a URL or access log.
+- Local Compose startup now blocks until the configured MinIO bucket exists and
+  is verified. Invalid names or app/server credential drift fail closed before
+  delivery-verification workers can consume jobs without durable snapshots;
+  production R2/S3 provisioning remains operator-owned.
+- Object-storage selection is atomic and environment-bound: development/test
+  can only use the fixed local MinIO service, production must explicitly choose
+  R2 or S3, provider secret sets cannot be mixed, and only worker lanes that can
+  consume delivery snapshots validate/receive the storage bundle.
+  Local startup was exercised twice idempotently; the restarted API/worker
+  selected MinIO, and an application-level PUT plus signed GET round-trip
+  returned 200 from localhost before the diagnostic object was removed.
+- Development seed funding no longer increments an existing wallet on every
+  run while reusing one ledger row. The unique synthetic deposit and balance
+  increment now commit atomically under a wallet row lock and bounded
+  serializable retry. Exact replays are no-ops; uniqueness races require a
+  fresh locked proof of the complete provider-free evidence and ledger parity.
+  Conflicting evidence aborts. The known-password fixture also refuses every
+  non-development/test mode, remote or indirect database, remote API target,
+  or database without the Compose-installed local sentinel before it performs
+  API or mutating database work; its package command does not override the
+  mode. A loopback-only API preflight independently proves the API runtime and
+  database sentinel before the first signup.
+- The already-drifted local seed wallet was corrected only after a validated
+  backup and exact ledger/evidence checks, under a row lock with a system audit
+  record. Reconciliation now has zero critical findings and no wallet drift;
+  one old paid order still has the expected workflow warning because it has
+  remained in customer review for more than seven days without a settlement.
+  No financial state was invented to clear that warning.
 - This is a mixed-version-incompatible financial release. Deployment requires
   a maintenance window, hard drain of every old API/worker writer, ordered
-  migrations `0900` through `0970`, startup of only the evidence-aware image,
+  migrations `0900` through `0980`, startup of only the evidence-aware image,
+  pre-provisioned evidence storage plus explicit R2/S3 selection on the API and
+  delivery-consuming Northflank lanes,
   zero unexplained incident-query findings, and signed Stripe deposit/payout
   canaries. Rollback after database guards land is a money freeze and forward
   fix, never an old image or trigger removal.
-- Validation is green: 117 API unit suites / 1,382 tests, 15 PostgreSQL API
-  integration suites / 138 tests, 24 shared suites / 241 tests, 13 integration
-  package suites / 104 tests, 6 API-client suites / 59 tests, and 32 worker
-  tests. The populated 58-migration finance upgrade rehearsal through `0970`
+- Every new payout send repeats the canonical Finance/method/rollout gate under
+  final routing locks immediately before the durable claim. Only an exact aged
+  claim or a persisted Stripe Transfer recovery stage may bypass current
+  rollout switches for narrowly scoped reconciliation; no configuration flip
+  can mint a new send authority.
+- Validation is green: 120 API unit suites / 1,479 tests, 18 PostgreSQL API
+  integration suites / 146 tests, 29 shared suites / 326 tests, 13 integration
+  package suites / 104 tests, 8 API-client suites / 65 tests, and 33 worker
+  tests. The populated 59-migration finance upgrade rehearsal through `0980`
   passes, including exact positive, idempotent no-op, same-amount collision,
   and unsafe-evidence rejection coverage for the legacy reservation repair.
   Database generation/build, focused delivery/revision concurrency suites, the

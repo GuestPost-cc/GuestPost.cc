@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-08-02
+updated: 2026-08-03
 ---
 
 # Infrastructure
@@ -84,6 +84,31 @@ rollout, rollback, and quota-monitoring procedure.
 - **MinIO** — S3-compatible object storage (:9000 API, :9001 console)
 - **Mailpit** — dev SMTP server (:1025 SMTP, :8025 UI)
 
+`pnpm services:up` uses `.env.development` for Compose substitution, verifies
+the fixed local Postgres service, installs the database-side sentinel required
+by the privileged known-password seed, waits for the fixed local MinIO service
+to become healthy, and idempotently creates and verifies `MINIO_BUCKET` with
+the client bundled in that container. Invalid
+bucket names or app/server credential drift fail startup. This path cannot
+target R2/S3 and never auto-creates production storage; those buckets remain an
+operator responsibility.
+
+Runtime provider selection is atomic and environment-bound. Development/test
+read only the complete `MINIO_*` bundle and require the fixed local HTTP port
+9000, even if external credentials coexist. Production requires an explicit
+`OBJECT_STORAGE_PROVIDER=r2|s3`, reads only that provider's complete bundle,
+requires HTTPS external endpoints, and never falls back to MinIO. API and only
+worker lanes that can consume delivery-verification jobs validate this contract
+before serving or consuming; unrelated worker lanes do not receive the storage
+credentials.
+
+Production readiness performs only a bounded `HeadObject` for the fixed
+operator-provisioned sentinel. That proves endpoint, bucket, identity, and read
+authority; it deliberately does not prove `PutObject` permission. Before
+delivery or Finance lanes are opened in staging/production, operators must run
+an audited upload-and-retrieve canary with the exact runtime role, verify the
+bytes/checksum, and remove only that canary object under the retention policy.
+
 ## Environment
 
 - `.env.development` — dev env vars (loaded when `NODE_ENV=development`)
@@ -132,7 +157,9 @@ Resend, Google, or Sentry deployment credentials.
 - `pnpm -F @guestpost/api test:all` — both projects (48 suites / 653 tests as of 2026-06-22)
 - `pnpm test:concurrency` — parallel attack scenarios
 - `pnpm test:load [users=1000] [concurrency=50]` — load test
-- `pnpm seed` — DB seed script
+- `pnpm seed` — local-only known-password/demo-data fixture; refuses remote or
+  indirect API/database targets, missing database sentinel, and
+  non-development/test modes
 
 ## Prisma 7 + adapter-pg (Phase 7.13, 2026-06-21)
 

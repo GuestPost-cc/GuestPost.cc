@@ -1,5 +1,6 @@
 import {
   assertStripeObjectMode,
+  isStripeFeatureEnabled,
   stripeKeyMode,
   validateStripeEnvironment,
 } from "../stripe-client"
@@ -11,6 +12,17 @@ afterEach(() => {
 })
 
 describe("Stripe environment security gates", () => {
+  it("never infers development deposit enablement from key presence", () => {
+    process.env.NODE_ENV = "development"
+    process.env.STRIPE_SECRET_KEY = "sk_test_stale_but_well_shaped"
+    delete process.env.STRIPE_DEPOSITS_ENABLED
+
+    expect(isStripeFeatureEnabled("deposits")).toBe(false)
+
+    process.env.STRIPE_DEPOSITS_ENABLED = "true"
+    expect(isStripeFeatureEnabled("deposits")).toBe(true)
+  })
+
   it.each([
     ["sk_test_example", "test"],
     ["rk_test_example", "test"],

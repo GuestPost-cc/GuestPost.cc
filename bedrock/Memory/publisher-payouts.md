@@ -53,6 +53,15 @@ stores the exact idempotency key, SHA-256 fingerprint, first claimant/time, and
 monotonic replay lease time. Claim and claimed stage commit atomically.
 `providerMetadata` is informational; `externalClaims` is forbidden.
 
+Every new external-send claim repeats the shared payout-method runtime
+eligibility predicate while the Withdrawal, execution, balance, provider,
+provider-account, and payout-method routing rows remain locked. A Finance-mode
+pause, Stripe Connect disablement, or manual-bank rollout change between
+initial validation and provider I/O therefore prevents the claim. Recovery of
+an already durable aged claim remains narrowly available with only its exact
+original idempotency identity and immutable route; configuration changes never
+authorize a new claim.
+
 Claims lease for 15 minutes. From 15 minutes through 23 hours, exact-key
 recovery may advance only `lastClaimedAt` after locked revalidation. At 23
 hours the claim becomes review-only; provider lookup and Finance adjudication
@@ -65,6 +74,17 @@ cross-rail secret fields are rejected. Current publisher-owner membership,
 user eligibility, and publisher identity are locked and revalidated inside the
 same serializable transaction as encryption, default-method serialization,
 creation, and audit.
+
+The certified method set for a new withdrawal is closed to manual
+`bank_transfer` while its rollout is enabled and a fully ready
+`stripe_connect` method bound to the same publisher's active USD provider
+account. PayPal and Wise rows are legacy lifecycle records: they remain
+readable for support and can be disabled, but cannot be created, reactivated,
+selected, or used for a new reservation. Exact replay of a historically
+committed idempotent request remains read-only. Method and provider query
+failures, runtime pauses, invalid provider bindings/readiness, positive debt,
+and missing destinations fail closed in the publisher UI; request and approval
+transactions re-lock and revalidate the same shared eligibility predicate.
 
 ## Completion and maker-checker
 
@@ -101,9 +121,9 @@ forward-fix rollback. The payout and aggregate migrations take stable,
 fail-fast SHARE lock barriers before their corruption preflights so old
 READ-COMMITTED writers cannot race a successful snapshot.
 
-The current release contains 58 migrations through `20260802097000`; every
-writer remains drained until that ordered chain and its exact-evidence
-postflights succeed.
+The current release contains 59 migrations through
+`20260803098000_deposit_provider_failure_evidence`; every writer remains
+drained until that ordered chain and its exact-evidence postflights succeed.
 
 ## Key files
 

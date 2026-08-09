@@ -58,6 +58,23 @@ describe("payout method input", () => {
     ).toThrow()
   })
 
+  it.each([
+    {
+      type: "paypal",
+      label: "PayPal",
+      details: { email: "owner@example.com" },
+    },
+    {
+      type: "wise",
+      label: "Wise",
+      details: { recipientId: "recipient-1" },
+    },
+  ])("rejects a well-formed but uncertified creation route", (input) => {
+    expect(() =>
+      normalizePayoutMethodInput(input as CreatePayoutMethodDto),
+    ).toThrow(/type must be one of: bank_transfer/i)
+  })
+
   it("rejects nested properties through the HTTP validation contract", async () => {
     const input = plainToInstance(CreatePayoutMethodDto, {
       type: "paypal",

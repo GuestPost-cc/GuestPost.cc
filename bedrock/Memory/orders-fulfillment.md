@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: orders-fulfillment
 project: guestpost-platform
-updated: 2026-08-02
+updated: 2026-08-03
 ---
 
 # Orders & Fulfillment
@@ -157,8 +157,9 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
   never enter `OrderEvent.metadata`; events carry only provenance and integrity
   references. Customer source content is created atomically with the DRAFT
   order but does not advance lifecycle status.
-- Publisher and Operations direct-order reads fail closed for DRAFT and
-  PENDING_PAYMENT orders, preventing pre-payment source-article disclosure.
+- Publisher order lists and Publisher/Operations direct-order reads fail closed
+  for DRAFT and PENDING_PAYMENT orders, preventing pre-payment brief and
+  source-article disclosure.
   Finance projections do not include article bodies.
 
 ## Order creation contract hardening (2026-07-24)

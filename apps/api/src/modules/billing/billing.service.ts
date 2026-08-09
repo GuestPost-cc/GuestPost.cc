@@ -7,6 +7,7 @@ import {
   isSupportedMoneyCurrency,
   isUniqueViolation,
   isWalletCreditBackedDepositStatus,
+  normalizeFinancialReference,
   resolveFinanceRuntimeMode,
   USD_CURRENCY,
 } from "@guestpost/shared"
@@ -38,7 +39,10 @@ import {
   isStripeFeatureEnabled,
 } from "../../common/stripe-client"
 import { AuditService } from "../audit/audit.service"
-import type { DepositProviderAdapter } from "./providers/deposit-provider.interface"
+import {
+  type DepositProviderAdapter,
+  DepositProviderError,
+} from "./providers/deposit-provider.interface"
 import { DepositProviderService } from "./providers/deposit-provider.service"
 import { StripeDepositAdapter } from "./providers/stripe-deposit.adapter"
 
@@ -119,6 +123,17 @@ interface PaymentProviderEventEnvelope {
   eventFingerprint: string
 }
 
+interface DepositCommandEvidence {
+  walletId: string
+  organizationId: string | null
+  createdByUserId: string
+  amount: Decimal
+  currency: typeof USD_CURRENCY
+  idempotencyKey: string
+}
+
+type ExactDepositAttemptPhase = "PRE_SESSION" | "ATTACHED"
+
 const PAYMENT_DISPUTE_EVENT_TYPES = new Set([
   "charge.dispute.created",
   "charge.dispute.closed",
@@ -158,6 +173,298 @@ export class BillingService {
     // always supplies the registry from BillingModule.
     this.depositProvider =
       providerService?.getAdapter("stripe") ?? new StripeDepositAdapter()
+  }
+
+  getDepositCapability() {
+    const enabled = isStripeFeatureEnabled("deposits")
+    const supportsUsd =
+      this.depositProvider.capabilities.supportedCurrencies.includes(
+        USD_CURRENCY,
+      )
+    const financeMode = resolveFinanceRuntimeMode(
+      process.env.FINANCE_RUNTIME_MODE,
+      process.env.NODE_ENV,
+    ).mode
+    const financeAvailable = isFinanceOperationAllowed(
+      financeMode,
+      "new_liability",
+    )
+    const available = enabled && supportsUsd && financeAvailable
+    return {
+      available,
+      provider: "stripe" as const,
+      currency: USD_CURRENCY,
+      code: available
+        ? ("AVAILABLE" as const)
+        : !financeAvailable
+          ? ("FINANCE_OPERATIONS_UNAVAILABLE" as const)
+          : enabled
+            ? ("DEPOSIT_CURRENCY_UNAVAILABLE" as const)
+            : ("CARD_DEPOSITS_DISABLED" as const),
+      message: available
+        ? "Secure card deposits are available."
+        : !financeAvailable
+          ? "Card deposits are temporarily paused while financial operations are in recovery mode."
+          : enabled
+            ? "Card deposits are not available for USD wallets."
+            : "Card deposits are temporarily unavailable.",
+    }
+  }
+
+  private depositProviderFailure(error: unknown): DepositProviderError {
+    return error instanceof DepositProviderError
+      ? error
+      : new DepositProviderError("PROVIDER_UNAVAILABLE", true)
+  }
+
+  private depositProviderUnavailable(): ServiceUnavailableException {
+    return new ServiceUnavailableException({
+      code: "DEPOSIT_PROVIDER_UNAVAILABLE",
+      message:
+        "Secure card checkout is temporarily unavailable. Please try again later.",
+    })
+  }
+
+  private depositStateUnavailable(): ServiceUnavailableException {
+    return new ServiceUnavailableException({
+      code: "DEPOSIT_STATE_UNAVAILABLE",
+      message:
+        "Secure card checkout could not be recorded safely. Please try again later.",
+    })
+  }
+
+  private depositIdempotencyConflict(): ConflictException {
+    return new ConflictException({
+      code: "DEPOSIT_IDEMPOTENCY_CONFLICT",
+      message:
+        "This deposit request key is already bound to different deposit evidence.",
+    })
+  }
+
+  private decimalEquals(value: unknown, expected: Decimal): boolean {
+    try {
+      return new Decimal(value as any).equals(expected)
+    } catch {
+      return false
+    }
+  }
+
+  private isValidDate(value: unknown): value is Date {
+    return value instanceof Date && !Number.isNaN(value.getTime())
+  }
+
+  private isBoundedProviderId(value: unknown): value is string {
+    return (
+      typeof value === "string" &&
+      value.length > 0 &&
+      value.length <= 191 &&
+      value.trim() === value
+    )
+  }
+
+  /**
+   * The only accepted local replay shapes for checkout creation. This binds a
+   * client key to its original actor, tenant, wallet, fee snapshot, and empty
+   * pre-credit linkage before any provider lookup or call is permitted.
+   */
+  private assertExactDepositAttempt(
+    attempt: any,
+    expected: DepositCommandEvidence,
+    requiredPhase?: ExactDepositAttemptPhase,
+    expectedSession?: Awaited<
+      ReturnType<DepositProviderAdapter["createSession"]>
+    >,
+  ): ExactDepositAttemptPhase {
+    const publicReference = attempt?.publicReference
+    const commonMatches =
+      this.isBoundedProviderId(attempt?.id) &&
+      typeof publicReference === "string" &&
+      publicReference.length > 0 &&
+      publicReference.length <= 32 &&
+      normalizeFinancialReference(publicReference, 32) === publicReference &&
+      attempt.walletId === expected.walletId &&
+      attempt.organizationId === expected.organizationId &&
+      attempt.createdByUserId === expected.createdByUserId &&
+      attempt.method === "CARD" &&
+      attempt.provider === "stripe" &&
+      this.decimalEquals(attempt.amount, expected.amount) &&
+      this.decimalEquals(attempt.walletCredit, expected.amount) &&
+      this.decimalEquals(attempt.customerFee, new Decimal(0)) &&
+      attempt.providerFee === null &&
+      attempt.currency === expected.currency &&
+      attempt.idempotencyKey === expected.idempotencyKey &&
+      attempt.providerChargeId === null &&
+      attempt.intendedOrderId === null &&
+      attempt.ledgerTransactionId === null &&
+      attempt.completedAt === null
+
+    if (!commonMatches) throw this.depositIdempotencyConflict()
+
+    const isCreated =
+      attempt.status === "CREATED" &&
+      attempt.providerSessionId === null &&
+      attempt.providerPaymentId === null &&
+      attempt.expiresAt === null &&
+      attempt.failedAt === null &&
+      attempt.failureCode === null
+    const isFailed =
+      attempt.status === "FAILED" &&
+      attempt.providerSessionId === null &&
+      attempt.providerPaymentId === null &&
+      attempt.expiresAt === null &&
+      this.isValidDate(attempt.failedAt) &&
+      typeof attempt.failureCode === "string" &&
+      attempt.failureCode.length > 0
+    const isAttached =
+      attempt.status === "PENDING_CUSTOMER_ACTION" &&
+      this.isBoundedProviderId(attempt.providerSessionId) &&
+      (attempt.providerPaymentId === null ||
+        this.isBoundedProviderId(attempt.providerPaymentId)) &&
+      this.isValidDate(attempt.expiresAt) &&
+      attempt.failedAt === null &&
+      attempt.failureCode === null
+
+    const phase: ExactDepositAttemptPhase | null =
+      isCreated || isFailed ? "PRE_SESSION" : isAttached ? "ATTACHED" : null
+    if (!phase || (requiredPhase && phase !== requiredPhase)) {
+      throw this.depositIdempotencyConflict()
+    }
+    if (
+      expectedSession &&
+      (phase !== "ATTACHED" ||
+        attempt.providerSessionId !== expectedSession.providerSessionId ||
+        attempt.providerPaymentId !== expectedSession.providerPaymentId ||
+        attempt.expiresAt.getTime() !== expectedSession.expiresAt?.getTime())
+    ) {
+      throw this.depositIdempotencyConflict()
+    }
+    return phase
+  }
+
+  private assertExactDepositSessionEvidence(
+    session: Awaited<ReturnType<DepositProviderAdapter["createSession"]>>,
+    attempt: any,
+    expected: DepositCommandEvidence,
+    amountMinor: number,
+    expectedProviderSessionId?: string,
+  ): void {
+    let modeMatches = false
+    try {
+      assertStripeObjectMode(session?.livemode, "Stripe Checkout Session")
+      modeMatches = true
+    } catch {
+      modeMatches = false
+    }
+
+    const exact =
+      modeMatches &&
+      this.isBoundedProviderId(session?.providerSessionId) &&
+      session.providerObjectType === "checkout.session" &&
+      (!expectedProviderSessionId ||
+        session.providerSessionId === expectedProviderSessionId) &&
+      (!expectedProviderSessionId ||
+        ((attempt.providerPaymentId === null ||
+          session.providerPaymentId === attempt.providerPaymentId) &&
+          this.isValidDate(attempt.expiresAt) &&
+          attempt.expiresAt.getTime() === session.expiresAt?.getTime())) &&
+      (session.providerPaymentId === null ||
+        this.isBoundedProviderId(session.providerPaymentId)) &&
+      session.clientReferenceId === attempt.id &&
+      session.metadata?.depositAttemptId === attempt.id &&
+      session.metadata?.publicReference === attempt.publicReference &&
+      session.metadata?.walletId === expected.walletId &&
+      session.metadata?.userId === expected.createdByUserId &&
+      session.metadata?.organizationId === (expected.organizationId ?? "") &&
+      session.amountTotalMinor === amountMinor &&
+      session.currency === expected.currency &&
+      session.mode === "payment" &&
+      ["open", "complete", "expired"].includes(session.status ?? "") &&
+      this.isValidDate(session.expiresAt)
+
+    if (!exact) {
+      throw new DepositProviderError("PROVIDER_RESPONSE_INVALID", false)
+    }
+  }
+
+  private assertReturnableDepositSession(
+    session: Awaited<ReturnType<DepositProviderAdapter["createSession"]>>,
+  ): asserts session is Awaited<
+    ReturnType<DepositProviderAdapter["createSession"]>
+  > & { url: string; status: "open" } {
+    if (session.status !== "open" || typeof session.url !== "string") {
+      throw new DepositProviderError("PROVIDER_RESPONSE_INVALID", false)
+    }
+    try {
+      const url = new URL(session.url)
+      const trustedCheckoutHost =
+        url.hostname === "checkout.stripe.com" ||
+        (process.env.NODE_ENV === "test" &&
+          url.hostname === "checkout.stripe.test")
+      if (
+        url.protocol !== "https:" ||
+        !trustedCheckoutHost ||
+        url.username ||
+        url.password ||
+        session.url.length > 2048
+      ) {
+        throw new Error("invalid checkout URL")
+      }
+    } catch {
+      throw new DepositProviderError("PROVIDER_RESPONSE_INVALID", false)
+    }
+  }
+
+  private async recordDepositProviderFailure(
+    attempt: any,
+    expected: DepositCommandEvidence,
+    failure: DepositProviderError,
+  ): Promise<void> {
+    let recorded: { count: number }
+    try {
+      recorded = await (this.prisma as any).depositAttempt.updateMany({
+        where: {
+          id: attempt.id,
+          providerSessionId: null,
+          status: { in: ["CREATED", "FAILED"] },
+        },
+        data: {
+          status: "FAILED",
+          failureCode: failure.code,
+          failedAt: new Date(),
+        },
+      })
+    } catch {
+      this.logger.error(
+        "Deposit provider failure evidence could not be stored",
+        {
+          depositAttemptId: attempt.id,
+          failureCode: failure.code,
+        },
+      )
+      throw this.depositStateUnavailable()
+    }
+    if (recorded.count === 1) return
+
+    try {
+      const successor = await (this.prisma as any).depositAttempt.findUnique({
+        where: { id: attempt.id },
+      })
+      this.assertExactDepositAttempt(successor, expected, "ATTACHED")
+    } catch {
+      this.logger.error(
+        "Deposit provider failure evidence lost its exact successor",
+        {
+          depositAttemptId: attempt.id,
+          failureCode: failure.code,
+        },
+      )
+      throw this.depositStateUnavailable()
+    }
+
+    this.logger.warn("Deposit provider failure evidence was superseded", {
+      depositAttemptId: attempt.id,
+      failureCode: failure.code,
+    })
   }
 
   private paymentProviderEventDate(value: unknown): Date | null {
@@ -502,97 +809,121 @@ export class BillingService {
       throw new BadRequestException("Card deposits do not support USD")
     }
 
-    const amountDecimal = new Decimal(amount)
+    const amountDecimal = this.canonicalMoneyAmount(amount, "Deposit")
     const amountMinorDecimal = amountDecimal.mul(100)
-    if (
-      !amountDecimal.isFinite() ||
-      amountDecimal.lessThanOrEqualTo(0) ||
-      !amountMinorDecimal.isInteger()
-    ) {
-      throw new BadRequestException(
-        "Deposit amount must be positive with no more than two decimal places",
-      )
-    }
     const amountMinor = amountMinorDecimal.toNumber()
     if (!Number.isSafeInteger(amountMinor)) {
       throw new BadRequestException("Deposit amount is outside the safe range")
     }
 
-    const requestKey = (idempotencyKey?.trim() || randomUUID()).slice(0, 191)
+    const suppliedRequestKey = idempotencyKey?.trim()
+    if (
+      idempotencyKey != null &&
+      (!suppliedRequestKey ||
+        suppliedRequestKey.length > 191 ||
+        !/^[A-Za-z0-9_-]+$/.test(suppliedRequestKey))
+    ) {
+      throw new BadRequestException({
+        code: "DEPOSIT_IDEMPOTENCY_KEY_INVALID",
+        message:
+          "Deposit idempotency key must be 1-191 letters, numbers, underscores, or hyphens.",
+      })
+    }
+    const requestKey = suppliedRequestKey ?? randomUUID()
+    const commandEvidence: DepositCommandEvidence = {
+      walletId,
+      organizationId: wallet.organizationId,
+      createdByUserId: user.id,
+      amount: amountDecimal,
+      currency: USD_CURRENCY,
+      idempotencyKey: requestKey,
+    }
     const depositAttempt = (this.prisma as any).depositAttempt
-    const existing = await depositAttempt.findUnique({
+    let attempt = await depositAttempt.findUnique({
       where: {
         walletId_idempotencyKey: { walletId, idempotencyKey: requestKey },
       },
     })
-    if (
-      existing &&
-      (!new Decimal(existing.amount).equals(amountDecimal) ||
-        existing.currency !== USD_CURRENCY)
-    ) {
-      throw new ConflictException(
-        "This deposit request key was already used for a different amount or currency",
-      )
-    }
-    if (existing?.providerSessionId) {
-      const existingSession = await this.depositProvider.retrieveSession(
-        existing.providerSessionId,
-      )
-      if (existingSession.url && existingSession.status === "open") {
-        return {
-          url: existingSession.url,
-          publicReference: existing.publicReference,
-          statementDescriptor: customerWalletStatementDescriptor(
-            existing.publicReference,
-          ),
-          feePolicy: initialStripeFeeDisclosure(amountMinor),
-        }
+    if (!attempt) {
+      try {
+        attempt = await depositAttempt.create({
+          data: {
+            publicReference: createFinancialReference("DP"),
+            walletId,
+            organizationId: wallet.organizationId,
+            createdByUserId: user.id,
+            method: "CARD",
+            provider: "stripe",
+            amount: amountDecimal,
+            walletCredit: amountDecimal,
+            customerFee: 0,
+            currency: USD_CURRENCY,
+            status: "CREATED",
+            idempotencyKey: requestKey,
+          },
+        })
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error
+        attempt = await depositAttempt.findUnique({
+          where: {
+            walletId_idempotencyKey: { walletId, idempotencyKey: requestKey },
+          },
+        })
+        if (!attempt) throw error
       }
-      throw new ConflictException(
-        "This deposit request has already been used; start a new deposit",
-      )
     }
 
-    let attempt: any
-    try {
-      attempt = await depositAttempt.create({
-        data: {
-          publicReference: createFinancialReference("DP"),
-          walletId,
-          organizationId: wallet.organizationId,
-          createdByUserId: user.id,
-          method: "CARD",
-          provider: "stripe",
-          amount: amountDecimal,
-          walletCredit: amountDecimal,
-          customerFee: 0,
-          currency: USD_CURRENCY,
-          status: "CREATED",
-          idempotencyKey: requestKey,
-        },
-      })
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error
-      attempt = await depositAttempt.findUnique({
-        where: {
-          walletId_idempotencyKey: { walletId, idempotencyKey: requestKey },
-        },
-      })
-      if (!attempt) throw error
-      if (
-        !new Decimal(attempt.amount).equals(amountDecimal) ||
-        attempt.currency !== USD_CURRENCY
-      ) {
-        throw new ConflictException(
-          "This deposit request key was already used for a different amount or currency",
+    const attemptPhase = this.assertExactDepositAttempt(
+      attempt,
+      commandEvidence,
+    )
+    if (attemptPhase === "ATTACHED") {
+      let existingSession: Awaited<
+        ReturnType<DepositProviderAdapter["retrieveSession"]>
+      >
+      try {
+        existingSession = await this.depositProvider.retrieveSession(
+          attempt.providerSessionId,
         )
+        this.assertExactDepositSessionEvidence(
+          existingSession,
+          attempt,
+          commandEvidence,
+          amountMinor,
+          attempt.providerSessionId,
+        )
+        if (existingSession.status === "open") {
+          this.assertReturnableDepositSession(existingSession)
+        }
+      } catch (error) {
+        const failure = this.depositProviderFailure(error)
+        this.logger.error("Stripe deposit session recovery failed", {
+          depositAttemptId: attempt.id,
+          failureCode: failure.code,
+          retryable: failure.retryable,
+        })
+        throw this.depositProviderUnavailable()
+      }
+      if (existingSession.status !== "open") {
+        throw new ConflictException(
+          "This deposit request has already been used; start a new deposit",
+        )
+      }
+      return {
+        url: existingSession.url,
+        publicReference: attempt.publicReference,
+        statementDescriptor: customerWalletStatementDescriptor(
+          attempt.publicReference,
+        ),
+        feePolicy: initialStripeFeeDisclosure(amountMinor),
       }
     }
 
     const portalUrl =
       process.env.NEXT_PUBLIC_PORTAL_URL || "http://localhost:3001"
+    let session: Awaited<ReturnType<DepositProviderAdapter["createSession"]>>
     try {
-      const session = await this.depositProvider.createSession({
+      session = await this.depositProvider.createSession({
         attemptId: attempt.id,
         publicReference: attempt.publicReference,
         walletId,
@@ -604,16 +935,77 @@ export class BillingService {
         successUrl: `${portalUrl}/dashboard/billing?success=true`,
         cancelUrl: `${portalUrl}/dashboard/billing?canceled=true`,
       })
+      this.assertExactDepositSessionEvidence(
+        session,
+        attempt,
+        commandEvidence,
+        amountMinor,
+      )
+      this.assertReturnableDepositSession(session)
+    } catch (error) {
+      const failure = this.depositProviderFailure(error)
+      await this.recordDepositProviderFailure(attempt, commandEvidence, failure)
+      this.logger.error("Stripe deposit session creation failed", {
+        depositAttemptId: attempt.id,
+        failureCode: failure.code,
+        retryable: failure.retryable,
+      })
+      throw this.depositProviderUnavailable()
+    }
 
-      await depositAttempt.update({
-        where: { id: attempt.id },
+    try {
+      const attached = await depositAttempt.updateMany({
+        where: {
+          id: attempt.id,
+          publicReference: attempt.publicReference,
+          walletId,
+          organizationId: wallet.organizationId,
+          createdByUserId: user.id,
+          method: "CARD",
+          provider: "stripe",
+          amount: amountDecimal,
+          walletCredit: amountDecimal,
+          customerFee: new Decimal(0),
+          providerFee: null,
+          currency: USD_CURRENCY,
+          idempotencyKey: requestKey,
+          providerSessionId: null,
+          providerPaymentId: null,
+          providerChargeId: null,
+          intendedOrderId: null,
+          ledgerTransactionId: null,
+          expiresAt: null,
+          completedAt: null,
+          status: { in: ["CREATED", "FAILED"] },
+        },
         data: {
           status: "PENDING_CUSTOMER_ACTION",
           providerSessionId: session.providerSessionId,
           providerPaymentId: session.providerPaymentId,
           expiresAt: session.expiresAt,
+          failedAt: null,
+          failureCode: null,
         },
       })
+      if (attached.count !== 1) {
+        const current = await depositAttempt.findUnique({
+          where: { id: attempt.id },
+        })
+        try {
+          this.assertExactDepositAttempt(
+            current,
+            commandEvidence,
+            "ATTACHED",
+            session,
+          )
+        } catch {
+          throw new ConflictException({
+            code: "DEPOSIT_SESSION_ATTACHMENT_RACE",
+            message:
+              "Deposit checkout state changed concurrently. Start a new deposit.",
+          })
+        }
+      }
 
       return {
         url: session.url,
@@ -624,17 +1016,12 @@ export class BillingService {
         feePolicy: initialStripeFeeDisclosure(amountMinor),
       }
     } catch (error) {
-      await depositAttempt.updateMany({
-        where: { id: attempt.id, status: "CREATED" },
-        data: { status: "FAILED", failedAt: new Date() },
-      })
-      this.logger.error("Stripe deposit session creation failed", {
+      if (error instanceof ConflictException) throw error
+      this.logger.error("Stripe deposit session evidence attachment failed", {
         depositAttemptId: attempt.id,
         errorType: error instanceof Error ? error.name : "UnknownError",
       })
-      throw new BadRequestException(
-        "Unable to start the secure card checkout. Please try again.",
-      )
+      throw this.depositStateUnavailable()
     }
   }
 
@@ -2082,6 +2469,7 @@ export class BillingService {
             ledgerTransactionId: ledgerTransaction.id,
             completedAt: new Date(),
             failedAt: null,
+            failureCode: null,
           },
         })
         if (completedAttempt.count !== 1) {

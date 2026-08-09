@@ -25,6 +25,48 @@ describe("BillingController direct-deposit surface", () => {
     expect(source).not.toContain('wallet/:id/deposit"')
     expect(source).not.toContain("ENABLE_DIRECT_DEPOSIT")
   })
+
+  it("exposes a read-only owner-scoped capability projection", () => {
+    const capability = {
+      available: false,
+      code: "CARD_DEPOSITS_DISABLED",
+    }
+    const billing = {
+      getDepositCapability: jest.fn().mockReturnValue(capability),
+    }
+    const controller = new BillingController(billing as any)
+    const handler = BillingController.prototype.getDepositCapability
+
+    expect(controller.getDepositCapability()).toBe(capability)
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe(
+      "deposit-capability",
+    )
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(
+      RequestMethod.GET,
+    )
+    expect(Reflect.getMetadata(ACTOR_TYPE_KEY, handler)).toEqual(["CUSTOMER"])
+    expect(Reflect.getMetadata(MEMBER_ROLES_KEY, handler)).toEqual(["OWNER"])
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual(
+      expect.arrayContaining([ActorTypeGuard, MemberRolesGuard]),
+    )
+  })
+})
+
+describe("BillingController ledger-read authorization", () => {
+  it.each([
+    ["wallet", BillingController.prototype.getWallet],
+    ["transactions", BillingController.prototype.listTransactions],
+  ])("keeps GET /billing/%s customer-owner-only with a fresh membership guard", (path, handler) => {
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe(path)
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(
+      RequestMethod.GET,
+    )
+    expect(Reflect.getMetadata(ACTOR_TYPE_KEY, handler)).toEqual(["CUSTOMER"])
+    expect(Reflect.getMetadata(MEMBER_ROLES_KEY, handler)).toEqual(["OWNER"])
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual(
+      expect.arrayContaining([ActorTypeGuard, MemberRolesGuard]),
+    )
+  })
 })
 
 describe("BillingController customer cash-out containment", () => {

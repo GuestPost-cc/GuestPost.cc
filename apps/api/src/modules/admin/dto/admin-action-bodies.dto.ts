@@ -184,11 +184,11 @@ export class BulkRetryVerificationDto {
   websiteIds!: string[]
 }
 
-const VERIFY_METHODS = [
-  "MANUAL_CHECK",
-  "ADMIN_OVERRIDE",
-  "PUBLISHER_REPLY",
-] as const
+// Keep the HTTP contract identical to the persisted
+// DeliveryVerificationMethod enum. This endpoint is an admin action, so it
+// may only record MANUAL_ADMIN; AUTO and CUSTOMER_MANUAL are produced by
+// their own evidence-bearing workflows.
+const VERIFY_METHODS = ["MANUAL_ADMIN"] as const
 
 export class ManualVerifyDto {
   @IsString()

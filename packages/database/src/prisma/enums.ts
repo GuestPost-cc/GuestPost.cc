@@ -258,6 +258,18 @@ export const DepositAttemptStatus = {
 export type DepositAttemptStatus = (typeof DepositAttemptStatus)[keyof typeof DepositAttemptStatus]
 
 
+export const DepositFailureCode = {
+  LEGACY_UNCLASSIFIED: 'LEGACY_UNCLASSIFIED',
+  PROVIDER_AUTHENTICATION_FAILED: 'PROVIDER_AUTHENTICATION_FAILED',
+  PROVIDER_RATE_LIMITED: 'PROVIDER_RATE_LIMITED',
+  PROVIDER_UNAVAILABLE: 'PROVIDER_UNAVAILABLE',
+  PROVIDER_REQUEST_REJECTED: 'PROVIDER_REQUEST_REJECTED',
+  PROVIDER_RESPONSE_INVALID: 'PROVIDER_RESPONSE_INVALID'
+} as const
+
+export type DepositFailureCode = (typeof DepositFailureCode)[keyof typeof DepositFailureCode]
+
+
 export const PaymentProviderEventStatus = {
   PENDING: 'PENDING',
   PROCESSING: 'PROCESSING',

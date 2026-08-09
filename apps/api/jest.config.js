@@ -32,6 +32,10 @@ const baseModuleNameMapperFromSrc = {
     "<rootDir>/../../../packages/shared/src/dns-lookup",
   "^@guestpost/shared/dist/delivery-verification-core$":
     "<rootDir>/../../../packages/shared/src/delivery-verification-core",
+  "^@guestpost/shared/dist/development-seed-funding$":
+    "<rootDir>/../../../packages/shared/src/development-seed-funding",
+  "^@guestpost/shared/dist/development-seed-safety$":
+    "<rootDir>/../../../packages/shared/src/development-seed-safety",
   "^@guestpost/shared/dist/object-storage$":
     "<rootDir>/../../../packages/shared/src/object-storage",
   "^@guestpost/shared/dist/payout-finalization-core$":
@@ -94,6 +98,10 @@ module.exports = {
           "<rootDir>/../../../../../packages/shared/src/dns-lookup",
         "^@guestpost/shared/dist/delivery-verification-core$":
           "<rootDir>/../../../../../packages/shared/src/delivery-verification-core",
+        "^@guestpost/shared/dist/development-seed-funding$":
+          "<rootDir>/../../../../../packages/shared/src/development-seed-funding",
+        "^@guestpost/shared/dist/development-seed-safety$":
+          "<rootDir>/../../../../../packages/shared/src/development-seed-safety",
         "^@guestpost/shared/dist/object-storage$":
           "<rootDir>/../../../../../packages/shared/src/object-storage",
         "^@guestpost/shared/dist/payout-finalization-core$":

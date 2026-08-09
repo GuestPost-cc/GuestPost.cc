@@ -7,14 +7,27 @@
  * Requires: API on :4000, seeded users (pnpm seed), publisher tier VERIFIED,
  * and manual payouts enabled in this development/test environment.
  */
-import { prisma } from "../packages/database/src"
+
+import { normalizePositiveUsdMoney } from "../packages/shared/src/money"
+import { loadRootEnv } from "./env"
 import { fundExistingWalletForTest } from "./test-wallet-funding"
+
+let prisma: typeof import("../packages/database/src")["prisma"]
 
 const API = process.env.API_URL ?? "http://localhost:4000"
 const H = {
   "Content-Type": "application/json",
   Origin: "http://localhost:3001",
 }
+type Portal = "customer" | "publisher" | "staff"
+type Session = { cookie: string; origin: string; portal: Portal }
+const activeSessions: Session[] = []
+const SESSION_COOKIE_NAMES = new Set([
+  "guestpost.session_token",
+  "__Secure-guestpost.session_token",
+  "guestpost-session_token",
+  "__Secure-guestpost-session_token",
+])
 
 let passed = 0
 let failed = 0
@@ -33,12 +46,24 @@ function check(name: string, cond: boolean, detail?: unknown) {
 async function call(
   method: string,
   path: string,
-  token?: string,
+  session?: Session,
   body?: unknown,
+  requestHeaders?: Record<string, string>,
 ) {
   const res = await fetch(`${API}/api/v1${path}`, {
     method,
-    headers: { ...H, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      ...H,
+      ...(session
+        ? {
+            Cookie: session.cookie,
+            Origin: session.origin,
+            "x-csrf-protection": "1",
+            "x-portal-type": session.portal,
+          }
+        : {}),
+      ...requestHeaders,
+    },
     body: body ? JSON.stringify(body) : undefined,
   })
   let data: any
@@ -48,20 +73,90 @@ async function call(
   } catch {
     data = text
   }
-  return { status: res.status, data }
+  return { status: res.status, data, headers: res.headers }
 }
 
-async function signIn(email: string, password: string) {
-  const r = await call("POST", "/auth/sign-in/email", undefined, {
-    email,
-    password,
-  })
+function portalOrigin(portal: Portal): string {
+  if (portal === "staff") return "http://localhost:3003"
+  if (portal === "publisher") return "http://localhost:3002"
+  return "http://localhost:3001"
+}
+
+async function signIn(email: string, password: string, portal: Portal) {
+  const r = await call(
+    "POST",
+    "/auth/sign-in/email",
+    undefined,
+    {
+      email,
+      password,
+    },
+    {
+      Origin: portalOrigin(portal),
+      "x-portal-type": portal,
+    },
+  )
   if (r.status !== 200)
     throw new Error(`sign-in failed for ${email}: ${JSON.stringify(r.data)}`)
-  return r.data.token as string
+  const setCookies =
+    (
+      r.headers as Headers & {
+        getSetCookie?: () => string[]
+      }
+    ).getSetCookie?.() ?? []
+  const sessionCookies = setCookies
+    .map((value) => value.split(";", 1)[0] ?? "")
+    .filter((value) => SESSION_COOKIE_NAMES.has(value.split("=", 1)[0] ?? ""))
+  if (sessionCookies.length !== 1) {
+    throw new Error(`sign-in did not establish one session for ${email}`)
+  }
+  const session = {
+    cookie: sessionCookies[0],
+    origin: portalOrigin(portal),
+    portal,
+  }
+  activeSessions.push(session)
+  return session
 }
 
-async function ensureManualPayoutMethod(publisherToken: string) {
+async function cleanupSessions() {
+  const sessions = activeSessions.splice(0)
+  const results = await Promise.allSettled(
+    sessions.map((session) =>
+      call("POST", "/auth/sign-out", session, undefined, {
+        Origin: session.origin,
+        "x-portal-type": session.portal,
+      }),
+    ),
+  )
+  if (
+    results.some(
+      (result) =>
+        result.status === "rejected" ||
+        (result.status === "fulfilled" && result.value.status >= 400),
+    )
+  ) {
+    throw new Error("one or more integration-test sessions could not be closed")
+  }
+}
+
+function paymentEvidence(order: any) {
+  const expectedAmount = normalizePositiveUsdMoney(order?.amount)
+  if (
+    !Number.isInteger(order?.version) ||
+    expectedAmount === null ||
+    order?.currency !== "USD"
+  ) {
+    throw new Error("order response is missing canonical USD capture evidence")
+  }
+  return {
+    expectedVersion: order.version,
+    expectedAmount,
+    expectedCurrency: order.currency,
+  }
+}
+
+async function ensureManualPayoutMethod(publisherToken: Session) {
   const listed = await call(
     "GET",
     "/publisher-payouts/payout-methods",
@@ -105,14 +200,30 @@ async function ensureManualPayoutMethod(publisherToken: string) {
 }
 
 async function main() {
+  loadRootEnv({ required: ["NODE_ENV", "DATABASE_URL"] })
+  ;({ prisma } = await import("../packages/database/src"))
+
   console.log("── Integration: full money loop")
-  const client = await signIn("client@guestpost.local", "Client123!")
-  const publisher = await signIn("publisher@guestpost.local", "Publisher123!")
-  const admin = await signIn("admin@guestpost.local", "Admin123!")
-  const finance = await signIn("finance@guestpost.local", "Finance123!")
+  const client = await signIn(
+    "client@guestpost.local",
+    "Client123!",
+    "customer",
+  )
+  const publisher = await signIn(
+    "publisher@guestpost.local",
+    "Publisher123!",
+    "publisher",
+  )
+  const admin = await signIn("admin@guestpost.local", "Admin123!", "staff")
+  const finance = await signIn(
+    "finance@guestpost.local",
+    "Finance123!",
+    "staff",
+  )
   const financeChecker = await signIn(
     "finance-checker@guestpost.local",
     "FinanceChecker123!",
+    "staff",
   )
 
   // Snapshot starting balances
@@ -198,7 +309,12 @@ async function main() {
   check("order created as DRAFT", order.status === "DRAFT", order)
 
   const paid = (
-    await call("POST", `/orders/${order.id}/submit-payment`, client)
+    await call(
+      "POST",
+      `/orders/${order.id}/submit-payment`,
+      client,
+      paymentEvidence(order),
+    )
   ).data
   check("payment moves order to SUBMITTED", paid.status === "SUBMITTED", paid)
 
@@ -259,7 +375,9 @@ async function main() {
   check("replayed accept rejected", replay.status >= 400, replay)
 
   const verified = (
-    await call("POST", `/admin/orders/${order.id}/manual-verify`, admin)
+    await call("POST", `/admin/orders/${order.id}/manual-verify`, admin, {
+      method: "MANUAL_ADMIN",
+    })
   ).data
   check("manual-verify -> VERIFIED", verified.status === "VERIFIED", verified)
 
@@ -469,11 +587,14 @@ async function main() {
   check("reconciliation: zero drift", recon.ok === true, recon)
 
   console.log(`\n${passed} passed, ${failed} failed`)
+  await cleanupSessions()
   await prisma.$disconnect()
   process.exit(failed > 0 ? 1 : 0)
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error(err)
+  await cleanupSessions().catch((cleanupError) => console.error(cleanupError))
+  await prisma?.$disconnect()
   process.exit(1)
 })

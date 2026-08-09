@@ -1,11 +1,13 @@
 jest.mock("ioredis", () => {
   const { EventEmitter } = require("node:events")
-  const mockRedis = new EventEmitter()
-  mockRedis.psubscribe = jest.fn()
-  mockRedis.publish = jest.fn().mockResolvedValue(1)
-  mockRedis.quit = jest.fn()
-  mockRedis.disconnect = jest.fn()
-  const ctor = jest.fn(() => mockRedis)
+  const ctor = jest.fn(() => {
+    const mockRedis = new EventEmitter()
+    mockRedis.psubscribe = jest.fn().mockResolvedValue(1)
+    mockRedis.publish = jest.fn().mockResolvedValue(1)
+    mockRedis.quit = jest.fn()
+    mockRedis.disconnect = jest.fn()
+    return mockRedis
+  })
   return { __esModule: true, default: ctor }
 })
 
@@ -17,25 +19,28 @@ import {
   invalidateAuthContext,
   setCachedAuthContext,
 } from "../auth-context-cache"
-import { getRedisSubscriber } from "../redis-client"
+import { getRedisClient, getRedisSubscriber } from "../redis-client"
 
 describe("auth-context-cache M-1 — Redis cross-pod invalidation", () => {
   let mockSub: any
+  let mockPublisher: any
 
   beforeEach(() => {
     clearAuthContextCache()
     jest.clearAllMocks()
     mockSub = getRedisSubscriber()
+    mockPublisher = getRedisClient()
     mockSub.removeAllListeners()
   })
 
   it("publishes invalidation on auth-context:invalidate:{userId} channel", () => {
     invalidateAuthContext("user-1")
 
-    expect(mockSub.publish).toHaveBeenCalledWith(
+    expect(mockPublisher.publish).toHaveBeenCalledWith(
       "auth-context:invalidate:user-1",
       "",
     )
+    expect(mockSub.publish).not.toHaveBeenCalled()
   })
 
   it("local cache is evicted before publish attempt", () => {
@@ -44,11 +49,11 @@ describe("auth-context-cache M-1 — Redis cross-pod invalidation", () => {
     invalidateAuthContext("user-1")
 
     expect(getCachedAuthContext("user-1")).toBeNull()
-    expect(mockSub.publish).toHaveBeenCalled()
+    expect(mockPublisher.publish).toHaveBeenCalled()
   })
 
-  it("subscriber pmessage evicts the targeted cache entry", () => {
-    initAuthContextSubscriber()
+  it("subscriber pmessage evicts the targeted cache entry", async () => {
+    await initAuthContextSubscriber()
     setCachedAuthContext("user-2", { id: "user-2" })
 
     mockSub.emit(
@@ -61,8 +66,8 @@ describe("auth-context-cache M-1 — Redis cross-pod invalidation", () => {
     expect(getCachedAuthContext("user-2")).toBeNull()
   })
 
-  it("subscriber pmessage does not evict unrelated entries", () => {
-    initAuthContextSubscriber()
+  it("subscriber pmessage does not evict unrelated entries", async () => {
+    await initAuthContextSubscriber()
     setCachedAuthContext("user-2", { id: "user-2" })
     setCachedAuthContext("user-3", { id: "user-3" })
 
@@ -81,7 +86,7 @@ describe("auth-context-cache M-1 — Redis cross-pod invalidation", () => {
     const warnSpy = jest
       .spyOn(Logger.prototype, "warn")
       .mockImplementation(() => {})
-    mockSub.publish.mockRejectedValue(new Error("Redis down"))
+    mockPublisher.publish.mockRejectedValue(new Error("Redis down"))
 
     setCachedAuthContext("user-1", { id: "user-1" })
 
@@ -92,9 +97,24 @@ describe("auth-context-cache M-1 — Redis cross-pod invalidation", () => {
     await Promise.resolve()
 
     expect(getCachedAuthContext("user-1")).toBeNull()
-    expect(mockSub.publish).toHaveBeenCalled()
+    expect(mockPublisher.publish).toHaveBeenCalled()
     expect(warnSpy).toHaveBeenCalledTimes(1)
 
+    warnSpy.mockRestore()
+  })
+
+  it("fails startup explicitly when the subscription cannot be established", async () => {
+    const failure = new Error("Redis subscription unavailable")
+    const warnSpy = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => {})
+    mockSub.psubscribe.mockRejectedValue(failure)
+
+    await expect(initAuthContextSubscriber()).rejects.toBe(failure)
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ error: failure.message }),
+      "auth-context-cache: Redis subscription failed during startup",
+    )
     warnSpy.mockRestore()
   })
 })

@@ -1442,6 +1442,13 @@ export type EnumDepositAttemptStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel> | $Enums.DepositAttemptStatus
 }
 
+export type EnumDepositFailureCodeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositFailureCode | Prisma.EnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DepositFailureCode[] | Prisma.ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DepositFailureCode[] | Prisma.ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel> | $Enums.DepositFailureCode | null
+}
+
 export type EnumDepositAttemptStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.DepositAttemptStatus | Prisma.EnumDepositAttemptStatusFieldRefInput<$PrismaModel>
   in?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
@@ -1450,6 +1457,16 @@ export type EnumDepositAttemptStatusWithAggregatesFilter<$PrismaModel = never> =
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel>
+}
+
+export type EnumDepositFailureCodeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositFailureCode | Prisma.EnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DepositFailureCode[] | Prisma.ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DepositFailureCode[] | Prisma.ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDepositFailureCodeNullableWithAggregatesFilter<$PrismaModel> | $Enums.DepositFailureCode | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel>
 }
 
 export type EnumPaymentProviderEventStatusFilter<$PrismaModel = never> = {
@@ -3216,6 +3233,13 @@ export type NestedEnumDepositAttemptStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel> | $Enums.DepositAttemptStatus
 }
 
+export type NestedEnumDepositFailureCodeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositFailureCode | Prisma.EnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DepositFailureCode[] | Prisma.ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DepositFailureCode[] | Prisma.ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel> | $Enums.DepositFailureCode | null
+}
+
 export type NestedEnumDepositAttemptStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.DepositAttemptStatus | Prisma.EnumDepositAttemptStatusFieldRefInput<$PrismaModel>
   in?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
@@ -3224,6 +3248,16 @@ export type NestedEnumDepositAttemptStatusWithAggregatesFilter<$PrismaModel = ne
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumDepositFailureCodeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositFailureCode | Prisma.EnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DepositFailureCode[] | Prisma.ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DepositFailureCode[] | Prisma.ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDepositFailureCodeNullableWithAggregatesFilter<$PrismaModel> | $Enums.DepositFailureCode | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel>
 }
 
 export type NestedEnumPaymentProviderEventStatusFilter<$PrismaModel = never> = {

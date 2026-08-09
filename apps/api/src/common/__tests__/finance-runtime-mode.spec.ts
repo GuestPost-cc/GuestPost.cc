@@ -22,7 +22,8 @@ describe("API finance runtime mode", () => {
         statusCode: 503,
         error: "Finance operation temporarily unavailable",
         code: "FINANCE_OPERATION_BLOCKED",
-        mode: "recovery_only",
+        message:
+          "This financial action is temporarily unavailable. Retry later or contact support.",
       })
     }
   })

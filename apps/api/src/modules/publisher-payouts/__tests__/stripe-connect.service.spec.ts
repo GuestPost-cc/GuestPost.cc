@@ -169,6 +169,61 @@ describe("StripeConnectService", () => {
     })
   })
 
+  it("maps Stripe onboarding SDK failures to a stable redacted 503", async () => {
+    const { service } = makeService()
+    const providerFailure = new Error(
+      "Stripe diagnostic request-id=req_secret account=acct_secret",
+    )
+    jest.spyOn(stripeClient, "getStripeClient").mockReturnValue({
+      accounts: { create: jest.fn().mockRejectedValue(providerFailure) },
+      accountLinks: { create: jest.fn() },
+    } as any)
+
+    let rejection: any
+    try {
+      await service.createOnboardingLink("pub-1", "user-1")
+    } catch (error) {
+      rejection = error
+    }
+
+    expect(rejection).toMatchObject({ status: 503 })
+    expect(rejection.getResponse()).toEqual({
+      code: "STRIPE_CONNECT_UNAVAILABLE",
+      message:
+        "Stripe payout setup could not be confirmed. No withdrawal was submitted. Retry or refresh the provider status later.",
+    })
+    expect(JSON.stringify(rejection.getResponse())).not.toMatch(
+      /req_secret|acct_secret|diagnostic/,
+    )
+  })
+
+  it("maps exhausted serializable account persistence retries to a stable 409", async () => {
+    const { service, prisma } = makeService()
+    prisma.$transaction.mockRejectedValue({ code: "P2034" })
+    jest.spyOn(stripeClient, "getStripeClient").mockReturnValue({
+      accounts: {
+        create: jest.fn().mockResolvedValue({
+          id: "acct_1",
+          country: "US",
+          default_currency: "usd",
+        }),
+      },
+      accountLinks: { create: jest.fn() },
+    } as any)
+
+    await expect(
+      service.createOnboardingLink("pub-1", "user-1"),
+    ).rejects.toMatchObject({
+      status: 409,
+      response: {
+        code: "STRIPE_CONNECT_CONCURRENCY_RETRY",
+        message:
+          "Stripe payout state changed concurrently. Refresh and retry the operation.",
+      },
+    })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(5)
+  })
+
   it("blocks onboarding in recovery-only mode before Stripe or local state can mutate", async () => {
     process.env.FINANCE_RUNTIME_MODE = "recovery_only"
     const { service, prisma } = makeService()
@@ -179,7 +234,6 @@ describe("StripeConnectService", () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({
         code: "FINANCE_OPERATION_BLOCKED",
-        mode: "recovery_only",
       }),
     })
 
@@ -400,7 +454,6 @@ describe("StripeConnectService", () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({
         code: "FINANCE_OPERATION_BLOCKED",
-        mode: "locked",
       }),
     })
 
@@ -421,7 +474,6 @@ describe("StripeConnectService", () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({
         code: "FINANCE_OPERATION_BLOCKED",
-        mode: "locked",
       }),
     })
 
@@ -477,6 +529,34 @@ describe("StripeConnectService", () => {
     expect(JSON.stringify(audit.log.mock.calls)).not.toContain(
       "business_profile.url",
     )
+  })
+
+  it("maps Stripe refresh SDK failures to the same redacted 503", async () => {
+    const { service, prisma } = makeService()
+    mockConnectedLocalIdentity(prisma)
+    jest.spyOn(stripeClient, "getStripeRecoveryClient").mockReturnValue({
+      accounts: {
+        retrieve: jest
+          .fn()
+          .mockRejectedValue(new Error("raw Stripe response body secret")),
+      },
+    } as any)
+
+    let rejection: any
+    try {
+      await service.refreshStatus("pub-1", "user-1")
+    } catch (error) {
+      rejection = error
+    }
+
+    expect(rejection).toMatchObject({ status: 503 })
+    expect(rejection.getResponse()).toMatchObject({
+      code: "STRIPE_CONNECT_UNAVAILABLE",
+    })
+    expect(JSON.stringify(rejection.getResponse())).not.toMatch(
+      /raw Stripe|response body secret/,
+    )
+    expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it("does not persist a publisher refresh when owner authority is revoked during Stripe recovery", async () => {

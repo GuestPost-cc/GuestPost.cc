@@ -7,7 +7,8 @@ import { ServiceUnavailableException } from "@nestjs/common"
 
 /**
  * Nest boundary for the shared fail-closed finance policy. Public responses
- * expose a stable code and mode, never configuration or provider secrets.
+ * expose only a stable code and actionable message, never the internal mode,
+ * requested operation, configuration, or provider secrets.
  */
 export function assertApiFinanceOperationAllowed(
   operation: FinanceOperationKind,
@@ -20,7 +21,8 @@ export function assertApiFinanceOperationAllowed(
       statusCode: 503,
       error: "Finance operation temporarily unavailable",
       code: error.code,
-      mode: error.mode,
+      message:
+        "This financial action is temporarily unavailable. Retry later or contact support.",
     })
   }
 }

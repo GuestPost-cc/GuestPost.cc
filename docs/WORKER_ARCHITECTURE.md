@@ -243,7 +243,11 @@ Required on all worker lanes:
 
 Lane-specific:
 
-- Realtime: SMTP and verification/object-storage settings used by its queues
+- Realtime: SMTP and verification/object-storage settings used by its queues;
+  production requires `OBJECT_STORAGE_PROVIDER=r2|s3` and only the matching
+  complete R2/S3 bundle. Startup must successfully read the fixed
+  `.guestpost/evidence-storage-ready-v1` sentinel before consuming delivery
+  evidence jobs.
 - On demand: integration encryption/provider settings, report settings, payout
   provider settings for inbox recovery
 - Scheduled dispatcher: the union of credentials needed by enabled maintenance
@@ -270,22 +274,27 @@ independently.
 3. Deploy the additive `PayoutWebhookEvent` migration, which also enforces
    provider-scoped transfer-reference uniqueness.
 4. Build and publish one immutable API/worker image set.
-5. Create the two Northflank jobs with the new worker image: an on-demand drain
+5. Before starting the new realtime image, set its explicit production object
+   storage provider and matching credential bundle. Give the same bundle only
+   to scheduled tasks that consume the delivery-verification queue. Pre-create
+   and verify the evidence bucket; application startup never provisions
+   production storage.
+6. Create the two Northflank jobs with the new worker image: an on-demand drain
    with a ten-minute catch-up schedule and a five-minute maintenance dispatcher.
    Keep their schedules paused until cutover.
-6. Deploy the new API. Verified payout events now accumulate durably even if no
+7. Deploy the new API. Verified payout events now accumulate durably even if no
    job is running yet.
-7. Let the old worker drain `integration-sync` and `integration-discovery`, then
+8. Let the old worker drain `integration-sync` and `integration-discovery`, then
    verify both have zero waiting/active/delayed jobs. New producers sign these
    jobs; the new worker intentionally rejects any legacy unsigned payload.
-8. Stop every old worker replica. Do not overlap worker code versions.
-9. Start the realtime service with `WORKER_MODE=realtime`; confirm the log says
+9. Stop every old worker replica. Do not overlap worker code versions.
+10. Start the realtime service with `WORKER_MODE=realtime`; confirm the log says
    four queues and legacy repeatables were removed.
-10. Run the maintenance dispatcher in a payout-reconciliation slot, then run
+11. Run the maintenance dispatcher in a payout-reconciliation slot, then run
     the on-demand job once.
-11. Enable the five-minute maintenance schedule and the on-demand job's
+12. Enable the five-minute maintenance schedule and the on-demand job's
     ten-minute catch-up schedule.
-12. Verify health, queue depth, inbox state, Redis command rate, and financial
+13. Verify health, queue depth, inbox state, Redis command rate, and financial
     reconciliation before declaring the cutover complete.
 
 The safe emergency fallback is the same new image with `WORKER_MODE=all`. It

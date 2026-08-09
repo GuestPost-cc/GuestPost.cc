@@ -22,14 +22,10 @@ const DETAIL_FIELDS: Record<LegacyPayoutMethodType, readonly string[]> = {
     "iban",
     "swift",
   ],
-  paypal: ["email"],
-  wise: ["recipientId", "currency", "targetCurrency"],
 }
 
 const REQUIRED_FIELDS: Record<LegacyPayoutMethodType, readonly string[]> = {
   bank_transfer: ["bankName", "accountHolderName", "accountNumber"],
-  paypal: ["email"],
-  wise: ["recipientId"],
 }
 
 const FIELD_LENGTHS: Record<string, readonly [number, number]> = {
@@ -39,16 +35,10 @@ const FIELD_LENGTHS: Record<string, readonly [number, number]> = {
   routingNumber: [1, 32],
   iban: [4, 34],
   swift: [8, 11],
-  email: [3, 254],
-  recipientId: [1, 191],
-  currency: [3, 3],
-  targetCurrency: [3, 3],
 }
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const SWIFT = /^[A-Za-z0-9]{8}(?:[A-Za-z0-9]{3})?$/
-const CURRENCY = /^[A-Z]{3}$/
 
 function invalid(message: string): never {
   throw new BadRequestException({
@@ -139,16 +129,8 @@ export function normalizePayoutMethodInput(
     }
   }
 
-  if (details.email && !EMAIL.test(details.email)) {
-    invalid("Payout method email is invalid")
-  }
   if (details.swift && !SWIFT.test(details.swift)) {
     invalid("Payout method swift has an invalid format")
-  }
-  for (const field of ["currency", "targetCurrency"] as const) {
-    if (details[field] && !CURRENCY.test(details[field])) {
-      invalid(`Payout method ${field} must be an uppercase ISO currency code`)
-    }
   }
 
   return {

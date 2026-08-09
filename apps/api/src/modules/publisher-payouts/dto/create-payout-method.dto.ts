@@ -1,7 +1,6 @@
 import { Type } from "class-transformer"
 import {
   IsBoolean,
-  IsEmail,
   IsIn,
   IsObject,
   IsOptional,
@@ -12,11 +11,7 @@ import {
   ValidateNested,
 } from "class-validator"
 
-export const LEGACY_PAYOUT_METHOD_TYPES = [
-  "bank_transfer",
-  "paypal",
-  "wise",
-] as const
+export const LEGACY_PAYOUT_METHOD_TYPES = ["bank_transfer"] as const
 
 export class PayoutMethodDetailsDto {
   @IsOptional()
@@ -53,27 +48,6 @@ export class PayoutMethodDetailsDto {
   @IsString()
   @Matches(/^[A-Za-z0-9]{8}(?:[A-Za-z0-9]{3})?$/)
   swift?: string
-
-  @IsOptional()
-  @IsEmail()
-  @MaxLength(254)
-  email?: string
-
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(191)
-  recipientId?: string
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^[A-Z]{3}$/)
-  currency?: string
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^[A-Z]{3}$/)
-  targetCurrency?: string
 }
 
 export class CreatePayoutMethodDto {

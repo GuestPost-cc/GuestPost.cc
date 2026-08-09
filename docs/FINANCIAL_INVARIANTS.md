@@ -281,6 +281,25 @@ A wallet credit requires all of:
 
 Redirects and checkout-session creation do not authorize a credit.
 
+The authenticated deposit-capability read is advisory only. New Checkout
+creation requires the explicit deposit feature gate, normal finance mode, an
+owned canonical USD wallet, and the same server-side checks in the command.
+An explicit client idempotency key is never truncated: it must match the
+bounded safe-key grammar or the command is rejected. Initial lookup,
+post-unique-conflict reread, attachment races, and provider-failure races all
+compare the exact actor, tenant, wallet, amount, wallet credit, zero-fee
+snapshot, method, provider, currency, and empty pre-credit linkage.
+
+A Stripe Checkout create or retrieval response is reduced to bounded facts and
+accepted only when its object/session identity, client reference, metadata,
+wallet, actor, organization, amount, USD currency, payment mode, credential
+environment, expiry, and trusted HTTPS Checkout host match that immutable
+attempt. An open URL is returned only after this comparison. Provider and
+database diagnostics never cross the adapter boundary: pre-checkout failures
+persist only a categorical `failureCode`, and a failed evidence write or an
+unproven CAS successor returns a stable unavailable response without moving
+money.
+
 Every signed payment-provider event first commits to the durable inbox as
 `PENDING` (or, when the signed envelope is malformed, terminal
 `QUARANTINED`). Provider identity, event type, object identity, normalized
@@ -615,6 +634,25 @@ Every update increments `version` by exactly one.
   current publisher-owner/user/publisher rows are locked and revalidated in
   the same serializable transaction as encryption, default-method
   serialization, creation, and audit.
+- The certified new-withdrawal method set is code-owned and closed: manual
+  `bank_transfer` while that rollout is enabled, or a fully ready
+  `stripe_connect` method bound to the same publisher's active USD provider
+  account. PayPal and Wise rows are legacy lifecycle records only: they may be
+  listed for support visibility and disabled, but cannot be created,
+  reactivated, selected, or used for a new reservation. A previously
+  committed command may be returned only as an exact idempotent replay; replay
+  never creates new liability or provider work.
+- Method lists expose a server-computed eligibility result. Publisher clients
+  select only active, certified methods carrying affirmative executable
+  eligibility. A failed method query, failed provider-status query, paused
+  finance mode, disabled rollout, provider-binding mismatch, incomplete
+  provider readiness, non-USD provider currency, positive publisher debt, or
+  absent destination is a non-submittable state. The request, approval, and
+  external-send claim transactions re-lock and re-evaluate the same canonical
+  predicate; UI state is never authority. A disabled route may still expose a
+  narrowly scoped recovery operation only for an existing durable send claim,
+  with its original idempotency key, lease, amount, currency, and routing
+  evidence; the recovery client is not available to new-send commands.
 - Evidence-backed payout cancellation returns the existing reserved
   withdrawal to `APPROVED`; it does not release allocations or restore the
   balance again. Generic failed-withdrawal reversal remains disabled.

@@ -32,6 +32,36 @@ pm2 save && pm2 startup   # survive server reboot
 Both processes fail fast on boot if Postgres/Redis are unreachable or
 required env vars are missing — pm2 restarts them with backoff.
 
+## Delivery evidence object storage
+
+Production must set `OBJECT_STORAGE_PROVIDER` explicitly to `r2` or `s3`.
+R2 requires `R2_ACCOUNT_ID`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, and
+`R2_SECRET_ACCESS_KEY`. S3 requires `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY`,
+and `S3_SECRET_KEY`; `S3_ENDPOINT` is optional for AWS and must be HTTPS when
+set. `R2_ACCOUNT_ID` must be the 32-hex account ID and `R2_ENDPOINT` must equal
+`https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`; custom or cross-account
+hosts are rejected. The selected provider's bucket is operator-created and
+retained for legal and dispute evidence.
+
+Provision `.guestpost/evidence-storage-ready-v1` in that bucket before rollout
+and retain it. The API and storage-capable worker lanes perform a bounded,
+read-only `HeadObject` against it before accepting work. A missing object,
+unreachable endpoint, or insufficient read permission fails startup. The
+application never creates or deletes production buckets or this sentinel.
+`HeadObject` does not prove that the runtime role can persist new evidence.
+Before opening delivery or Finance lanes in staging or production, use the
+exact runtime credentials for an audited upload-and-retrieve canary, verify the
+retrieved checksum, and remove only that canary object according to the
+retention policy. A failed write/read canary blocks rollout even when startup
+readiness is green.
+
+The API and every worker lane that can consume delivery-verification jobs need
+the selected bundle. On the hybrid worker layout, that means `realtime` and
+legacy `all`, plus the `settlement-link-check` and
+`delivery-verification-dispatch` scheduled tasks. Do not grant these credentials
+to unrelated on-demand or scheduled lanes. Update secret storage before
+rolling out an image that requires a new provider selector.
+
 ## Backups
 
 ### Nightly dump

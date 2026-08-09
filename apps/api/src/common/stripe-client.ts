@@ -47,15 +47,11 @@ export function isStripeFeatureEnabled(feature: StripeFeature): boolean {
     feature === "deposits"
       ? "STRIPE_DEPOSITS_ENABLED"
       : "STRIPE_CONNECT_ENABLED"
-  if (process.env[key] != null) return enabled(process.env[key])
-
-  // Production—including staging deployments that run production builds—is
-  // fail-closed. Local development keeps the historical key-driven behavior.
-  return (
-    feature === "deposits" &&
-    process.env.NODE_ENV === "development" &&
-    Boolean(process.env.STRIPE_SECRET_KEY)
-  )
+  // Every environment is explicit. In particular, a stale or expired local
+  // key must not silently turn on a money-moving UI merely because it has a
+  // Stripe-looking prefix. The key and webhook configuration are validated
+  // separately when the feature is deliberately enabled.
+  return enabled(process.env[key])
 }
 
 export function stripeKeyMode(): StripeKeyMode {

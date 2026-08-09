@@ -103,7 +103,24 @@ export interface PayoutProviderAdapter {
 
   createTransfer(params: CreateTransferParams): Promise<CreateTransferResult>
 
+  /**
+   * Replay an already-durable, exact provider-send claim with its original
+   * idempotency key. This path may remain available while new sends are
+   * disabled, so callers must never use it for an unclaimed command.
+   */
+  recoverClaimedTransfer?(
+    params: CreateTransferParams,
+  ): Promise<CreateTransferResult>
+
   createBankPayout?(
+    params: CreateBankPayoutParams,
+  ): Promise<CreateBankPayoutResult>
+
+  /**
+   * Replay an already-durable, exact bank-payout claim with its original
+   * idempotency key. This is recovery-only and must not bypass new-send gates.
+   */
+  recoverClaimedBankPayout?(
     params: CreateBankPayoutParams,
   ): Promise<CreateBankPayoutResult>
 
