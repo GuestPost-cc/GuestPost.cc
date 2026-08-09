@@ -214,4 +214,19 @@ export class DeliveriesController {
       body.reason,
     )
   }
+
+  @Post("fraud-flags/:id/resolve")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  resolveFraudFlag(
+    @Param("id") id: string,
+    @Body("reason") reason: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.intervention.resolveFraudFlag(
+      id,
+      user.id,
+      this.role(user),
+      reason,
+    )
+  }
 }

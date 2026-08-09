@@ -11,6 +11,7 @@ import {
   Controller,
   Delete,
   Get,
+  GoneException,
   Header,
   Param,
   ParseEnumPipe,
@@ -29,6 +30,7 @@ import { Request, Response } from "express"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { Permissions } from "../../common/decorators/permissions.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
+import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
 import { PermissionsGuard } from "../../common/guards/permissions.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
 import {
@@ -50,6 +52,7 @@ import { OrderDisputeService } from "../orders/services/order-dispute.service"
 import { OrderOperationsService } from "../orders/services/order-operations.service"
 import { OrderReviewService } from "../orders/services/order-review.service"
 import { DecryptPayoutMethodDto } from "../publisher-payouts/dto/decrypt-payout-method.dto"
+import { RejectWithdrawalDto } from "../publisher-payouts/dto/reject-withdrawal.dto"
 import { PayoutExecutionService } from "../publisher-payouts/payout-execution.service"
 import { PublisherPayoutsService } from "../publisher-payouts/publisher-payouts.service"
 import { SettlementReasonDto } from "../settlements/dto/settlement-reason.dto"
@@ -64,10 +67,10 @@ import {
   CreateStaffDto,
   ExecuteWithdrawalDto,
   ForceVerifyWebsitesDto,
-  ManualVerifyDto,
   MarkPlatformPublishedDto,
   MarkVerifiedDto,
   PauseWebsiteDto,
+  PayoutOperatorReasonDto,
   PreviewWebsiteImportDto,
   ReassignWebsiteDto,
   RejectVerificationDto,
@@ -458,11 +461,19 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   manualVerify(
     @Param("id") id: string,
-    @Body() body: ManualVerifyDto,
+    @Body() body: MarkVerifiedDto,
     @CurrentUser() user: any,
   ) {
-    const method = body.method
-    return this.admin.manualVerify(id, method, user.id)
+    // Compatibility alias for older admin clients. Route every manual
+    // verification through the evidence-bearing delivery-version workflow;
+    // mutating Order.status alone can never satisfy settlement eligibility.
+    return this.verificationQueue.markVerified(
+      id,
+      user.id,
+      user.staffRole,
+      body.reason,
+      body.notes,
+    )
   }
 
   // ── Verification queue ────────────────────────────────────────────────────
@@ -551,6 +562,7 @@ export class AdminController {
     @Body() body: ResolveDisputeDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.dispute.resolveDispute(
       id,
       user.id,
@@ -568,6 +580,7 @@ export class AdminController {
     @Body() body: ForceCancelOrderDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.cancellation.forceCancel(id, user.id, body)
   }
 
@@ -603,6 +616,7 @@ export class AdminController {
     @Body() body: FinanceApproveCancellationDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.cancellation.financeApprove(id, user.id, body)
   }
 
@@ -613,6 +627,7 @@ export class AdminController {
     @Body() body: CancelOrderDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.cancellation.decline(id, staffCancellationActor(user), body)
   }
 
@@ -632,6 +647,7 @@ export class AdminController {
     @Body() body: CreateCancellationRequestDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.cancellation.createRequest(
       id,
       staffCancellationActor(user),
@@ -647,6 +663,7 @@ export class AdminController {
     @Body() body: RespondCancellationRequestDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.cancellation.respond(
       orderId,
       requestId,
@@ -765,6 +782,7 @@ export class AdminController {
     @Param("orderId") orderId: string,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("new_liability")
     // Staff have no organization context — service resolves org from the order
     return this.settlements.createSettlement(orderId, null, user.id)
   }
@@ -776,6 +794,7 @@ export class AdminController {
     @Body() body: SettlementReasonDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.settlements.adminApprove(
       id,
       body.reason,
@@ -791,6 +810,7 @@ export class AdminController {
     @Body() body: SettlementReasonDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.settlements.forceApprove(
       id,
       body.reason,
@@ -806,6 +826,7 @@ export class AdminController {
     @Body() body: SettlementReasonDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.settlements.cancelSettlement(id, user.id, body.reason)
   }
 
@@ -846,19 +867,37 @@ export class AdminController {
 
   @Patch("withdrawals/:id/mark-paid")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  markWithdrawalPaid(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.payouts.markWithdrawalPaid(id, user.id)
+  markWithdrawalPaid(@Param("id") _id: string): never {
+    throw new GoneException({
+      code: "LEGACY_MARK_PAID_RETIRED",
+      message:
+        "Generic Mark Paid is retired. Complete an existing manual payout execution with bank evidence.",
+    })
   }
 
   @Patch("withdrawals/:id/reject")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  rejectWithdrawal(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.payouts.rejectWithdrawal(id, user.id)
+  rejectWithdrawal(
+    @Param("id") id: string,
+    @Body() body: RejectWithdrawalDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.payouts.rejectWithdrawal(id, user.id, body.reason)
   }
 
-  // FAILED -> REVERSED: returns trapped funds to the publisher's withdrawable
-  // balance after a hard provider failure. Refuses while any execution is
-  // COMPLETED/PROCESSING (money may have moved).
+  @Patch("withdrawals/:id/abandon")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  abandonApprovedWithdrawal(
+    @Param("id") id: string,
+    @Body() body: RejectWithdrawalDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.payouts.abandonApprovedWithdrawal(id, user.id, body.reason)
+  }
+
+  // Compatibility endpoint only. Liability restoration remains fail-closed
+  // until a provider-confirmed failure/cancellation transition can be checked
+  // and persisted atomically; the service performs no balance mutation here.
   @Post("withdrawals/:id/reverse")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   reverseFailedWithdrawal(
@@ -886,6 +925,7 @@ export class AdminController {
       id,
       body.providerName,
       user.id,
+      body.reason,
     )
   }
 
@@ -897,14 +937,22 @@ export class AdminController {
 
   @Post("payout-executions/:id/retry")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  retryPayoutExecution(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.payoutExecution.retryExecution(id, user.id)
+  retryPayoutExecution(
+    @Param("id") id: string,
+    @Body() body: PayoutOperatorReasonDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.payoutExecution.retryExecution(id, user.id, body.reason)
   }
 
   @Post("payout-executions/:id/cancel")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  cancelPayoutExecution(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.payoutExecution.cancelExecution(id, user.id)
+  cancelPayoutExecution(
+    @Param("id") id: string,
+    @Body() body: PayoutOperatorReasonDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.payoutExecution.cancelExecution(id, user.id, body.reason)
   }
 
   // FIN-06: source IP + User-Agent for the decrypt audit event MUST come
@@ -992,6 +1040,7 @@ export class AdminController {
     @Body() body: UpdatePlatformFeeDto,
     @CurrentUser() user: any,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     return this.admin.updatePlatformFee(body.platformFeePct, body.reason, {
       id: user.id,
     })

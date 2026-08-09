@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from "@nestjs/common"
+import { invalidateAuthContext } from "../../../common/auth-context-cache"
 import { AdminService } from "../admin.service"
 
 jest.mock("@better-auth/utils/password", () => ({
@@ -19,6 +20,7 @@ describe("AdminService staff management", () => {
   let audit: any
 
   beforeEach(() => {
+    jest.clearAllMocks()
     audit = { log: jest.fn().mockResolvedValue(undefined) }
     prisma = {
       user: {
@@ -34,12 +36,29 @@ describe("AdminService staff management", () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      membership: {
+        count: jest.fn(),
+        findFirst: jest.fn(),
+        findFirstOrThrow: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      organization: { create: jest.fn() },
+      publisher: { create: jest.fn() },
+      publisherMembership: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
       fulfillmentAssignment: { findMany: jest.fn(), count: jest.fn() },
       auditLog: { findMany: jest.fn(), groupBy: jest.fn() },
       settlementApproval: { findMany: jest.fn() },
       withdrawal: { findMany: jest.fn() },
       session: { deleteMany: jest.fn() },
-      $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "organization-1" }]),
+      $transaction: jest
+        .fn()
+        .mockImplementation(async (callback: any) => callback(prisma)),
     }
     service = new AdminService(prisma, audit, {} as any)
   })
@@ -99,10 +118,8 @@ describe("AdminService staff management", () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "admin-1",
       userType: "STAFF",
-    })
-    prisma.staffMembership.findUnique.mockResolvedValue({
-      id: "membership-1",
-      role: "SUPER_ADMIN",
+      banned: false,
+      staffMemberships: [{ id: "membership-1", role: "SUPER_ADMIN" }],
     })
 
     await expect(
@@ -114,16 +131,97 @@ describe("AdminService staff management", () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "admin-1",
       userType: "STAFF",
-    })
-    prisma.staffMembership.findUnique.mockResolvedValue({
-      id: "membership-1",
-      role: "SUPER_ADMIN",
+      banned: false,
+      staffMemberships: [{ id: "membership-1", role: "SUPER_ADMIN" }],
     })
     prisma.user.count.mockResolvedValue(1)
 
     await expect(
       service.updateStaffRole("admin-1", "FINANCE", { id: "admin-2" }),
     ).rejects.toThrow(ConflictException)
+    expect(prisma.staffMembership.update).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
+  })
+
+  it("locks, rechecks, mutates, and audits a staff demotion atomically", async () => {
+    const existing = { id: "membership-1", role: "SUPER_ADMIN" }
+    const updated = { ...existing, role: "FINANCE" }
+    prisma.user.findUnique.mockResolvedValue({
+      id: "admin-1",
+      userType: "STAFF",
+      banned: false,
+      staffMemberships: [existing],
+    })
+    prisma.user.count.mockResolvedValue(2)
+    prisma.staffMembership.update.mockResolvedValue(updated)
+
+    await expect(
+      service.updateStaffRole("admin-1", "FINANCE", { id: "admin-2" }),
+    ).resolves.toEqual(updated)
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    })
+    expect(prisma.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      prisma.user.findUnique.mock.invocationCallOrder[0],
+    )
+    expect(prisma.staffMembership.update).toHaveBeenCalledWith({
+      where: { id: "membership-1" },
+      data: { role: "FINANCE" },
+    })
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "STAFF_ROLE_UPDATE" }),
+      prisma,
+    )
+    expect(invalidateAuthContext).toHaveBeenCalledWith("admin-1")
+    expect(audit.log.mock.invocationCallOrder[0]).toBeLessThan(
+      (invalidateAuthContext as jest.Mock).mock.invocationCallOrder[0],
+    )
+  })
+
+  it("does not invalidate staff authority when the atomic audit fails", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "admin-1",
+      userType: "STAFF",
+      banned: false,
+      staffMemberships: [{ id: "membership-1", role: "SUPER_ADMIN" }],
+    })
+    prisma.user.count.mockResolvedValue(2)
+    prisma.staffMembership.update.mockResolvedValue({
+      id: "membership-1",
+      role: "FINANCE",
+    })
+    audit.log.mockRejectedValue(new Error("audit unavailable"))
+
+    await expect(
+      service.updateStaffRole("admin-1", "FINANCE", { id: "admin-2" }),
+    ).rejects.toThrow("audit unavailable")
+
+    expect(audit.log).toHaveBeenCalledWith(expect.any(Object), prisma)
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
+  })
+
+  it("maps exhausted staff-role serialization retries to a stable conflict", async () => {
+    prisma.$transaction.mockRejectedValue({
+      code: "P2010",
+      meta: {
+        driverAdapterError: { cause: { originalCode: "40001" } },
+      },
+    })
+
+    await expect(
+      service.updateStaffRole("admin-1", "FINANCE", { id: "admin-2" }),
+    ).rejects.toMatchObject({
+      response: {
+        message:
+          "Staff role changed concurrently. Review the latest state and try again.",
+        statusCode: 409,
+      },
+    })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3)
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
   })
 
   it("prevents suspending Operations staff with active assignments", async () => {
@@ -201,6 +299,37 @@ describe("AdminService staff management", () => {
       }),
       prisma,
     )
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    })
+  })
+
+  it("maps exhausted suspension serialization retries to a stable conflict", async () => {
+    prisma.$transaction.mockRejectedValue({
+      code: "P2010",
+      meta: {
+        driverAdapterError: { cause: { originalCode: "40001" } },
+      },
+    })
+
+    await expect(
+      service.suspendUser(
+        "admin-1",
+        {
+          reasonCode: "STAFF_ACCESS_REMOVAL",
+          internalNote: "Concurrent security review",
+        },
+        { id: "admin-2" },
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        message:
+          "Account access changed concurrently. Review the latest status and try again.",
+        statusCode: 409,
+      },
+    })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3)
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
   })
 
   it("restores access without recreating revoked sessions", async () => {
@@ -277,6 +406,198 @@ describe("AdminService staff management", () => {
     await expect(
       service.updateUserRole("publisher-1", "OWNER", { id: "admin-1" }),
     ).rejects.toThrow(BadRequestException)
+  })
+
+  it("maps pg-adapter wrapped serialization exhaustion to a stable conflict", async () => {
+    prisma.$transaction.mockRejectedValue({
+      code: "P2010",
+      meta: {
+        driverAdapterError: { cause: { originalCode: "40001" } },
+      },
+    })
+
+    await expect(
+      service.updateUserRole("customer-1", "OWNER", { id: "admin-1" }),
+    ).rejects.toThrow(ConflictException)
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
+  })
+
+  it("refuses to demote the last active organization owner", async () => {
+    const membership = {
+      id: "membership-1",
+      userId: "customer-1",
+      organizationId: "organization-1",
+      role: "OWNER",
+      status: "ACTIVE",
+    }
+    prisma.user.findUnique.mockResolvedValue({
+      id: "customer-1",
+      email: "customer@example.com",
+      userType: "CUSTOMER",
+    })
+    prisma.membership.findFirst.mockResolvedValue(membership)
+    prisma.membership.findUnique.mockResolvedValue(membership)
+    prisma.membership.count.mockResolvedValue(1)
+
+    await expect(
+      service.updateUserRole("customer-1", "MEMBER", { id: "admin-1" }),
+    ).rejects.toThrow(ConflictException)
+
+    expect(prisma.membership.count).toHaveBeenCalledWith({
+      where: {
+        organizationId: "organization-1",
+        role: "OWNER",
+        status: "ACTIVE",
+      },
+    })
+    expect(prisma.membership.update).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
+  })
+
+  it("demotes an owner when another active owner remains", async () => {
+    const membership = {
+      id: "membership-1",
+      userId: "customer-1",
+      organizationId: "organization-1",
+      role: "OWNER",
+      status: "ACTIVE",
+    }
+    const demoted = { ...membership, role: "MEMBER" }
+    prisma.user.findUnique.mockResolvedValue({
+      id: "customer-1",
+      email: "customer@example.com",
+      userType: "CUSTOMER",
+    })
+    prisma.membership.findFirst.mockResolvedValue(membership)
+    prisma.membership.findUnique.mockResolvedValue(membership)
+    prisma.membership.count.mockResolvedValue(2)
+    prisma.membership.update.mockResolvedValue(demoted)
+
+    await expect(
+      service.updateUserRole("customer-1", "MEMBER", { id: "admin-1" }),
+    ).resolves.toEqual(demoted)
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    })
+    expect(prisma.membership.update).toHaveBeenCalledWith({
+      where: { id: "membership-1" },
+      data: { role: "MEMBER" },
+    })
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "CUSTOMER_ROLE_UPDATE",
+        organizationId: "organization-1",
+      }),
+      prisma,
+    )
+    expect(invalidateAuthContext).toHaveBeenCalledWith("customer-1")
+  })
+
+  it("creates a first customer organization and its audit atomically", async () => {
+    const membership = {
+      id: "membership-1",
+      userId: "customer-1",
+      organizationId: "organization-1",
+      role: "OWNER",
+      status: "ACTIVE",
+    }
+    prisma.user.findUnique.mockResolvedValue({
+      id: "customer-1",
+      email: "customer@example.com",
+      userType: "CUSTOMER",
+    })
+    prisma.membership.findFirst.mockResolvedValue(null)
+    prisma.organization.create.mockResolvedValue({ id: "organization-1" })
+    prisma.membership.findFirstOrThrow.mockResolvedValue(membership)
+
+    await expect(
+      service.updateUserRole("customer-1", "MEMBER", { id: "admin-1" }),
+    ).resolves.toEqual(membership)
+
+    expect(prisma.organization.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        memberships: { create: { userId: "customer-1", role: "OWNER" } },
+      }),
+    })
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "CUSTOMER_ROLE_UPDATE",
+        metadata: expect.objectContaining({
+          newRole: "OWNER",
+          requestedRole: "MEMBER",
+        }),
+      }),
+      prisma,
+    )
+  })
+
+  it("does not invalidate authorization when the atomic customer audit fails", async () => {
+    const membership = {
+      id: "membership-1",
+      userId: "customer-1",
+      organizationId: "organization-1",
+      role: "OWNER",
+      status: "ACTIVE",
+    }
+    prisma.user.findUnique.mockResolvedValue({
+      id: "customer-1",
+      email: "customer@example.com",
+      userType: "CUSTOMER",
+    })
+    prisma.membership.findFirst.mockResolvedValue(membership)
+    prisma.membership.findUnique.mockResolvedValue(membership)
+    prisma.membership.count.mockResolvedValue(2)
+    prisma.membership.update.mockResolvedValue({
+      ...membership,
+      role: "MEMBER",
+    })
+    audit.log.mockRejectedValue(new Error("audit unavailable"))
+
+    await expect(
+      service.updateUserRole("customer-1", "MEMBER", { id: "admin-1" }),
+    ).rejects.toThrow("audit unavailable")
+
+    expect(audit.log).toHaveBeenCalledWith(expect.any(Object), prisma)
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
+  })
+
+  it("creates a publisher identity and its audit in one user-locked transaction", async () => {
+    const publisherMembership = {
+      id: "publisher-membership-1",
+      userId: "publisher-1",
+      publisherId: "publisher-entity-1",
+      role: "PUBLISHER_OWNER",
+    }
+    prisma.user.findUnique.mockResolvedValue({
+      id: "publisher-1",
+      email: "publisher@example.com",
+      name: "Publisher",
+      userType: "PUBLISHER",
+    })
+    prisma.publisherMembership.findFirst.mockResolvedValue(null)
+    prisma.membership.findFirst.mockResolvedValue(null)
+    prisma.organization.create.mockResolvedValue({ id: "organization-1" })
+    prisma.publisher.create.mockResolvedValue({ id: "publisher-entity-1" })
+    prisma.publisherMembership.create.mockResolvedValue(publisherMembership)
+
+    await expect(
+      service.updateUserRole("publisher-1", "PUBLISHER_OWNER", {
+        id: "admin-1",
+      }),
+    ).resolves.toEqual(publisherMembership)
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    })
+    expect(prisma.publisher.create).toHaveBeenCalledTimes(1)
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "PUBLISHER_ROLE_UPDATE" }),
+      prisma,
+    )
+    expect(invalidateAuthContext).toHaveBeenCalledWith("publisher-1")
   })
 
   it("reports Operations sales and Finance handled volume separately", async () => {

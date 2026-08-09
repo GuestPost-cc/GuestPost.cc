@@ -1,5 +1,10 @@
 "use client"
 
+import { payoutErrorPresentation } from "@guestpost/api-client"
+import {
+  type CertifiedWithdrawalMethodType,
+  selectExecutablePayoutMethods,
+} from "@guestpost/shared"
 import {
   Badge,
   Button,
@@ -37,7 +42,7 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -94,7 +99,11 @@ export default function WithdrawalsPage() {
   const [showRequestDialog, setShowRequestDialog] = useState(false)
 
   const requestSchema = z.object({
-    amount: z.coerce.number().positive("Amount must be positive"),
+    amount: z.coerce
+      .number()
+      .min(1, "Amount must be at least $1")
+      .max(1_000_000, "Amount is too large")
+      .multipleOf(0.01, "Use no more than two decimal places"),
   })
 
   type RequestFormInput = z.input<typeof requestSchema>
@@ -132,20 +141,40 @@ export default function WithdrawalsPage() {
   })
   const withdrawals = withdrawalsRaw?.items ?? []
 
-  const { data: payoutMethods } = useQuery({
+  const {
+    data: payoutMethodsRaw,
+    isLoading: payoutMethodsLoading,
+    error: payoutMethodsError,
+    refetch: refetchPayoutMethods,
+  } = useQuery({
     queryKey: ["payout-methods"],
     queryFn: () => api.publisherPayouts.listPayoutMethods(),
   })
+  const payoutMethods = selectExecutablePayoutMethods(payoutMethodsRaw)
+  const payoutMethodsFailure = payoutMethodsError
+    ? payoutErrorPresentation(
+        payoutMethodsError,
+        "Payout methods could not be verified.",
+      )
+    : null
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
   const defaultMethod =
     payoutMethods?.find((m) => m.isDefault) ?? payoutMethods?.[0]
-  const activeMethodId = selectedMethodId ?? defaultMethod?.id
+  const selectedMethod = payoutMethods?.find(
+    (method) => method.id === selectedMethodId,
+  )
+  const activeMethod = selectedMethod ?? defaultMethod
+  const activeMethodId = activeMethod?.id
+  const idempotencyRef = useRef<{
+    fingerprint: string
+    key: string
+  } | null>(null)
 
   const requestMutation = useMutation({
     mutationFn: (data: {
       amount: number
-      payoutMethodId?: string
-      method: string
+      payoutMethodId: string
+      method: CertifiedWithdrawalMethodType
       idempotencyKey: string
     }) => api.publisherPayouts.requestWithdrawal(data),
     onSuccess: (withdrawal) => {
@@ -154,29 +183,89 @@ export default function WithdrawalsPage() {
       )
       setShowRequestDialog(false)
       reset()
+      idempotencyRef.current = null
       refetch()
       refetchWithdrawals()
     },
-    onError: (err: any) => {
-      toast.error(err?.message ?? "Failed to request withdrawal")
+    onError: (error: unknown) => {
+      const presentation = payoutErrorPresentation(
+        error,
+        "Failed to request withdrawal",
+      )
+      toast.error(presentation.message, {
+        description: presentation.requestId
+          ? `Request ID: ${presentation.requestId}`
+          : undefined,
+      })
     },
   })
 
   const handleRequest = (data: RequestFormData) => {
+    if (payoutMethodsLoading || payoutMethodsError) {
+      toast.error(
+        "Payout eligibility could not be verified. Retry loading payout methods before submitting.",
+      )
+      return
+    }
+    if (balance && Number(balance.debtBalance) > 0) {
+      toast.error(
+        "Withdrawals are unavailable while outstanding publisher debt remains. Future settlements must repay it first.",
+      )
+      return
+    }
     if (balance && data.amount > balance.withdrawableBalance) {
       toast.error("Amount exceeds withdrawable balance")
       return
     }
-    const method = payoutMethods?.find((m) => m.id === activeMethodId)
+    if (!activeMethod) {
+      toast.error("Select an active payout method")
+      return
+    }
+    const fingerprint = [
+      data.amount.toFixed(2),
+      activeMethod.id,
+      activeMethod.type,
+    ].join(":")
+    if (idempotencyRef.current?.fingerprint !== fingerprint) {
+      idempotencyRef.current = {
+        fingerprint,
+        key: crypto.randomUUID(),
+      }
+    }
     requestMutation.mutate({
       amount: data.amount,
-      payoutMethodId: activeMethodId ?? undefined,
-      method: method?.type ?? "bank_transfer",
-      idempotencyKey: crypto.randomUUID(),
+      payoutMethodId: activeMethod.id,
+      method: activeMethod.type,
+      idempotencyKey: idempotencyRef.current.key,
     })
   }
 
   const withdrawableAmount = balance ? Number(balance.withdrawableBalance) : 0
+  const debtAmount = balance ? Number(balance.debtBalance) : 0
+  const withdrawalBlockedReason = isLoading
+    ? "Checking your withdrawable balance…"
+    : payoutMethodsLoading
+      ? "Checking your eligible payout methods…"
+      : payoutMethodsError
+        ? `${payoutMethodsFailure?.message ?? "Payout methods could not be verified."} Retry before requesting a withdrawal.${
+            payoutMethodsFailure?.requestId
+              ? ` Request ID: ${payoutMethodsFailure.requestId}`
+              : ""
+          }`
+        : debtAmount > 0
+          ? "Withdrawals are unavailable while outstanding publisher debt remains. Future settlements must repay it first."
+          : withdrawableAmount < 1
+            ? "No withdrawable balance is currently available."
+            : payoutMethods.length === 0
+              ? "No active, executable payout method is available. Complete or review payout setup first."
+              : null
+  const canRequestWithdrawal =
+    !isLoading &&
+    !payoutMethodsLoading &&
+    !payoutMethodsError &&
+    debtAmount <= 0 &&
+    payoutMethods.length > 0 &&
+    withdrawableAmount >= 1
 
   const withdrawError = error ?? withdrawalsError
   if (withdrawError)
@@ -201,16 +290,52 @@ export default function WithdrawalsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => refetch()}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              void refetch()
+              void refetchWithdrawals()
+              void refetchPayoutMethods()
+            }}
+          >
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Button onClick={() => setShowRequestDialog(true)}>
+          <Button
+            onClick={() => setShowRequestDialog(true)}
+            disabled={!canRequestWithdrawal}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Request Withdrawal
           </Button>
         </div>
       </div>
+
+      {withdrawalBlockedReason ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-4 text-sm">
+          <p className="text-muted-foreground">{withdrawalBlockedReason}</p>
+          {payoutMethodsError ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void refetchPayoutMethods()}
+            >
+              Retry payout methods
+            </Button>
+          ) : payoutMethods.length === 0 &&
+            !payoutMethodsLoading &&
+            debtAmount <= 0 &&
+            withdrawableAmount >= 1 ? (
+            <a
+              href="/dashboard/payout-methods"
+              className="font-medium underline"
+            >
+              Review payout setup
+            </a>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -406,16 +531,39 @@ export default function WithdrawalsPage() {
             </div>
             <div className="space-y-2">
               <Label>Payout Method</Label>
-              {!payoutMethods || payoutMethods.length === 0 ? (
+              {payoutMethodsLoading ? (
                 <p className="text-sm text-muted-foreground">
-                  No payout method on file — add one under{" "}
+                  Checking eligible payout methods…
+                </p>
+              ) : payoutMethodsError ? (
+                <div className="space-y-2 text-sm text-destructive">
+                  <p>
+                    {payoutMethodsFailure?.message ??
+                      "Payout methods could not be verified."}{" "}
+                    A withdrawal cannot be submitted safely.
+                    {payoutMethodsFailure?.requestId
+                      ? ` Request ID: ${payoutMethodsFailure.requestId}`
+                      : ""}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void refetchPayoutMethods()}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : payoutMethods.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No active, executable payout method is available. Review{" "}
                   <a
                     href="/dashboard/payout-methods"
                     className="underline text-foreground"
                   >
                     Payout Methods
                   </a>{" "}
-                  first.
+                  before requesting a withdrawal.
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -466,7 +614,11 @@ export default function WithdrawalsPage() {
             </Button>
             <Button
               onClick={handleFormSubmit(handleRequest)}
-              disabled={requestMutation.isPending || !activeMethodId}
+              disabled={
+                requestMutation.isPending ||
+                !canRequestWithdrawal ||
+                !activeMethodId
+              }
             >
               {requestMutation.isPending
                 ? "Processing..."

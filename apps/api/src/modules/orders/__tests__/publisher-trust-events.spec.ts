@@ -193,12 +193,13 @@ describe("runDeliveryLinkRecheck emits trust events", () => {
     organizationId: "org1",
     customerId: "c1",
     websiteId: "w1",
+    activeDeliveryVersionId: "v1",
     targetUrl: "https://client.com/p",
     anchorText: "anchor",
     website: { url: "https://blog.com", publisherId: "pub1" },
   }
   function prismaFor(status: string, hasFlag = false) {
-    return {
+    const prisma: any = {
       orderDeliveryVersion: {
         findUnique: jest.fn().mockResolvedValue({
           id: "v1",
@@ -215,13 +216,24 @@ describe("runDeliveryLinkRecheck emits trust events", () => {
         findFirst: jest.fn().mockResolvedValue(hasFlag ? { id: "f1" } : null),
         create: jest.fn().mockResolvedValue({}),
       },
+      deliveryFraudFlagResolution: {
+        create: jest.fn().mockResolvedValue({ id: "resolution-1" }),
+      },
+      deliveryVerificationEvidence: {
+        create: jest.fn().mockResolvedValue({ id: "evidence-1" }),
+      },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       notification: { create: jest.fn().mockResolvedValue({}) },
       publisherMembership: { findMany: jest.fn().mockResolvedValue([]) },
       staffMembership: {
         findMany: jest.fn().mockResolvedValue([{ userId: "s1" }]),
       },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "o1" }]),
     }
+    prisma.$transaction = jest
+      .fn()
+      .mockImplementation(async (callback: any) => callback(prisma))
+    return prisma
   }
   const fetcher = (html: string) =>
     jest.fn().mockResolvedValue({

@@ -64,7 +64,7 @@ export class CreateWebsiteServiceDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(["USD", "EUR", "GBP"])
+  @IsIn(["USD"])
   currency?: string = "USD"
 
   @Type(() => Number)

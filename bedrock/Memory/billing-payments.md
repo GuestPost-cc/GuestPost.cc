@@ -2,50 +2,124 @@
 note_type: domain-memory
 domain: billing-payments
 project: guestpost-platform
-updated: 2026-07-16
+updated: 2026-08-03
 ---
 
 # Billing & Payments
 
-## Wallet-Based Payment System
+`docs/FINANCIAL_INVARIANTS.md` is canonical when this summary is incomplete.
 
-Pattern: **reserve → capture → release** using Stripe integration.
+## Closed-loop wallet
 
-### Transaction Types
+Customer money uses reserve, capture, and release under a locked/versioned
+`Wallet`. Every new available-balance spend enters through
+`BillingService.reserve`; captures consume only an existing owned reservation.
+The complete wallet and ledger projections are organization-owner data:
+`GET /billing/wallet` and `GET /billing/transactions` require a fresh active
+`OWNER` membership rather than only a cached customer actor type.
+Both reservation and capture lock and re-authorize the owned wallet and fail
+closed on positive open/lost uncovered dispute exposure, so a standalone
+capture cannot spend an earlier reservation after a zero-held dispute case is
+recorded.
+Order checkout locks the Order before the Wallet and validates its exact USD
+item contract before either reservation or capture. The paid transition,
+reservation, PURCHASE evidence, audit, and submission commit atomically; a
+concurrent checkout request cannot debit the same Order twice.
+The former customer wallet-withdrawal endpoint and API-client method are
+retired because they reduced an internal balance without an external return.
+A future return requires source allocation, destination policy, provider
+execution, terminal evidence, and reconciliation.
 
-`TransactionType` enum: `DEPOSIT`, `PURCHASE`, `REFUND`, `WITHDRAWAL`, `WITHDRAWAL_REVERSAL`, `SETTLEMENT_RELEASE`, `SETTLEMENT_CLAWBACK`, `DEBT_REPAYMENT`, `RESERVATION`
+Development seed funding follows the same balance/ledger parity rule. Its one
+synthetic USD deposit and wallet increment commit together under a wallet row
+lock and bounded serializable retry. Repeated or concurrent seeds use the
+unique funding reference as evidence and never increment the balance again. A
+unique collision is accepted only after a fresh locked read proves the full
+provider-free transaction shape and exact parity; conflicting evidence aborts.
+The known-password fixture command is restricted to explicit development/test
+mode, a direct loopback PostgreSQL target carrying the Compose-installed
+development sentinel, and the loopback HTTP API on port 4000. It does not
+override the runtime mode or create an environment file. Before signup, a
+loopback-only API readiness proof independently checks the API runtime mode and
+the sentinel through the API's own Prisma connection.
 
-### Concurrency
+## Stripe deposits
 
-- Version-based optimistic concurrency on `Wallet` prevents race conditions
-- In-transaction audit logging on all money paths (pool-deadlock fixed — all hot paths pass `tx` to `audit.log`)
-- `submitPayment` claims order (version-guarded DRAFT→PAID) BEFORE money moves; reserve/pay run inside same tx
-- PrismaService tuned: `connection_limit=25` + `pool_timeout=20`; transactionOptions maxWait 10s / timeout 20s
+A durable `DepositAttempt` precedes Checkout. Only a fresh signature-verified
+paid event—or a separately certified authenticated retrieval finalizer—may
+credit a wallet. Attempt, wallet, one exact `DEPOSIT` ledger row, inbox state,
+and audit commit atomically.
 
-### Stripe Integration
+Stripe Checkout creation is disabled unless `STRIPE_DEPOSITS_ENABLED=true`;
+the presence of a Stripe key never enables deposits implicitly. The
+authenticated, owner-only `GET /billing/deposit-capability` route is the
+advisory UI capability contract, while the command repeats every finance,
+wallet, provider, and currency gate. Explicit idempotency keys are never
+truncated and must be 1-191 ASCII letters, numbers, underscores, or hyphens.
+Each retry is bound to the exact actor, organization, wallet, method, provider,
+USD amount, zero-fee shape, and empty order/ledger linkage.
 
-- Wallet deposits start as Stripe Checkout Sessions. There is no direct API credit path: only a verified `checkout.session.completed` webhook credits a wallet.
-- Stripe webhooks are signature-verified from the raw body before any wallet mutation. Missing webhook configuration fails closed.
-- A deposit ledger row is keyed by the Checkout session reference and also carries `provider: "stripe"` plus the PaymentIntent in `providerRef`.
-- The database enforces provider-aware uniqueness for non-null provider references. This prevents a replay under a different Checkout session ID from double-crediting the same Stripe payment.
+Before persisting or returning a redirect, the Stripe adapter normalizes and
+verifies the Checkout object/session/PaymentIntent identity, client reference,
+metadata, USD minor amount, mode, status, expiration, and HTTPS URL. Production
+redirects are accepted only on the exact `checkout.stripe.com` host. Provider
+diagnostics are classified into a bounded `DepositFailureCode`; raw provider
+messages are never stored, logged, or returned. A failed-attempt retry clears
+failure evidence only while recreating the exact canonical pre-session shape,
+and a failed compare-and-swap is accepted only after a fresh read proves the
+exact successor state.
 
-### Money Safety
+Exact replay requires the same Checkout session, PaymentIntent, wallet, amount,
+currency, ledger row, and a wallet-credit-backed attempt. The backed statuses
+are `SUCCEEDED`, `PARTIALLY_REFUNDED`, `REFUNDED`, `DISPUTED`, and
+`CHARGEBACK`; derivative refund/dispute state does not erase the original
+credit fact. A uniqueness error is never accepted without a fresh
+post-rollback exact comparison.
 
-- `splitPlatformFee` Decimal helper (fee-by-subtraction)
-- The buyer billing page consumes the API client's `TransactionResponse` contract directly. Transaction amounts may arrive as `string | number` and are converted with `Number(...)` only at arithmetic and display boundaries; avoid narrower page-local transaction interfaces.
-- Customer Billing is an OWNER-only portal surface. The sidebar omits it for MEMBER users and the page independently fails closed on a direct member URL. Available and reserved balances come directly from `GET /billing/wallet`; reservation rows are labeled as held funds rather than duplicate spend. Dashboard and checkout expose the same authoritative balance fields without changing wallet, deposit, capture, refund, or settlement behavior.
-- `Transaction.reference @@unique` is the primary webhook idempotency key; provider-aware `providerRef` uniqueness is defence in depth.
-- Refunds are wallet-credit only (no Stripe refund-to-card yet)
-- Chargebacks reserve the still-available portion of the originating deposit, record any shortfall, and notify staff. The dispute lookups use the same Stripe provider identity as the write path.
-- Platform-fee changes use an optimistic-lock update and an audit event containing the changed field, old value, new value, and staff-supplied reason.
+Every newly accepted Stripe `PaymentProviderEvent` has immutable non-null
+`livemode`; historical rows without that fact cannot authorize a new money
+transition. Shared key classification supports both `sk_test_`/`sk_live_` and
+least-privilege `rk_test_`/`rk_live_`. Credential and event modes must match.
+Checkout-success recovery currently requires fresh signed Stripe redelivery;
+the normalized inbox alone cannot authorize a credit. In locked finance mode,
+the API persists the inbox row as `PENDING` but returns 503 so Stripe keeps
+redelivering; it acknowledges only after a recovery-capable mode can consume
+the fresh signed body.
 
-## Key Models
+## Payment disputes
 
-- `Wallet` — per-org wallet with `balance` Decimal (versioned)
-- `Transaction` — ledger row with `reference` unique constraint plus optional provider and provider reference
+Chargebacks use provider-neutral `PaymentDispute` cases keyed by
+`(provider, providerDisputeId)`. The original PaymentIntent identity belongs
+only to the deposit; hold/release/loss ledger rows use case-owned internal
+references. Case, wallet, ledger, inbox, audit, and structured shortfall
+converge in one serializable transition.
 
-## Key Files
+Spend reservation and dispute processing share `Wallet ... FOR UPDATE`.
+Positive `OPEN` or `LOST` current exposure blocks new available-balance spend
+with `409 WALLET_SPEND_BLOCKED_BY_DISPUTE`. Won/zero exposure permits spend.
+Future credits are not auto-netted against lost shortfall; that requires a
+separately reviewed recovery aggregate.
 
-- `apps/api/src/modules/billing/` — wallet, deposits, payments
-- `apps/api/src/modules/billing/__tests__/`
-- `apps/api/src/common/platform-fee.ts`
+The five-minute durable worker retries transient dispute events from immutable
+normalized facts and quarantines deterministic contradictions or exhaustion.
+
+## Runtime and release
+
+Finance runtime mode gates new liabilities, operator decisions, recovery,
+reconciliation, sends, and manual completion independently from Stripe feature
+flags. Missing/invalid production mode is `locked`; signed inbound evidence
+still persists. Provider-inbox/dispute guards require a hard-drain cutover,
+sanitized populated-clone rehearsal, validated constraints, incident queries,
+and signed Stripe staging evidence. Migration
+`20260803098000_deposit_provider_failure_evidence` makes categorical failure
+evidence mandatory for every failed attempt; all old writers must be drained
+before it lands.
+
+## Key files
+
+- `apps/api/src/modules/billing/`
+- `apps/worker/src/processors/payment-dispute.processor.ts`
+- `packages/shared/src/deposit-status.ts`
+- `packages/shared/src/payment-dispute-core.ts`
+- `packages/shared/src/stripe-key-mode.ts`
+- `docs/STRIPE_STAGING_RUNBOOK.md`

@@ -6,6 +6,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  ServiceUnavailableException,
 } from "@nestjs/common"
 import { CancellationResponseAction } from "../../dto/order-cancellation.dto"
 import { OrderCancellationService } from "../order-cancellation.service"
@@ -60,6 +61,7 @@ describe("OrderCancellationService", () => {
       },
       wallet: { findUnique: jest.fn() },
       transaction: { findFirst: jest.fn().mockResolvedValue(null) },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
       $transaction: jest
         .fn()
         .mockImplementation(async (callback: any) => callback(prisma)),
@@ -125,6 +127,12 @@ describe("OrderCancellationService", () => {
           responsibility: "CUSTOMER",
         }),
       }),
+    )
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.order.updateMany.mock.invocationCallOrder[0],
+    )
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.orderCancellationRequest.create.mock.invocationCallOrder[0],
     )
   })
 
@@ -324,6 +332,45 @@ describe("OrderCancellationService", () => {
         data: expect.objectContaining({ status: "CANCELLED" }),
       }),
     )
+  })
+
+  it("blocks reserved-wallet releases while finance is locked", async () => {
+    const previousMode = process.env.FINANCE_RUNTIME_MODE
+    process.env.FINANCE_RUNTIME_MODE = "locked"
+    prisma.order.findUnique.mockResolvedValue({
+      ...order,
+      status: "PENDING_PAYMENT",
+      paymentStatus: "PENDING",
+      version: 1,
+      cancellationRequests: [],
+    })
+
+    try {
+      await expect(
+        service.cancelNow(
+          "order-1",
+          {
+            userId: "customer-1",
+            kind: "CUSTOMER",
+            organizationId: "org-1",
+            customerRole: "MEMBER",
+          },
+          {
+            reasonCode: CancellationReasonCode.CUSTOMER_CHANGED_MIND,
+            expectedVersion: 1,
+          },
+        ),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException)
+    } finally {
+      if (previousMode === undefined) {
+        delete process.env.FINANCE_RUNTIME_MODE
+      } else {
+        process.env.FINANCE_RUNTIME_MODE = previousMode
+      }
+    }
+
+    expect(prisma.wallet.findUnique).not.toHaveBeenCalled()
+    expect(prisma.order.updateMany).not.toHaveBeenCalled()
   })
 
   it("attributes a server-verified acceptance timeout to the fulfiller", async () => {

@@ -18,15 +18,18 @@ import { prisma } from "@guestpost/database"
 import {
   QUEUE_JOBS,
   QUEUES,
+  resolveFinanceRuntimeMode,
   resolveOrderCancellationConfig,
 } from "@guestpost/shared"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
+import { assertObjectStorageReady } from "@guestpost/shared/dist/object-storage"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { Queue, QueueEvents } from "bullmq"
 import { type HealthServerHandle, startHealthServer } from "./lib/health-server"
 import {
   MAINTENANCE_DISPATCH_TASK,
   type MaintenanceTaskName,
+  maintenanceTasksAllowedForFinanceMode,
   maintenanceTasksDueAt,
 } from "./lib/maintenance-schedule"
 import { createAutoAcceptWorker } from "./processors/auto-accept.processor"
@@ -34,6 +37,7 @@ import { createDeliveryVerificationWorker } from "./processors/delivery-verifica
 import { createDomainMetricsWorker } from "./processors/domain-metrics.processor"
 import { createEmailWorker } from "./processors/email.processor"
 import { createNotificationWorker } from "./processors/notification.processor"
+import { processPaymentDisputeInbox } from "./processors/payment-dispute.processor"
 import {
   createPayoutWorker,
   processPayoutWebhookInbox,
@@ -104,6 +108,39 @@ async function registerReconciliationSweep(): Promise<RegisteredJob> {
     intervalMin: everyMs / 60000,
   })
   return { name: "reconciliation-run", queue: QUEUES.RECONCILIATION }
+}
+
+// Dispute holds are spend-blocking and cannot wait for the hourly drift sweep.
+// This dedicated inbox drain caps the normal recovery window at five minutes.
+async function registerPaymentDisputeInbox(): Promise<RegisteredJob> {
+  const everyMs = 5 * 60 * 1000
+  const queue = new Queue(QUEUES.RECONCILIATION, { connection })
+  await queue
+    .removeRepeatable("payment-dispute-inbox", { every: everyMs })
+    .catch(() => {})
+  await queue.add(
+    "payment-dispute-inbox",
+    signJobPayload(
+      {
+        limit: positiveInt(process.env.PAYMENT_DISPUTE_INBOX_BATCH_SIZE, 100),
+      },
+      0,
+    ),
+    {
+      repeat: { every: everyMs },
+      jobId: "payment-dispute-inbox",
+      removeOnComplete: { count: 24 },
+      removeOnFail: { count: 24 },
+    },
+  )
+  await queue.close()
+  logger.info("registered payment dispute inbox drain", {
+    intervalMs: everyMs,
+  })
+  return {
+    name: "payment-dispute-inbox",
+    queue: QUEUES.RECONCILIATION,
+  }
 }
 
 // Daily governance sweep expires temporary overrides within 24h. The core
@@ -181,6 +218,47 @@ async function registerSettlementHoldLinkSweep(): Promise<RegisteredJob> {
     intervalHours: everyMs / 3600000,
   })
   return { name: "settlement-hold-sweep", queue: QUEUES.DELIVERY_VERIFICATION }
+}
+
+// Postgres is the delivery source of truth. This sweep recovers a committed
+// PENDING delivery when the API's post-commit Redis enqueue failed or returned
+// ambiguously after Redis accepted it.
+async function registerDeliveryVerificationDispatchSweep(): Promise<RegisteredJob> {
+  const everyMs =
+    Math.max(
+      Number(process.env.DELIVERY_VERIFICATION_DISPATCH_MINUTES ?? 5),
+      1,
+    ) *
+    60 *
+    1000
+  const batchSize = positiveInt(
+    process.env.DELIVERY_VERIFICATION_DISPATCH_BATCH_SIZE,
+    100,
+  )
+  await removeRepeatableJobsByName(
+    QUEUES.DELIVERY_VERIFICATION,
+    "delivery-verification-dispatch-sweep",
+  )
+  const queue = new Queue(QUEUES.DELIVERY_VERIFICATION, { connection })
+  await queue.add(
+    "delivery-verification-dispatch-sweep",
+    signJobPayload({ batchSize }, 0),
+    {
+      repeat: { every: everyMs },
+      jobId: "delivery-verification-dispatch-sweep",
+      removeOnComplete: { count: 24 },
+      removeOnFail: { count: 24 },
+    },
+  )
+  await queue.close()
+  logger.info("registered delivery verification dispatch sweep", {
+    intervalMs: everyMs,
+    batchSize,
+  })
+  return {
+    name: "delivery-verification-dispatch-sweep",
+    queue: QUEUES.DELIVERY_VERIFICATION,
+  }
 }
 
 // Phase 7.3 — settlement review window auto-approval. Replaces the per-API-pod
@@ -458,6 +536,13 @@ function positiveInt(value: string | undefined, fallback: number): number {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
+async function assertObjectStorageReadiness(): Promise<void> {
+  const storage = await assertObjectStorageReady()
+  logger.info("object storage readiness validated", {
+    provider: storage.provider,
+  })
+}
+
 function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
   const cancellation = resolveOrderCancellationConfig(process.env)
   const tasks: Record<string, ScheduledTaskConfig> = {
@@ -471,6 +556,14 @@ function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
       queue: QUEUES.RECONCILIATION,
       jobName: QUEUE_JOBS[QUEUES.RECONCILIATION].RUN,
       data: {},
+      createWorker: createReconciliationWorker,
+    },
+    "payment-dispute-inbox": {
+      queue: QUEUES.RECONCILIATION,
+      jobName: QUEUE_JOBS[QUEUES.RECONCILIATION].PAYMENT_DISPUTE_INBOX,
+      data: {
+        limit: positiveInt(process.env.PAYMENT_DISPUTE_INBOX_BATCH_SIZE, 100),
+      },
       createWorker: createReconciliationWorker,
     },
     "website-reverify": {
@@ -489,6 +582,17 @@ function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
       queue: QUEUES.DELIVERY_VERIFICATION,
       jobName: QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].HOLD_LINK_SWEEP,
       data: {},
+      createWorker: createDeliveryVerificationWorker,
+    },
+    "delivery-verification-dispatch": {
+      queue: QUEUES.DELIVERY_VERIFICATION,
+      jobName: QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].DISPATCH_SWEEP,
+      data: {
+        batchSize: positiveInt(
+          process.env.DELIVERY_VERIFICATION_DISPATCH_BATCH_SIZE,
+          100,
+        ),
+      },
       createWorker: createDeliveryVerificationWorker,
     },
     "settlement-auto-approve": {
@@ -567,7 +671,10 @@ async function removeHybridRepeatables(): Promise<void> {
     },
     {
       queue: QUEUES.RECONCILIATION,
-      names: [QUEUE_JOBS[QUEUES.RECONCILIATION].RUN],
+      names: [
+        QUEUE_JOBS[QUEUES.RECONCILIATION].RUN,
+        QUEUE_JOBS[QUEUES.RECONCILIATION].PAYMENT_DISPUTE_INBOX,
+      ],
     },
     {
       queue: QUEUES.WEBSITE_VERIFICATION,
@@ -579,7 +686,10 @@ async function removeHybridRepeatables(): Promise<void> {
     },
     {
       queue: QUEUES.DELIVERY_VERIFICATION,
-      names: [QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].HOLD_LINK_SWEEP],
+      names: [
+        QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].HOLD_LINK_SWEEP,
+        QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].DISPATCH_SWEEP,
+      ],
     },
     {
       queue: QUEUES.SETTLEMENT,
@@ -626,6 +736,12 @@ async function runScheduledTask(taskName: string): Promise<void> {
     throw new Error(`Unknown WORKER_TASK=${taskName}`)
   }
 
+  // These scheduled tasks share the delivery-verification queue with snapshot
+  // writes, so their temporary worker needs storage before it consumes.
+  if (task.queue === QUEUES.DELIVERY_VERIFICATION) {
+    await assertObjectStorageReadiness()
+  }
+
   if (taskName === "payout-reconcile") {
     const inbox = await processPayoutWebhookInbox(
       positiveInt(process.env.PAYOUT_WEBHOOK_INBOX_BATCH_SIZE, 100),
@@ -638,9 +754,14 @@ async function runScheduledTask(taskName: string): Promise<void> {
   const worker = task.createWorker()
   const queue = new Queue(task.queue, { connection })
   try {
-    const tenMinuteBucket = Math.floor(Date.now() / (10 * 60 * 1000))
+    const jobBucketMs =
+      taskName === "payment-dispute-inbox" ||
+      taskName === "delivery-verification-dispatch"
+        ? 5 * 60 * 1000
+        : 10 * 60 * 1000
+    const jobBucket = Math.floor(Date.now() / jobBucketMs)
     const job = await queue.add(task.jobName, signJobPayload(task.data), {
-      jobId: `scheduled-${taskName}-${tenMinuteBucket}`,
+      jobId: `scheduled-${taskName}-${jobBucket}`,
       attempts: 1,
       // Retain through the bucket so an orchestrator retry/duplicate trigger
       // cannot execute the same scheduled mutation twice.
@@ -671,12 +792,24 @@ function isMaintenanceTaskDisabled(taskName: MaintenanceTaskName): boolean {
 }
 
 async function runMaintenanceDispatch(now = new Date()): Promise<void> {
-  const dueTasks = maintenanceTasksDueAt(now).filter(
-    (taskName) => !isMaintenanceTaskDisabled(taskName),
+  const financeMode = resolveFinanceRuntimeMode(
+    process.env.FINANCE_RUNTIME_MODE,
+    process.env.NODE_ENV,
   )
+  if (!financeMode.valid) {
+    logger.error("finance runtime mode is missing or invalid; failing closed", {
+      mode: financeMode.mode,
+      configured: financeMode.configured,
+    })
+  }
+  const dueTasks = maintenanceTasksAllowedForFinanceMode(
+    maintenanceTasksDueAt(now),
+    financeMode.mode,
+  ).filter((taskName) => !isMaintenanceTaskDisabled(taskName))
   logger.info("maintenance dispatch started", {
     scheduledAt: now.toISOString(),
     tasks: dueTasks,
+    financeMode: financeMode.mode,
   })
 
   const failures: Array<{ taskName: MaintenanceTaskName; error: Error }> = []
@@ -719,6 +852,9 @@ async function drainOnDemandQueues(): Promise<void> {
       const inbox = await processPayoutWebhookInbox(
         positiveInt(process.env.PAYOUT_WEBHOOK_INBOX_BATCH_SIZE, 100),
       )
+      const disputeInbox = await processPaymentDisputeInbox(
+        positiveInt(process.env.PAYMENT_DISPUTE_INBOX_BATCH_SIZE, 100),
+      )
       const counts = await Promise.all(
         queueHandles.map((queue) =>
           queue.getJobCounts("waiting", "active", "prioritized"),
@@ -737,7 +873,13 @@ async function drainOnDemandQueues(): Promise<void> {
       // commands even when its backoff is hours long. The mandatory catch-up
       // run will claim it after its delay expires.
       const inboxPending = inbox.claimed - inbox.processed - inbox.ignored
-      if (queued === 0 && inboxPending <= 0) quietChecks++
+      const disputeInboxPending =
+        disputeInbox.claimed -
+        disputeInbox.processed -
+        disputeInbox.retried -
+        disputeInbox.quarantined
+      if (queued === 0 && inboxPending <= 0 && disputeInboxPending <= 0)
+        quietChecks++
       else quietChecks = 0
       if (quietChecks >= 2) return
       await new Promise((resolve) => setTimeout(resolve, 2_000))
@@ -811,6 +953,7 @@ async function bootstrap() {
   logger.info("worker runtime selected", { mode })
 
   if (mode === "all") {
+    await assertObjectStorageReadiness()
     healthServer = await startHealthServer()
     workers.push(
       createEmailWorker(),
@@ -834,8 +977,10 @@ async function bootstrap() {
     const registeredJobs = await Promise.all([
       registerPayoutStatusPoll(),
       registerReconciliationSweep(),
+      registerPaymentDisputeInbox(),
       registerWebsiteReverifySweep(),
       registerDomainMetricsRefresh(),
+      registerDeliveryVerificationDispatchSweep(),
       registerSettlementHoldLinkSweep(),
       registerSettlementAutoApproveSweep(),
       registerSettlementAutoReleaseSweep(),
@@ -849,6 +994,7 @@ async function bootstrap() {
   }
 
   if (mode === "realtime") {
+    await assertObjectStorageReadiness()
     await removeHybridRepeatables()
     healthServer = await startHealthServer()
     workers.push(...REALTIME_WORKERS.map((createWorker) => createWorker()))

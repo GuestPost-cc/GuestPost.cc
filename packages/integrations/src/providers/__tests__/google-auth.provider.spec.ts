@@ -1,6 +1,7 @@
 import { GoogleAuthProvider } from "../google-auth.provider"
 
 describe("GoogleAuthProvider account selection", () => {
+  const originalFetch = global.fetch
   const originalClientId = process.env.GOOGLE_CLIENT_ID
   const originalClientSecret = process.env.GOOGLE_CLIENT_SECRET
 
@@ -12,6 +13,7 @@ describe("GoogleAuthProvider account selection", () => {
   afterAll(() => {
     process.env.GOOGLE_CLIENT_ID = originalClientId
     process.env.GOOGLE_CLIENT_SECRET = originalClientSecret
+    global.fetch = originalFetch
   })
 
   it("always asks the actor to select the Google data-owning account", async () => {
@@ -45,5 +47,19 @@ describe("GoogleAuthProvider account selection", () => {
         "https://api.example.com/callback",
       ),
     ).rejects.toThrow("Google OAuth is not configured")
+  })
+
+  it("fails closed when Google does not confirm token revocation", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+    }) as any
+    const provider = new GoogleAuthProvider([])
+
+    await expect(provider.revokeToken("access-token")).rejects.toMatchObject({
+      code: "PROVIDER_ERROR",
+      message: "Google token revocation failed with status 503",
+      details: { providerCode: "GOOGLE_TOKEN_REVOCATION_FAILED" },
+    })
   })
 })

@@ -14,7 +14,15 @@ if (process.env.NODE_ENV === "development") {
 // later silently no-ops the wrappers.
 import "./instrument"
 import { createAuth, toNodeHandler } from "@guestpost/auth"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, resolveFinanceRuntimeMode } from "@guestpost/shared"
+import {
+  assertDevelopmentSeedDatabaseSentinel,
+  isDevelopmentSeedApiRequestAllowed,
+} from "@guestpost/shared/dist/development-seed-safety"
+import {
+  assertObjectStorageReady,
+  resolveObjectStorageConfig,
+} from "@guestpost/shared/dist/object-storage"
 import {
   generateRequestId,
   isValidRequestId,
@@ -42,6 +50,11 @@ import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-b
 import { PrismaService } from "./common/prisma.service"
 import { getQueueConnection, getRedisClient } from "./common/redis-client"
 import { validateStripeEnvironment } from "./common/stripe-client"
+import {
+  createWebhookIngressLimiter,
+  isSignedWebhookIngressRequest,
+  WEBHOOK_INGRESS_RATE_LIMIT_CEILING,
+} from "./common/webhook-ingress-rate-limit"
 import { QueueService } from "./modules/queues/queue.service"
 
 const REQUIRED_ENV_VARS = [
@@ -88,6 +101,24 @@ function validateEnv(): void {
     }
   }
 
+  const financeMode = resolveFinanceRuntimeMode(
+    process.env.FINANCE_RUNTIME_MODE,
+    process.env.NODE_ENV,
+  )
+  if (!financeMode.valid) {
+    bootstrapLogger.error(
+      "FINANCE_RUNTIME_MODE is missing or invalid; financial mutations are locked",
+      {
+        mode: financeMode.mode,
+        configured: financeMode.configured,
+      },
+    )
+  } else {
+    bootstrapLogger.info("finance runtime mode validated", {
+      mode: financeMode.mode,
+    })
+  }
+
   try {
     validateStripeEnvironment()
   } catch (error) {
@@ -96,10 +127,27 @@ function validateEnv(): void {
     })
     process.exit(1)
   }
+
+  try {
+    const storage = resolveObjectStorageConfig()
+    bootstrapLogger.info("object storage configuration validated", {
+      provider: storage.provider,
+    })
+  } catch (error) {
+    bootstrapLogger.error("Object storage configuration validation failed", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    process.exit(1)
+  }
 }
 
 async function bootstrap() {
   validateEnv()
+
+  const storage = await assertObjectStorageReady()
+  bootstrapLogger.info("object storage readiness validated", {
+    provider: storage.provider,
+  })
 
   const server = express()
 
@@ -161,6 +209,7 @@ async function bootstrap() {
     generalAuth: number
     admin: number
     billing: number
+    webhookIngress: number
     // Per-IP first-line cap on verification trigger endpoints (publisher DNS
     // verify, admin bulk-retry / recompute-trust). Secondary to the DB-based
     // per-publisher/per-website business throttles — not a replacement.
@@ -181,6 +230,7 @@ async function bootstrap() {
         // Test suites (integration + concurrency back-to-back) legitimately
         // exceed 10 deposits/min; staging/production stay at 10.
         billing: 1000,
+        webhookIngress: 5000,
         verification: 1000,
       },
       staging: {
@@ -191,6 +241,7 @@ async function bootstrap() {
         generalAuth: 300,
         admin: 300,
         billing: 10,
+        webhookIngress: 600,
         verification: 30,
       },
       production: {
@@ -201,11 +252,34 @@ async function bootstrap() {
         generalAuth: 300,
         admin: 300,
         billing: 10,
+        webhookIngress: 600,
         verification: 15,
       },
     }
 
     const d = defaults[env] ?? defaults.development
+
+    const configuredWebhookIngressLimit =
+      process.env.WEBHOOK_INGRESS_RATE_LIMIT_MAX?.trim()
+    const parsedWebhookIngressLimit = Number(configuredWebhookIngressLimit)
+    const hasValidConfiguredWebhookIngressLimit =
+      Boolean(configuredWebhookIngressLimit) &&
+      Number.isSafeInteger(parsedWebhookIngressLimit) &&
+      parsedWebhookIngressLimit >= 1 &&
+      parsedWebhookIngressLimit <= WEBHOOK_INGRESS_RATE_LIMIT_CEILING
+    const webhookIngress = hasValidConfiguredWebhookIngressLimit
+      ? parsedWebhookIngressLimit
+      : d.webhookIngress
+
+    if (
+      configuredWebhookIngressLimit &&
+      !hasValidConfiguredWebhookIngressLimit
+    ) {
+      bootstrapLogger.warn(
+        "Ignoring invalid WEBHOOK_INGRESS_RATE_LIMIT_MAX; using the environment default",
+        { ceiling: WEBHOOK_INGRESS_RATE_LIMIT_CEILING },
+      )
+    }
 
     return {
       auth: {
@@ -229,6 +303,7 @@ async function bootstrap() {
         Number(process.env.AUTHENTICATED_RATE_LIMIT_MAX) || d.generalAuth,
       admin: Number(process.env.ADMIN_RATE_LIMIT_MAX) || d.admin,
       billing: Number(process.env.BILLING_RATE_LIMIT_MAX) || d.billing,
+      webhookIngress,
       verification:
         Number(process.env.VERIFICATION_RATE_LIMIT_MAX) || d.verification,
     }
@@ -274,28 +349,33 @@ async function bootstrap() {
   function createTieredLimiters(
     anonMax: number,
     authMax: number,
-    message?: string,
+    options?: {
+      message?: string
+      skip?: (req: express.Request) => boolean
+    },
   ) {
     const anon = rateLimit({
       windowMs: 60 * 1000,
       max: anonMax,
-      skip: (req: express.Request) => hasAuthCredentials(req),
+      skip: (req: express.Request) =>
+        options?.skip?.(req) === true || hasAuthCredentials(req),
       standardHeaders: true,
       legacyHeaders: false,
       message: {
         statusCode: 429,
-        message: message ?? "Too many requests, try again later",
+        message: options?.message ?? "Too many requests, try again later",
       },
     })
     const authed = rateLimit({
       windowMs: 60 * 1000,
       max: authMax,
-      skip: (req: express.Request) => !hasAuthCredentials(req),
+      skip: (req: express.Request) =>
+        options?.skip?.(req) === true || !hasAuthCredentials(req),
       standardHeaders: true,
       legacyHeaders: false,
       message: {
         statusCode: 429,
-        message: message ?? "Too many requests, try again later",
+        message: options?.message ?? "Too many requests, try again later",
       },
     })
     return [anon, authed]
@@ -322,13 +402,19 @@ async function bootstrap() {
     createAuthLimiter(envLimits.auth.resetPassword),
   )
 
-  // Billing — webhook exempt from rate limit (Stripe retries on failure; protected by signature verification instead)
+  // Signed provider callbacks get a high-burst but finite per-IP budget. This
+  // classifier does not authenticate a request; controller-level verification
+  // against the untouched raw body remains the trust boundary.
+  server.use(createWebhookIngressLimiter(envLimits.webhookIngress))
+
+  // Billing commands stay on the tighter limiter. Only the exact signed
+  // deposit callback is skipped here because it was counted above.
   server.use(
     "/api/v1/billing",
     rateLimit({
       windowMs: 60 * 1000,
       max: envLimits.billing,
-      skip: (req: express.Request) => req.path.startsWith("/webhook"),
+      skip: (req: express.Request) => isSignedWebhookIngressRequest(req),
       standardHeaders: true,
       legacyHeaders: false,
       message: {
@@ -407,7 +493,11 @@ async function bootstrap() {
 
   // Global fallback — two-tier, catches all unmatched routes
   server.use(
-    ...createTieredLimiters(envLimits.generalAnon, envLimits.generalAuth),
+    ...createTieredLimiters(envLimits.generalAnon, envLimits.generalAuth, {
+      // Exact signed webhook paths were counted by their dedicated limiter.
+      // Lookalikes and the retired shared Stripe route stay on this fallback.
+      skip: isSignedWebhookIngressRequest,
+    }),
   )
 
   const configuredOrigins = process.env.CORS_ORIGIN?.split(",") ?? [
@@ -480,16 +570,48 @@ async function bootstrap() {
   })
 
   // M-1 — cross-pod auth-context invalidation subscriber (Redis pub/sub).
-  // Must be called after Redis connection is available but before any
-  // auth-dependent requests arrive. Subscription is fire-and-forget;
-  // Redis unavailability is logged but does not block startup.
-  initAuthContextSubscriber()
+  // Must be established after Redis connection is available and before any
+  // auth-dependent request can arrive. A startup without the projection
+  // subscriber would create a silent cross-pod freshness gap, so await the
+  // subscription and let bootstrap fail explicitly when it cannot be opened.
+  await initAuthContextSubscriber()
   authLogger.info("Auth context cache subscriber initialized")
 
   // Phase A3 — dependency-checked readiness endpoint. Runs after Nest init
   // so PrismaService connection is established. Redis PING uses the HTTP
   // client (getRedisClient). Returns 503 when any dependency is down.
   const prismaService: PrismaService = app.get(PrismaService)
+
+  // The privileged local fixture uses both HTTP and direct Prisma writes. This
+  // preflight proves the API itself is non-production, reached over loopback,
+  // and connected to a database marked by the fixed local Compose bootstrap
+  // before the first known-password account can be created.
+  server.get("/api/v1/health/development-seed-ready", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store")
+    if (
+      !isDevelopmentSeedApiRequestAllowed(
+        process.env.NODE_ENV,
+        req.socket.remoteAddress,
+      )
+    ) {
+      res.status(404).json({ status: "not_found" })
+      return
+    }
+
+    try {
+      const databaseIdentity =
+        await assertDevelopmentSeedDatabaseSentinel(prismaService)
+      res.status(200).json({
+        status: "ok",
+        environment: process.env.NODE_ENV,
+        database: "local-development",
+        databaseIdentity,
+      })
+    } catch {
+      res.status(503).json({ status: "unavailable" })
+    }
+  })
+
   server.get("/api/v1/health/ready", async (_req, res) => {
     const checks: { redis: string; database: string } = {
       redis: "ok",

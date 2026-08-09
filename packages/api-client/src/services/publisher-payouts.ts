@@ -1,4 +1,8 @@
-import type { WithdrawalStatus } from "@guestpost/shared"
+import type {
+  CertifiedWithdrawalMethodType,
+  PayoutMethodEligibility,
+  WithdrawalStatus,
+} from "@guestpost/shared"
 import type { HttpClient, RequestOptions } from "../client"
 
 export interface PaginatedResponse<T> {
@@ -26,6 +30,7 @@ export interface WithdrawalResponse {
   payoutFee: number
   netAmount: number
   feePolicyVersion: string | null
+  method: string
   status: WithdrawalStatus
   availableAt: string | null
   payoutMethodId: string | null
@@ -45,11 +50,15 @@ export interface PayoutMethodResponse {
   type: string
   label: string
   isDefault: boolean
+  isActive: boolean
   displayDetails: Record<string, unknown>
+  withdrawalEligibility: PayoutMethodEligibility
 }
 
 export interface StripeConnectStatusResponse {
   available: boolean
+  payoutActionsAvailable: boolean
+  manualBankPayoutsAvailable: boolean
   connected: boolean
   status:
     | "NOT_CONNECTED"
@@ -115,8 +124,8 @@ export class PublisherPayoutsService {
 
   async requestWithdrawal(data: {
     amount: number
-    method: string
-    payoutMethodId?: string
+    method: CertifiedWithdrawalMethodType
+    payoutMethodId: string
     idempotencyKey: string
   }) {
     const raw = await this.client.post<any>("/publisher-payouts/withdrawals", {
@@ -135,9 +144,12 @@ export class PublisherPayoutsService {
     return { ...raw, items: (raw.items ?? []).map(normalizeWithdrawal) }
   }
 
-  listPayoutMethods() {
+  listPayoutMethods(includeInactive = false) {
     return this.client.get<PayoutMethodResponse[]>(
       "/publisher-payouts/payout-methods",
+      includeInactive
+        ? ({ params: { includeInactive: "true" } } as RequestOptions)
+        : undefined,
     )
   }
 
@@ -160,7 +172,7 @@ export class PublisherPayoutsService {
   }
 
   createPayoutMethod(data: {
-    type: string
+    type: "bank_transfer"
     label: string
     details: Record<string, unknown>
     isDefault?: boolean
@@ -174,8 +186,18 @@ export class PublisherPayoutsService {
   }
 
   deactivatePayoutMethod(id: string) {
-    return this.client.post<{ id: string; isActive: boolean }>(
-      `/publisher-payouts/payout-methods/${id}/deactivate`,
-    )
+    return this.client.post<{
+      id: string
+      isActive: boolean
+      replayed: boolean
+    }>(`/publisher-payouts/payout-methods/${id}/deactivate`)
+  }
+
+  reactivatePayoutMethod(id: string) {
+    return this.client.post<{
+      id: string
+      isActive: boolean
+      replayed: boolean
+    }>(`/publisher-payouts/payout-methods/${id}/reactivate`)
   }
 }

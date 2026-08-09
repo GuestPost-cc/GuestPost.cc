@@ -1,5 +1,6 @@
 "use client"
 
+import { payoutErrorPresentation } from "@guestpost/api-client"
 import {
   Badge,
   Button,
@@ -25,8 +26,8 @@ import {
   Building2,
   CreditCard,
   ExternalLink,
-  Mail,
   Plus,
+  RotateCcw,
   ShieldCheck,
   Trash2,
 } from "lucide-react"
@@ -35,6 +36,15 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { api } from "../../../lib/api"
+
+function showPayoutError(error: unknown, fallback: string) {
+  const presentation = payoutErrorPresentation(error, fallback)
+  toast.error(presentation.message, {
+    description: presentation.requestId
+      ? `Request ID: ${presentation.requestId}`
+      : undefined,
+  })
+}
 
 const bankSchema = z.object({
   label: z.string().min(2, "Label required"),
@@ -46,17 +56,10 @@ const bankSchema = z.object({
   swift: z.string().optional(),
 })
 
-const paypalSchema = z.object({
-  label: z.string().min(2, "Label required"),
-  email: z.string().email("Valid email required"),
-})
-
 type BankForm = z.infer<typeof bankSchema>
-type PaypalForm = z.infer<typeof paypalSchema>
 
 const typeIcons: Record<string, React.ElementType> = {
   bank_transfer: Building2,
-  paypal: Mail,
   wise: CreditCard,
   stripe_connect: CreditCard,
 }
@@ -64,9 +67,6 @@ const typeIcons: Record<string, React.ElementType> = {
 export default function PayoutMethodsPage() {
   const queryClient = useQueryClient()
   const [showAdd, setShowAdd] = useState(false)
-  const [methodType, setMethodType] = useState<"bank_transfer" | "paypal">(
-    "bank_transfer",
-  )
   const [makeDefault, setMakeDefault] = useState(true)
 
   const {
@@ -76,10 +76,15 @@ export default function PayoutMethodsPage() {
     refetch,
   } = useQuery({
     queryKey: ["payout-methods"],
-    queryFn: () => api.publisherPayouts.listPayoutMethods(),
+    queryFn: () => api.publisherPayouts.listPayoutMethods(true),
   })
 
-  const { data: stripeStatus, refetch: refetchStripeStatus } = useQuery({
+  const {
+    data: stripeStatus,
+    isLoading: stripeStatusLoading,
+    error: stripeStatusError,
+    refetch: refetchStripeStatus,
+  } = useQuery({
     queryKey: ["stripe-connect-status"],
     queryFn: () => api.publisherPayouts.getStripeConnectStatus(),
   })
@@ -87,8 +92,8 @@ export default function PayoutMethodsPage() {
   const stripeOnboarding = useMutation({
     mutationFn: () => api.publisherPayouts.createStripeConnectOnboardingLink(),
     onSuccess: ({ url }) => window.location.assign(url),
-    onError: (err: any) =>
-      toast.error(err?.message ?? "Could not start secure Stripe onboarding"),
+    onError: (error: unknown) =>
+      showPayoutError(error, "Could not start secure Stripe onboarding"),
   })
   const stripeRefresh = useMutation({
     mutationFn: () => api.publisherPayouts.refreshStripeConnectStatus(),
@@ -97,18 +102,15 @@ export default function PayoutMethodsPage() {
       void queryClient.invalidateQueries({ queryKey: ["payout-methods"] })
       toast.success("Stripe payout status refreshed")
     },
-    onError: (err: any) =>
-      toast.error(err?.message ?? "Could not refresh Stripe status"),
+    onError: (error: unknown) =>
+      showPayoutError(error, "Could not refresh Stripe status"),
   })
 
   const bankForm = useForm<BankForm>({ resolver: zodResolver(bankSchema) })
-  const paypalForm = useForm<PaypalForm>({
-    resolver: zodResolver(paypalSchema),
-  })
 
   const createMutation = useMutation({
     mutationFn: (data: {
-      type: string
+      type: "bank_transfer"
       label: string
       details: Record<string, unknown>
       isDefault?: boolean
@@ -117,24 +119,45 @@ export default function PayoutMethodsPage() {
       toast.success("Payout method added")
       setShowAdd(false)
       bankForm.reset()
-      paypalForm.reset()
       queryClient.invalidateQueries({ queryKey: ["payout-methods"] })
     },
-    onError: (err: any) =>
-      toast.error(err?.message ?? "Failed to add payout method"),
+    onError: (error: unknown) =>
+      showPayoutError(error, "Failed to add payout method"),
   })
 
   const deactivateMutation = useMutation({
     mutationFn: (id: string) => api.publisherPayouts.deactivatePayoutMethod(id),
-    onSuccess: () => {
-      toast.success("Payout method removed")
+    onSuccess: ({ replayed }) => {
+      toast.success(
+        replayed
+          ? "Payout method was already disabled"
+          : "Payout method disabled",
+      )
       queryClient.invalidateQueries({ queryKey: ["payout-methods"] })
     },
-    onError: (err: any) =>
-      toast.error(err?.message ?? "Failed to remove payout method"),
+    onError: (error: unknown) =>
+      showPayoutError(error, "Failed to disable payout method"),
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) => api.publisherPayouts.reactivatePayoutMethod(id),
+    onSuccess: ({ replayed }) => {
+      toast.success(
+        replayed ? "Payout method was already active" : "Payout method enabled",
+      )
+      queryClient.invalidateQueries({ queryKey: ["payout-methods"] })
+    },
+    onError: (error: unknown) =>
+      showPayoutError(error, "Failed to enable payout method"),
   })
 
   const submitBank = (data: BankForm) => {
+    if (!canAddManualBank) {
+      toast.error(
+        "Manual payout setup is temporarily unavailable. Refresh the page before retrying.",
+      )
+      return
+    }
     const { label, ...details } = data
     const cleaned = Object.fromEntries(
       Object.entries(details).filter(([, v]) => v),
@@ -147,21 +170,30 @@ export default function PayoutMethodsPage() {
     })
   }
 
-  const submitPaypal = (data: PaypalForm) => {
-    createMutation.mutate({
-      type: "paypal",
-      label: data.label,
-      details: { email: data.email },
-      isDefault: makeDefault,
-    })
-  }
+  const stripeMethodDisabled = methods?.some(
+    (method) => method.type === "stripe_connect" && !method.isActive,
+  )
+  const canAddManualBank =
+    stripeStatus?.manualBankPayoutsAvailable === true &&
+    stripeStatus.payoutActionsAvailable === true
 
-  if (error)
+  const loadError = error ?? stripeStatusError
+  const loadPresentation = loadError
+    ? payoutErrorPresentation(loadError, "Unable to verify payout setup")
+    : null
+  if (loadError)
     return (
       <ErrorState
-        title="Failed to load payout methods"
-        description={(error as Error).message}
-        onRetry={() => refetch()}
+        title="Cannot verify payout setup"
+        description={`${loadPresentation?.message ?? "Payout setup could not be verified."} No setup action is available until both checks succeed.${
+          loadPresentation?.requestId
+            ? ` Request ID: ${loadPresentation.requestId}`
+            : ""
+        }`}
+        onRetry={() => {
+          void refetch()
+          void refetchStripeStatus()
+        }}
       />
     )
 
@@ -174,7 +206,7 @@ export default function PayoutMethodsPage() {
             Where your withdrawals get paid out
           </p>
         </div>
-        {!stripeStatus?.available ? (
+        {canAddManualBank ? (
           <Button onClick={() => setShowAdd(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Method
@@ -195,14 +227,18 @@ export default function PayoutMethodsPage() {
               </div>
               <Badge
                 variant={
-                  stripeStatus.status === "ENABLED" ? "success" : "secondary"
+                  stripeStatus.status === "ENABLED" && !stripeMethodDisabled
+                    ? "success"
+                    : "secondary"
                 }
               >
-                {stripeStatus.status === "ENABLED"
-                  ? "Ready"
-                  : stripeStatus.connected
-                    ? "Setup required"
-                    : "Not connected"}
+                {stripeStatus.status === "ENABLED" && stripeMethodDisabled
+                  ? "Payouts disabled"
+                  : stripeStatus.status === "ENABLED"
+                    ? "Ready"
+                    : stripeStatus.connected
+                      ? "Setup required"
+                      : "Not connected"}
               </Badge>
             </div>
           </CardHeader>
@@ -210,6 +246,12 @@ export default function PayoutMethodsPage() {
             <div className="text-sm text-muted-foreground">
               <p>Your withdrawal fee: $0.00 during the initial rollout.</p>
               <p>Stripe processing fees are paid by GuestPost.</p>
+              {stripeStatus.payoutActionsAvailable !== true ? (
+                <p className="font-medium text-amber-700 dark:text-amber-300">
+                  New payout setup and withdrawals are temporarily paused by
+                  operations.
+                </p>
+              ) : null}
               {stripeStatus.requirementsDue.length > 0 ? (
                 <p>
                   {stripeStatus.requirementsDue.length} verification item(s)
@@ -230,7 +272,10 @@ export default function PayoutMethodsPage() {
               {stripeStatus.status !== "ENABLED" ? (
                 <Button
                   onClick={() => stripeOnboarding.mutate()}
-                  disabled={stripeOnboarding.isPending}
+                  disabled={
+                    stripeOnboarding.isPending ||
+                    stripeStatus.payoutActionsAvailable !== true
+                  }
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />
                   {stripeStatus.connected ? "Continue setup" : "Connect Stripe"}
@@ -238,6 +283,21 @@ export default function PayoutMethodsPage() {
               ) : null}
             </div>
           </CardContent>
+        </Card>
+      ) : null}
+
+      {stripeStatus &&
+      !stripeStatus.available &&
+      !stripeStatus.manualBankPayoutsAvailable ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Payout setup is temporarily unavailable</CardTitle>
+            <CardDescription>
+              New payout destinations are disabled by operations. Existing
+              legacy methods remain visible below and can be disabled, but no
+              new withdrawal can use them. Contact support if this persists.
+            </CardDescription>
+          </CardHeader>
         </Card>
       ) : null}
 
@@ -250,7 +310,7 @@ export default function PayoutMethodsPage() {
         </p>
       </div>
 
-      {isLoading ? (
+      {isLoading || stripeStatusLoading ? (
         <div className="grid gap-4 md:grid-cols-2">
           {[1, 2].map((i) => (
             <Skeleton key={i} className="h-32" />
@@ -262,7 +322,11 @@ export default function PayoutMethodsPage() {
             <CreditCard className="mb-3 h-10 w-10 text-muted-foreground/50" />
             <p className="font-medium">No payout methods yet</p>
             <p className="text-sm text-muted-foreground">
-              Connect Stripe above to receive verified bank payouts
+              {stripeStatus?.available
+                ? "Connect Stripe above to receive verified bank payouts."
+                : canAddManualBank
+                  ? "Add a manual bank destination above to receive payouts."
+                  : "Payout setup is temporarily unavailable. Retry later or contact support."}
             </p>
           </CardContent>
         </Card>
@@ -270,6 +334,7 @@ export default function PayoutMethodsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {methods.map((m) => {
             const Icon = typeIcons[m.type] ?? CreditCard
+            const eligibility = m.withdrawalEligibility
             return (
               <Card key={m.id}>
                 <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
@@ -284,7 +349,15 @@ export default function PayoutMethodsPage() {
                       </CardDescription>
                     </div>
                   </div>
-                  {m.isDefault && <Badge>Default</Badge>}
+                  <div className="flex gap-2">
+                    {!m.isActive ? (
+                      <Badge variant="secondary">Disabled</Badge>
+                    ) : null}
+                    {m.isActive && !eligibility.executable ? (
+                      <Badge variant="warning">Unavailable</Badge>
+                    ) : null}
+                    {m.isDefault ? <Badge>Default</Badge> : null}
+                  </div>
                 </CardHeader>
                 <CardContent className="flex items-end justify-between">
                   <div className="text-sm text-muted-foreground">
@@ -297,17 +370,44 @@ export default function PayoutMethodsPage() {
                     {m.displayDetails?.maskedEmail ? (
                       <p>{String(m.displayDetails.maskedEmail)}</p>
                     ) : null}
+                    {!eligibility.executable ? (
+                      <p className="mt-2 max-w-sm text-xs">
+                        {eligibility.message}
+                      </p>
+                    ) : null}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => deactivateMutation.mutate(m.id)}
-                    disabled={deactivateMutation.isPending}
-                  >
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    Remove
-                  </Button>
+                  {m.isActive ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => deactivateMutation.mutate(m.id)}
+                      disabled={
+                        deactivateMutation.isPending ||
+                        reactivateMutation.isPending
+                      }
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      Disable
+                    </Button>
+                  ) : eligibility.canReactivate ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => reactivateMutation.mutate(m.id)}
+                      disabled={
+                        deactivateMutation.isPending ||
+                        reactivateMutation.isPending
+                      }
+                    >
+                      <RotateCcw className="mr-1 h-4 w-4" />
+                      Enable
+                    </Button>
+                  ) : (
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Cannot enable
+                    </span>
+                  )}
                 </CardContent>
               </Card>
             )
@@ -315,118 +415,70 @@ export default function PayoutMethodsPage() {
         </div>
       )}
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+      <Dialog open={showAdd && canAddManualBank} onOpenChange={setShowAdd}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Payout Method</DialogTitle>
             <DialogDescription>
-              Details are encrypted before they are stored.
+              Add a manual bank destination. Details are encrypted before they
+              are stored, and availability is revalidated by the server when you
+              request a withdrawal.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={methodType === "bank_transfer" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setMethodType("bank_transfer")}
-            >
-              <Building2 className="mr-2 h-4 w-4" /> Bank Transfer
-            </Button>
-            <Button
-              type="button"
-              variant={methodType === "paypal" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setMethodType("paypal")}
-            >
-              <Mail className="mr-2 h-4 w-4" /> PayPal
-            </Button>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="label">Label</Label>
+              <Input
+                id="label"
+                placeholder="My checking account"
+                {...bankForm.register("label")}
+              />
+              {bankForm.formState.errors.label && (
+                <p className="text-sm text-destructive">
+                  {bankForm.formState.errors.label.message}
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="bankName">Bank Name</Label>
+                <Input id="bankName" {...bankForm.register("bankName")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="accountHolderName">Account Holder</Label>
+                <Input
+                  id="accountHolderName"
+                  {...bankForm.register("accountHolderName")}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="accountNumber">Account Number / IBAN</Label>
+              <Input
+                id="accountNumber"
+                {...bankForm.register("accountNumber")}
+              />
+              {bankForm.formState.errors.accountNumber && (
+                <p className="text-sm text-destructive">
+                  {bankForm.formState.errors.accountNumber.message}
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="routingNumber">Routing Number (US)</Label>
+                <Input
+                  id="routingNumber"
+                  {...bankForm.register("routingNumber")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="swift">SWIFT / BIC</Label>
+                <Input id="swift" {...bankForm.register("swift")} />
+              </div>
+            </div>
           </div>
-
-          {methodType === "bank_transfer" ? (
-            <div className="space-y-3 py-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="label">Label</Label>
-                <Input
-                  id="label"
-                  placeholder="My checking account"
-                  {...bankForm.register("label")}
-                />
-                {bankForm.formState.errors.label && (
-                  <p className="text-sm text-destructive">
-                    {bankForm.formState.errors.label.message}
-                  </p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="bankName">Bank Name</Label>
-                  <Input id="bankName" {...bankForm.register("bankName")} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="accountHolderName">Account Holder</Label>
-                  <Input
-                    id="accountHolderName"
-                    {...bankForm.register("accountHolderName")}
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="accountNumber">Account Number / IBAN</Label>
-                <Input
-                  id="accountNumber"
-                  {...bankForm.register("accountNumber")}
-                />
-                {bankForm.formState.errors.accountNumber && (
-                  <p className="text-sm text-destructive">
-                    {bankForm.formState.errors.accountNumber.message}
-                  </p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="routingNumber">Routing Number (US)</Label>
-                  <Input
-                    id="routingNumber"
-                    {...bankForm.register("routingNumber")}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="swift">SWIFT / BIC</Label>
-                  <Input id="swift" {...bankForm.register("swift")} />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3 py-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="plabel">Label</Label>
-                <Input
-                  id="plabel"
-                  placeholder="My PayPal"
-                  {...paypalForm.register("label")}
-                />
-                {paypalForm.formState.errors.label && (
-                  <p className="text-sm text-destructive">
-                    {paypalForm.formState.errors.label.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="pemail">PayPal Email</Label>
-                <Input
-                  id="pemail"
-                  type="email"
-                  {...paypalForm.register("email")}
-                />
-                {paypalForm.formState.errors.email && (
-                  <p className="text-sm text-destructive">
-                    {paypalForm.formState.errors.email.message}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
 
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -442,12 +494,8 @@ export default function PayoutMethodsPage() {
               Cancel
             </Button>
             <Button
-              onClick={
-                methodType === "bank_transfer"
-                  ? bankForm.handleSubmit(submitBank)
-                  : paypalForm.handleSubmit(submitPaypal)
-              }
-              disabled={createMutation.isPending}
+              onClick={bankForm.handleSubmit(submitBank)}
+              disabled={createMutation.isPending || !canAddManualBank}
             >
               {createMutation.isPending ? "Saving..." : "Add Method"}
             </Button>

@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from "@nestjs/common"
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { PermissionsGuard } from "../../../common/guards/permissions.guard"
 import { PayoutEncryptionService } from "../payout-encryption.service"
@@ -137,6 +141,22 @@ describe("PayoutEncryptionService", () => {
     expect(() => new PayoutEncryptionService()).toThrow(/PAYOUT_ENCRYPTION_KEY/)
   })
 
+  it("fails startup when a configured 64-character key contains non-hex data", () => {
+    process.env.NODE_ENV = "test"
+    process.env.PAYOUT_ENCRYPTION_KEY = `${"a".repeat(63)}z`
+    expect(() => new PayoutEncryptionService()).toThrow(
+      /exactly 64 hexadecimal characters/,
+    )
+  })
+
+  it("fails startup instead of truncating a configured key longer than 64 characters", () => {
+    process.env.NODE_ENV = "test"
+    process.env.PAYOUT_ENCRYPTION_KEY = "a".repeat(66)
+    expect(() => new PayoutEncryptionService()).toThrow(
+      /exactly 64 hexadecimal characters/,
+    )
+  })
+
   it("falls back to a dev key outside production", () => {
     process.env.NODE_ENV = "test"
     delete process.env.PAYOUT_ENCRYPTION_KEY
@@ -222,6 +242,20 @@ describe("PublisherPayoutsService — decrypt access path", () => {
         findUnique: jest.fn(),
         findMany: jest.fn(),
       },
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            role: "FINANCE",
+            permissions: ["FINANCIAL_DATA_DECRYPT"],
+            banned: false,
+            userType: "STAFF",
+          },
+        ])
+        .mockResolvedValueOnce([{ id: "pm-1" }]),
+      $transaction: jest.fn((operation: (tx: any) => unknown) =>
+        operation(prismaMock),
+      ),
     }
     service = new PublisherPayoutsService(
       prismaMock as any,
@@ -263,11 +297,22 @@ describe("PublisherPayoutsService — decrypt access path", () => {
           userAgent: "TestAgent/1.0",
         }),
       }),
+      prismaMock,
     )
   })
 
   it("decryptPayoutMethod 404s on unknown method without decrypting", async () => {
-    prismaMock.payoutMethod.findUnique.mockResolvedValue(null)
+    prismaMock.$queryRaw
+      .mockReset()
+      .mockResolvedValueOnce([
+        {
+          role: "FINANCE",
+          permissions: ["FINANCIAL_DATA_DECRYPT"],
+          banned: false,
+          userType: "STAFF",
+        },
+      ])
+      .mockResolvedValueOnce([])
 
     await expect(
       service.decryptPayoutMethod(
@@ -280,6 +325,66 @@ describe("PublisherPayoutsService — decrypt access path", () => {
     ).rejects.toThrow(NotFoundException)
     expect(encryptionMock.decrypt).not.toHaveBeenCalled()
     expect(auditMock.log).not.toHaveBeenCalled()
+    expect(prismaMock.payoutMethod.findUnique).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    {
+      name: "revoked decrypt permission",
+      staff: {
+        role: "FINANCE",
+        permissions: [],
+        banned: false,
+        userType: "STAFF",
+      },
+    },
+    {
+      name: "role downgrade",
+      staff: {
+        role: "OPERATIONS",
+        permissions: ["FINANCIAL_DATA_DECRYPT"],
+        banned: false,
+        userType: "STAFF",
+      },
+    },
+    {
+      name: "account ban",
+      staff: {
+        role: "FINANCE",
+        permissions: ["FINANCIAL_DATA_DECRYPT"],
+        banned: true,
+        userType: "STAFF",
+      },
+    },
+  ])("revalidates $name at the service boundary", async ({ staff }) => {
+    prismaMock.$queryRaw.mockReset().mockResolvedValueOnce([staff])
+
+    await expect(
+      service.decryptPayoutMethod(
+        "pm-1",
+        "staff-1",
+        "KYC verification review",
+        "1.2.3.4",
+        "TestAgent/1.0",
+      ),
+    ).rejects.toThrow(ForbiddenException)
+    expect(prismaMock.payoutMethod.findUnique).not.toHaveBeenCalled()
+    expect(encryptionMock.decrypt).not.toHaveBeenCalled()
+    expect(auditMock.log).not.toHaveBeenCalled()
+  })
+
+  it("rejects an oversized reason at the service boundary before reading finance data", async () => {
+    await expect(
+      service.decryptPayoutMethod(
+        "pm-1",
+        "staff-1",
+        "x".repeat(501),
+        "1.2.3.4",
+        "TestAgent/1.0",
+      ),
+    ).rejects.toThrow(/between 10 and 500/)
+    expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    expect(encryptionMock.decrypt).not.toHaveBeenCalled()
   })
 
   it("listPayoutMethods never selects or returns encrypted details", async () => {
@@ -290,6 +395,7 @@ describe("PublisherPayoutsService — decrypt access path", () => {
         label: "Main",
         displayDetails: { bankName: "Test Bank", last4: "3000" },
         isDefault: true,
+        isActive: true,
       },
     ])
 
@@ -297,98 +403,204 @@ describe("PublisherPayoutsService — decrypt access path", () => {
 
     const select = prismaMock.payoutMethod.findMany.mock.calls[0][0].select
     expect(select.details).toBeUndefined()
+    expect(prismaMock.payoutMethod.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { publisherId: "pub-1", isActive: true },
+      }),
+    )
     expect(encryptionMock.decrypt).not.toHaveBeenCalled()
     expect(JSON.stringify(result)).not.toContain("DE89370400440532013000")
     expect(result[0].displayDetails).toEqual({
       bankName: "Test Bank",
       last4: "3000",
     })
+    expect(result[0].isActive).toBe(true)
+  })
+
+  it("keeps active but uncertified legacy rows out of the withdrawal selector", async () => {
+    prismaMock.payoutMethod.findMany.mockResolvedValue([
+      {
+        id: "pm-paypal-legacy",
+        type: "paypal",
+        label: "Historical PayPal",
+        displayDetails: { maskedEmail: "p***@example.test" },
+        isDefault: true,
+        isActive: true,
+        providerAccountId: null,
+        providerAccount: null,
+      },
+      {
+        id: "pm-bank",
+        type: "bank_transfer",
+        label: "Manual bank",
+        displayDetails: { bankName: "Test Bank", last4: "3000" },
+        isDefault: false,
+        isActive: true,
+        providerAccountId: null,
+        providerAccount: null,
+      },
+    ])
+
+    const result = await service.listPayoutMethods("pub-1", "user-1")
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      id: "pm-bank",
+      withdrawalEligibility: { executable: true, code: "READY" },
+    })
+  })
+
+  it("listPayoutMethods includes inactive lifecycle rows only when requested", async () => {
+    prismaMock.payoutMethod.findMany.mockResolvedValue([
+      {
+        id: "pm-paypal-legacy",
+        type: "paypal",
+        label: "Historical PayPal",
+        displayDetails: { maskedEmail: "p***@example.test" },
+        isDefault: false,
+        isActive: true,
+        providerAccountId: null,
+        providerAccount: null,
+      },
+    ])
+
+    const result = await service.listPayoutMethods("pub-1", "user-1", true)
+
+    expect(prismaMock.payoutMethod.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { publisherId: "pub-1" },
+      }),
+    )
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: "pm-paypal-legacy",
+        isActive: true,
+        withdrawalEligibility: expect.objectContaining({
+          executable: false,
+          canReactivate: false,
+          code: "METHOD_NOT_CERTIFIED",
+        }),
+      }),
+    ])
   })
 })
 
 describe("PayoutExecutionService — provider error redaction", () => {
-  it("redacts banking data from logs, errorMessage, and audit metadata on provider failure", async () => {
-    process.env.NODE_ENV = "test"
-    process.env.PAYOUT_ENCRYPTION_KEY = "d".repeat(64)
-    const encryption = new PayoutEncryptionService()
-    const { ciphertext, version } = encryption.encrypt(SECRET_DETAILS)
+  const originalStripeKey = process.env.STRIPE_SECRET_KEY
+  const originalLiveGate = process.env.STRIPE_LIVE_MODE_ENABLED
 
+  beforeEach(() => {
+    process.env.STRIPE_SECRET_KEY = "rk_test_provider_redaction"
+    process.env.STRIPE_LIVE_MODE_ENABLED = "false"
+  })
+
+  afterEach(() => {
+    if (originalStripeKey === undefined) {
+      delete process.env.STRIPE_SECRET_KEY
+    } else {
+      process.env.STRIPE_SECRET_KEY = originalStripeKey
+    }
+    if (originalLiveGate === undefined) {
+      delete process.env.STRIPE_LIVE_MODE_ENABLED
+    } else {
+      process.env.STRIPE_LIVE_MODE_ENABLED = originalLiveGate
+    }
+  })
+
+  it("replaces a provider response-loss error with a constant safe message", async () => {
+    const account = {
+      id: "account-row-1",
+      providerAccountId: "acct_1",
+    }
     const withdrawal = {
       id: "wd-1",
-      status: "APPROVED",
-      version: 0,
+      status: "PROCESSING",
       amount: new Decimal(100),
+      netAmount: new Decimal(100),
       currency: "USD",
-      method: "wise",
       publisherId: "pub-1",
+      publicReference: "GP-WD-1",
       publisher: { organizationId: "org-1" },
-      payoutMethod: {
-        id: "pm-1",
-        isActive: true,
-        details: ciphertext,
-        encryptionKeyVersion: version,
-      },
+      payoutMethod: { id: "pm-1", providerAccount: account },
+    }
+    const execution = {
+      id: "exec-1",
+      withdrawalId: withdrawal.id,
+      status: "PROCESSING",
+      stage: "PROVIDER_SEND_CLAIMED",
+      version: 1,
+      livemode: false,
+      idempotencyKey: "payout-wd-1-v1",
+      providerMetadata: {},
+      provider: { id: "provider-1", name: "stripe_connect" },
+      withdrawal,
     }
     const auditMock = { log: jest.fn().mockResolvedValue(undefined) }
     const prismaMock: any = {
-      withdrawal: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValueOnce(withdrawal)
-          .mockResolvedValue({ ...withdrawal, version: 1 }),
+      payoutExecution: {
+        findUnique: jest.fn().mockResolvedValue(execution),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      payoutExecution: {
-        create: jest.fn().mockResolvedValue({ id: "exec-1" }),
-        findUnique: jest.fn().mockResolvedValue({
-          id: "exec-1",
-          status: "PROCESSING",
-          stage: "CREATED",
-        }),
-        update: jest.fn().mockResolvedValue({}),
-      },
-      $queryRaw: jest.fn().mockResolvedValue([]),
-      $transaction: jest
-        .fn()
-        .mockImplementation(async (cb: any) => cb(prismaMock)),
+      $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: "locked" }]),
     }
+    prismaMock.$transaction = jest
+      .fn()
+      .mockImplementation(async (work: any) => work(prismaMock))
     const leakyError = new Error(
       `Wise API 422: invalid payload {"accountNumber":"DE89370400440532013000"}`,
     )
     const providerMock = {
       getAdapter: jest.fn().mockReturnValue({
-        capabilities: { supportedCurrencies: ["USD"] },
         validateRecipient: jest.fn().mockResolvedValue({ valid: true }),
-        createTransfer: jest.fn().mockRejectedValue(leakyError),
+        recoverClaimedTransfer: jest.fn().mockRejectedValue(leakyError),
       }),
-      getActiveProvider: jest
-        .fn()
-        .mockResolvedValue({ id: "prov-1", name: "wise", decryptedConfig: {} }),
     }
 
-    const service = new PayoutExecutionService(
+    const service: any = new PayoutExecutionService(
       prismaMock,
       auditMock as any,
-      encryption,
+      { decrypt: jest.fn() } as any,
       providerMock as any,
     )
+    service.claimExternalCall = jest.fn().mockResolvedValue({
+      kind: "claimed",
+      execution,
+      withdrawal,
+      recipientDetails: {
+        connectedAccountId: "acct_1",
+        providerAccountStatus: "ENABLED",
+        payoutScheduleConfigured: true,
+      },
+      providerConfig: {},
+      claimedVersion: 2,
+    })
 
-    await expect(
-      service.executeWithdrawal("wd-1", "wise", "staff-1"),
-    ).rejects.toThrow(/\[REDACTED\]/)
-
-    const updateCall = prismaMock.payoutExecution.update.mock.calls.find(
-      (c: any[]) => c[0].data.status === "FAILED",
+    let rejection: unknown
+    try {
+      await service.recoverClaimedProviderSend(execution, "staff-1")
+    } catch (error) {
+      rejection = error
+    }
+    expect(rejection).toBeInstanceOf(ConflictException)
+    expect(String((rejection as Error).message)).toMatch(
+      /outcome remains unknown/i,
     )
-    expect(updateCall[0].data.errorMessage).not.toContain(
+    expect(String((rejection as Error).stack)).not.toContain(
       "DE89370400440532013000",
     )
-    expect(updateCall[0].data.errorMessage).toContain("[REDACTED]")
 
-    const failAudit = auditMock.log.mock.calls.find(
-      (c: any[]) => c[0].action === "PAYOUT_EXECUTION_FAILED",
+    expect(
+      JSON.stringify(prismaMock.payoutExecution.updateMany.mock.calls),
+    ).not.toContain("DE89370400440532013000")
+    expect(prismaMock.payoutExecution.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          errorMessage:
+            "Stripe Transfer outcome remains unknown; retry the original claim only after the recovery lease",
+        }),
+      }),
     )
-    expect(JSON.stringify(failAudit[0].metadata)).not.toContain(
+    expect(JSON.stringify(auditMock.log.mock.calls)).not.toContain(
       "DE89370400440532013000",
     )
   })

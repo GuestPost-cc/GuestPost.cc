@@ -46,15 +46,30 @@ double-pay the publisher.
 
 ### Webhook receipt
 
-`POST /payout-webhooks/:provider` performs this sequence:
+Wise uses `POST /payout-webhooks/wise`. Stripe uses two non-interchangeable
+trust-domain routes:
+`POST /payout-webhooks/stripe_connect/platform` for platform Transfer events
+and `POST /payout-webhooks/stripe_connect/connected` for connected-account
+Payout/account events. The retired shared Stripe route returns 400 without an
+inbox write. Each active route performs this sequence:
 
 1. Reject unsupported providers.
-2. Verify the Stripe HMAC or Wise RSA signature against the raw body.
+2. Verify exactly that route's Stripe HMAC secret or the Wise RSA signature
+   against the raw body; payout secrets are never tried as fallbacks.
 3. Enforce the five-minute replay timestamp window.
-4. Parse and normalize the provider payload.
-5. Persist an allow-listed `PayoutWebhookEvent` row.
-6. Return success only after the Postgres commit.
-7. Send a best-effort Northflank wake-up with no payout/customer identifiers.
+4. Parse, topology-check, and normalize the provider payload. Platform events
+   must have a `tr_*` object and no top-level account; connected events require
+   the exact `acct_*` account and a matching `po_*`/Account object.
+5. Persist an allow-listed `PayoutWebhookEvent` row. Stripe object snapshots
+   on `transfer.updated`/`payout.updated` are observational; only exact typed
+   `payout.paid`, `payout.failed`, or `payout.canceled` events are terminal.
+6. For payout-object evidence, return success after the Postgres commit and
+   send a best-effort Northflank wake-up with no payout/customer identifiers.
+7. For Stripe `account.updated`, claim the committed row under the finance
+   recovery gate, retrieve/configure the exact account, atomically persist the
+   sanitized account/method state plus audit, then mark the inbox row
+   processed. A lock or processing failure returns non-2xx for Stripe
+   redelivery.
 
 Raw provider payloads, signature headers, bank details, and provider error
 bodies are not stored in the inbox. Event deduplication is permanent and uses
@@ -63,7 +78,12 @@ available. It never deduplicates solely by transfer ID because one transfer can
 emit `processing`, `failed`, and `completed` events.
 
 The inbox processor claims rows with conditional updates. Stale claims recover
-after 15 minutes. A webhook that arrives before the API saves
+after 15 minutes. Every payout-object and Stripe account-sync path carries the
+exact inbox attempt and lease timestamp through its provider/local work and
+terminal update. Canonical payout completion also records that token and the
+database verifies it against the locked event before releasing liability; a
+stalled attempt cannot resume after a newer claimant, borrow its lease, or
+overwrite/complete that claim. A webhook that arrives before the API saves
 `providerExecutionId` remains retryable for up to 72 hours instead of being
 discarded. The 432-attempt ceiling is a secondary corruption/clock guard and
 does not shorten that age window under the capped ten-minute backoff.
@@ -71,6 +91,14 @@ Completion is version-guarded and locks `PublisherBalance` before incrementing
 `lifetimePaid`. A provider-completed transfer whose local execution is in an
 unsafe state is not mutated silently; it creates a
 `PAYOUT_WEBHOOK_STATE_CONFLICT` audit event for Finance review.
+
+The generic payout-completion worker deliberately excludes Stripe
+`account.updated`: it is routing eligibility, not proof that a payout
+completed. The API owns that event's durable lease and exact account sync.
+Provider refreshes never silently reactivate a publisher-disabled payout
+method; reactivation is a separate owner-authorized, audited command. Pending
+or failed account events remain visible in the incident query and require an
+exact signature-verified redelivery while recovery is allowed.
 
 ### Scheduled reconciliation
 
@@ -82,6 +110,15 @@ incident recovery and processes up to
 every 10 minutes; successive runs bound larger backlogs. Webhooks are the
 prompt signal, and polling is the independent recovery path.
 
+The dispatcher and every financial processor enforce
+`FINANCE_RUNTIME_MODE`. In `recovery_only`, payout/dispute recovery and
+reconciliation remain eligible while settlement approval/release,
+auto-acceptance, cancellation/acceptance deadlines, and delivery-driven
+liability work fail closed. In `locked`, financial recovery processors also
+pause; signed API webhook handlers continue recording durable inbox evidence.
+Non-financial reminder, website-verification, and domain-metric work is
+unaffected.
+
 ## Scheduled task catalog
 
 The task catalog remains individually runnable with `WORKER_MODE=scheduled`
@@ -89,6 +126,7 @@ and one `WORKER_TASK`:
 
 | `WORKER_TASK` | Recommended cron (UTC) | Notes |
 |---|---:|---|
+| `delivery-verification-dispatch` | `*/5 * * * *` | Recover active PENDING delivery rows whose post-commit queue dispatch failed; deterministic generation-scoped job IDs |
 | `payout-reconcile` | `*/10 * * * *` | Inbox + provider status safety net |
 | `settlement-auto-approve` | `*/15 * * * *` | Review-window approvals |
 | `settlement-auto-release` | `5,20,35,50 * * * *` | Offset from approval |
@@ -164,6 +202,14 @@ Keep payout provider credentials on this dispatcher only when provider polling
 is enabled; the realtime worker never receives payout initiation or payout
 method decryption keys.
 
+Provider status reads use a ten-second abort deadline, a 64 KiB response cap,
+JSON content checks, and strict amount/currency/reference/mode schemas. A
+timeout or malformed provider response skips that execution with a sanitized
+category; it cannot block the remaining reconciliation sweep. Stripe mode is
+re-read at both status-poll and terminal-failure mutation boundaries. Delayed
+test/live evidence or a disabled live gate performs no execution mutation; a
+verified failure webhook is exact-lease quarantined and alerts Finance.
+
 ## Redis configuration and command budget
 
 `QUEUE_REDIS_URL` is the BullMQ connection. It falls back to `REDIS_URL` for
@@ -197,7 +243,11 @@ Required on all worker lanes:
 
 Lane-specific:
 
-- Realtime: SMTP and verification/object-storage settings used by its queues
+- Realtime: SMTP and verification/object-storage settings used by its queues;
+  production requires `OBJECT_STORAGE_PROVIDER=r2|s3` and only the matching
+  complete R2/S3 bundle. Startup must successfully read the fixed
+  `.guestpost/evidence-storage-ready-v1` sentinel before consuming delivery
+  evidence jobs.
 - On demand: integration encryption/provider settings, report settings, payout
   provider settings for inbox recovery
 - Scheduled dispatcher: the union of credentials needed by enabled maintenance
@@ -224,22 +274,27 @@ independently.
 3. Deploy the additive `PayoutWebhookEvent` migration, which also enforces
    provider-scoped transfer-reference uniqueness.
 4. Build and publish one immutable API/worker image set.
-5. Create the two Northflank jobs with the new worker image: an on-demand drain
+5. Before starting the new realtime image, set its explicit production object
+   storage provider and matching credential bundle. Give the same bundle only
+   to scheduled tasks that consume the delivery-verification queue. Pre-create
+   and verify the evidence bucket; application startup never provisions
+   production storage.
+6. Create the two Northflank jobs with the new worker image: an on-demand drain
    with a ten-minute catch-up schedule and a five-minute maintenance dispatcher.
    Keep their schedules paused until cutover.
-6. Deploy the new API. Verified payout events now accumulate durably even if no
+7. Deploy the new API. Verified payout events now accumulate durably even if no
    job is running yet.
-7. Let the old worker drain `integration-sync` and `integration-discovery`, then
+8. Let the old worker drain `integration-sync` and `integration-discovery`, then
    verify both have zero waiting/active/delayed jobs. New producers sign these
    jobs; the new worker intentionally rejects any legacy unsigned payload.
-8. Stop every old worker replica. Do not overlap worker code versions.
-9. Start the realtime service with `WORKER_MODE=realtime`; confirm the log says
+9. Stop every old worker replica. Do not overlap worker code versions.
+10. Start the realtime service with `WORKER_MODE=realtime`; confirm the log says
    four queues and legacy repeatables were removed.
-10. Run the maintenance dispatcher in a payout-reconciliation slot, then run
+11. Run the maintenance dispatcher in a payout-reconciliation slot, then run
     the on-demand job once.
-11. Enable the five-minute maintenance schedule and the on-demand job's
+12. Enable the five-minute maintenance schedule and the on-demand job's
     ten-minute catch-up schedule.
-12. Verify health, queue depth, inbox state, Redis command rate, and financial
+13. Verify health, queue depth, inbox state, Redis command rate, and financial
     reconciliation before declaring the cutover complete.
 
 The safe emergency fallback is the same new image with `WORKER_MODE=all`. It

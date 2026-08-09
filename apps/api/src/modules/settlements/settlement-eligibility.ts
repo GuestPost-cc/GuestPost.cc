@@ -1,12 +1,8 @@
-import {
-  buildSettlementEligibilitySnapshot,
-  evaluateSettlementEligibility,
-} from "@guestpost/shared"
+import { evaluateLockedSettlementEligibility } from "@guestpost/shared"
 
 export async function evaluateSettlementEligibilityTx(
   tx: any,
   orderId: string,
 ) {
-  const snapshot = await buildSettlementEligibilitySnapshot(tx, orderId)
-  return evaluateSettlementEligibility(snapshot)
+  return evaluateLockedSettlementEligibility(tx, orderId)
 }

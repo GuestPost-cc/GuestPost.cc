@@ -115,8 +115,14 @@ export async function makeOrder(
       | "PUBLISHED"
     fulfillmentChannel?: "PUBLISHER" | "PLATFORM"
     amount?: number
+    currency?: string
     title?: string
     paymentStatus?: string
+    listingId?: string
+    listingServiceId?: string
+    revisionRoundsSnapshot?: number | null
+    turnaroundDays?: number
+    warrantyDays?: number | null
   },
 ) {
   const suffix = uniqueSuffix()
@@ -129,8 +135,14 @@ export async function makeOrder(
       websiteId: args.websiteId ?? null,
       fulfillmentChannel: args.fulfillmentChannel ?? "PLATFORM",
       amount: args.amount ?? 100,
+      currency: args.currency ?? "USD",
       title: args.title ?? `Test order ${suffix}`,
       paymentStatus: args.paymentStatus ?? "PENDING",
+      listingId: args.listingId ?? null,
+      listingServiceId: args.listingServiceId ?? null,
+      revisionRoundsSnapshot: args.revisionRoundsSnapshot ?? null,
+      turnaroundDays: args.turnaroundDays ?? null,
+      warrantyDays: args.warrantyDays ?? null,
     },
   })
 }
@@ -142,8 +154,9 @@ export async function makeOrderItem(
   prisma: AnyPrisma,
   args: {
     orderId: string
-    websiteId: string
+    websiteId: string | null
     price?: number
+    status?: "DRAFT" | "PENDING_PAYMENT" | "PAID" | "SUBMITTED"
   },
 ) {
   return prisma.orderItem.create({
@@ -151,7 +164,7 @@ export async function makeOrderItem(
       orderId: args.orderId,
       websiteId: args.websiteId,
       price: args.price ?? 100,
-      status: "PAID",
+      status: args.status ?? "PENDING_PAYMENT",
     },
   })
 }

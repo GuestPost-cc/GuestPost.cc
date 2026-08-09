@@ -1,6 +1,12 @@
-import { type CustomerRole, QUEUES } from "@guestpost/shared"
+import {
+  type CustomerRole,
+  QUEUES,
+  runSerializableTransactionWithRetry,
+} from "@guestpost/shared"
+import { isRetryablePrismaTransactionError } from "@guestpost/shared/dist/prisma-transaction-retry"
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -42,6 +48,12 @@ export class IdentityService {
           create: {
             userId: data.ownerId,
             role: "OWNER",
+          },
+        },
+        wallets: {
+          create: {
+            userId: data.ownerId,
+            currency: "USD",
           },
         },
       },
@@ -159,7 +171,12 @@ export class IdentityService {
     role: CustomerRole,
   ) {
     const membership = await this.prisma.membership.findFirst({
-      where: { organizationId, userId: callerUserId, role: { in: ["OWNER"] } },
+      where: {
+        organizationId,
+        userId: callerUserId,
+        role: "OWNER",
+        status: "ACTIVE",
+      },
     })
 
     if (!membership)
@@ -219,53 +236,112 @@ export class IdentityService {
     callerUserId: string,
     targetUserId: string,
   ) {
-    const callerMembership = await this.prisma.membership.findFirst({
-      where: { organizationId, userId: callerUserId, role: { in: ["OWNER"] } },
-    })
-    if (!callerMembership) {
-      throw new ForbiddenException(
-        "Only organization owners can remove members",
+    try {
+      await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx: any) => {
+          // All membership-removing commands lock affected User rows in
+          // stable order before the Organization aggregate. Admin role
+          // changes use the same User(s) -> Organization lock order.
+          const affectedUserIds = [
+            ...new Set([callerUserId, targetUserId]),
+          ].sort()
+          for (const affectedUserId of affectedUserIds) {
+            await tx.$queryRaw`
+              SELECT "id"
+              FROM "User"
+              WHERE "id" = ${affectedUserId}
+              FOR UPDATE
+            `
+          }
+
+          // Admin owner demotions take this same Organization aggregate lock.
+          // Serializing both entry points prevents concurrent removals and
+          // demotions from observing an owner the other command is removing.
+          await tx.$queryRaw`
+            SELECT "id"
+            FROM "Organization"
+            WHERE "id" = ${organizationId}
+            FOR UPDATE
+          `
+
+          const callerMembership = await tx.membership.findFirst({
+            where: {
+              organizationId,
+              userId: callerUserId,
+              role: "OWNER",
+              status: "ACTIVE",
+            },
+          })
+          if (!callerMembership) {
+            throw new ForbiddenException(
+              "Only active organization owners can remove members",
+            )
+          }
+
+          const targetMembership = await tx.membership.findUnique({
+            where: {
+              userId_organizationId: { userId: targetUserId, organizationId },
+            },
+          })
+          if (!targetMembership) {
+            throw new NotFoundException("Member not found in this organization")
+          }
+
+          if (
+            targetMembership.role === "OWNER" &&
+            targetMembership.status === "ACTIVE"
+          ) {
+            const ownerCount = await tx.membership.count({
+              where: { organizationId, role: "OWNER", status: "ACTIVE" },
+            })
+            if (ownerCount <= 1) {
+              throw new ForbiddenException(
+                "Cannot remove the last active owner of the organization",
+              )
+            }
+          }
+
+          await tx.membership.delete({
+            where: { id: targetMembership.id },
+          })
+          await this.audit.log(
+            {
+              action: "MEMBER_REMOVED",
+              entityType: "Membership",
+              entityId: targetMembership.id,
+              metadata: {
+                removedUserId: targetUserId,
+                removedRole: targetMembership.role,
+              },
+              userId: callerUserId,
+              organizationId,
+            },
+            tx,
+          )
+        },
       )
-    }
-
-    const targetMembership = await this.prisma.membership.findUnique({
-      where: {
-        userId_organizationId: { userId: targetUserId, organizationId },
-      },
-    })
-    if (!targetMembership)
-      throw new NotFoundException("Member not found in this organization")
-
-    if (targetMembership.role === "OWNER") {
-      const ownerCount = await this.prisma.membership.count({
-        where: { organizationId, role: "OWNER", status: "ACTIVE" },
-      })
-      if (ownerCount <= 1) {
-        throw new ForbiddenException(
-          "Cannot remove the last owner of the organization",
+    } catch (error: any) {
+      if (isRetryablePrismaTransactionError(error)) {
+        throw new ConflictException(
+          "Organization membership changed concurrently. Review the latest state and try again.",
         )
       }
+      throw error
     }
 
-    await this.prisma.membership.delete({ where: { id: targetMembership.id } })
+    // Revoke cached authorization only after the removal commits.
     invalidateAuthContext(targetUserId)
-
-    await this.audit.log({
-      action: "MEMBER_REMOVED",
-      entityType: "Membership",
-      entityId: targetMembership.id,
-      metadata: {
-        removedUserId: targetUserId,
-        removedRole: targetMembership.role,
-      },
-      userId: callerUserId,
-      organizationId,
-    })
   }
 
   async createTeam(organizationId: string, userId: string, name: string) {
     const membership = await this.prisma.membership.findFirst({
-      where: { organizationId, userId, role: { in: ["OWNER"] } },
+      where: {
+        organizationId,
+        userId,
+        role: "OWNER",
+        status: "ACTIVE",
+      },
     })
 
     if (!membership)
@@ -289,7 +365,12 @@ export class IdentityService {
 
   async deleteTeam(organizationId: string, userId: string, teamId: string) {
     const membership = await this.prisma.membership.findFirst({
-      where: { organizationId, userId, role: { in: ["OWNER"] } },
+      where: {
+        organizationId,
+        userId,
+        role: "OWNER",
+        status: "ACTIVE",
+      },
     })
     if (!membership)
       throw new ForbiddenException("Only organization owners can delete teams")
@@ -313,7 +394,7 @@ export class IdentityService {
 
   async listTeams(organizationId: string, userId: string) {
     const membership = await this.prisma.membership.findFirst({
-      where: { organizationId, userId },
+      where: { organizationId, userId, status: "ACTIVE" },
     })
 
     if (!membership)
@@ -324,7 +405,7 @@ export class IdentityService {
 
   async getOrganization(organizationId: string, userId: string) {
     const membership = await this.prisma.membership.findFirst({
-      where: { organizationId, userId },
+      where: { organizationId, userId, status: "ACTIVE" },
     })
     if (!membership)
       throw new ForbiddenException("You don't belong to this organization")
@@ -351,7 +432,7 @@ export class IdentityService {
 
   async listMembers(organizationId: string, userId: string) {
     const membership = await this.prisma.membership.findFirst({
-      where: { organizationId, userId },
+      where: { organizationId, userId, status: "ACTIVE" },
     })
     if (!membership)
       throw new ForbiddenException("You don't belong to this organization")

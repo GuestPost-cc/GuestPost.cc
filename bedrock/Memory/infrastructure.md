@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-07-19
+updated: 2026-08-03
 ---
 
 # Infrastructure
@@ -84,6 +84,31 @@ rollout, rollback, and quota-monitoring procedure.
 - **MinIO** — S3-compatible object storage (:9000 API, :9001 console)
 - **Mailpit** — dev SMTP server (:1025 SMTP, :8025 UI)
 
+`pnpm services:up` uses `.env.development` for Compose substitution, verifies
+the fixed local Postgres service, installs the database-side sentinel required
+by the privileged known-password seed, waits for the fixed local MinIO service
+to become healthy, and idempotently creates and verifies `MINIO_BUCKET` with
+the client bundled in that container. Invalid
+bucket names or app/server credential drift fail startup. This path cannot
+target R2/S3 and never auto-creates production storage; those buckets remain an
+operator responsibility.
+
+Runtime provider selection is atomic and environment-bound. Development/test
+read only the complete `MINIO_*` bundle and require the fixed local HTTP port
+9000, even if external credentials coexist. Production requires an explicit
+`OBJECT_STORAGE_PROVIDER=r2|s3`, reads only that provider's complete bundle,
+requires HTTPS external endpoints, and never falls back to MinIO. API and only
+worker lanes that can consume delivery-verification jobs validate this contract
+before serving or consuming; unrelated worker lanes do not receive the storage
+credentials.
+
+Production readiness performs only a bounded `HeadObject` for the fixed
+operator-provisioned sentinel. That proves endpoint, bucket, identity, and read
+authority; it deliberately does not prove `PutObject` permission. Before
+delivery or Finance lanes are opened in staging/production, operators must run
+an audited upload-and-retrieve canary with the exact runtime role, verify the
+bytes/checksum, and remove only that canary object under the retention policy.
+
 ## Environment
 
 - `.env.development` — dev env vars (loaded when `NODE_ENV=development`)
@@ -121,13 +146,20 @@ Resend, Google, or Sentry deployment credentials.
 
 ## Dev Commands
 
-- `pnpm dev:all` — compose + all apps (stable local stack); after the production build it removes only `apps/*/.next/dev` before starting Next dev servers so stale development route manifests cannot hide valid app-router pages.
+- `pnpm dev:all` — compose + all apps (stable local stack). It removes generated
+  `apps/*/.next` state before the production build to clear abandoned locks,
+  checks `prisma migrate status` after the build, removes production Next output
+  again, and only then starts API, worker, and Next dev servers. Pending, failed,
+  or unreachable migration state therefore fails before any application writer
+  starts; committed migrations remain an explicit hard-drain deploy operation.
 - `pnpm -F @guestpost/api test` — unit jest project only (fast feedback; ~5s for 47 suites / 652 tests)
 - `pnpm -F @guestpost/api test:integration` — integration jest project only (real-DB; ~3s/spec)
 - `pnpm -F @guestpost/api test:all` — both projects (48 suites / 653 tests as of 2026-06-22)
 - `pnpm test:concurrency` — parallel attack scenarios
 - `pnpm test:load [users=1000] [concurrency=50]` — load test
-- `pnpm seed` — DB seed script
+- `pnpm seed` — local-only known-password/demo-data fixture; refuses remote or
+  indirect API/database targets, missing database sentinel, and
+  non-development/test modes
 
 ## Prisma 7 + adapter-pg (Phase 7.13, 2026-06-21)
 
@@ -196,13 +228,59 @@ The default of 10 is conservative — suitable for up to ~5 API replicas sharing
 - #7 (Critical): pool was hardcoded to `max: 25` with no env-var override → closed by adding `PRISMA_POOL_MAX` + default 10.
 - #30 (Medium): pool config had no validation → closed by adding `parsePoolMax()` + `console.warn` on excess.
 
+## Integration Credential Encryption And Rotation
+
+Integration access and refresh tokens use AES-256-GCM and are encrypted as one
+credential pair. Every configured master key must be exactly 64 hexadecimal
+characters (32 bytes); malformed or explicitly empty values fail in every
+environment, and production has no fallback.
+
+`ExternalAccount.encryptionKeyVersion` records the key version shared by both
+token fields. New versioned deployments use
+`INTEGRATION_ENCRYPTION_KEYS={"1":"<old-64-hex>","2":"<new-64-hex>"}` plus
+`INTEGRATION_ENCRYPTION_ACTIVE_VERSION`. The keyring is bounded to 16 distinct
+positive versions; the active version must exist, be the highest configured
+version, and be at least 2. Do not configure the legacy
+`INTEGRATION_ENCRYPTION_KEY` at the same time.
+
+Version 2+ ciphertext carries a `v{version}:` envelope and AES-GCM additional
+authenticated data bound to provider, external user id, owner type, owner id,
+and token purpose (`access` or `refresh`). Copying ciphertext between accounts
+or token fields therefore fails authentication. OAuth, refresh, reconnect, and
+rotation update both ciphertexts and the stored version atomically; refresh
+uses compare-and-swap so it cannot overwrite a concurrent reconnect or rekey.
+Version 1 remains read-compatible only while its key is present.
+
+Hard rotation procedure:
+
+1. Add a new, distinct 64-hex key under a higher keyring version; keep every
+   version still referenced by an `ExternalAccount` row.
+2. Set that version as `INTEGRATION_ENCRYPTION_ACTIVE_VERSION`, deploy the
+   dual-read/new-write configuration, and stop if startup validation fails.
+3. Run `pnpm tsx scripts/rotate-integration-encryption.ts --verify-only` before
+   mutation, then run the command without `--verify-only`. It processes bounded
+   batches, locks each account, authenticates both old envelopes, and replaces
+   the pair with an exact compare-and-swap update.
+4. Run `--verify-only` again and confirm no active credential row references an
+   older version before removing any old key. A missing key, newer stored
+   version, invalid envelope, or concurrent credential change is a hard
+   failure—not a skipped success.
+
+Never log keys, plaintext tokens, or decrypted payloads. Rotation output is
+limited to row ids and normalized failure classes.
+
 ## Payout Encryption Key Rotation
 
 ### Architecture
 - **Algorithm**: AES-256-GCM, random 12-byte IV, 16-byte auth tag.
 - **Key derivation**: `scryptSync(masterKey, "payout-key-v{N}", 32)` per version number.
-- **Master key source**: `PAYOUT_ENCRYPTION_KEY` env var (64+ hex chars).
-- **Encrypted tables**: `PayoutMethod.details`, `PayoutProvider.config`.
+- **Master key source**: `PAYOUT_ENCRYPTION_KEY` env var (exactly 64
+  hexadecimal characters / 32 bytes). Any configured malformed value fails in
+  every environment.
+- **Encrypted fields**: every `PayoutMethod.details` value and every non-empty
+  `PayoutProvider.config`. Provider rows that use process-environment
+  credentials may store exactly `{}` as a no-secret sentinel; any non-empty
+  plaintext provider object is rejected by the runtime and verifier.
 - **Version columns**: `PayoutMethod.encryptionKeyVersion`, `PayoutProvider.configEncryptionKeyVersion`.
 - **Current version**: `CURRENT_PAYOUT_KEY_VERSION` at `apps/api/src/modules/publisher-payouts/payout-encryption.constants.ts` — single source of truth shared by the encryption service and the version verifier script.
 - **Dev fallback**: Version 0 (hardcoded dev key, blocked in production).
@@ -213,37 +291,63 @@ The default of 10 is conservative — suitable for up to ~5 API replicas sharing
 
 New encryptions use a fresh derived key; old rows remain decryptable.
 
-1. In `payout-encryption.constants.ts`, bump `CURRENT_PAYOUT_KEY_VERSION` from `1` to `2`.
-2. Deploy — new rows encrypt with `deriveKey(2)`, old rows (version 1) still decrypt.
-3. Verify via `pnpm test` — the rotation-safety test at `payout-decrypt-security.spec.ts:156` validates multi-version round-trips.
-4. (Optional) Re-encrypt old rows to the latest version (see Backfill below).
+1. Before the change, run
+   `pnpm tsx scripts/verify-encryption-versions.ts --decrypt`. Any unknown
+   version or decryption failure blocks the rotation.
+2. In `payout-encryption.constants.ts`, increment
+   `CURRENT_PAYOUT_KEY_VERSION` by exactly one.
+3. Deploy without changing `PAYOUT_ENCRYPTION_KEY`. New rows use the new
+   derived key; every version from `0` through the current version remains
+   readable from the same master key.
+4. Run the verifier again and exercise an audited payout-method decrypt plus a
+   new payout-method write/read canary.
 
-No data migration. Zero downtime.
+No data migration is required. There is currently no general-purpose
+re-encryption/backfill command; do not improvise one against production data.
 
-#### Hard rotation (change master key)
+#### Hard rotation (change master key) — NOT CURRENTLY SUPPORTED
 
-Use when the master key is potentially compromised.
+The runtime accepts only one master key. Directly changing
+`PAYOUT_ENCRYPTION_KEY` makes every row written under the old key
+undecryptable, regardless of its version number. The version verifier is an
+audit tool, not a re-encryption tool.
 
-1. Generate new master key: `openssl rand -hex 32`.
-2. BEFORE deploying the new key, re-encrypt all existing rows:
-   - For each `PayoutMethod`: decrypt with old key → encrypt with new key → update row.
-   - Same for each `PayoutProvider.config` row.
-3. Update `PAYOUT_ENCRYPTION_KEY` in the deployment environment.
-4. Deploy.
-5. Run `pnpm tsx scripts/verify-encryption-versions.ts --decrypt` to assert all samples decrypt.
-6. Securely erase the old master key after confirming no rollback.
+If the master key may be compromised:
+
+1. Set `FINANCE_RUNTIME_MODE=locked`, disable payout sends, and revoke
+   `FINANCIAL_DATA_DECRYPT` while retaining signed inbound evidence.
+2. Preserve the old key in the approved incident secret vault; do not replace
+   or erase it.
+3. Build and independently review a dual-key/keyring reader plus a resumable,
+   transactional, compare-and-swap re-encryption tool. It must cover active and
+   inactive `PayoutMethod` and `PayoutProvider` rows, retain per-row source-key
+   identity, verify every ciphertext, support safe restart, and preserve a
+   tested rollback window.
+4. Rehearse that tool on a sanitized production clone and approve a dedicated
+   incident change before touching production.
+
+Until that capability exists, a hard master-key rotation is an operational
+blocker, not a manual runbook procedure.
 
 ### Verifier
 - `scripts/verify-encryption-versions.ts` — standalone runtime tool.
-- `pnpm tsx scripts/verify-encryption-versions.ts` — version-only audit.
-- `pnpm tsx scripts/verify-encryption-versions.ts --decrypt` — decrypts one sample per (table, version).
+- `pnpm tsx scripts/verify-encryption-versions.ts` — version-only audit across
+  active and inactive encrypted rows.
+- `pnpm tsx scripts/verify-encryption-versions.ts --decrypt` — decrypts one
+  payout-method sample per version and validates every provider config,
+  including the empty-sentinel rule.
 - `pnpm tsx scripts/verify-encryption-versions.ts --json --quiet` — CI-friendly output.
-- Shared constant: `CURRENT_PAYOUT_KEY_VERSION` is imported from `payout-encryption.constants.ts` — no version drift between the service and the verifier.
+- Shared constant: `CURRENT_PAYOUT_KEY_VERSION` is imported from
+  `payout-encryption.constants.ts`; the supported set is every integer from
+  `0` through the current version, so intermediate historical versions remain
+  valid after repeated soft rotations.
 
 ### Post-rotation checklist
 1. [ ] Run `pnpm tsx scripts/verify-encryption-versions.ts` — all versions in supported set.
 2. [ ] Run `pnpm tsx scripts/verify-encryption-versions.ts --decrypt` — all samples decrypt.
-3. [ ] `pnpm test` passes (55+ suites).
-4. [ ] Manual spot-check: decrypt one old-row and one new-row `PayoutMethod` via the admin API.
-5. [ ] Update `payout-encryption.constants.ts` with the new version.
-6. [ ] Update this runbook with the rotation date and new version.
+3. [ ] Full tests and the payout security suites pass.
+4. [ ] Perform an authorized, audited decrypt canary for an old row and verify
+       a newly encrypted row can be read.
+5. [ ] Confirm the master-key secret value was not changed.
+6. [ ] Record the rotation date, old/current version, verifier output, and
+       approvers in the change record.

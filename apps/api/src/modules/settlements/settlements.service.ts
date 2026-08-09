@@ -7,6 +7,7 @@ import {
   notificationDedupKey,
   orderEventMetadata,
   type PublisherTier,
+  runSettlementSerializableTransaction,
   WorkflowDecisionService,
 } from "@guestpost/shared"
 import {
@@ -18,8 +19,9 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
 import {
-  resolvePlatformFeeFraction,
+  resolvePlatformFeePolicy,
   splitPlatformFee,
 } from "../../common/platform-fee"
 import { PrismaService } from "../../common/prisma.service"
@@ -54,6 +56,7 @@ export class SettlementsService {
     organizationId: string | null,
     userId: string,
   ) {
+    assertApiFinanceOperationAllowed("new_liability")
     const order = await this.prisma.order.findFirst({
       where: organizationId ? { id: orderId, organizationId } : { id: orderId },
     })
@@ -90,46 +93,13 @@ export class SettlementsService {
       })
     }
 
-    // Find publisher from order items' websites + the website's ownership
-    // type (we snapshot it onto Settlement so historical reports survive a
-    // later ownership change).
-    const item = await this.prisma.orderItem.findFirst({
-      where: { orderId, websiteId: { not: null } },
-      include: {
-        website: { select: { publisherId: true, ownershipType: true } },
-      },
-    })
-    const publisherId = item?.website?.publisherId
-    const ownerType = item?.website?.ownershipType ?? null
-    if (!publisherId)
-      throw new BadRequestException("No publisher found for this order")
-
-    // Phase 6: pull the per-service unitPrice from the snapshotted
-    // ListingService row. Always present for new orders (Phase 4 hard
-    // switch) but tolerate NULL for legacy orders that haven't been
-    // backfilled — the column is nullable and reports degrade gracefully.
-    const listingServiceId: string | null = order.listingServiceId ?? null
-    let serviceType: any = order.type ?? null
-    let unitPrice: Decimal | null = null
-    if (order.listingServiceId) {
-      const ls = await this.prisma.listingService.findUnique({
-        where: { id: order.listingServiceId },
-        select: { price: true, serviceType: true },
-      })
-      if (ls) {
-        unitPrice = new Decimal(ls.price)
-        serviceType = ls.serviceType
-      }
-    }
-
-    if (!order.amount || new Decimal(order.amount).lessThanOrEqualTo(0)) {
+    if (
+      !order.amount ||
+      new Decimal(order.amount).lessThanOrEqualTo(0) ||
+      new Decimal(order.amount).decimalPlaces() > 2
+    ) {
       throw new BadRequestException("Order has no amount to settle")
     }
-    const feeFraction = await resolvePlatformFeeFraction(this.prisma)
-    const { fee: platformFee, net: publisherAmount } = splitPlatformFee(
-      order.amount,
-      feeFraction,
-    )
 
     // Tier-aware review window (Phase 7.2 — audit #6). The publisher's payout
     // is held while we keep re-checking the live link. If it's removed during
@@ -140,123 +110,237 @@ export class SettlementsService {
     // per Phase 7.2 Key decision #6 — cheaper than cascading nested includes
     // into the existing include chain).
 
-    return this.prisma.$transaction(async (tx: any) => {
-      // Re-check inside transaction; partial unique index on Settlement.orderId
-      // (status != CANCELLED) is the hard guarantee against concurrent duplicates
-      const existing = await tx.settlement.findFirst({
-        where: { orderId, status: { not: "CANCELLED" } },
-      })
-      if (existing)
-        throw new BadRequestException(
-          "Settlement already exists for this order",
+    return runSettlementSerializableTransaction(
+      this.prisma,
+      async (tx: any) => {
+        // Re-check gating inside the transaction to close the TOCTOU window
+        // between the pre-transaction evaluateSettlementEligibility call
+        // (line 52) and this point — a dispute could have been opened, fraud
+        // flag raised, or order cancelled concurrently.
+        const txnEligibility = await evaluateSettlementEligibilityTx(
+          tx,
+          orderId,
         )
+        if (!txnEligibility.eligible) {
+          throw new BadRequestException({
+            code: "SETTLEMENT_BLOCKED",
+            message: `Settlement blocked: ${txnEligibility.reasons.join("; ")}`,
+            reasons: txnEligibility.reasons,
+          })
+        }
+        if (txnEligibility.snapshot.orderVersion !== order.version) {
+          throw new ConflictException(
+            "Order financial state changed while settlement was being prepared. Retry.",
+          )
+        }
 
-      const publisherTierRow = await tx.publisher.findUnique({
-        where: { id: publisherId },
-        select: { tier: true },
-      })
-      const reviewDays = getSettlementReviewDays(
-        (publisherTierRow?.tier ?? "NEW") as PublisherTier,
-        process.env.SETTLEMENT_REVIEW_DAYS,
-      )
-      const reviewEndsAt = new Date(
-        Date.now() + reviewDays * 24 * 60 * 60 * 1000,
-      )
-
-      // Compute release policy using the centralized decision service
-      const fraudFlags = await tx.deliveryFraudFlag.findMany({
-        where: { orderId },
-        select: { type: true },
-      })
-      const releasePolicy = this.decision.computeSettlementReleasePolicy(
-        { verifyMethod: order.verifyMethod, amount: Number(order.amount) },
-        publisherTierRow ? { tier: publisherTierRow.tier } : null,
-        fraudFlags,
-        null,
-      )
-
-      // Re-check gating inside the transaction to close the TOCTOU window
-      // between the pre-transaction evaluateSettlementEligibility call
-      // (line 52) and this point — a dispute could have been opened, fraud
-      // flag raised, or order cancelled concurrently.
-      const txnEligibility = await evaluateSettlementEligibilityTx(tx, orderId)
-      if (!txnEligibility.eligible) {
-        throw new BadRequestException({
-          code: "SETTLEMENT_BLOCKED",
-          message: `Settlement blocked: ${txnEligibility.reasons.join("; ")}`,
-          reasons: txnEligibility.reasons,
-        })
-      }
-
-      let settlement: any
-      try {
-        settlement = await tx.settlement.create({
-          data: {
-            orderId,
-            publisherId,
-            grossAmount: order.amount,
-            platformFee,
-            publisherAmount,
-            status: "PENDING",
-            reviewEndsAt,
-            releasePolicy,
-            // Phase 6 snapshots (read-only after creation).
-            listingServiceId,
-            serviceType,
-            ownerType,
-            fulfillmentChannel: order.fulfillmentChannel ?? null,
-            unitPrice,
+        // The eligibility helper has now locked the parent Order row. Every
+        // financial and attribution snapshot below is re-read from that locked
+        // row; pre-transaction OrderItem/live-listing data is never trusted for
+        // publisher liability.
+        const lockedOrder = await tx.order.findUnique({
+          where: { id: orderId },
+          select: {
+            id: true,
+            organizationId: true,
+            version: true,
+            amount: true,
+            currency: true,
+            status: true,
+            paymentStatus: true,
+            verifyMethod: true,
+            listingId: true,
+            listingServiceId: true,
+            type: true,
+            fulfillmentChannel: true,
+            websiteId: true,
           },
         })
-      } catch (err: any) {
+        if (!lockedOrder) throw new NotFoundException("Order not found")
         if (
-          err?.code === "P2002" ||
-          /Settlement_orderId_active_key/.test(err?.message ?? "")
+          lockedOrder.version !== order.version ||
+          lockedOrder.organizationId !== order.organizationId ||
+          (organizationId && lockedOrder.organizationId !== organizationId)
         ) {
+          throw new ConflictException(
+            "Order ownership or financial state changed while settlement was being prepared. Retry.",
+          )
+        }
+
+        const grossAmount = lockedOrder.amount
+          ? new Decimal(lockedOrder.amount)
+          : null
+        if (
+          lockedOrder.currency !== "USD" ||
+          lockedOrder.status !== "DELIVERED" ||
+          lockedOrder.paymentStatus !== "PAID" ||
+          !grossAmount ||
+          grossAmount.lessThanOrEqualTo(0) ||
+          grossAmount.decimalPlaces() > 2
+        ) {
+          throw new BadRequestException(
+            "Order must be paid, delivered, exact-USD, and have a positive whole-cent amount to settle",
+          )
+        }
+        if (!lockedOrder.websiteId) {
+          throw new BadRequestException(
+            "Order has no canonical website for publisher attribution",
+          )
+        }
+
+        const website = await tx.website.findUnique({
+          where: { id: lockedOrder.websiteId },
+          select: { publisherId: true, ownershipType: true },
+        })
+        const publisherId = website?.publisherId
+        const ownerType = website?.ownershipType ?? null
+        if (!publisherId) {
+          throw new BadRequestException(
+            "Order website has no publisher for settlement attribution",
+          )
+        }
+
+        const existing = await tx.settlement.findFirst({
+          where: { orderId, status: { not: "CANCELLED" } },
+        })
+        if (existing) {
           throw new BadRequestException(
             "Settlement already exists for this order",
           )
         }
-        throw err
-      }
 
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "SETTLEMENT_CREATED",
-          actorId: userId,
-          message: `Settlement created — customer amount: ${order.amount}, publisher amount: ${publisherAmount}`,
-          metadata: {
-            settlementId: settlement.id,
-            releasePolicy,
-            publisherAmount: publisherAmount.toNumber(),
-            platformFee: platformFee.toNumber(),
+        const listingServiceId: string | null =
+          lockedOrder.listingServiceId ?? null
+        let serviceType: any = lockedOrder.type ?? null
+        let unitPrice: Decimal | null = null
+        if (listingServiceId) {
+          const listingService = await tx.listingService.findUnique({
+            where: { id: listingServiceId },
+            select: { price: true, serviceType: true },
+          })
+          if (!listingService) {
+            throw new ConflictException(
+              "Order listing-service snapshot is unavailable. Settlement requires review.",
+            )
+          }
+          unitPrice = new Decimal(listingService.price)
+          serviceType = listingService.serviceType
+        }
+
+        const feePolicy = await resolvePlatformFeePolicy(tx)
+        const { fee: platformFee, net: publisherAmount } = splitPlatformFee(
+          grossAmount,
+          feePolicy.fraction,
+        )
+        if (
+          platformFee.lessThan(0) ||
+          publisherAmount.lessThanOrEqualTo(0) ||
+          !platformFee.plus(publisherAmount).equals(grossAmount)
+        ) {
+          throw new BadRequestException(
+            "Settlement fee split is not a valid exact-USD allocation",
+          )
+        }
+
+        const publisherTierRow = await tx.publisher.findUnique({
+          where: { id: publisherId },
+          select: { tier: true },
+        })
+        const reviewDays = getSettlementReviewDays(
+          (publisherTierRow?.tier ?? "NEW") as PublisherTier,
+          process.env.SETTLEMENT_REVIEW_DAYS,
+        )
+        const reviewEndsAt = new Date(
+          Date.now() + reviewDays * 24 * 60 * 60 * 1000,
+        )
+
+        const fraudFlags = await tx.deliveryFraudFlag.findMany({
+          where: { orderId, resolution: null },
+          select: { type: true },
+        })
+        const releasePolicy = this.decision.computeSettlementReleasePolicy(
+          {
+            verifyMethod: lockedOrder.verifyMethod,
+            amount: grossAmount.toNumber(),
           },
-        },
-      })
+          publisherTierRow ? { tier: publisherTierRow.tier } : null,
+          fraudFlags,
+          null,
+        )
 
-      await this.audit.log(
-        {
-          action: "SETTLEMENT_CREATED",
-          entityType: "Settlement",
-          entityId: settlement.id,
-          // Standardized Phase 6 metadata helper — every order-scoped audit
-          // should carry the snapshot trio so historical reports / replays
-          // never have to chase the live listing.
-          metadata: {
+        let settlement: any
+        try {
+          settlement = await tx.settlement.create({
+            data: {
+              orderId,
+              publisherId,
+              grossAmount,
+              currency: "USD",
+              platformFee,
+              publisherAmount,
+              platformFeeBps: feePolicy.basisPoints,
+              feePolicyVersion: feePolicy.policyVersion,
+              status: "PENDING",
+              reviewEndsAt,
+              releasePolicy,
+              // Phase 6 snapshots (read-only after creation).
+              listingServiceId,
+              serviceType,
+              ownerType,
+              fulfillmentChannel: lockedOrder.fulfillmentChannel ?? null,
+              unitPrice,
+            },
+          })
+        } catch (err: any) {
+          if (
+            err?.code === "P2002" ||
+            /Settlement_orderId_active_key/.test(err?.message ?? "")
+          ) {
+            throw new BadRequestException(
+              "Settlement already exists for this order",
+            )
+          }
+          throw err
+        }
+
+        await tx.orderEvent.create({
+          data: {
             orderId,
-            publisherAmount: publisherAmount.toNumber(),
-            platformFee: platformFee.toNumber(),
-            ...orderEventMetadata(order),
+            eventType: "SETTLEMENT_CREATED",
+            actorId: userId,
+            message: `Settlement created — customer amount: ${grossAmount}, publisher amount: ${publisherAmount}`,
+            metadata: {
+              settlementId: settlement.id,
+              releasePolicy,
+              publisherAmount: publisherAmount.toNumber(),
+              platformFee: platformFee.toNumber(),
+            },
           },
-          userId,
-          organizationId: order.organizationId,
-        },
-        tx,
-      )
+        })
 
-      return settlement
-    })
+        await this.audit.log(
+          {
+            action: "SETTLEMENT_CREATED",
+            entityType: "Settlement",
+            entityId: settlement.id,
+            // Standardized Phase 6 metadata helper — every order-scoped audit
+            // should carry the snapshot trio so historical reports / replays
+            // never have to chase the live listing.
+            metadata: {
+              orderId,
+              publisherAmount: publisherAmount.toNumber(),
+              platformFee: platformFee.toNumber(),
+              ...orderEventMetadata(lockedOrder),
+            },
+            userId,
+            organizationId: lockedOrder.organizationId,
+          },
+          tx,
+        )
+
+        return settlement
+      },
+    )
   }
 
   // organizationId is null for staff callers — customers may only see their own org's settlements
@@ -309,6 +393,7 @@ export class SettlementsService {
     role: string,
     actorCustomerRole?: string | null,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -338,6 +423,9 @@ export class SettlementsService {
         `Cannot approve settlement in ${settlement.status} status`,
       )
     }
+    if (settlement.currency !== "USD") {
+      throw new BadRequestException("Settlement currency must be exactly USD")
+    }
 
     // Check for active dispute
     const activeDispute = await this.prisma.orderDispute.findFirst({
@@ -351,71 +439,91 @@ export class SettlementsService {
         "Cannot approve settlement while dispute is active",
       )
 
-    return this.prisma.$transaction(async (tx: any) => {
-      // Conditional transition — the unguarded update here could overwrite a
-      // settlement that was concurrently RELEASED (status corruption; the
-      // pre-tx status check reads a stale snapshot).
-      const transitioned = await tx.settlement.updateMany({
-        where: {
-          id,
-          status: { in: ["PENDING", "UNDER_REVIEW"] },
-          version: settlement.version,
-        },
-        data: { status: "CUSTOMER_APPROVED", version: { increment: 1 } },
-      })
-      if (transitioned.count === 0) {
-        throw new ConflictException(
-          "Settlement was modified by another request. Retry.",
+    return runSettlementSerializableTransaction(
+      this.prisma,
+      async (tx: any) => {
+        const eligibility = await evaluateSettlementEligibilityTx(
+          tx,
+          settlement.orderId,
         )
-      }
-      const updated = await tx.settlement.findUniqueOrThrow({ where: { id } })
+        if (!eligibility.eligible) {
+          throw new BadRequestException({
+            code: "SETTLEMENT_BLOCKED",
+            message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+            reasons: eligibility.reasons,
+          })
+        }
 
-      await tx.settlementApproval.upsert({
-        where: { settlementId_type: { settlementId: id, type: "CUSTOMER" } },
-        create: {
-          settlementId: id,
-          type: "CUSTOMER",
-          approvedBy: userId,
-          roleAtTime: role,
-        },
-        update: {
-          approvedBy: userId,
-          roleAtTime: role,
-          approvedAt: new Date(),
-        },
-      })
+        // Conditional transition — the unguarded update here could overwrite a
+        // settlement that was concurrently RELEASED (status corruption; the
+        // pre-tx status check reads a stale snapshot).
+        const transitioned = await tx.settlement.updateMany({
+          where: {
+            id,
+            status: { in: ["PENDING", "UNDER_REVIEW"] },
+            version: settlement.version,
+            currency: "USD",
+          },
+          data: {
+            status: "CUSTOMER_APPROVED",
+            currency: "USD",
+            version: { increment: 1 },
+          },
+        })
+        if (transitioned.count === 0) {
+          throw new ConflictException(
+            "Settlement was modified by another request. Retry.",
+          )
+        }
+        const updated = await tx.settlement.findUniqueOrThrow({ where: { id } })
 
-      await tx.orderEvent.create({
-        data: {
-          orderId: settlement.orderId,
-          eventType: "SETTLED",
-          actorId: userId,
-          message: `Settlement customer-approved`,
-          metadata: {
+        await tx.settlementApproval.upsert({
+          where: { settlementId_type: { settlementId: id, type: "CUSTOMER" } },
+          create: {
             settlementId: id,
-            publisherAmount: Number(settlement.publisherAmount),
+            type: "CUSTOMER",
+            approvedBy: userId,
+            roleAtTime: role,
           },
-        },
-      })
+          update: {
+            approvedBy: userId,
+            roleAtTime: role,
+            approvedAt: new Date(),
+          },
+        })
 
-      await this.audit.log(
-        {
-          action: "SETTLEMENT_CUSTOMER_APPROVED",
-          entityType: "Settlement",
-          entityId: id,
-          metadata: {
-            ...orderEventMetadata(settlement.order),
+        await tx.orderEvent.create({
+          data: {
             orderId: settlement.orderId,
-            publisherAmount: Number(settlement.publisherAmount),
+            eventType: "SETTLED",
+            actorId: userId,
+            message: `Settlement customer-approved`,
+            metadata: {
+              settlementId: id,
+              publisherAmount: Number(settlement.publisherAmount),
+            },
           },
-          userId,
-          organizationId,
-        },
-        tx,
-      )
+        })
 
-      return updated
-    })
+        await this.audit.log(
+          {
+            action: "SETTLEMENT_CUSTOMER_APPROVED",
+            entityType: "Settlement",
+            entityId: id,
+            metadata: {
+              ...orderEventMetadata(settlement.order),
+              orderId: settlement.orderId,
+              publisherAmount: Number(settlement.publisherAmount),
+            },
+            userId,
+            organizationId,
+          },
+          tx,
+        )
+
+        return updated
+      },
+    )
   }
 
   // Fired after the release transaction commits — queue writes are not transactional
@@ -495,6 +603,25 @@ export class SettlementsService {
     }
   }
 
+  private async enqueueSettlementTrustRecompute(
+    settlementId: string,
+    publisherId: string,
+  ) {
+    try {
+      await this.queue.enqueueTrustRecompute(
+        publisherId,
+        "SETTLEMENT_RELEASED",
+        `settlement ${settlementId} released`,
+      )
+    } catch (error) {
+      // Queue I/O is not transactional. A queue outage must never roll back or
+      // falsely report failure for an already-committed money transition.
+      this.logger.warn(
+        `Failed to enqueue publisher trust recompute after settlement ${settlementId}: ${error}`,
+      )
+    }
+  }
+
   // Staff approves settlement (admin side)
   async adminApprove(
     id: string,
@@ -502,6 +629,7 @@ export class SettlementsService {
     userId: string,
     staffRole: string,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -515,85 +643,90 @@ export class SettlementsService {
 
     const previousStatus = settlement.status
 
-    const { result, releaseSummary } = await this.prisma.$transaction(
-      async (tx: any) => {
-        // Re-check with fresh transactional snapshot — closes TOCTOU window
-        const eligibility = await evaluateSettlementEligibilityTx(
-          tx,
-          settlement.orderId,
-        )
-        if (!eligibility.eligible) {
-          throw new BadRequestException({
-            code: "SETTLEMENT_BLOCKED",
-            message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
-            reasons: eligibility.reasons,
-          })
-        }
-
-        const adminUpdated = await tx.settlement.updateMany({
-          where: {
-            id,
-            status: "CUSTOMER_APPROVED",
-            version: settlement.version,
-          },
-          data: {
-            status: "ADMIN_APPROVED",
-            version: { increment: 1 },
-          },
-        })
-        if (adminUpdated.count === 0) {
-          throw new ConflictException(
-            "Settlement status changed by another request",
+    const { result, releaseSummary } =
+      await runSettlementSerializableTransaction(
+        this.prisma,
+        async (tx: any) => {
+          // Re-check with fresh transactional snapshot — closes TOCTOU window
+          const eligibility = await evaluateSettlementEligibilityTx(
+            tx,
+            settlement.orderId,
           )
-        }
+          if (!eligibility.eligible) {
+            throw new BadRequestException({
+              code: "SETTLEMENT_BLOCKED",
+              message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+              reasons: eligibility.reasons,
+            })
+          }
 
-        const fresh = await tx.settlement.findUniqueOrThrow({ where: { id } })
-
-        await tx.settlementApproval.create({
-          data: {
-            settlementId: id,
-            type: "ADMIN",
-            approvedBy: userId,
-            roleAtTime: staffRole,
-          },
-        })
-
-        // Auto-release if admin approved
-        const releaseSummary = await this.releaseFundsInternal(
-          tx,
-          id,
-          { ...settlement, version: fresh.version },
-          userId,
-        )
-
-        await this.audit.log(
-          {
-            action: "SETTLEMENT_ADMIN_APPROVED",
-            entityType: "Settlement",
-            entityId: id,
-            metadata: {
-              orderId: settlement.orderId,
-              ...orderEventMetadata(settlement.order),
-              reason,
-              actorRole: staffRole,
-              previousStatus,
-              newStatus: "ADMIN_APPROVED",
-              publisherAmount:
-                settlement.publisherAmount?.toNumber?.() ??
-                Number(settlement.publisherAmount),
+          const adminUpdated = await tx.settlement.updateMany({
+            where: {
+              id,
+              status: "CUSTOMER_APPROVED",
+              version: settlement.version,
             },
+            data: {
+              status: "ADMIN_APPROVED",
+              version: { increment: 1 },
+            },
+          })
+          if (adminUpdated.count === 0) {
+            throw new ConflictException(
+              "Settlement status changed by another request",
+            )
+          }
+
+          const fresh = await tx.settlement.findUniqueOrThrow({ where: { id } })
+
+          await tx.settlementApproval.create({
+            data: {
+              settlementId: id,
+              type: "ADMIN",
+              approvedBy: userId,
+              roleAtTime: staffRole,
+            },
+          })
+
+          // Auto-release if admin approved
+          const releaseSummary = await this.releaseFundsInternal(
+            tx,
+            id,
+            { ...settlement, version: fresh.version },
             userId,
-            organizationId: settlement.order.organizationId,
-          },
-          tx,
-        )
+          )
 
-        // Row is now RELEASED — return the final state, not the snapshot
-        const result = await tx.settlement.findUniqueOrThrow({ where: { id } })
-        return { result, releaseSummary }
-      },
-    )
+          await this.audit.log(
+            {
+              action: "SETTLEMENT_ADMIN_APPROVED",
+              entityType: "Settlement",
+              entityId: id,
+              metadata: {
+                orderId: settlement.orderId,
+                ...orderEventMetadata(settlement.order),
+                reason,
+                actorRole: staffRole,
+                previousStatus,
+                newStatus: "ADMIN_APPROVED",
+                publisherAmount:
+                  settlement.publisherAmount?.toNumber?.() ??
+                  Number(settlement.publisherAmount),
+              },
+              userId,
+              organizationId: settlement.order.organizationId,
+            },
+            tx,
+          )
 
+          // Row is now RELEASED — return the final state, not the snapshot
+          const result = await tx.settlement.findUniqueOrThrow({
+            where: { id },
+          })
+          return { result, releaseSummary }
+        },
+      )
+
+    await this.enqueueSettlementTrustRecompute(id, settlement.publisherId)
     await this.notifySettlementReleased(settlement, releaseSummary)
 
     return result
@@ -606,6 +739,7 @@ export class SettlementsService {
     userId: string,
     staffRole: string,
   ) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -621,88 +755,91 @@ export class SettlementsService {
         ? "ADMIN_APPROVED"
         : "CUSTOMER_APPROVED"
 
-    const { result, releaseSummary } = await this.prisma.$transaction(
-      async (tx: any) => {
-        // Fresh eligibility check with locked snapshot — closes TOCTOU window
-        const eligibility = await evaluateSettlementEligibilityTx(
-          tx,
-          settlement.orderId,
-        )
-        if (!eligibility.eligible) {
-          throw new BadRequestException({
-            code: "SETTLEMENT_BLOCKED",
-            message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
-            reasons: eligibility.reasons,
-          })
-        }
-
-        const updated = await tx.settlement.updateMany({
-          where: { id, version: settlement.version },
-          data: {
-            status: targetStatus,
-            version: { increment: 1 },
-          },
-        })
-        if (updated.count === 0) {
-          throw new ConflictException(
-            "Settlement was modified by another request",
+    const { result, releaseSummary } =
+      await runSettlementSerializableTransaction(
+        this.prisma,
+        async (tx: any) => {
+          // Fresh eligibility check with locked snapshot — closes TOCTOU window
+          const eligibility = await evaluateSettlementEligibilityTx(
+            tx,
+            settlement.orderId,
           )
-        }
+          if (!eligibility.eligible) {
+            throw new BadRequestException({
+              code: "SETTLEMENT_BLOCKED",
+              message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+              reasons: eligibility.reasons,
+            })
+          }
 
-        const fresh = await tx.settlement.findUniqueOrThrow({ where: { id } })
-
-        await tx.settlementApproval.create({
-          data: {
-            settlementId: id,
-            type: targetStatus === "ADMIN_APPROVED" ? "ADMIN" : "CUSTOMER",
-            approvedBy: userId,
-            roleAtTime: staffRole,
-          },
-        })
-
-        const releaseSummary =
-          targetStatus === "ADMIN_APPROVED"
-            ? await this.releaseFundsInternal(
-                tx,
-                id,
-                { ...settlement, version: fresh.version },
-                userId,
-              )
-            : null
-
-        await this.audit.log(
-          {
-            action: "SETTLEMENT_FORCE_APPROVED",
-            entityType: "Settlement",
-            entityId: id,
-            metadata: {
-              orderId: settlement.orderId,
-              ...orderEventMetadata(settlement.order),
-              reason,
-              actorRole: staffRole,
-              previousStatus,
-              newStatus: targetStatus,
-              publisherAmount:
-                settlement.publisherAmount?.toNumber?.() ??
-                Number(settlement.publisherAmount),
+          const updated = await tx.settlement.updateMany({
+            where: { id, version: settlement.version },
+            data: {
+              status: targetStatus,
+              version: { increment: 1 },
             },
-            userId,
-            organizationId: settlement.order.organizationId,
-          },
-          tx,
-        )
+          })
+          if (updated.count === 0) {
+            throw new ConflictException(
+              "Settlement was modified by another request",
+            )
+          }
 
-        // releaseFundsInternal moved the row to RELEASED — return the final
-        // state, not the pre-release snapshot
-        const result =
-          targetStatus === "ADMIN_APPROVED"
-            ? await tx.settlement.findUnique({ where: { id } })
-            : fresh
-        return { result, releaseSummary }
-      },
-    )
+          const fresh = await tx.settlement.findUniqueOrThrow({ where: { id } })
+
+          await tx.settlementApproval.create({
+            data: {
+              settlementId: id,
+              type: targetStatus === "ADMIN_APPROVED" ? "ADMIN" : "CUSTOMER",
+              approvedBy: userId,
+              roleAtTime: staffRole,
+            },
+          })
+
+          const releaseSummary =
+            targetStatus === "ADMIN_APPROVED"
+              ? await this.releaseFundsInternal(
+                  tx,
+                  id,
+                  { ...settlement, version: fresh.version },
+                  userId,
+                )
+              : null
+
+          await this.audit.log(
+            {
+              action: "SETTLEMENT_FORCE_APPROVED",
+              entityType: "Settlement",
+              entityId: id,
+              metadata: {
+                orderId: settlement.orderId,
+                ...orderEventMetadata(settlement.order),
+                reason,
+                actorRole: staffRole,
+                previousStatus,
+                newStatus: targetStatus,
+                publisherAmount:
+                  settlement.publisherAmount?.toNumber?.() ??
+                  Number(settlement.publisherAmount),
+              },
+              userId,
+              organizationId: settlement.order.organizationId,
+            },
+            tx,
+          )
+
+          // releaseFundsInternal moved the row to RELEASED — return the final
+          // state, not the pre-release snapshot
+          const result =
+            targetStatus === "ADMIN_APPROVED"
+              ? await tx.settlement.findUnique({ where: { id } })
+              : fresh
+          return { result, releaseSummary }
+        },
+      )
 
     if (targetStatus === "ADMIN_APPROVED") {
+      await this.enqueueSettlementTrustRecompute(id, settlement.publisherId)
       await this.notifySettlementReleased(settlement, releaseSummary!)
     }
 
@@ -710,6 +847,7 @@ export class SettlementsService {
   }
 
   async cancelSettlement(id: string, userId: string, reason: string) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true, publisher: true },
@@ -756,6 +894,7 @@ export class SettlementsService {
   }
 
   async returnToReview(id: string, userId: string, reason: string) {
+    assertApiFinanceOperationAllowed("operator_decision")
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -841,6 +980,27 @@ export class SettlementsService {
     settlement: any,
     userId: string,
   ) {
+    // The final money boundary owns its eligibility proof. Callers may perform
+    // earlier checks for UX, but no future/manual/automated path can release by
+    // invoking this method around the canonical locked decision.
+    const eligibility = await evaluateSettlementEligibilityTx(
+      tx,
+      settlement.orderId,
+    )
+    if (eligibility.snapshot.orderStatus === "NOT_FOUND") {
+      throw new NotFoundException("Order not found for settlement release")
+    }
+    if (!eligibility.eligible) {
+      throw new BadRequestException({
+        code: "SETTLEMENT_BLOCKED",
+        message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+        reasons: eligibility.reasons,
+      })
+    }
+    if (settlement.currency !== "USD") {
+      throw new BadRequestException("Settlement currency must be exactly USD")
+    }
+
     // Separation of duties: for platform inventory the fulfiller may not also
     // release the settlement. Look up the order's ownership + active delivery
     // submitter and block self-release.
@@ -909,6 +1069,7 @@ export class SettlementsService {
       },
       data: {
         status: "RELEASED",
+        currency: "USD",
         settledAt: new Date(),
         version: { increment: 1 },
       },
@@ -923,6 +1084,11 @@ export class SettlementsService {
       tx,
       settlement.publisherId,
     )
+    if (balance && balance.currency !== "USD") {
+      throw new BadRequestException(
+        "Publisher balance currency must be exactly USD",
+      )
+    }
 
     const publisherAmount = new Decimal(settlement.publisherAmount)
     // Outstanding clawback debt is repaid before anything reaches
@@ -940,6 +1106,7 @@ export class SettlementsService {
           version: balance.version,
         },
         data: {
+          currency: "USD",
           withdrawableBalance: { increment: credited },
           debtBalance: { decrement: debtApplied },
           lifetimeEarnings: { increment: publisherAmount },
@@ -965,6 +1132,7 @@ export class SettlementsService {
       await tx.publisherBalance.create({
         data: {
           publisherId: settlement.publisherId,
+          currency: "USD",
           withdrawableBalance: publisherAmount,
           lifetimeEarnings: publisherAmount,
         },
@@ -976,10 +1144,9 @@ export class SettlementsService {
     //
     // Phase 8.2 (audit #2) — version-guarded so a concurrent order mutation
     // (customer dispute, force-cancel) doesn't get silently overwritten. A
-    // status predicate excludes terminal states (CANCELLED, REFUNDED, DISPUTED)
-    // as defense-in-depth: even if a concurrent mutation doesn't bump the order
-    // version, the status check prevents COMPLETED from overwriting a terminal
-    // state.
+    // Exact status/currency/payment predicates mirror the canonical gate as
+    // defense in depth. A newly introduced state can never become payout-
+    // eligible through a permissive notIn condition.
     // `order` may be null (the pre-existing null-check on line 517 covers
     // the SoD branch); if null at this point we still need to handle it.
     if (!order)
@@ -988,7 +1155,9 @@ export class SettlementsService {
       where: {
         id: settlement.orderId,
         version: order.version,
-        status: { notIn: ["CANCELLED", "REFUNDED", "DISPUTED"] },
+        status: "DELIVERED",
+        currency: "USD",
+        paymentStatus: "PAID",
       },
       data: {
         status: "COMPLETED",
@@ -1007,16 +1176,10 @@ export class SettlementsService {
       )
     }
 
-    // Event-driven trust recompute (proven completion + payout released).
-    await this.queue.enqueueTrustRecompute(
-      settlement.publisherId,
-      "SETTLEMENT_RELEASED",
-      `settlement ${settlementId} released`,
-    )
-
     await tx.transaction.create({
       data: {
         amount: publisherAmount,
+        currency: "USD",
         type: "SETTLEMENT_RELEASE",
         orderId: settlement.orderId,
         publisherId: settlement.publisherId,
@@ -1029,6 +1192,7 @@ export class SettlementsService {
       await tx.transaction.create({
         data: {
           amount: debtApplied.negated(),
+          currency: "USD",
           type: "DEBT_REPAYMENT",
           orderId: settlement.orderId,
           publisherId: settlement.publisherId,
@@ -1077,7 +1241,7 @@ export class SettlementsService {
       publisherAmount: publisherAmount.toFixed(2),
       debtApplied: debtApplied.toFixed(2),
       credited: credited.toFixed(2),
-      currency: order.currency ?? "USD",
+      currency: "USD",
     }
   }
 }

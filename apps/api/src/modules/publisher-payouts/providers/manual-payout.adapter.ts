@@ -13,7 +13,7 @@ export class ManualPayoutAdapter implements PayoutProviderAdapter {
   readonly capabilities = {
     supportedCurrencies: ["USD"],
     supportsBankPayout: true,
-    supportsCancellation: true,
+    supportsCancellation: false,
     supportsWebhooks: false,
     supportsStatusPolling: false,
     supportsExternalReference: true,
@@ -56,12 +56,11 @@ export class ManualPayoutAdapter implements PayoutProviderAdapter {
   }
 
   async cancelTransfer(
-    providerExecutionId: string,
+    _providerExecutionId: string,
     _idempotencyKey: string,
   ): Promise<CancelTransferResult> {
-    return {
-      success: true,
-      providerExecutionId,
-    }
+    throw new Error(
+      "Manual bank payouts cannot be cancelled without external reversal evidence",
+    )
   }
 }

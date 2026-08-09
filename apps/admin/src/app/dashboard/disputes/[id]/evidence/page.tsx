@@ -84,10 +84,15 @@ export default function DisputeEvidencePage({
             {data.fraudFlags.map((f: any) => (
               <Badge
                 key={f.id}
-                variant="destructive"
-                title={JSON.stringify(f.details)}
+                variant={f.resolution ? "outline" : "destructive"}
+                title={
+                  f.resolution
+                    ? `${f.resolution.kind}: ${f.resolution.reason}`
+                    : JSON.stringify(f.details)
+                }
               >
                 {f.type}
+                {f.resolution ? " (RESOLVED)" : ""}
               </Badge>
             ))}
           </CardContent>

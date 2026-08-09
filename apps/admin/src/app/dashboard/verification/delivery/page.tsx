@@ -59,7 +59,7 @@ function DeliveryVerificationQueuePageInner() {
   const qc = useQueryClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [actionDialog, setActionDialog] = useState<{
-    mode: "verify" | "reject"
+    mode: "verify" | "reject" | "resolve-fraud"
     id: string
     orderId: string
   } | null>(null)
@@ -125,6 +125,18 @@ function DeliveryVerificationQueuePageInner() {
       qc.invalidateQueries({ queryKey: ["delivery-verification-queue"] })
     },
     onError: () => toast.error("Failed to request re-verification"),
+  })
+
+  const resolveFraud = useMutation({
+    mutationFn: (args: { id: string; reason: string }) =>
+      api.admin.resolveDeliveryFraudFlag(args.id, args.reason),
+    onSuccess: () => {
+      toast.success("Fraud hold resolved with staff evidence")
+      setActionDialog(null)
+      setReason("")
+      qc.invalidateQueries({ queryKey: ["delivery-verification-queue"] })
+    },
+    onError: () => toast.error("Failed to resolve fraud hold"),
   })
 
   const items = queue ?? []
@@ -271,50 +283,57 @@ function DeliveryVerificationQueuePageInner() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={retry.isPending}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                retry.mutate(item.orderId)
-                              }}
-                            >
-                              <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                              Retry
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-green-600"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setActionDialog({
-                                  mode: "verify",
-                                  id: item.orderId,
-                                  orderId: item.orderId,
-                                })
-                              }}
-                            >
-                              <ShieldCheck className="h-3.5 w-3.5 mr-1" />
-                              Verify
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setActionDialog({
-                                  mode: "reject",
-                                  id: item.orderId,
-                                  orderId: item.orderId,
-                                })
-                              }}
-                            >
-                              <ShieldX className="h-3.5 w-3.5 mr-1" />
-                              Reject
-                            </Button>
+                            {item.status === "PUBLISHED" &&
+                              ["FAILED", "MANUAL_REVIEW"].includes(
+                                verificationStatus,
+                              ) && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={retry.isPending}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      retry.mutate(item.orderId)
+                                    }}
+                                  >
+                                    <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                                    Retry
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-green-600"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setActionDialog({
+                                        mode: "verify",
+                                        id: item.orderId,
+                                        orderId: item.orderId,
+                                      })
+                                    }}
+                                  >
+                                    <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+                                    Verify
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-red-600"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setActionDialog({
+                                        mode: "reject",
+                                        id: item.orderId,
+                                        orderId: item.orderId,
+                                      })
+                                    }}
+                                  >
+                                    <ShieldX className="h-3.5 w-3.5 mr-1" />
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -419,13 +438,76 @@ function DeliveryVerificationQueuePageInner() {
                                   <strong className="text-sm">
                                     Fraud flags:
                                   </strong>
-                                  {delivery.fraudFlags.map((flag, index) => (
-                                    <Badge
-                                      key={`${flag.type}-${index}`}
-                                      variant="destructive"
+                                  {delivery.fraudFlags.map((flag) => (
+                                    <div
+                                      key={flag.id}
+                                      className="space-y-2 rounded border border-destructive/30 bg-destructive/5 p-3"
                                     >
-                                      {flag.type.replace(/_/g, " ")}
-                                    </Badge>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <Badge variant="destructive">
+                                          {flag.type.replace(/_/g, " ")}
+                                        </Badge>
+                                        {flag.deliveryVersionId !==
+                                          delivery.id && (
+                                          <Badge variant="warning">
+                                            Historical delivery v
+                                            {flag.deliveryVersion.version}
+                                          </Badge>
+                                        )}
+                                        <span className="text-xs text-muted-foreground">
+                                          {format(
+                                            new Date(flag.createdAt),
+                                            "MMM d, yyyy HH:mm",
+                                          )}
+                                        </span>
+                                      </div>
+                                      <p className="break-all text-xs">
+                                        <strong>Flagged delivery:</strong>{" "}
+                                        {flag.deliveryVersion.publishedUrl}
+                                      </p>
+                                      {flag.deliveryVersion.evidence && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Evidence: HTTP{" "}
+                                          {
+                                            flag.deliveryVersion.evidence
+                                              .httpStatus
+                                          }
+                                          , link{" "}
+                                          {flag.deliveryVersion.evidence
+                                            .linkFound
+                                            ? "found"
+                                            : "missing"}
+                                          , target{" "}
+                                          {flag.deliveryVersion.evidence
+                                            .targetUrlMatched
+                                            ? "matched"
+                                            : "mismatched"}
+                                          , anchor{" "}
+                                          {flag.deliveryVersion.evidence
+                                            .anchorFound
+                                            ? "found"
+                                            : "missing"}
+                                        </p>
+                                      )}
+                                      <pre className="max-w-xl overflow-auto whitespace-pre-wrap break-all rounded bg-background p-2 text-xs">
+                                        {JSON.stringify(flag.details, null, 2)}
+                                      </pre>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={resolveFraud.isPending}
+                                        onClick={() => {
+                                          setActionDialog({
+                                            mode: "resolve-fraud",
+                                            id: flag.id,
+                                            orderId: item.orderId,
+                                          })
+                                          setReason("")
+                                        }}
+                                      >
+                                        Resolve hold
+                                      </Button>
+                                    </div>
                                   ))}
                                 </div>
                               )}
@@ -469,14 +551,18 @@ function DeliveryVerificationQueuePageInner() {
             <DialogTitle>
               {actionDialog?.mode === "verify"
                 ? "Mark Order as Verified"
-                : "Reject Verification"}
+                : actionDialog?.mode === "resolve-fraud"
+                  ? "Resolve Fraud Hold"
+                  : "Reject Verification"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
               {actionDialog?.mode === "verify"
                 ? "Confirm that the delivery has been manually verified. This will approve the order."
-                : "Reject the delivery verification. This will require the publisher to resubmit."}
+                : actionDialog?.mode === "resolve-fraud"
+                  ? "Document why this specific immutable fraud signal is safe to clear. This does not advance the order or release funds by itself."
+                  : "Reject the delivery verification. This will require the publisher to resubmit."}
             </p>
             <Textarea
               placeholder="Reason (required, min 10 characters)"
@@ -506,7 +592,12 @@ function DeliveryVerificationQueuePageInner() {
               variant={
                 actionDialog?.mode === "verify" ? "default" : "destructive"
               }
-              disabled={reason.length < 10}
+              disabled={
+                reason.length > 1000 ||
+                resolveFraud.isPending ||
+                reason.trim().length <
+                  (actionDialog?.mode === "resolve-fraud" ? 20 : 10)
+              }
               onClick={() => {
                 if (!actionDialog) return
                 if (actionDialog.mode === "verify") {
@@ -514,6 +605,11 @@ function DeliveryVerificationQueuePageInner() {
                     id: actionDialog.id,
                     reason,
                     notes: notes || undefined,
+                  })
+                } else if (actionDialog.mode === "resolve-fraud") {
+                  resolveFraud.mutate({
+                    id: actionDialog.id,
+                    reason,
                   })
                 } else {
                   reject.mutate({
@@ -523,7 +619,11 @@ function DeliveryVerificationQueuePageInner() {
                 }
               }}
             >
-              {actionDialog?.mode === "verify" ? "Confirm Verify" : "Reject"}
+              {actionDialog?.mode === "verify"
+                ? "Confirm Verify"
+                : actionDialog?.mode === "resolve-fraud"
+                  ? "Resolve Hold"
+                  : "Reject"}
             </Button>
           </DialogFooter>
         </DialogContent>

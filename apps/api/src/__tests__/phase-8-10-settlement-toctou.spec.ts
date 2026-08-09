@@ -17,6 +17,9 @@ function makeOrderMock(over: Record<string, unknown> = {}) {
   return {
     id: "o1",
     status: "DELIVERED",
+    version: 2,
+    currency: "USD",
+    paymentStatus: "PAID",
     amount: "100.00",
     organizationId: "org-1",
     listingServiceId: null,
@@ -32,6 +35,7 @@ function makeOrderMock(over: Record<string, unknown> = {}) {
 function makeDeliveryVersionMock() {
   return {
     id: "v1",
+    orderId: "o1",
     verificationStatus: "VERIFIED",
     interventionStatus: "NONE",
   }
@@ -42,6 +46,7 @@ function makeSettlementMock(over: Record<string, unknown> = {}) {
     id: "s1",
     orderId: "o1",
     publisherId: "p1",
+    currency: "USD",
     status: "PENDING",
     ...over,
   }
@@ -49,6 +54,7 @@ function makeSettlementMock(over: Record<string, unknown> = {}) {
 
 function makeTxMock(disputeFindFirst: jest.Mock) {
   return {
+    $queryRaw: jest.fn().mockResolvedValue([]),
     settlement: {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue(makeSettlementMock()),
@@ -56,19 +62,35 @@ function makeTxMock(disputeFindFirst: jest.Mock) {
     publisher: {
       findUnique: jest.fn().mockResolvedValue({ id: "p1", tier: "NEW" }),
     },
+    website: {
+      findUnique: jest.fn().mockResolvedValue({
+        publisherId: "p1",
+        ownershipType: "PUBLISHER",
+      }),
+    },
+    listingService: { findUnique: jest.fn().mockResolvedValue(null) },
     order: { findUnique: jest.fn().mockResolvedValue(makeOrderMock()) },
     orderDeliveryVersion: {
       findUnique: jest.fn().mockResolvedValue(makeDeliveryVersionMock()),
     },
     orderDispute: { findFirst: disputeFindFirst },
     revision: { findFirst: jest.fn().mockResolvedValue(null) },
+    orderCancellationRequest: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     deliveryFraudFlag: {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
     orderEvent: { create: jest.fn().mockResolvedValue({}) },
     platformSettings: {
-      findFirst: jest.fn().mockResolvedValue({ platformFeePct: 20 }),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: "platform-settings-default",
+          platformFeePct: 20,
+          version: 1,
+        },
+      ]),
     },
   }
 }
@@ -89,13 +111,22 @@ function makePrismaMock(tx: ReturnType<typeof makeTxMock>) {
     },
     listingService: { findUnique: jest.fn().mockResolvedValue(null) },
     platformSettings: {
-      findFirst: jest.fn().mockResolvedValue({ platformFeePct: 20 }),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: "platform-settings-default",
+          platformFeePct: 20,
+          version: 1,
+        },
+      ]),
     },
     orderDeliveryVersion: {
       findUnique: jest.fn().mockResolvedValue(makeDeliveryVersionMock()),
     },
     orderDispute: { findFirst: jest.fn().mockResolvedValue(null) },
     revision: { findFirst: jest.fn().mockResolvedValue(null) },
+    orderCancellationRequest: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     deliveryFraudFlag: {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
@@ -144,5 +175,54 @@ describe("Phase 8.10 (audit #1) — Settlement creation TOCTOU guard", () => {
 
     // The settlement should NOT have been created — the txn re-check caught the race.
     expect(tx.settlement.create).not.toHaveBeenCalled()
+  })
+
+  it("derives publisher attribution from the locked Order website, not mutable OrderItem data", async () => {
+    const tx = makeTxMock(jest.fn().mockResolvedValue(null))
+    tx.website.findUnique.mockResolvedValue({
+      publisherId: "canonical-publisher",
+      ownershipType: "PUBLISHER",
+    })
+    tx.publisher.findUnique.mockResolvedValue({
+      id: "canonical-publisher",
+      tier: "NEW",
+    })
+    const prisma = makePrismaMock(tx)
+    prisma.orderItem.findFirst.mockResolvedValue({
+      website: { publisherId: "stale-item-publisher" },
+    })
+
+    await makeService(prisma).createSettlement("o1", "org-1", "user-1")
+
+    expect(tx.settlement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          publisherId: "canonical-publisher",
+        }),
+      }),
+    )
+    expect(prisma.orderItem.findFirst).not.toHaveBeenCalled()
+  })
+
+  it("uses the locked Order amount for the entire exact fee split", async () => {
+    const tx = makeTxMock(jest.fn().mockResolvedValue(null))
+    tx.order.findUnique.mockResolvedValue(makeOrderMock({ amount: "125.55" }))
+    const prisma = makePrismaMock(tx)
+
+    await makeService(prisma).createSettlement("o1", "org-1", "user-1")
+
+    expect(tx.settlement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          grossAmount: expect.objectContaining({}),
+          platformFee: expect.objectContaining({}),
+          publisherAmount: expect.objectContaining({}),
+        }),
+      }),
+    )
+    const data = tx.settlement.create.mock.calls[0][0].data
+    expect(data.grossAmount.toFixed(2)).toBe("125.55")
+    expect(data.platformFee.toFixed(2)).toBe("25.11")
+    expect(data.publisherAmount.toFixed(2)).toBe("100.44")
   })
 })

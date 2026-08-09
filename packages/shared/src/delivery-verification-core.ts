@@ -11,6 +11,7 @@
 
 import { createHash } from "node:crypto"
 import * as cheerio from "cheerio"
+import { runLockedOrderSerializableTransaction } from "./order-aggregate-lock"
 import { normalizeUrl, sameDomain, urlsMatch } from "./url-normalize"
 import { defaultWorkflowConfig } from "./workflow/workflow-config"
 
@@ -42,8 +43,6 @@ export interface DeliveryDeps {
     reason?: string,
   ) => void | Promise<void>
 }
-
-type AnyPrisma = DeliveryDeps["prisma"]
 
 export interface DeliveryVerifyResult {
   skipped?: string
@@ -128,6 +127,7 @@ async function audit(
 // Parse the captured HTML for evidence fields + the target link / anchor.
 function analyzeHtml(
   html: string,
+  fetchedPageUrl: string,
   targetUrl: string | null,
   anchorText: string | null,
 ) {
@@ -154,7 +154,10 @@ function analyzeHtml(
       const href = $(el).attr("href") || ""
       let abs = href
       try {
-        abs = canonicalUrl ? new URL(href, canonicalUrl).toString() : href
+        // Relative links navigate against the fetched document URL. Canonical
+        // metadata is publisher-controlled and must never rewrite the target
+        // users would actually follow.
+        abs = new URL(href, fetchedPageUrl).toString()
       } catch {
         abs = href
       }
@@ -191,16 +194,24 @@ function analyzeHtml(
   }
 }
 
-// Fraud heuristics. Each match creates a DeliveryFraudFlag (deduped by type) +
-// staff notification + audit.
-async function runFraudDetection(
+interface FraudCandidate {
+  type: string
+  details: Record<string, unknown>
+}
+
+// Fraud heuristics are deliberately read-only. Candidates are persisted only
+// inside the final Order-locked verification transaction, after the active
+// delivery pointer and optimistic version have been revalidated. This keeps a
+// slow fetch/parse from attaching a settlement hold to a delivery that was
+// superseded while the worker was running.
+async function detectFraudCandidates(
   deps: DeliveryDeps,
   order: any,
   version: any,
   analysis: { targetUrlMatched: boolean; anchorFound: boolean },
-) {
+): Promise<FraudCandidate[]> {
   const { prisma } = deps
-  const flags: Array<{ type: string; details: any }> = []
+  const flags: FraudCandidate[] = []
 
   // 1. Published URL reused on a different order
   const reuse = await prisma.orderDeliveryVersion.findFirst({
@@ -257,38 +268,54 @@ async function runFraudDetection(
       details: { count: rapid, windowSeconds: 60 },
     })
 
-  for (const f of flags) {
-    // Dedupe: one flag per (version, type)
-    const exists = await prisma.deliveryFraudFlag.findFirst({
-      where: { deliveryVersionId: version.id, type: f.type },
-      select: { id: true },
-    })
-    if (exists) continue
-    await prisma.deliveryFraudFlag.create({
-      data: {
-        orderId: order.id,
-        deliveryVersionId: version.id,
-        type: f.type,
-        details: f.details,
-      },
-    })
-    await audit(prisma, "ORDER_DELIVERY_FRAUD_FLAGGED", order, version, null, {
-      fraudType: f.type,
-      details: f.details,
-    })
-  }
+  return flags
+}
 
-  if (flags.length > 0) {
-    const ids = await staffIds(prisma)
-    await notifyUsers(
-      prisma,
-      ids,
-      null,
-      "ORDER_DELIVERY_FRAUD_FLAGGED",
-      `Fraud flags on order ${order.id}: ${flags.map((f) => f.type).join(", ")}. Review before settlement.`,
-    )
+async function readActiveDeliveryForMutation(
+  tx: any,
+  orderId: string,
+  deliveryVersionId: string,
+  expectedVerificationVersion: number,
+) {
+  const [currentOrder, currentDelivery] = await Promise.all([
+    tx.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        status: true,
+        version: true,
+        activeDeliveryVersionId: true,
+      },
+    }),
+    tx.orderDeliveryVersion.findUnique({
+      where: { id: deliveryVersionId },
+      select: {
+        id: true,
+        orderId: true,
+        verificationStatus: true,
+        interventionStatus: true,
+        verificationVersion: true,
+        supersededByVersion: true,
+      },
+    }),
+  ])
+
+  if (!currentOrder || !currentDelivery) return { state: "missing" as const }
+  if (
+    currentOrder.activeDeliveryVersionId !== deliveryVersionId ||
+    currentDelivery.orderId !== orderId ||
+    currentDelivery.supersededByVersion != null
+  ) {
+    return { state: "stale" as const }
   }
-  return flags.map((f) => f.type)
+  if (currentDelivery.verificationVersion !== expectedVerificationVersion) {
+    return { state: "version_conflict" as const }
+  }
+  return {
+    state: "current" as const,
+    order: currentOrder,
+    delivery: currentDelivery,
+  }
 }
 
 // Main entry. `isFinalAttempt` tells us to route transient failures to
@@ -296,7 +323,11 @@ async function runFraudDetection(
 export async function runDeliveryVerification(
   deps: DeliveryDeps,
   deliveryVersionId: string,
-  opts: { actorUserId?: string; isFinalAttempt?: boolean } = {},
+  opts: {
+    expectedVerificationVersion: number
+    actorUserId?: string
+    isFinalAttempt?: boolean
+  },
 ): Promise<DeliveryVerifyResult> {
   const { prisma, fetchUrl, putObject } = deps
   const now = (deps.now ?? (() => new Date()))()
@@ -305,6 +336,15 @@ export async function runDeliveryVerification(
     where: { id: deliveryVersionId },
   })
   if (!version) return { skipped: "not_found" }
+  if (
+    !Number.isSafeInteger(opts.expectedVerificationVersion) ||
+    opts.expectedVerificationVersion < 0
+  ) {
+    return { skipped: "invalid_generation" }
+  }
+  if (version.verificationVersion !== opts.expectedVerificationVersion) {
+    return { skipped: "stale_generation" }
+  }
   // Idempotent: a delivery already auto-VERIFIED is not re-run by the worker.
   if (version.verificationStatus === "VERIFIED")
     return { skipped: "already_verified" }
@@ -325,7 +365,9 @@ export async function runDeliveryVerification(
     opts.actorUserId ?? null,
   )
 
-  const expectedVersion = version.verificationVersion
+  // The signed job generation is immutable command evidence. Never adopt a
+  // newer row generation after a preflight/reverify race.
+  const expectedVersion = opts.expectedVerificationVersion
 
   // ── Fetch ────────────────────────────────────────────────────────────────
   let fetched: FetchResult
@@ -347,21 +389,43 @@ export async function runDeliveryVerification(
   if (transientFailure) {
     if (!opts.isFinalAttempt) {
       // Throw so BullMQ retries with backoff (5/15/60m).
-      await audit(
+      const transition = await runLockedOrderSerializableTransaction(
         prisma,
-        "ORDER_DELIVERY_VERIFICATION_RETRIED",
-        order,
-        version,
-        null,
-        {
-          httpStatus: fetched.status,
-          error: fetched.error ?? null,
+        order.id,
+        async (tx) => {
+          const current = await readActiveDeliveryForMutation(
+            tx,
+            order.id,
+            version.id,
+            expectedVersion,
+          )
+          if (current.state !== "current") return current.state
+          if (current.order.status !== "PUBLISHED") return "stale" as const
+          const updated = await tx.orderDeliveryVersion.updateMany({
+            where: {
+              id: version.id,
+              orderId: order.id,
+              supersededByVersion: null,
+              verificationVersion: expectedVersion,
+            },
+            data: { verificationStatus: "RETRYING" },
+          })
+          if (updated.count === 0) return "version_conflict" as const
+          await audit(
+            tx,
+            "ORDER_DELIVERY_VERIFICATION_RETRIED",
+            order,
+            version,
+            null,
+            {
+              httpStatus: fetched.status,
+              error: fetched.error ?? null,
+            },
+          )
+          return "committed" as const
         },
       )
-      await prisma.orderDeliveryVersion.updateMany({
-        where: { id: version.id, verificationVersion: expectedVersion },
-        data: { verificationStatus: "RETRYING" },
-      })
+      if (transition !== "committed") return { skipped: transition }
       throw new Error(
         `Delivery fetch failed (status ${fetched.status}${fetched.error ? `, ${fetched.error}` : ""}) — retrying`,
       )
@@ -370,46 +434,58 @@ export async function runDeliveryVerification(
     const reason = fetched.error
       ? `Fetch error: ${fetched.error}`
       : `HTTP ${fetched.status} after redirects`
-    const runInTransaction =
-      typeof prisma.$transaction === "function"
-        ? (work: (tx: AnyPrisma) => Promise<boolean>) =>
-            prisma.$transaction(work)
-        : (work: (tx: AnyPrisma) => Promise<boolean>) => work(prisma)
-    const committed = await runInTransaction(async (tx) => {
-      const upd = await tx.orderDeliveryVersion.updateMany({
-        where: { id: version.id, verificationVersion: expectedVersion },
-        data: {
-          verificationStatus: "MANUAL_REVIEW",
-          verificationFailureReason: reason,
-          verificationVersion: expectedVersion + 1,
-        },
-      })
-      if (upd.count === 0) return false
-      await audit(tx, "ORDER_DELIVERY_ESCALATED", order, version, null, {
-        reason,
-        manualReview: true,
-        httpStatus: fetched.status,
-        error: fetched.error ?? null,
-        redirectChain: fetched.redirectChain,
-      })
-      await tx.orderEvent.create({
-        data: {
-          orderId: order.id,
-          eventType: "VERIFICATION_ESCALATED",
-          actorId: null,
-          message: `Verification escalated to manual review: ${reason}`,
-          metadata: {
-            deliveryVersionId: version.id,
-            reason,
-            httpStatus: fetched.status,
-            error: fetched.error ?? null,
-            redirectChain: fetched.redirectChain,
+    const transition = await runLockedOrderSerializableTransaction(
+      prisma,
+      order.id,
+      async (tx) => {
+        const current = await readActiveDeliveryForMutation(
+          tx,
+          order.id,
+          version.id,
+          expectedVersion,
+        )
+        if (current.state !== "current") return current.state
+        if (current.order.status !== "PUBLISHED") return "stale" as const
+        const upd = await tx.orderDeliveryVersion.updateMany({
+          where: {
+            id: version.id,
+            orderId: order.id,
+            supersededByVersion: null,
+            verificationVersion: expectedVersion,
           },
-        },
-      })
-      return true
-    })
-    if (!committed) return { skipped: "version_conflict" }
+          data: {
+            verificationStatus: "MANUAL_REVIEW",
+            verificationFailureReason: reason,
+            verificationVersion: expectedVersion + 1,
+          },
+        })
+        if (upd.count === 0) return "version_conflict" as const
+        await audit(tx, "ORDER_DELIVERY_ESCALATED", order, version, null, {
+          reason,
+          manualReview: true,
+          httpStatus: fetched.status,
+          error: fetched.error ?? null,
+          redirectChain: fetched.redirectChain,
+        })
+        await tx.orderEvent.create({
+          data: {
+            orderId: order.id,
+            eventType: "VERIFICATION_ESCALATED",
+            actorId: null,
+            message: `Verification escalated to manual review: ${reason}`,
+            metadata: {
+              deliveryVersionId: version.id,
+              reason,
+              httpStatus: fetched.status,
+              error: fetched.error ?? null,
+              redirectChain: fetched.redirectChain,
+            },
+          },
+        })
+        return "committed" as const
+      },
+    )
+    if (transition !== "committed") return { skipped: transition }
     const ids = await staffIds(prisma)
     await notifyUsers(
       prisma,
@@ -431,142 +507,245 @@ export async function runDeliveryVerification(
   // ── Parse + analyze ───────────────────────────────────────────────────────
   const analysis = analyzeHtml(
     fetched.html,
+    fetched.finalUrl,
     order.targetUrl ?? null,
     order.anchorText ?? null,
   )
   const htmlHash = createHash("sha256").update(fetched.html).digest("hex")
 
-  // ── Snapshot (permanent) ───────────────────────────────────────────────────
-  const htmlKey = `deliveries/${version.id}/page.html`
+  // The object is uploaded before the database transaction because object
+  // storage cannot participate in PostgreSQL commit. The key is immutable and
+  // content addressed, so a retry can only overwrite identical bytes. A lost
+  // database CAS may leave an unreferenced object for retention cleanup, but
+  // never a misleading evidence row.
+  const htmlKey = `deliveries/${version.id}/verification-${expectedVersion}-${htmlHash}.html`
   let snapshotStored = false
+  let snapshotObjectKey: string | null = null
+  let snapshotStorageError: string | null = null
   try {
-    await putObject(htmlKey, fetched.html, "text/html; charset=utf-8")
-    await prisma.deliverySnapshot.create({
-      data: {
-        deliveryVersionId: version.id,
-        htmlObjectKey: htmlKey,
-        responseHeaders: fetched.headers as any,
-      },
-    })
+    const stored = await putObject(
+      htmlKey,
+      fetched.html,
+      "text/html; charset=utf-8",
+    )
+    if (stored.objectKey !== htmlKey) {
+      throw new Error("object storage returned an unexpected snapshot key")
+    }
+    snapshotObjectKey = stored.objectKey
     snapshotStored = true
-    await audit(
-      prisma,
-      "ORDER_DELIVERY_SNAPSHOT_CAPTURED",
-      order,
-      version,
-      null,
-      { htmlObjectKey: htmlKey, htmlHash },
-    )
   } catch (err: any) {
-    // Snapshot storage failure must not lose the verification result — log via
-    // audit and continue. Evidence row still records the hash.
-    await audit(
-      prisma,
-      "ORDER_DELIVERY_SNAPSHOT_CAPTURED",
-      order,
-      version,
-      null,
-      { error: err?.message ?? "snapshot failed" },
-    )
+    snapshotStorageError = err?.message ?? "snapshot storage failed"
+    if (!opts.isFinalAttempt) {
+      throw new Error(
+        `Delivery snapshot storage failed (${snapshotStorageError}) — retrying`,
+      )
+    }
   }
 
-  // ── Immutable evidence ──────────────────────────────────────────────────────
-  await prisma.deliveryVerificationEvidence.create({
-    data: {
-      deliveryVersionId: version.id,
-      pageTitle: analysis.pageTitle,
-      metaTitle: analysis.metaTitle,
-      canonicalUrl: analysis.canonicalUrl,
-      resolvedUrl: fetched.finalUrl,
-      httpStatus: fetched.status,
-      anchorFound: analysis.anchorFound,
-      linkFound: analysis.linkFound,
-      targetUrlMatched: analysis.targetUrlMatched,
-      verifiedAnchorText: analysis.verifiedAnchorText,
-      verifiedTargetUrl: analysis.verifiedTargetUrl,
-      htmlHash,
-      redirectChain: fetched.redirectChain as any,
-      checkedAt: now,
-    },
-  })
-
   // ── Decide + transition (version-guarded) ───────────────────────────────────
-  const pass =
+  const checksPass =
     analysis.linkFound && analysis.targetUrlMatched && analysis.anchorFound
-  const newStatus = pass ? "VERIFIED" : "FAILED"
-  const failureReason = pass
-    ? null
-    : [
-        !analysis.targetUrlMatched && order.targetUrl
-          ? "target URL not found on page"
-          : null,
-        !analysis.anchorFound && order.anchorText
-          ? "anchor text mismatch"
-          : null,
-      ]
-        .filter(Boolean)
-        .join("; ") || "link verification failed"
+  // Permanent raw evidence is required before automation may advance an Order
+  // toward settlement. Exhausted storage retries fail closed to manual review.
+  const newStatus = snapshotStored
+    ? checksPass
+      ? "VERIFIED"
+      : "FAILED"
+    : "MANUAL_REVIEW"
+  const pass = newStatus === "VERIFIED"
+  const failureReason = snapshotStorageError
+    ? `Permanent delivery snapshot unavailable: ${snapshotStorageError}`
+    : checksPass
+      ? null
+      : [
+          !analysis.targetUrlMatched && order.targetUrl
+            ? "target URL not found on page"
+            : null,
+          !analysis.anchorFound && order.anchorText
+            ? "anchor text mismatch"
+            : null,
+        ]
+          .filter(Boolean)
+          .join("; ") || "link verification failed"
 
-  // Fraud detection runs on every checked delivery before the atomic state
-  // transition so the canonical event can include the resulting flags.
-  const fraudTypes = await runFraudDetection(deps, order, version, analysis)
+  // Detection can perform slow reads before the lock; no hold is persisted
+  // until the active delivery is revalidated inside the transition below.
+  const fraudCandidates = await detectFraudCandidates(
+    deps,
+    order,
+    version,
+    analysis,
+  )
+  const fraudTypes = fraudCandidates.map((flag) => flag.type)
 
-  const runInTransaction =
-    typeof prisma.$transaction === "function"
-      ? (work: (tx: AnyPrisma) => Promise<void>) => prisma.$transaction(work)
-      : (work: (tx: AnyPrisma) => Promise<void>) => work(prisma)
   try {
-    await runInTransaction(async (tx) => {
-      const upd = await tx.orderDeliveryVersion.updateMany({
-        where: { id: version.id, verificationVersion: expectedVersion },
-        data: {
-          verificationStatus: newStatus,
-          verificationFailureReason: failureReason,
-          verificationVersion: expectedVersion + 1,
-        },
-      })
-      if (upd.count === 0) {
-        const conflict = new Error("delivery verification version conflict")
-        conflict.name = "DeliveryVerificationVersionConflict"
-        throw conflict
-      }
-
-      let autoAcceptAt: Date | null = null
-      if (pass) {
-        const reviewWindowMs =
-          defaultWorkflowConfig.reviewWindowDays * 24 * 60 * 60 * 1000
-        autoAcceptAt = new Date(now.getTime() + reviewWindowMs)
-        const orderUpdate = await tx.order.updateMany({
-          where: {
-            id: order.id,
-            status: "PUBLISHED",
-            version: order.version,
-          },
-          data: {
-            status: "VERIFIED",
-            verifiedAt: now,
-            verifiedBy: null,
-            verifyMethod: "AUTO",
-            autoAcceptAt,
-            version: { increment: 1 },
-          },
-        })
-        if (orderUpdate.count === 0) {
-          const conflict = new Error("order verification version conflict")
+    const transition = await runLockedOrderSerializableTransaction(
+      prisma,
+      order.id,
+      async (tx) => {
+        const current = await readActiveDeliveryForMutation(
+          tx,
+          order.id,
+          version.id,
+          expectedVersion,
+        )
+        if (current.state === "missing" || current.state === "stale") {
+          return current.state
+        }
+        if (current.state === "version_conflict") {
+          const conflict = new Error("delivery verification version conflict")
           conflict.name = "DeliveryVerificationVersionConflict"
           throw conflict
         }
-      }
+        if (current.order.status !== "PUBLISHED") return "stale" as const
 
-      await tx.orderEvent.create({
-        data: {
-          orderId: order.id,
-          eventType: pass ? "VERIFIED_AUTO" : "VERIFICATION_ESCALATED",
-          actorId: null,
-          message: pass
-            ? `Delivery auto-verified; review window expires ${autoAcceptAt?.toISOString()}`
-            : "Delivery verification failed and requires attention",
-          metadata: {
+        if (snapshotStored && snapshotObjectKey) {
+          await tx.deliverySnapshot.create({
+            data: {
+              deliveryVersionId: version.id,
+              htmlObjectKey: snapshotObjectKey,
+              responseHeaders: fetched.headers as any,
+            },
+          })
+        }
+        await tx.deliveryVerificationEvidence.create({
+          data: {
+            deliveryVersionId: version.id,
+            pageTitle: analysis.pageTitle,
+            metaTitle: analysis.metaTitle,
+            canonicalUrl: analysis.canonicalUrl,
+            resolvedUrl: fetched.finalUrl,
+            httpStatus: fetched.status,
+            anchorFound: analysis.anchorFound,
+            linkFound: analysis.linkFound,
+            targetUrlMatched: analysis.targetUrlMatched,
+            verifiedAnchorText: analysis.verifiedAnchorText,
+            verifiedTargetUrl: analysis.verifiedTargetUrl,
+            htmlHash,
+            redirectChain: fetched.redirectChain as any,
+            checkedAt: now,
+          },
+        })
+        await audit(
+          tx,
+          "ORDER_DELIVERY_SNAPSHOT_CAPTURED",
+          order,
+          version,
+          null,
+          snapshotStored
+            ? { htmlObjectKey: snapshotObjectKey, htmlHash }
+            : { error: snapshotStorageError, htmlHash },
+        )
+
+        const upd = await tx.orderDeliveryVersion.updateMany({
+          where: {
+            id: version.id,
+            orderId: order.id,
+            supersededByVersion: null,
+            verificationVersion: expectedVersion,
+          },
+          data: {
+            verificationStatus: newStatus,
+            verificationFailureReason: failureReason,
+            verificationVersion: expectedVersion + 1,
+          },
+        })
+        if (upd.count === 0) {
+          const conflict = new Error("delivery verification version conflict")
+          conflict.name = "DeliveryVerificationVersionConflict"
+          throw conflict
+        }
+
+        let autoAcceptAt: Date | null = null
+        if (pass) {
+          const reviewWindowMs =
+            defaultWorkflowConfig.reviewWindowDays * 24 * 60 * 60 * 1000
+          autoAcceptAt = new Date(now.getTime() + reviewWindowMs)
+          const orderUpdate = await tx.order.updateMany({
+            where: {
+              id: order.id,
+              status: "PUBLISHED",
+              version: current.order.version,
+            },
+            data: {
+              status: "VERIFIED",
+              verifiedAt: now,
+              verifiedBy: null,
+              verifyMethod: "AUTO",
+              autoAcceptAt,
+              version: { increment: 1 },
+            },
+          })
+          if (orderUpdate.count === 0) {
+            const conflict = new Error("order verification version conflict")
+            conflict.name = "DeliveryVerificationVersionConflict"
+            throw conflict
+          }
+        }
+
+        for (const flag of fraudCandidates) {
+          // The Order lock serializes this check+insert. The database unique
+          // constraint remains the final guard for non-cooperating clients.
+          const exists = await tx.deliveryFraudFlag.findFirst({
+            where: {
+              deliveryVersionId: version.id,
+              type: flag.type,
+              resolution: null,
+            },
+            select: { id: true },
+          })
+          if (exists) continue
+          await tx.deliveryFraudFlag.create({
+            data: {
+              orderId: order.id,
+              deliveryVersionId: version.id,
+              type: flag.type,
+              details: flag.details,
+            },
+          })
+          await audit(
+            tx,
+            "ORDER_DELIVERY_FRAUD_FLAGGED",
+            order,
+            version,
+            null,
+            { fraudType: flag.type, details: flag.details },
+          )
+        }
+
+        await tx.orderEvent.create({
+          data: {
+            orderId: order.id,
+            eventType: pass ? "VERIFIED_AUTO" : "VERIFICATION_ESCALATED",
+            actorId: null,
+            message: pass
+              ? `Delivery auto-verified; review window expires ${autoAcceptAt?.toISOString()}`
+              : newStatus === "MANUAL_REVIEW"
+                ? "Delivery verification requires manual evidence review"
+                : "Delivery verification failed and requires attention",
+            metadata: {
+              httpStatus: fetched.status,
+              resolvedUrl: fetched.finalUrl,
+              targetUrlMatched: analysis.targetUrlMatched,
+              anchorFound: analysis.anchorFound,
+              htmlHash,
+              snapshotStored,
+              fraudTypes,
+              reason: failureReason,
+            },
+          },
+        })
+        await audit(
+          tx,
+          pass
+            ? "ORDER_DELIVERY_AUTO_VERIFIED"
+            : newStatus === "MANUAL_REVIEW"
+              ? "ORDER_DELIVERY_ESCALATED"
+              : "ORDER_DELIVERY_AUTO_FAILED",
+          order,
+          version,
+          null,
+          {
             httpStatus: fetched.status,
             resolvedUrl: fetched.finalUrl,
             targetUrlMatched: analysis.targetUrlMatched,
@@ -576,26 +755,11 @@ export async function runDeliveryVerification(
             fraudTypes,
             reason: failureReason,
           },
-        },
-      })
-      await audit(
-        tx,
-        pass ? "ORDER_DELIVERY_AUTO_VERIFIED" : "ORDER_DELIVERY_AUTO_FAILED",
-        order,
-        version,
-        null,
-        {
-          httpStatus: fetched.status,
-          resolvedUrl: fetched.finalUrl,
-          targetUrlMatched: analysis.targetUrlMatched,
-          anchorFound: analysis.anchorFound,
-          htmlHash,
-          snapshotStored,
-          fraudTypes,
-          reason: failureReason,
-        },
-      )
-    })
+        )
+        return "committed" as const
+      },
+    )
+    if (transition !== "committed") return { skipped: transition }
   } catch (error) {
     if (
       error instanceof Error &&
@@ -612,6 +776,15 @@ export async function runDeliveryVerification(
 
   // Notifications are intentionally after commit. They are retryable side
   // effects and must never make an order/event transaction roll back.
+  if (fraudTypes.length > 0) {
+    await notifyUsers(
+      prisma,
+      await staffIds(prisma),
+      null,
+      "ORDER_DELIVERY_FRAUD_FLAGGED",
+      `Fraud flags on order ${order.id}: ${fraudTypes.join(", ")}. Review before settlement.`,
+    )
+  }
   const ownerIds = await publisherOwnerIds(prisma, order.website?.publisherId)
   if (pass) {
     await notifyUsers(
@@ -627,6 +800,21 @@ export async function runDeliveryVerification(
       order.organizationId,
       "ORDER_VERIFICATION_PASSED",
       `Your order ${order.id} delivery was verified.`,
+    )
+  } else if (newStatus === "MANUAL_REVIEW") {
+    await notifyUsers(
+      prisma,
+      await staffIds(prisma),
+      null,
+      "ORDER_DELIVERY_MANUAL_REVIEW",
+      `Delivery for order ${order.id} needs manual evidence review: ${failureReason}.`,
+    )
+    await notifyUsers(
+      prisma,
+      ownerIds,
+      order.organizationId,
+      "ORDER_DELIVERY_MANUAL_REVIEW",
+      `Your delivery for order ${order.id} is awaiting manual evidence review.`,
     )
   } else {
     await notifyUsers(
@@ -678,11 +866,20 @@ export async function runDeliveryLinkRecheck(
   const hadRemovalFlag =
     version.verificationStatus === "FAILED"
       ? await prisma.deliveryFraudFlag.findFirst({
-          where: { deliveryVersionId: version.id, type: "LINK_REMOVED" },
+          where: {
+            deliveryVersionId: version.id,
+            type: "LINK_REMOVED",
+            resolution: null,
+          },
           select: { id: true },
         })
       : null
-  if (version.verificationStatus !== "VERIFIED" && !hadRemovalFlag)
+  const manuallyApproved = version.interventionStatus === "APPROVED"
+  if (
+    version.verificationStatus !== "VERIFIED" &&
+    !manuallyApproved &&
+    !hadRemovalFlag
+  )
     return { skipped: "not_verified" }
 
   const order = await prisma.order.findUnique({
@@ -711,36 +908,115 @@ export async function runDeliveryLinkRecheck(
 
   const analysis = analyzeHtml(
     fetched.html,
+    fetched.finalUrl,
     order.targetUrl ?? null,
     order.anchorText ?? null,
   )
+  const htmlHash = createHash("sha256").update(fetched.html).digest("hex")
   const stillPresent =
     analysis.linkFound && analysis.targetUrlMatched && analysis.anchorFound
 
   // ── Restoration path: a previously-removed link is back ──────────────────
   if (hadRemovalFlag) {
     if (!stillPresent) return { ok: true } // still gone
-    const upd = await prisma.orderDeliveryVersion.updateMany({
-      where: {
-        id: version.id,
-        verificationVersion: version.verificationVersion,
+    const committed = await runLockedOrderSerializableTransaction(
+      prisma,
+      order.id,
+      async (tx) => {
+        const current = await readActiveDeliveryForMutation(
+          tx,
+          order.id,
+          version.id,
+          version.verificationVersion,
+        )
+        if (current.state !== "current") return false
+        const currentRemovalFlag = await tx.deliveryFraudFlag.findFirst({
+          where: {
+            deliveryVersionId: version.id,
+            type: "LINK_REMOVED",
+            resolution: null,
+          },
+          select: { id: true, createdAt: true },
+        })
+        if (!currentRemovalFlag) return false
+        const flagCreatedAt = new Date(
+          currentRemovalFlag.createdAt ?? now.getTime() - 1,
+        ).getTime()
+        const checkedAt = new Date(
+          Math.max(
+            now.getTime(),
+            Number.isFinite(flagCreatedAt) ? flagCreatedAt + 1 : now.getTime(),
+          ),
+        )
+        const verificationEvidence =
+          await tx.deliveryVerificationEvidence.create({
+            data: {
+              deliveryVersionId: version.id,
+              pageTitle: analysis.pageTitle,
+              metaTitle: analysis.metaTitle,
+              canonicalUrl: analysis.canonicalUrl,
+              resolvedUrl: fetched.finalUrl,
+              httpStatus: fetched.status,
+              anchorFound: analysis.anchorFound,
+              linkFound: analysis.linkFound,
+              targetUrlMatched: analysis.targetUrlMatched,
+              verifiedAnchorText: analysis.verifiedAnchorText,
+              verifiedTargetUrl: analysis.verifiedTargetUrl,
+              htmlHash,
+              redirectChain: fetched.redirectChain as any,
+              checkedAt,
+            },
+          })
+        const upd = await tx.orderDeliveryVersion.updateMany({
+          where: {
+            id: version.id,
+            orderId: order.id,
+            supersededByVersion: null,
+            verificationVersion: version.verificationVersion,
+          },
+          data: {
+            verificationStatus: "VERIFIED",
+            interventionStatus: "NONE",
+            verificationFailureReason: null,
+            verificationVersion: version.verificationVersion + 1,
+          },
+        })
+        if (upd.count === 0) return false
+        const resolution = await tx.deliveryFraudFlagResolution.create({
+          data: {
+            fraudFlagId: currentRemovalFlag.id,
+            orderId: order.id,
+            deliveryVersionId: version.id,
+            kind: "LINK_RESTORED",
+            reason:
+              "Automated settlement-hold recheck confirmed the required live link was restored.",
+            resolvedByUserId: null,
+            resolvedByRole: null,
+            evidenceId: verificationEvidence.id,
+            evidence: {
+              checkedAt: checkedAt.toISOString(),
+              httpStatus: fetched.status,
+              resolvedUrl: fetched.finalUrl,
+              htmlHash,
+            },
+          },
+        })
+        await audit(tx, "ORDER_DELIVERY_LINK_RESTORED", order, version, null, {
+          httpStatus: fetched.status,
+          fraudFlagId: currentRemovalFlag.id,
+          fraudResolutionId: resolution.id,
+          verificationEvidenceId: verificationEvidence.id,
+        })
+        return true
       },
-      data: {
-        verificationStatus: "VERIFIED",
-        verificationFailureReason: null,
-        verificationVersion: version.verificationVersion + 1,
-      },
-    })
-    if (upd.count === 0) return { skipped: "version_conflict" }
-    await audit(prisma, "ORDER_DELIVERY_LINK_RESTORED", order, version, null, {
-      httpStatus: fetched.status,
-    })
+    )
+    if (!committed) return { skipped: "version_conflict" }
     await notifyUsers(
       prisma,
       await staffIds(prisma),
       null,
       "ORDER_DELIVERY_LINK_RESTORED",
-      `Link restored on order ${order.id}. Note: the LINK_REMOVED fraud flag remains for review.`,
+      `Link restored on order ${order.id}; the automated LINK_REMOVED hold was resolved with fresh evidence.`,
     )
     // Restoration re-evaluates trust (historical penalty is kept per the algorithm).
     await deps.onTrustEvent?.(
@@ -752,41 +1028,145 @@ export async function runDeliveryLinkRecheck(
   }
 
   // ── Removal path: monitored VERIFIED link is gone ────────────────────────
-  if (stillPresent) return { ok: true }
+  if (stillPresent) {
+    const committed = await runLockedOrderSerializableTransaction(
+      prisma,
+      order.id,
+      async (tx) => {
+        const current = await readActiveDeliveryForMutation(
+          tx,
+          order.id,
+          version.id,
+          version.verificationVersion,
+        )
+        if (current.state !== "current") return false
+        if (
+          current.delivery.verificationStatus !== "VERIFIED" &&
+          current.delivery.interventionStatus !== "APPROVED"
+        ) {
+          return false
+        }
+        const evidence = await tx.deliveryVerificationEvidence.create({
+          data: {
+            deliveryVersionId: version.id,
+            pageTitle: analysis.pageTitle,
+            metaTitle: analysis.metaTitle,
+            canonicalUrl: analysis.canonicalUrl,
+            resolvedUrl: fetched.finalUrl,
+            httpStatus: fetched.status,
+            anchorFound: analysis.anchorFound,
+            linkFound: analysis.linkFound,
+            targetUrlMatched: analysis.targetUrlMatched,
+            verifiedAnchorText: analysis.verifiedAnchorText,
+            verifiedTargetUrl: analysis.verifiedTargetUrl,
+            htmlHash,
+            redirectChain: fetched.redirectChain as any,
+            checkedAt: now,
+          },
+        })
+        await audit(
+          tx,
+          "ORDER_DELIVERY_LINK_RECHECK_PASSED",
+          order,
+          version,
+          null,
+          {
+            httpStatus: fetched.status,
+            verificationEvidenceId: evidence.id,
+          },
+        )
+        return true
+      },
+    )
+    return committed ? { ok: true } : { skipped: "version_conflict" }
+  }
 
   const reason =
     "Link removed or changed after delivery (detected during settlement hold)"
-  const upd = await prisma.orderDeliveryVersion.updateMany({
-    where: { id: version.id, verificationVersion: version.verificationVersion },
-    data: {
-      verificationStatus: "FAILED",
-      verificationFailureReason: reason,
-      verificationVersion: version.verificationVersion + 1,
-    },
-  })
-  if (upd.count === 0) return { skipped: "version_conflict" }
-
-  const exists = await prisma.deliveryFraudFlag.findFirst({
-    where: { deliveryVersionId: version.id, type: "LINK_REMOVED" },
-    select: { id: true },
-  })
-  if (!exists) {
-    await prisma.deliveryFraudFlag.create({
-      data: {
-        orderId: order.id,
-        deliveryVersionId: version.id,
-        type: "LINK_REMOVED",
-        details: {
-          detectedAt: now.toISOString(),
-          publishedUrl: version.publishedUrl,
+  const committed = await runLockedOrderSerializableTransaction(
+    prisma,
+    order.id,
+    async (tx) => {
+      const current = await readActiveDeliveryForMutation(
+        tx,
+        order.id,
+        version.id,
+        version.verificationVersion,
+      )
+      if (current.state !== "current") return false
+      if (
+        current.delivery.verificationStatus !== "VERIFIED" &&
+        current.delivery.interventionStatus !== "APPROVED"
+      ) {
+        return false
+      }
+      const verificationEvidence = await tx.deliveryVerificationEvidence.create(
+        {
+          data: {
+            deliveryVersionId: version.id,
+            pageTitle: analysis.pageTitle,
+            metaTitle: analysis.metaTitle,
+            canonicalUrl: analysis.canonicalUrl,
+            resolvedUrl: fetched.finalUrl,
+            httpStatus: fetched.status,
+            anchorFound: analysis.anchorFound,
+            linkFound: analysis.linkFound,
+            targetUrlMatched: analysis.targetUrlMatched,
+            verifiedAnchorText: analysis.verifiedAnchorText,
+            verifiedTargetUrl: analysis.verifiedTargetUrl,
+            htmlHash,
+            redirectChain: fetched.redirectChain as any,
+            checkedAt: now,
+          },
         },
-      },
-    })
-  }
-  await audit(prisma, "ORDER_DELIVERY_LINK_REMOVED", order, version, null, {
-    reason,
-    httpStatus: fetched.status,
-  })
+      )
+      const upd = await tx.orderDeliveryVersion.updateMany({
+        where: {
+          id: version.id,
+          orderId: order.id,
+          supersededByVersion: null,
+          verificationVersion: version.verificationVersion,
+        },
+        data: {
+          verificationStatus: "FAILED",
+          interventionStatus: "REJECTED",
+          verificationFailureReason: reason,
+          verificationVersion: version.verificationVersion + 1,
+        },
+      })
+      if (upd.count === 0) return false
+
+      const exists = await tx.deliveryFraudFlag.findFirst({
+        where: {
+          deliveryVersionId: version.id,
+          type: "LINK_REMOVED",
+          resolution: null,
+        },
+        select: { id: true },
+      })
+      if (!exists) {
+        await tx.deliveryFraudFlag.create({
+          data: {
+            orderId: order.id,
+            deliveryVersionId: version.id,
+            type: "LINK_REMOVED",
+            details: {
+              detectedAt: now.toISOString(),
+              publishedUrl: version.publishedUrl,
+              verificationEvidenceId: verificationEvidence.id,
+            },
+          },
+        })
+      }
+      await audit(tx, "ORDER_DELIVERY_LINK_REMOVED", order, version, null, {
+        reason,
+        httpStatus: fetched.status,
+        verificationEvidenceId: verificationEvidence.id,
+      })
+      return true
+    },
+  )
+  if (!committed) return { skipped: "version_conflict" }
 
   const ownerIds = await publisherOwnerIds(prisma, publisherId)
   await notifyUsers(
@@ -823,34 +1203,117 @@ export async function runDeliveryLinkRecheck(
 
 export interface HoldSweepResult {
   ok: boolean
+  scanned: number
   checked: number
   removed: number
   restored: number
+  failed: number
+  scanCapReached: boolean
+  oldestUncheckedCreatedAt: Date | null
 }
 
-// Re-checks the live link for every order whose payout is still on hold
-// (settlement PENDING/UNDER_REVIEW). Run periodically by the worker.
+const HOLD_SWEEP_PAGE_SIZE = 100
+const HOLD_SWEEP_SCAN_CAP = 5_000
+const HOLD_SWEEP_CONCURRENCY = 5
+const UNRELEASED_SETTLEMENT_STATUSES = [
+  "PENDING",
+  "UNDER_REVIEW",
+  "CUSTOMER_APPROVED",
+  "ADMIN_APPROVED",
+] as const
+
+// Re-check every unreleased settlement deterministically. Cursor pagination
+// prevents the same first 500 rows from starving newer holds; bounded batches
+// cap worker load while fetchWithChain supplies the per-request timeout.
 export async function runSettlementHoldLinkSweep(
   deps: DeliveryDeps,
 ): Promise<HoldSweepResult> {
   const { prisma } = deps
-  const held = await prisma.settlement.findMany({
-    where: { status: { in: ["PENDING", "UNDER_REVIEW"] } },
-    include: { order: { select: { activeDeliveryVersionId: true } } },
-    take: 500,
-  })
-
+  let scanned = 0
   let checked = 0
   let removed = 0
   let restored = 0
-  for (const s of held) {
-    const versionId = s.order?.activeDeliveryVersionId
-    if (!versionId) continue
-    const r = await runDeliveryLinkRecheck(deps, versionId)
-    if (r.skipped === "not_verified" || r.skipped === "superseded") continue
-    checked++
-    if (r.removed) removed++
-    if (r.restored) restored++
+  let failed = 0
+  let cursorId: string | null = null
+  let lastPageWasFull = false
+
+  while (scanned < HOLD_SWEEP_SCAN_CAP) {
+    const take = Math.min(HOLD_SWEEP_PAGE_SIZE, HOLD_SWEEP_SCAN_CAP - scanned)
+    const held: Array<{
+      id: string
+      createdAt: Date
+      order?: { activeDeliveryVersionId?: string | null } | null
+    }> = await prisma.settlement.findMany({
+      where: { status: { in: [...UNRELEASED_SETTLEMENT_STATUSES] } },
+      include: { order: { select: { activeDeliveryVersionId: true } } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+      take,
+    })
+    if (held.length === 0) {
+      lastPageWasFull = false
+      break
+    }
+    scanned += held.length
+    cursorId = held[held.length - 1].id
+    lastPageWasFull = held.length === take
+
+    for (
+      let offset = 0;
+      offset < held.length;
+      offset += HOLD_SWEEP_CONCURRENCY
+    ) {
+      const batch = held.slice(offset, offset + HOLD_SWEEP_CONCURRENCY)
+      const results = await Promise.allSettled(
+        batch.map(async (settlement: any) => {
+          const versionId = settlement.order?.activeDeliveryVersionId
+          return versionId
+            ? runDeliveryLinkRecheck(deps, versionId)
+            : ({ skipped: "no_active_delivery" } as LinkRecheckResult)
+        }),
+      )
+      for (const result of results) {
+        if (result.status === "rejected") {
+          failed++
+          continue
+        }
+        const recheck = result.value
+        if (
+          recheck.skipped === "not_verified" ||
+          recheck.skipped === "superseded" ||
+          recheck.skipped === "no_active_delivery"
+        ) {
+          continue
+        }
+        checked++
+        if (recheck.removed) removed++
+        if (recheck.restored) restored++
+      }
+    }
+    if (held.length < take) break
   }
-  return { ok: true, checked, removed, restored }
+
+  const scanCapReached =
+    scanned >= HOLD_SWEEP_SCAN_CAP && lastPageWasFull && cursorId != null
+  const oldestUnchecked = scanCapReached
+    ? await prisma.settlement.findMany({
+        where: { status: { in: [...UNRELEASED_SETTLEMENT_STATUSES] } },
+        select: { createdAt: true },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        cursor: { id: cursorId },
+        skip: 1,
+        take: 1,
+      })
+    : []
+
+  return {
+    ok: failed === 0,
+    scanned,
+    checked,
+    removed,
+    restored,
+    failed,
+    scanCapReached: scanCapReached && oldestUnchecked.length > 0,
+    oldestUncheckedCreatedAt: oldestUnchecked[0]?.createdAt ?? null,
+  }
 }

@@ -2,9 +2,9 @@
 //
 // Reads PlatformRevenue with 4 groupings (channel | month | serviceType |
 // listing), computes a same-duration previous-period comparison, and surfaces
-// a currency-mismatch warning when any Order in the range was non-USD
-// (PlatformRevenue itself has no `currency` column per Phase 0 finding, so
-// we check the source Orders).
+// a currency-mismatch warning when any source Order in the range was non-USD.
+// PlatformRevenue now snapshots USD too; source-order scanning remains a
+// diagnostic for pre-cutover history and future schema expansion.
 //
 // Invariants:
 //   - reversedAt IS NOT NULL rows are excluded from sums but counted as
@@ -12,9 +12,8 @@
 //   - NULL snapshot fields collapse into a single "(unknown)" bucket (audit
 //     #21 — pre-Phase-6 rows). Never throw, never silently drop.
 //   - Decimals are serialized as strings (JSON precision).
-//   - `currency` is the constant "USD" in every bucket today. PlatformRevenue
-//     has no currency column; Order does. Mismatch detection lives at the
-//     Order layer.
+//   - `currency` is the constant "USD" in every bucket today. Both Order and
+//     PlatformRevenue are database-constrained to USD.
 
 import { Prisma } from "@guestpost/database"
 import { Injectable, Logger } from "@nestjs/common"
@@ -595,16 +594,14 @@ export class RevenueService {
     }
   }
 
-  // ── Currency mismatch (queries Order, not PlatformRevenue) ──────────────
+  // ── Source-order currency mismatch diagnostic ──────────────────────────
 
   private async detectCurrencyMismatch(
     range: ResolvedRange,
   ): Promise<RevenueCurrencyMismatch | null> {
-    // Phase 0 finding: PlatformRevenue has no `currency` column. We check
-    // the source Orders for non-USD currency in the same date window. The
-    // mapping is "Orders that contributed revenue in this range" — which
-    // for the dashboard's purposes is "Orders that were delivered/refunded
-    // in this range."
+    // Both tables are USD-constrained. Retain this source scan so a future
+    // currency expansion or a pre-cutover row cannot be hidden by bucket
+    // aggregation. The mapping is Orders delivered/refunded in this range.
     const where: Prisma.OrderWhereInput = {
       currency: { not: USD },
       status: { in: ["DELIVERED", "COMPLETED", "REFUNDED"] },

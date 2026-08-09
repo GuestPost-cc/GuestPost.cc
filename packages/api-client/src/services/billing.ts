@@ -25,11 +25,29 @@ export interface WalletResponse {
   transactions: TransactionResponse[]
 }
 
+export interface DepositCapabilityResponse {
+  available: boolean
+  provider: "stripe"
+  currency: "USD"
+  code:
+    | "AVAILABLE"
+    | "CARD_DEPOSITS_DISABLED"
+    | "DEPOSIT_CURRENCY_UNAVAILABLE"
+    | "FINANCE_OPERATIONS_UNAVAILABLE"
+  message: string
+}
+
 export class BillingService {
   constructor(private client: HttpClient) {}
 
   getWallet() {
     return this.client.get<WalletResponse>("/billing/wallet")
+  }
+
+  getDepositCapability() {
+    return this.client.get<DepositCapabilityResponse>(
+      "/billing/deposit-capability",
+    )
   }
 
   createCheckoutSession(data: {
@@ -67,24 +85,6 @@ export class BillingService {
       statementDescriptor: string
       completedAt: string | null
     }>(`/billing/deposits/${encodeURIComponent(publicReference)}/status`)
-  }
-
-  withdraw(data: {
-    walletId: string
-    amount: number
-    idempotencyKey?: string
-  }) {
-    return this.client.post<WalletResponse>(
-      `/billing/wallet/${data.walletId}/withdraw`,
-      {
-        json: {
-          amount: data.amount,
-          ...(data.idempotencyKey
-            ? { idempotencyKey: data.idempotencyKey }
-            : {}),
-        },
-      },
-    )
   }
 
   listTransactions() {

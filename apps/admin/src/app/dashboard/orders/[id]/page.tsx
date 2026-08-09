@@ -1200,12 +1200,22 @@ export default function OrderDetailPage() {
                         {activeDelivery.fraudFlags.map((ff: any) => (
                           <div
                             key={ff.id}
-                            className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-red-700"
+                            className={`flex min-w-0 flex-wrap items-center gap-1 rounded-md border px-2 py-1 ${
+                              ff.resolution
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-red-200 bg-red-50 text-red-700"
+                            }`}
                           >
                             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                             <span className="font-medium capitalize">
                               {ff.type.replace(/_/g, " ")}
                             </span>
+                            {ff.resolution && (
+                              <span className="font-medium">
+                                Resolved:{" "}
+                                {ff.resolution.kind.replace(/_/g, " ")}
+                              </span>
+                            )}
                             {ff.details && (
                               <span className="min-w-0 break-all text-red-600">
                                 {typeof ff.details === "string"

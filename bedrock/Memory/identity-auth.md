@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: identity-auth
 project: guestpost-platform
-updated: 2026-07-19
+updated: 2026-08-03
 ---
 
 # Identity & Auth
@@ -16,7 +16,11 @@ Three actor types enforced via `ActorTypeGuard`:
 
 ## ActiveContext
 
-Decoupled from auth provider (Better-Auth). Stores which org/publisher the user is currently acting as in `ActiveContext` table. Provides immediate context changes, easy to query/validate. No first-membership-wins — all context explicit.
+Decoupled from auth provider (Better-Auth). Stores which org/publisher the user is currently acting as in `ActiveContext` table. Provides immediate context changes, easy to query/validate. No first-membership-wins — all context explicit. First-use creation is a user-keyed upsert with an empty update so concurrent authenticated requests cannot collide on the unique user id and cannot overwrite a context established by a simultaneous explicit switch.
+
+The shared password login form declares a native `POST` fallback. React still
+intercepts hydrated submissions, while a click before hydration cannot place
+email/password fields in the URL, browser history, referrers, or access logs.
 
 ## Auth Guards (applied globally in NestJS)
 
@@ -29,7 +33,31 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 
 ## AuthGuard Caching
 
-30s per-instance TTL cache (`common/auth-context-cache.ts`, 10K-entry cap). Session still verified every request, and Better Auth's `user.banned` signal is checked before the derived-context cache so a suspension cannot retain cached access. Explicit invalidation occurs on context switch, membership invite/remove, role changes, suspension, and restoration. `PermissionsGuard` (decrypt) deliberately uncached.
+Derived context has a 30-second per-instance TTL cache
+(`common/auth-context-cache.ts`, 10K-entry cap), but the session is still
+verified on every request. Cache entries are deep-cloned both when stored and
+for every cache hit, so request-scoped guard enrichment cannot mutate the
+process-global entry or another concurrent request's authorization context.
+Better Auth's `user.banned` signal is checked before the cache.
+
+Role-protected routes do not trust the cached role snapshot:
+`MemberRolesGuard` and `StaffRolesGuard` re-read the current joined `User` and
+membership from PostgreSQL for every protected request, require the expected
+immutable actor type and `banned=false`, and require an active customer
+membership/current active context where applicable. Redis invalidation uses a
+dedicated command connection; API startup registers handlers and awaits the
+separate subscriber connection before accepting traffic. Explicit
+invalidation still occurs after context switches, membership changes, role
+changes, suspension, and restoration. `PermissionsGuard` (decrypt) remains
+deliberately uncached.
+
+Staff demotion and suspension share one bounded serializable authority
+critical section. It locks active staff users in stable ID order, locks and
+re-reads the target, proves at least one other active `SUPER_ADMIN` before a
+demotion/suspension, and commits the mutation with its audit evidence. Auth
+cache invalidation happens only after commit; retry exhaustion is a stable 409.
+This prevents concurrent demotions or a demotion/suspension race from leaving
+the platform without an active Super Admin.
 
 ## Mutation Security (2026-07-16)
 

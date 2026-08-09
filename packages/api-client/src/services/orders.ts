@@ -3,6 +3,7 @@ import type {
   OrderStatus,
   ServiceType,
 } from "@guestpost/shared"
+import { normalizePositiveUsdMoney } from "@guestpost/shared"
 import type { HttpClient } from "../client"
 
 // Mirrors CreateOrderDto exactly — the API whitelists properties, so any
@@ -38,6 +39,12 @@ export interface CreateOrderData {
   items?: OrderItemData[]
 }
 
+export interface SubmitPaymentData {
+  expectedVersion: number
+  expectedAmount: string
+  expectedCurrency: string
+}
+
 // Raw API shape: Order rows carry type/title/amount at the ORDER level and
 // items carry price/targetUrl/anchorText. Decimal columns serialize as
 // strings over JSON.
@@ -51,6 +58,34 @@ interface RawPublication {
   verificationStatus: string
 }
 
+interface RawOrderWebsite {
+  id: string
+  url: string | null
+  name?: string | null
+  access?: {
+    unlocked: false
+    reason: "FIRST_DEPOSIT_REQUIRED"
+  }
+}
+
+export interface OrderDisputeResponse {
+  id: string
+  reason: string
+  status: string
+  resolvedAt: string | null
+  resolution: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OrderReviewResponse {
+  id: string
+  rating: number
+  comment: string | null
+  createdAt: string
+  updatedAt?: string
+}
+
 interface RawOrderItem {
   id: string
   websiteId: string | null
@@ -58,7 +93,7 @@ interface RawOrderItem {
   anchorText: string | null
   price: string | number | null
   status: OrderStatus
-  website?: { id: string; url: string | null } | null
+  website?: RawOrderWebsite | null
   publications?: RawPublication[]
 }
 
@@ -87,7 +122,7 @@ interface RawOrder {
   fulfillmentDueAt: string | null
   warrantyEndsAt: string | null
   briefData: Record<string, unknown> | null
-  website?: { id: string; url: string | null; name?: string | null } | null
+  website?: RawOrderWebsite | null
   items?: RawOrderItem[]
   events?: Array<{
     id: string
@@ -124,7 +159,7 @@ interface RawOrder {
     createdAt: string
   }>
   settlements?: unknown[]
-  dispute?: unknown
+  dispute?: OrderDisputeResponse | null
   fulfillmentChannel?: "PUBLISHER" | "PLATFORM" | null
   cancellationRequests?: CancellationRequestResponse[]
   createdAt: string
@@ -143,7 +178,7 @@ export interface OrderResponse {
   publishedUrl: string | null
   campaignId: string | null
   campaign: { id: string; name: string } | null
-  website: { id: string; url: string | null; name?: string | null } | null
+  website: RawOrderWebsite | null
   items: Array<{
     id: string
     // Derived from the order row — service type/topic live on the Order,
@@ -155,7 +190,7 @@ export interface OrderResponse {
     targetUrl: string | null
     anchorText: string | null
     status: OrderStatus
-    website: { id: string; url: string | null } | null
+    website: RawOrderWebsite | null
     publications: Array<{
       id: string
       publishedUrl: string | null
@@ -194,6 +229,9 @@ export interface OrderResponse {
     createdAt: string
   }>
   totalAmount: number | null
+  // Canonical exact decimal evidence for money-changing commands. UI display
+  // may use totalAmount, but capture must never round-trip through Number.
+  totalAmountExact: string | null
   currency: string
   createdAt: string
   updatedAt: string
@@ -214,7 +252,7 @@ export interface OrderResponse {
   warrantyEndsAt: string | null
   briefData: Record<string, unknown> | null
   settlements?: unknown[]
-  dispute?: unknown
+  dispute?: OrderDisputeResponse | null
   fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
   cancellationRequests: CancellationRequestResponse[]
 }
@@ -360,6 +398,7 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
       createdAt: r.createdAt,
     })),
     totalAmount: raw.amount != null ? Number(raw.amount) : null,
+    totalAmountExact: normalizePositiveUsdMoney(raw.amount),
     currency: raw.currency,
     autoAcceptAt: raw.autoAcceptAt ?? null,
     verifyMethod: raw.verifyMethod ?? null,
@@ -484,8 +523,11 @@ export class OrdersService {
     )
   }
 
-  async submitPayment(id: string) {
-    const raw = await this.client.post<RawOrder>(`/orders/${id}/submit-payment`)
+  async submitPayment(id: string, data: SubmitPaymentData) {
+    const raw = await this.client.post<RawOrder>(
+      `/orders/${id}/submit-payment`,
+      { json: data as unknown as Record<string, unknown> },
+    )
     return normalizeOrder(raw)
   }
 
@@ -605,16 +647,11 @@ export class OrdersService {
     )
   }
   submitReview(id: string, rating: number, comment?: string) {
-    return this.client.post<any>(`/orders/${id}/review`, {
+    return this.client.post<OrderReviewResponse>(`/orders/${id}/review`, {
       json: { rating, comment },
     })
   }
   getReview(id: string) {
-    return this.client.get<{
-      id: string
-      rating: number
-      comment: string | null
-      createdAt: string
-    } | null>(`/orders/${id}/review`)
+    return this.client.get<OrderReviewResponse | null>(`/orders/${id}/review`)
   }
 }

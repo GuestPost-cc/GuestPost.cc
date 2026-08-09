@@ -9,6 +9,16 @@ export class IntegrationError extends Error {
   }
 }
 
+export class GoogleMetricsDisabledError extends IntegrationError {
+  constructor() {
+    super(
+      "GOOGLE_METRICS_DISABLED",
+      "Google Search Console and Google Analytics metrics are temporarily disabled while property-to-domain binding is being hardened.",
+    )
+    this.name = "GoogleMetricsDisabledError"
+  }
+}
+
 export class TokenExpiredError extends IntegrationError {
   constructor(details?: Record<string, unknown>) {
     super(

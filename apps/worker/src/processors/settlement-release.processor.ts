@@ -1,5 +1,9 @@
 import { prisma } from "@guestpost/database"
-import { QUEUES, runSettlementAutoRelease } from "@guestpost/shared"
+import {
+  assertFinanceOperationAllowed,
+  QUEUES,
+  runSettlementAutoRelease,
+} from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import * as Sentry from "@sentry/node"
@@ -31,6 +35,7 @@ export function createSettlementReleaseWorker() {
         logger.warn("unexpected job name — skipping", { jobName: job.name })
         return
       }
+      assertFinanceOperationAllowed("new_liability")
 
       const batchSize = clampBatchSize(
         (job.data as { batchSize?: number }).batchSize,
@@ -80,8 +85,29 @@ export function createSettlementReleaseWorker() {
         scanned: result.scanned,
         released: result.released,
         skipped: result.skipped,
+        freshness_blocked: result.freshnessBlocked,
         duration_ms: result.durationMs,
       })
+
+      if (result.freshnessBlocked > 0) {
+        Sentry.captureMessage(
+          "Settlement auto-release blocked by stale verification evidence",
+          {
+            level: "warning",
+            tags: {
+              queue: "settlement",
+              job: job.name,
+              sweepRunId: job.id ?? "unknown",
+            },
+            extra: {
+              freshness_blocked: result.freshnessBlocked,
+              scanned: result.scanned,
+              released: result.released,
+              batch_size: batchSize,
+            },
+          },
+        )
+      }
 
       if (result.durationMs > slowMs) {
         Sentry.captureMessage("Settlement auto-release sweep slow", {

@@ -27,9 +27,11 @@
 
 const JOB_NAMES = [
   "payout-check-status",
+  "payment-dispute-inbox",
   "reconciliation-run",
   "website-reverify-sweep",
   "domain-metrics-refresh",
+  "delivery-verification-dispatch-sweep",
   "settlement-hold-sweep",
   "settlement-auto-approve",
   "settlement-auto-release",

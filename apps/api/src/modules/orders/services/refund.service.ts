@@ -1,7 +1,9 @@
 import {
+  isSupportedMoneyCurrency,
   notificationDedupKey,
   orderEventMetadata,
   REFUNDABLE_ORDER_STATUSES,
+  USD_CURRENCY,
 } from "@guestpost/shared"
 import {
   FinalRefundResponsibility,
@@ -16,6 +18,7 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
 import { PrismaService } from "../../../common/prisma.service"
 import { checkPublisherBalanceInvariant } from "../../../common/publisher-balance-invariants"
 import { lockPublisherBalanceForUpdate } from "../../../common/publisher-balance-lock"
@@ -48,6 +51,28 @@ export class RefundService {
     private readonly queue: QueueService,
   ) {}
 
+  private assertCanonicalUsd(
+    currency: unknown,
+    entity: "order" | "wallet" | "publisher balance",
+  ) {
+    if (!isSupportedMoneyCurrency(currency)) {
+      throw new ConflictException({
+        code:
+          entity === "order"
+            ? "ORDER_CURRENCY_UNSUPPORTED"
+            : entity === "wallet"
+              ? "WALLET_CURRENCY_MISMATCH"
+              : "PUBLISHER_BALANCE_CURRENCY_INVALID",
+        message:
+          entity === "order"
+            ? "Order cannot be refunded outside the supported USD currency"
+            : entity === "wallet"
+              ? "Refund wallet is not a canonical USD wallet"
+              : "Publisher balance is not denominated in canonical USD",
+      })
+    }
+  }
+
   async refundOrder(
     orderId: string,
     reason: string,
@@ -70,6 +95,7 @@ export class RefundService {
       if (existing)
         return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
     }
+    assertApiFinanceOperationAllowed("new_liability")
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -78,6 +104,7 @@ export class RefundService {
       },
     })
     if (!order) throw new NotFoundException("Order not found")
+    this.assertCanonicalUsd(order.currency, "order")
 
     if (
       !(REFUNDABLE_ORDER_STATUSES as readonly string[]).includes(order.status)
@@ -129,6 +156,7 @@ export class RefundService {
     idempotencyKey: string | undefined,
     responsibility: FinalRefundResponsibility,
   ): Promise<RefundTransactionResult> {
+    this.assertCanonicalUsd(order.currency, "order")
     // Duplicate guard
     if (idempotencyKey) {
       const existing = await tx.transaction.findFirst({
@@ -154,6 +182,7 @@ export class RefundService {
     if (existingRefund) {
       throw new BadRequestException("Order already refunded")
     }
+    assertApiFinanceOperationAllowed("new_liability")
 
     if (
       !(REFUNDABLE_ORDER_STATUSES as readonly string[]).includes(order.status)
@@ -239,6 +268,7 @@ export class RefundService {
         )
         const owed = new Decimal(activeSettlement.publisherAmount)
         if (balance) {
+          this.assertCanonicalUsd(balance.currency, "publisher balance")
           const withdrawable = new Decimal(balance.withdrawableBalance)
           const clawedNow = Decimal.min(withdrawable, owed)
           const newDebt = owed.minus(clawedNow)
@@ -278,6 +308,7 @@ export class RefundService {
               data: {
                 amount: clawedNow.negated(),
                 type: "SETTLEMENT_CLAWBACK",
+                currency: USD_CURRENCY,
                 orderId: order.id,
                 publisherId: activeSettlement.publisherId,
                 settlementId: activeSettlement.id,
@@ -295,7 +326,7 @@ export class RefundService {
               publisherId: activeSettlement.publisherId,
               orderId: order.id,
               amount: newDebt,
-              currency: order.currency ?? "USD",
+              currency: USD_CURRENCY,
             })
           }
         } else {
@@ -303,6 +334,7 @@ export class RefundService {
           await tx.publisherBalance.create({
             data: {
               publisherId: activeSettlement.publisherId,
+              currency: USD_CURRENCY,
               debtBalance: owed,
             },
           })
@@ -310,7 +342,7 @@ export class RefundService {
             publisherId: activeSettlement.publisherId,
             orderId: order.id,
             amount: owed,
-            currency: order.currency ?? "USD",
+            currency: USD_CURRENCY,
           })
         }
 
@@ -354,6 +386,7 @@ export class RefundService {
       )
     }
     if (wallet && amount.greaterThan(0)) {
+      this.assertCanonicalUsd(wallet.currency, "wallet")
       const refunded = await tx.wallet.updateMany({
         where: { id: wallet.id, version: wallet.version },
         data: {
@@ -390,6 +423,7 @@ export class RefundService {
       data: {
         amount,
         type: "REFUND",
+        currency: USD_CURRENCY,
         orderId: order.id,
         walletId: wallet?.id ?? null,
         reference: idempotencyKey ?? `refund-${order.id}`,

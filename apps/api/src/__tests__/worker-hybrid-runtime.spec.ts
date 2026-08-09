@@ -75,7 +75,11 @@ describe("hybrid worker runtime contract", () => {
       "const INBOX_MAX_RETRY_AGE_MS = 72 * 60 * 60 * 1000",
     )
     expect(source).toContain("const INBOX_MAX_ATTEMPTS = 432")
-    expect(source).toContain("PAYOUT_WEBHOOK_STATE_CONFLICT")
+    expect(source).toContain("PAYOUT_WEBHOOK_TERMINAL_CONFLICT_QUARANTINED")
+    expect(source).toContain("finalizePayoutExecution")
+    expect(source).toContain("PAYOUT_WEBHOOK_UNMATCHED_TERMINAL_QUARANTINED")
+    expect(source).toContain("providerAccountExternalId")
+    expect(source).not.toContain('data: { status: "COMPLETED"')
     const schema = read("packages/database/prisma/schema.prisma")
     expect(schema).toContain("@@unique([providerId, providerExecutionId])")
   })
@@ -89,6 +93,18 @@ describe("hybrid worker runtime contract", () => {
     expect(removal).toContain("ownedSchedules")
     expect(removal).toContain(".filter((job) => names.has(job.name))")
     expect(removal).not.toContain("repeatables.map(")
+    expect(removal).toContain("DISPATCH_SWEEP")
+  })
+
+  it("wires delivery verification orphan recovery into both scheduler modes", () => {
+    const source = read("apps/worker/src/index.ts")
+    expect(source).toContain("registerDeliveryVerificationDispatchSweep()")
+    expect(source).toContain('"delivery-verification-dispatch": {')
+    expect(source).toContain(
+      "QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].DISPATCH_SWEEP",
+    )
+    const schedule = read("apps/worker/src/lib/maintenance-schedule.ts")
+    expect(schedule).toContain('tasks.push("delivery-verification-dispatch")')
   })
 
   it("does not keep a burst worker alive for delayed retries", () => {

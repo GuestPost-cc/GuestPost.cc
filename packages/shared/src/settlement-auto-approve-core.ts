@@ -6,8 +6,9 @@
 // rows directly via prisma (worker has no DI container).
 //
 // The original NestJS service is deleted as part of this phase; this is the
-// new single source of truth. Same per-row semantics as before:
-//   - Skip settlements with an OPEN/UNDER_REVIEW dispute (settlement gating)
+// new single source of truth. Per-row semantics:
+//   - Re-evaluate the locked canonical gate (delivery identity/evidence,
+//     payment, currency, disputes, revisions, cancellations, fraud)
 //   - Status + version guard on the updateMany (a manual approval racing
 //     the sweep wins, the sweep silently skips that row)
 //   - Atomic transaction per row: status update + SettlementApproval upsert
@@ -17,6 +18,8 @@
 // `status: { in: ["PENDING", "UNDER_REVIEW"] }` filter and are skipped.
 
 import { orderEventMetadata } from "./audit/order-event-metadata"
+import { evaluateLockedSettlementEligibility } from "./settlement-gating"
+import { runSettlementSerializableTransaction } from "./settlement-transaction"
 
 export interface RunSettlementAutoApproveOptions {
   /**
@@ -102,7 +105,7 @@ export interface SettlementAutoApproveResult {
   scanned: number
   /** Successfully auto-approved (transaction committed). */
   approved: number
-  /** Eligible but skipped (active dispute OR status/version race lost). */
+  /** Due but blocked, raced, or failed after its bounded retry budget. */
   skipped: number
   /** Wall-clock duration of the entire sweep in milliseconds. */
   durationMs: number
@@ -154,70 +157,81 @@ export async function runSettlementAutoApprove(
 
   for (const settlement of due) {
     try {
-      const committed = await prisma.$transaction(async (tx: AutoApproveTx) => {
-        // Re-check dispute inside the transaction (TOCTOU guard)
-        const activeDispute = await tx.orderDispute.findFirst({
-          where: {
-            orderId: settlement.orderId,
-            status: { in: ["OPEN", "UNDER_REVIEW"] },
-          },
-        })
-        if (activeDispute) return false
+      const committed = await runSettlementSerializableTransaction(
+        prisma,
+        async (tx: AutoApproveTx) => {
+          // One canonical, locked decision protects every settlement transition.
+          // This covers delivery status/identity, disputes, revisions, fraud and
+          // cancellation holds, and keeps the decision stable until commit.
+          const eligibility = await evaluateLockedSettlementEligibility(
+            tx,
+            settlement.orderId,
+          )
+          if (!eligibility.eligible) return false
+          if (settlement.currency !== "USD") {
+            throw new Error("Settlement currency must be exactly USD")
+          }
 
-        // Status + version guard — a manual approval racing this sweep wins.
-        const updated = await tx.settlement.updateMany({
-          where: {
-            id: settlement.id,
-            status: { in: ["PENDING", "UNDER_REVIEW"] },
-            version: settlement.version,
-          },
-          data: { status: "CUSTOMER_APPROVED", version: { increment: 1 } },
-        })
-        if (updated.count === 0) return false
+          // Status + version guard — a manual approval racing this sweep wins.
+          const updated = await tx.settlement.updateMany({
+            where: {
+              id: settlement.id,
+              status: { in: ["PENDING", "UNDER_REVIEW"] },
+              version: settlement.version,
+              currency: "USD",
+            },
+            data: {
+              status: "CUSTOMER_APPROVED",
+              currency: "USD",
+              version: { increment: 1 },
+            },
+          })
+          if (updated.count === 0) return false
 
-        await tx.settlementApproval.upsert({
-          where: {
-            settlementId_type: {
+          await tx.settlementApproval.upsert({
+            where: {
+              settlementId_type: {
+                settlementId: settlement.id,
+                type: "CUSTOMER",
+              },
+            },
+            create: {
               settlementId: settlement.id,
               type: "CUSTOMER",
+              approvedBy: "SYSTEM_AUTO_APPROVE",
+              roleAtTime: "SYSTEM",
             },
-          },
-          create: {
-            settlementId: settlement.id,
-            type: "CUSTOMER",
-            approvedBy: "SYSTEM_AUTO_APPROVE",
-            roleAtTime: "SYSTEM",
-          },
-          update: {},
-        })
+            update: {},
+          })
 
-        await tx.orderEvent.create({
-          data: {
-            orderId: settlement.orderId,
-            eventType: "SETTLED",
-            actorId: null,
-            message: `Settlement auto-approved — review window ended ${settlement.reviewEndsAt?.toISOString()}`,
-            metadata: { settlementId: settlement.id, auto: true },
-          },
-        })
-
-        await tx.auditLog.create({
-          data: {
-            action: "SETTLEMENT_AUTO_APPROVED",
-            entityType: "Settlement",
-            entityId: settlement.id,
-            metadata: {
-              ...orderEventMetadata(settlement.order),
+          await tx.orderEvent.create({
+            data: {
               orderId: settlement.orderId,
-              reviewEndsAt: settlement.reviewEndsAt?.toISOString(),
+              eventType: "SETTLED",
+              actorId: null,
+              message: `Settlement auto-approved — review window ended ${settlement.reviewEndsAt?.toISOString()}`,
+              metadata: { settlementId: settlement.id, auto: true },
             },
-            userId: null,
-            organizationId: settlement.order.organizationId ?? null,
-          },
-        })
+          })
 
-        return true
-      })
+          await tx.auditLog.create({
+            data: {
+              action: "SETTLEMENT_AUTO_APPROVED",
+              entityType: "Settlement",
+              entityId: settlement.id,
+              metadata: {
+                ...orderEventMetadata(settlement.order),
+                orderId: settlement.orderId,
+                reviewEndsAt: settlement.reviewEndsAt?.toISOString(),
+              },
+              userId: null,
+              organizationId: settlement.order.organizationId ?? null,
+            },
+          })
+
+          return true
+        },
+      )
 
       if (committed) {
         approved++
@@ -256,8 +270,8 @@ export async function runSettlementAutoApprove(
 /**
  * Stale-review detector. Independent query — call this AFTER `runSettlementAutoApprove`
  * to surface settlements that should have been approved by now but weren't
- * (either because the sweep is broken, the dispute path is wedged, or the
- * status guard kept failing). Caller decides what to do with the count
+ * (either because the sweep is broken, an eligibility hold is unresolved, or
+ * the status guard kept failing). Caller decides what to do with the count
  * (typically: emit a Sentry warning if > 0).
  *
  * "Stale" = `reviewEndsAt` more than `staleThresholdHours` hours in the past

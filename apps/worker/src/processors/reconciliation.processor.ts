@@ -1,5 +1,6 @@
 import { prisma } from "@guestpost/database"
 import {
+  assertFinanceOperationAllowed,
   getDedupHitsTotal,
   incrementDedupHits,
   isUniqueViolation,
@@ -12,6 +13,7 @@ import { createLogger } from "@guestpost/shared/dist/observability/structured-lo
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
+import { processPaymentDisputeInbox } from "./payment-dispute.processor"
 
 const logger = createLogger("worker.reconciliation")
 
@@ -86,6 +88,7 @@ async function handleReconciliationRun() {
   const dedupSnapshot = getDedupHitsTotal()
 
   const staff = await prisma.staffMembership.findMany({
+    where: { role: { in: ["FINANCE", "SUPER_ADMIN"] } },
     select: { userId: true },
   })
   for (const s of staff) {
@@ -148,7 +151,11 @@ export function createReconciliationWorker() {
       }
       switch (job.name) {
         case "reconciliation-run":
+          assertFinanceOperationAllowed("reconciliation")
           return handleReconciliationRun()
+        case "payment-dispute-inbox":
+          assertFinanceOperationAllowed("recovery")
+          return processPaymentDisputeInbox(Number(job.data?.limit) || 100)
         default:
           logger.warn("unknown job name", { jobName: job.name })
       }

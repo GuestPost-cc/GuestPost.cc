@@ -53,9 +53,9 @@ describe("[INTEGRATION] Financial — deposit → settle → release happy path"
         publisherWithdrawableBalance: 80,
         publisherLifetimeEarnings: 80,
         publisherPendingBalance: 0,
-        walletAvailableBalance: 100,
-        transactionCount: 2,
-        transactionSum: 180,
+        walletAvailableBalance: 0,
+        transactionCount: 3,
+        transactionSum: 80,
       })
     } finally {
       await cleanup()

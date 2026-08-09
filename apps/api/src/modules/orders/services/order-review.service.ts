@@ -1,10 +1,15 @@
 import {
+  assertCanonicalPlatformRevenueFundingCore,
+  evaluateLockedSettlementEligibility,
   getSettlementReviewDays,
   orderEventMetadata,
+  PlatformRevenueEvidenceError,
   type PublisherTier,
   QUEUES,
+  runLockedOrderSerializableTransaction,
   WorkflowDecisionService,
 } from "@guestpost/shared"
+import { isRetryablePrismaTransactionError } from "@guestpost/shared/dist/prisma-transaction-retry"
 import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
 import {
   BadRequestException,
@@ -13,8 +18,10 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
+import { Decimal } from "@prisma/client/runtime/client"
+import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
 import {
-  resolvePlatformFeeFraction,
+  resolvePlatformFeePolicy,
   splitPlatformFee,
 } from "../../../common/platform-fee"
 import { PrismaService } from "../../../common/prisma.service"
@@ -56,10 +63,12 @@ export class OrderReviewService {
       )
     }
     const isCreator = order.customerId === userId
-    const isOwner = await this.prisma.membership.findFirst({
-      where: { organizationId, userId, role: "OWNER" },
+    const membership = await this.prisma.membership.findFirst({
+      where: { organizationId, userId, status: "ACTIVE" },
+      select: { role: true },
     })
-    if (!isCreator && !isOwner)
+    const isOwner = membership?.role === "OWNER"
+    if (!membership || (!isCreator && !isOwner))
       throw new ForbiddenException(
         "Only the order creator or organization owner can review",
       )
@@ -174,58 +183,100 @@ export class OrderReviewService {
     organizationId: string,
     userId: string,
   ) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, organizationId },
-      include: {
-        items: { include: { website: { select: { publisherId: true } } } },
-      },
-    })
-    if (!order) throw new NotFoundException("Order not found")
-    if (order.status !== "CUSTOMER_REVIEW") {
-      throw new BadRequestException(
-        "Order must be in CUSTOMER_REVIEW to approve content",
-      )
-    }
-    await this.cancellation.assertNoActiveCancellation(orderId)
+    const result = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        const order = await tx.order.findFirst({
+          where: { id: orderId, organizationId },
+          include: {
+            items: {
+              include: { website: { select: { publisherId: true } } },
+            },
+          },
+        })
+        if (!order) throw new NotFoundException("Order not found")
+        if (order.status !== "CUSTOMER_REVIEW") {
+          throw new BadRequestException(
+            "Order must be in CUSTOMER_REVIEW to approve content",
+          )
+        }
+        await this.cancellation.assertNoActiveCancellation(orderId, tx)
 
-    const membership = await this.prisma.membership.findFirst({
-      where: { organizationId, userId },
-    })
-    const isOwner = membership?.role === "OWNER"
-    const isCreator = order.customerId === userId
-    if (!isOwner && !isCreator) {
-      throw new ForbiddenException(
-        "Only organization owner or order creator can approve content",
-      )
-    }
+        const membership = await tx.membership.findFirst({
+          where: { organizationId, userId, status: "ACTIVE" },
+        })
+        const isOwner = membership?.role === "OWNER"
+        const isCreator = order.customerId === userId
+        if (!membership || (!isOwner && !isCreator)) {
+          throw new ForbiddenException(
+            "Only organization owner or order creator can approve content",
+          )
+        }
 
-    const updated = await this.prisma.$transaction(async (tx: any) => {
-      const fresh = await this.transition(
-        orderId,
-        order.version,
-        { status: "APPROVED" },
-        "CUSTOMER_REVIEW",
-        tx,
-      )
-      await tx.orderEvent.create({
-        data: {
+        const activeRevisions = await tx.revision.findMany({
+          where: {
+            orderId,
+            status: { notIn: ["APPROVED", "REJECTED"] },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 2,
+        })
+        if (activeRevisions.length > 1) {
+          throw new ConflictException({
+            code: "REVISION_LIFECYCLE_CORRUPT",
+            message:
+              "Multiple active revisions require staff repair before content approval",
+          })
+        }
+
+        const fresh = await this.transition(
           orderId,
-          eventType: "CONTENT_APPROVED",
-          actorId: userId,
-          message: "Content approved by customer",
-        },
-      })
-      return fresh
-    })
+          order.version,
+          { status: "APPROVED" },
+          "CUSTOMER_REVIEW",
+          tx,
+        )
+        const activeRevision = activeRevisions[0]
+        if (activeRevision) {
+          const closed = await tx.revision.updateMany({
+            where: {
+              id: activeRevision.id,
+              orderId,
+              status: { notIn: ["APPROVED", "REJECTED"] },
+            },
+            data: { status: "APPROVED" },
+          })
+          if (closed.count !== 1) {
+            throw new ConflictException(
+              "Revision changed during content approval. Refresh and retry.",
+            )
+          }
+        }
+        await tx.orderEvent.create({
+          data: {
+            orderId,
+            eventType: "CONTENT_APPROVED",
+            actorId: userId,
+            message: "Content approved by customer",
+            metadata: {
+              revisionId: activeRevision?.id ?? null,
+              revisionClosed: activeRevision != null,
+            },
+          },
+        })
+        return { order: fresh, assigneeId: order.assigneeId }
+      },
+    )
 
     await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: order.assigneeId ?? "",
+      userId: result.assigneeId ?? "",
       organizationId,
       type: "CONTENT_APPROVED",
       message: `Content for order ${orderId} was approved — proceed to publish`,
     })
 
-    return updated
+    return result.order
   }
 
   async requestRevision(
@@ -234,81 +285,134 @@ export class OrderReviewService {
     userId: string,
     notes: string,
   ) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, organizationId },
-      include: {
-        items: {
-          include: { website: { select: { publisherId: true } } },
-        },
-      },
-    })
-    if (!order) throw new NotFoundException("Order not found")
-    if (order.status !== "CUSTOMER_REVIEW") {
+    const normalizedNotes = notes?.trim()
+    if (!normalizedNotes || normalizedNotes.length < 10) {
       throw new BadRequestException(
-        "Order must be in CUSTOMER_REVIEW to request revision",
+        "Revision notes must contain at least 10 characters",
       )
     }
-    await this.cancellation.assertNoActiveCancellation(orderId)
-
-    // Phase 7: revision-rounds cap moved off the deprecated listing-level
-    // column onto the snapshotted ListingService. We read the SAME row the
-    // order locked into at creation, so customer + publisher contract
-    // matches what they saw at checkout even after subsequent edits.
-    let maxRevisions = 2
-    if (order.listingServiceId) {
-      const ls = await this.prisma.listingService.findUnique({
-        where: { id: order.listingServiceId },
-        select: { revisionRounds: true },
-      })
-      if (ls?.revisionRounds != null) maxRevisions = ls.revisionRounds
-    }
-    if (order.revisionCount >= maxRevisions) {
+    if (normalizedNotes.length > 2000) {
       throw new BadRequestException(
-        `Maximum revisions (${maxRevisions}) reached. Open a dispute if unsatisfied.`,
+        "Revision notes must be 2,000 characters or fewer",
       )
     }
 
-    const updated = await this.prisma.$transaction(async (tx: any) => {
-      const fresh = await this.transition(
-        orderId,
-        order.version,
-        {
-          status: "CONTENT_REQUESTED",
-          revisionCount: { increment: 1 },
-        },
-        "CUSTOMER_REVIEW",
-        tx,
-      )
-      await tx.revision.create({
-        data: { orderId, notes, status: "REQUESTED" },
-      })
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "REVISION_REQUESTED",
-          actorId: userId,
-          message: `Revision requested: ${notes}`,
-          metadata: { revisionNumber: order.revisionCount + 1, notes },
-        },
-      })
-      await this.audit.log(
-        {
-          action: "REVISION_REQUESTED",
-          entityType: "Order",
-          entityId: orderId,
-          metadata: {
-            ...orderEventMetadata(order),
-            revisionNumber: order.revisionCount + 1,
+    return runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        // All policy facts are re-read only after the canonical Order lock.
+        // This keeps the legacy campaign route and the primary order route on
+        // one fail-closed revision state machine.
+        const order = await tx.order.findFirst({
+          where: { id: orderId, organizationId },
+          include: {
+            items: {
+              include: { website: { select: { publisherId: true } } },
+            },
           },
-          userId,
-          organizationId,
-        },
-        tx,
-      )
-      return fresh
-    })
+        })
+        if (!order) throw new NotFoundException("Order not found")
+        if (order.status !== "CUSTOMER_REVIEW") {
+          throw new BadRequestException(
+            "Order must be in CUSTOMER_REVIEW to request revision",
+          )
+        }
+        await this.cancellation.assertNoActiveCancellation(orderId, tx)
 
-    return updated
+        const membership = await tx.membership.findFirst({
+          where: { organizationId, userId, status: "ACTIVE" },
+          select: { role: true },
+        })
+        const isOwner = membership?.role === "OWNER"
+        const isCreator = order.customerId === userId
+        if (!membership || (!isOwner && !isCreator)) {
+          throw new ForbiddenException(
+            "Only organization owner or order creator can request revisions",
+          )
+        }
+
+        const activeRevisions = await tx.revision.findMany({
+          where: {
+            orderId,
+            status: { notIn: ["APPROVED", "REJECTED"] },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 2,
+          select: { id: true },
+        })
+        if (activeRevisions.length > 0) {
+          throw new ConflictException({
+            code:
+              activeRevisions.length > 1
+                ? "REVISION_LIFECYCLE_CORRUPT"
+                : "REVISION_ALREADY_ACTIVE",
+            message:
+              activeRevisions.length > 1
+                ? "Multiple active revisions require staff repair"
+                : "Replacement content must be submitted before another revision can be requested",
+          })
+        }
+
+        // Revision entitlement is immutable order-contract evidence. The live
+        // ListingService may change for future buyers and is never consulted
+        // for an in-flight order.
+        const maxRevisions = order.revisionRoundsSnapshot
+        if (!Number.isInteger(maxRevisions) || maxRevisions < 0) {
+          throw new ConflictException({
+            code: "REVISION_POLICY_EVIDENCE_MISSING",
+            message:
+              "This order is missing its immutable revision entitlement; staff review is required",
+          })
+        }
+        if (order.revisionCount >= maxRevisions) {
+          throw new BadRequestException(
+            `Maximum revisions (${maxRevisions}) reached. Open a dispute if unsatisfied.`,
+          )
+        }
+
+        const fresh = await this.transition(
+          orderId,
+          order.version,
+          {
+            status: "CONTENT_REQUESTED",
+            revisionCount: { increment: 1 },
+          },
+          "CUSTOMER_REVIEW",
+          tx,
+        )
+        await tx.revision.create({
+          data: { orderId, notes: normalizedNotes, status: "REQUESTED" },
+        })
+        await tx.orderEvent.create({
+          data: {
+            orderId,
+            eventType: "REVISION_REQUESTED",
+            actorId: userId,
+            message: `Revision requested: ${normalizedNotes}`,
+            metadata: {
+              revisionNumber: order.revisionCount + 1,
+              notes: normalizedNotes,
+            },
+          },
+        })
+        await this.audit.log(
+          {
+            action: "REVISION_REQUESTED",
+            entityType: "Order",
+            entityId: orderId,
+            metadata: {
+              ...orderEventMetadata(order),
+              revisionNumber: order.revisionCount + 1,
+            },
+            userId,
+            organizationId,
+          },
+          tx,
+        )
+        return fresh
+      },
+    )
   }
 
   async confirmDelivery(
@@ -316,90 +420,105 @@ export class OrderReviewService {
     organizationId: string,
     userId: string,
   ) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, organizationId },
-    })
-    if (!order) throw new NotFoundException("Order not found")
-    if (order.status !== "VERIFIED") {
-      throw new BadRequestException(
-        "Order must be VERIFIED before confirming delivery",
-      )
-    }
-    await this.cancellation.assertNoActiveCancellation(orderId)
+    assertApiFinanceOperationAllowed("new_liability")
+    try {
+      // Authorization, cancellation state, delivery transition, and
+      // settlement/revenue creation are all re-read after the canonical Order
+      // lock. The helper retries only trusted serialization/deadlock errors.
+      return await runLockedOrderSerializableTransaction(
+        this.prisma,
+        orderId,
+        async (tx: any) => {
+          const [order, membership] = await Promise.all([
+            tx.order.findFirst({ where: { id: orderId, organizationId } }),
+            tx.membership.findFirst({
+              where: { organizationId, userId, status: "ACTIVE" },
+            }),
+          ])
+          if (!order) throw new NotFoundException("Order not found")
+          if (order.status !== "VERIFIED") {
+            throw new BadRequestException(
+              "Order must be VERIFIED before confirming delivery",
+            )
+          }
+          await this.cancellation.assertNoActiveCancellation(orderId, tx)
 
-    const membership = await this.prisma.membership.findFirst({
-      where: { organizationId, userId },
-    })
-    const isOwner = membership?.role === "OWNER"
-    const isCreator = order.customerId === userId
-    if (!isOwner && !isCreator) {
-      throw new ForbiddenException(
-        "Only organization owner or order creator can confirm delivery",
-      )
-    }
+          const isOwner = membership?.role === "OWNER"
+          const isCreator = order.customerId === userId
+          if (!membership || (!isOwner && !isCreator)) {
+            throw new ForbiddenException(
+              "Only organization owner or order creator can confirm delivery",
+            )
+          }
 
-    // Delivery transition and settlement/revenue creation commit atomically —
-    // a crash in between would leave a DELIVERED order with no settlement and
-    // nothing to retry it.
-    const updated = await this.prisma.$transaction(async (tx: any) => {
-      // Phase 6.9 — Audit finding #22 closure. The inner updateMany previously
-      // gated on (id, version) only. A race window existed where a parallel
-      // customer-accept-delivery (PUBLISHED → DELIVERED) could commit first,
-      // bumping `version` but ALSO leaving the row in DELIVERED state. Without
-      // the status guard, confirmDelivery's updateMany would still match (it
-      // re-reads the version on retry) and we'd attempt a second DELIVERED
-      // transition + duplicate settlement creation. The status guard makes
-      // this race deterministic — the second tx fails fast with 409.
-      const r = await tx.order.updateMany({
-        where: { id: orderId, version: order.version, status: "VERIFIED" },
-        data: {
-          status: "DELIVERED",
-          deliveredAt: new Date(),
-          version: { increment: 1 },
+          const transitioned = await tx.order.updateMany({
+            where: { id: orderId, version: order.version, status: "VERIFIED" },
+            data: {
+              status: "DELIVERED",
+              deliveredAt: new Date(),
+              version: { increment: 1 },
+            },
+          })
+          if (transitioned.count === 0) {
+            throw new ConflictException(
+              "Order was modified by another request. Retry.",
+            )
+          }
+
+          await tx.orderEvent.create({
+            data: {
+              orderId,
+              eventType: "DELIVERY_CONFIRMED",
+              actorId: userId,
+              message: "Delivery confirmed by customer",
+            },
+          })
+
+          await this.createSettlementForOrder(tx, orderId)
+          const fresh = await tx.order.findUniqueOrThrow({
+            where: { id: orderId },
+          })
+
+          await this.audit.log(
+            {
+              action: "DELIVERY_CONFIRMED",
+              entityType: "Order",
+              entityId: orderId,
+              metadata: { ...orderEventMetadata(fresh) },
+              userId,
+              organizationId,
+            },
+            tx,
+          )
+
+          return fresh
         },
-      })
-      if (r.count === 0) {
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
-        )
+      )
+    } catch (error) {
+      if (isRetryablePrismaTransactionError(error)) {
+        throw new ConflictException({
+          code: "ORDER_CONFIRMATION_CONCURRENCY_CONFLICT",
+          message:
+            "Order state changed concurrently. Refresh and retry confirmation.",
+        })
       }
-      let fresh = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
-
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "DELIVERY_CONFIRMED",
-          actorId: userId,
-          message: `Delivery confirmed by customer`,
-        },
-      })
-
-      await this.createSettlementForOrder(tx, orderId)
-      fresh = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
-
-      await this.audit.log(
-        {
-          action: "DELIVERY_CONFIRMED",
-          entityType: "Order",
-          entityId: orderId,
-          // Use `fresh` so the audit row carries the post-transition state
-          // (status=DELIVERED, version+1). orderEventMetadata reads the
-          // snapshot trio which is immutable after creation either way.
-          metadata: { ...orderEventMetadata(fresh) },
-          userId,
-          organizationId,
-        },
-        tx,
-      )
-
-      return fresh
-    })
-
-    return updated
+      throw error
+    }
   }
 
   async createSettlementForOrder(tx: any, orderId: string) {
-    await this.cancellation.assertNoActiveCancellation(orderId, tx)
+    // This method is also called from delivery verification. Keep the gate at
+    // the shared write boundary so an internal caller cannot bypass the
+    // finance-wide maintenance/incident freeze.
+    assertApiFinanceOperationAllowed("new_liability")
+    const eligibility = await evaluateLockedSettlementEligibility(tx, orderId)
+    if (!eligibility.eligible) {
+      throw new BadRequestException({
+        code: "SETTLEMENT_BLOCKED",
+        message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+        reasons: eligibility.reasons,
+      })
+    }
     const existingSettlement = await tx.settlement.findFirst({
       where: { orderId, status: { not: "CANCELLED" } },
     })
@@ -435,22 +554,80 @@ export class OrderReviewService {
       order.fulfillmentChannel ??
       (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
     if (channel === "PLATFORM") {
+      // Platform recognition is never inferred from mutable Website ownership.
+      // Old orders without an explicit channel require Finance review rather
+      // than silently becoming new revenue evidence.
+      if (order.fulfillmentChannel !== "PLATFORM") {
+        throw new ConflictException({
+          code: "PLATFORM_REVENUE_CHANNEL_EVIDENCE_MISSING",
+          message:
+            "Platform revenue requires an explicit PLATFORM order snapshot.",
+        })
+      }
+      try {
+        await assertCanonicalPlatformRevenueFundingCore(tx, order)
+      } catch (error) {
+        if (!(error instanceof PlatformRevenueEvidenceError)) throw error
+        throw new ConflictException({
+          code:
+            error.code === "INVALID_PURCHASE_EVIDENCE"
+              ? "PLATFORM_REVENUE_PURCHASE_EVIDENCE_INVALID"
+              : "PLATFORM_REVENUE_ORDER_EVIDENCE_INVALID",
+          message:
+            error.code === "INVALID_PURCHASE_EVIDENCE"
+              ? "Platform revenue requires one exact canonical purchase record."
+              : "Platform revenue requires a paid exact-USD platform order.",
+        })
+      }
+
       const existingRevenue = await tx.platformRevenue.findUnique({
         where: { orderId },
       })
-      if (!existingRevenue) {
-        const feeFraction = await resolvePlatformFeeFraction(tx)
+      if (existingRevenue) {
+        const existingAmount = new Decimal(existingRevenue.amount)
+        const existingFee = new Decimal(existingRevenue.platformFee)
+        const existingNet = new Decimal(existingRevenue.netRevenue)
+        const existingFeeBps = existingRevenue.platformFeeBps
+        const expectedFee = Number.isInteger(existingFeeBps)
+          ? existingAmount
+              .mul(existingFeeBps)
+              .div(10_000)
+              .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+          : null
+        if (
+          existingRevenue.reversedAt !== null ||
+          existingRevenue.currency !== "USD" ||
+          existingRevenue.fulfillmentChannel !== "PLATFORM" ||
+          existingFeeBps == null ||
+          existingFeeBps < 0 ||
+          existingFeeBps > 10_000 ||
+          !existingRevenue.feePolicyVersion ||
+          !existingAmount.equals(order.amount) ||
+          !expectedFee?.equals(existingFee) ||
+          !existingFee.plus(existingNet).equals(existingAmount)
+        ) {
+          throw new ConflictException({
+            code: "PLATFORM_REVENUE_EVIDENCE_CONFLICT",
+            message:
+              "Existing platform revenue does not match the immutable order evidence.",
+          })
+        }
+      } else {
+        const feePolicy = await resolvePlatformFeePolicy(tx)
         const { fee: platformFee, net: netRevenue } = splitPlatformFee(
           order.amount,
-          feeFraction,
+          feePolicy.fraction,
         )
 
         await tx.platformRevenue.create({
           data: {
             orderId,
             amount: order.amount,
+            currency: "USD",
             platformFee,
             netRevenue,
+            platformFeeBps: feePolicy.basisPoints,
+            feePolicyVersion: feePolicy.policyVersion,
             recordedAt: new Date(),
             // Phase 6 snapshots — frozen at recognition time.
             listingServiceId: snapshotLsId,
@@ -468,7 +645,7 @@ export class OrderReviewService {
               order.warrantyDays * 86_400_000,
           )
         : null
-      await tx.order.updateMany({
+      const completed = await tx.order.updateMany({
         where: { id: orderId, status: "DELIVERED" },
         data: {
           status: "COMPLETED",
@@ -476,6 +653,13 @@ export class OrderReviewService {
           version: { increment: 1 },
         },
       })
+      if (completed.count !== 1) {
+        throw new ConflictException({
+          code: "PLATFORM_REVENUE_COMPLETION_CONFLICT",
+          message:
+            "Order state changed while platform revenue was being recorded.",
+        })
+      }
       return
     }
 
@@ -504,10 +688,10 @@ export class OrderReviewService {
     })
     if (!publisher) return
 
-    const feeFraction = await resolvePlatformFeeFraction(tx)
+    const feePolicy = await resolvePlatformFeePolicy(tx)
     const { fee: platformFee, net: publisherAmount } = splitPlatformFee(
       order.amount,
-      feeFraction,
+      feePolicy.fraction,
     )
     // Phase 7.2 — tier-aware review window (audit #6). Helper applies env
     // override when set (incident-response escape hatch); otherwise per-tier
@@ -519,7 +703,7 @@ export class OrderReviewService {
     const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
 
     const fraudFlags = await tx.deliveryFraudFlag.findMany({
-      where: { orderId },
+      where: { orderId, resolution: null },
       select: { type: true },
     })
     const releasePolicy = this.decision.computeSettlementReleasePolicy(
@@ -534,8 +718,11 @@ export class OrderReviewService {
         orderId,
         publisherId: publisher.id,
         grossAmount: order.amount,
+        currency: "USD",
         platformFee,
         publisherAmount,
+        platformFeeBps: feePolicy.basisPoints,
+        feePolicyVersion: feePolicy.policyVersion,
         status: "PENDING",
         reviewEndsAt,
         releasePolicy,

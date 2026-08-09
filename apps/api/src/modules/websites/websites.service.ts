@@ -8,6 +8,7 @@ import {
 import {
   generateVerificationToken,
   QUEUES,
+  USD_CURRENCY,
   validateWebsiteEnlistmentInput,
   verificationTxtValue,
 } from "@guestpost/shared"
@@ -142,6 +143,15 @@ export class WebsitesService {
     // the legacy price fields as a compatibility bridge, but never create an
     // AVAILABLE zero-price service.
     const initialService = dto.initialService ?? null
+    if (
+      initialService?.currency !== undefined &&
+      initialService.currency !== USD_CURRENCY
+    ) {
+      throw new BadRequestException({
+        code: "UNSUPPORTED_CURRENCY",
+        message: "Website service currency must be exactly USD",
+      })
+    }
 
     let website
     try {
@@ -208,7 +218,7 @@ export class WebsitesService {
                     {
                       serviceType: initialService.serviceType,
                       price: initialService.price,
-                      currency: initialService.currency ?? "USD",
+                      currency: USD_CURRENCY,
                       turnaroundDays: initialService.turnaroundDays,
                       revisionRounds: initialService.revisionRounds ?? 2,
                       warrantyDays: initialService.warrantyDays,
@@ -457,60 +467,58 @@ export class WebsitesService {
     let domain = website.domain
     if (dto.url && dto.url !== website.url) {
       domain = normalizeDomain(dto.url)
-      const duplicate = await this.prisma.website.findFirst({
-        where: { id: { not: id }, OR: [{ url: dto.url }, { domain }] },
-      })
-      if (duplicate) {
-        throw new BadRequestException(
-          `Website with this domain already exists (${duplicate.url})`,
-        )
+      // Domain identity anchors DNS ownership, marketplace inventory, orders,
+      // and (eventually) provider-property bindings. A generic profile edit
+      // must never retarget those records to another hostname. Formatting-only
+      // URL changes for the same canonical domain remain safe.
+      if (!website.canonicalDomain || domain !== website.canonicalDomain) {
+        throw new BadRequestException({
+          code: "WEBSITE_DOMAIN_IMMUTABLE",
+          message:
+            "A website domain cannot be changed after registration. Add the new domain as a separate website and verify it independently.",
+        })
       }
     }
 
-    const updated = await this.prisma.website.update({
-      where: { id },
-      data: {
-        ...(dto.url !== undefined ? { url: dto.url } : {}),
-        domain,
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.country !== undefined ? { country: dto.country } : {}),
-        ...(dto.language !== undefined ? { language: dto.language } : {}),
-      },
-    })
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.website.update({
+        where: { id },
+        data: {
+          ...(dto.url !== undefined ? { url: dto.url } : {}),
+          domain,
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.country !== undefined ? { country: dto.country } : {}),
+          ...(dto.language !== undefined ? { language: dto.language } : {}),
+        },
+      })
 
-    // Also update the pending listing if exists
-    const listing = await this.prisma.marketplaceListing.findFirst({
-      where: {
-        websiteId: id,
-        status: { in: [ListingStatus.DRAFT, ListingStatus.PENDING_REVIEW] },
-      },
-    })
-
-    if (listing) {
-      // Phase 7: price + turnaroundDays move per-service. If the dto
-      // carried them, propagate to the matching ListingService row(s)
-      // (currently a publisher only has GUEST_POST seeded by the create
-      // path; multi-service edits happen through the Services dialog).
-      await this.prisma.marketplaceListing.update({
-        where: { id: listing.id },
+      // Keep every non-archived marketplace projection consistent with the
+      // Website aggregate in the same commit. Approved/paused listings are
+      // included: a formatting-only URL change must not leave a stale buyer
+      // projection, and a later audit failure must roll the whole edit back.
+      await tx.marketplaceListing.updateMany({
+        where: { websiteId: id, status: { not: ListingStatus.ARCHIVED } },
         data: {
           ...(dto.country !== undefined ? { country: dto.country } : {}),
           ...(dto.language !== undefined ? { language: dto.language } : {}),
           ...(dto.url !== undefined ? { websiteUrl: dto.url } : {}),
         },
       })
-    }
 
-    await this.audit.log({
-      action: "WEBSITE_UPDATED",
-      entityType: "Website",
-      entityId: id,
-      metadata: { url: dto.url ?? website.url },
-      userId: user.id,
-      organizationId,
+      await this.audit.log(
+        {
+          action: "WEBSITE_UPDATED",
+          entityType: "Website",
+          entityId: id,
+          metadata: { url: dto.url ?? website.url },
+          userId: user.id,
+          organizationId,
+        },
+        tx,
+      )
+
+      return updated
     })
-
-    return updated
   }
 
   async getWebsiteById(

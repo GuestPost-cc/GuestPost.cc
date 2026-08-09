@@ -135,6 +135,16 @@ describe("Phase 7.4 — isUniqueViolation (Prisma P2002 detection)", () => {
         meta: { target: ["userId", "dedupKey"] },
       }),
     ).toBe(true)
+    expect(
+      isUniqueViolation({
+        code: "P2010",
+        meta: {
+          driverAdapterError: {
+            cause: { originalCode: "23505" },
+          },
+        },
+      }),
+    ).toBe(true)
   })
 
   it("returns false for any other shape", () => {

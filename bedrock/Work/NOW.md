@@ -1,8 +1,177 @@
 # Current Status
 
-**Phase**: PR #61 is merged and exact commit `442304f` is live across all five Render services and all three Northflank worker workloads. The Neon staging database is migrated through the Stripe-first finance migration and every runtime uses a restricted application role; the former owner password was rotated after cutover. Stripe webhook destinations are active, but both deposit and Connect execution remain fail-closed pending replacement of the staging restricted key and a user-initiated sandbox checkout. Existing Admin-auth and GSC/GA4 deployment follow-ups remain open.
+**Phase**: Draft PR #84 (`agent/financial-integrity-hardening`) contains the
+completed financial hardening plus local schema/login recovery work. It is not
+merged or deployed. GitHub `main` through dependency consolidation commit
+`c55c4d9` is merged into the branch and remains its ancestor.
 
-**Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
+## Current Local Work: Financial Evidence And Release Integrity
+
+- The original money defects are fixed: publisher approval uses the already
+  reserved balance instead of charging it twice; chargeback holds have an
+  independent ledger identity; approved automated payouts cannot be manually
+  completed without provider/bank evidence; and the buyer wallet withdrawal
+  endpoint is retired because it never moved money externally.
+- Launch accounting is exact, case-sensitive USD only. Catalog, order, wallet,
+  deposit, refund/dispute, settlement/revenue, publisher balance, withdrawal,
+  payout execution/allocation/batch, and ledger boundaries enforce currency in
+  application code and PostgreSQL. Historical non-USD rows stop migration
+  preflight and are never relabelled.
+- Order create, cart mutation, and payment capture serialize on the Order row.
+  Capture re-authorizes the actor and verifies the reviewed delivery version,
+  immutable catalog/service/version/amount/currency snapshot, live listing and
+  website state, exact USD wallet evidence, and idempotency fingerprint.
+  PostgreSQL guards the paid-order/purchase-ledger equivalence and immutable
+  captured contract.
+- Manual approval and automated settlement release share one canonical live
+  predicate under the Order lock. Active revisions, disputes, cancellations,
+  delivery failure/change, unresolved fraud flags, and current holds block
+  release. Auto-release additionally requires successful current-delivery
+  evidence no older than 12 hours. Blocker writes and settlement writes are
+  serialized by database triggers; one exact release ledger row is required.
+- Staff delivery overrides, including the legacy compatibility route, all use
+  the canonical active-delivery-version intervention. An audited bounded reason
+  and current staff authority are required under the order lock; no endpoint
+  may advance only `Order.status` without updating the immutable delivery
+  evidence that settlement eligibility consumes.
+- Delivery verification is durable and bounded: enqueue failures persist for
+  retry, worker fetches cap redirects/body/time, superseded delivery evidence
+  cannot authorize settlement, and structured warnings surface freshness
+  blocks, hold-sweep failures, and scan-cap exhaustion. Fraud flags are
+  adjudicated through append-only resolution evidence plus current holds;
+  manual rejection checks current version and exact state while locked.
+- GSC/GA4 metrics are fully quarantined until exact property/web-stream to
+  canonical-domain binding exists. Legacy summaries are scrubbed, stale writer
+  inserts are rejected, and marketplace traffic uses only current unexpired
+  Ahrefs evidence.
+- Integration token encryption accepts only exact 64-hex keys, persists a
+  per-account key version, authenticates version-2+ ciphertext to immutable
+  account identity and token purpose, updates access/refresh tokens atomically,
+  and includes a lock/CAS-based batch rotation and verification command.
+- External customer/publisher order responses use explicit public-field
+  allowlists so nested actor, reviewer, finance, refund, cancellation
+  idempotency, and other internal evidence cannot escape via a newly selected
+  Prisma relation.
+- Publisher list and detail reads now both exclude DRAFT/PENDING_PAYMENT
+  orders, so an unpaid buyer brief cannot leak through the work queue before
+  capture. Customer wallet and ledger reads require a fresh active OWNER
+  membership rather than only an actor-type snapshot.
+- Derived auth cache entries are deep-cloned on insert and every hit; concurrent
+  requests cannot mutate one another's context. Role-protected guards re-read
+  current user/membership authority from PostgreSQL, and API startup awaits the
+  dedicated invalidation subscriber. Staff demotion and suspension share a
+  bounded serializable stable-lock critical section that preserves at least one
+  active Super Admin and commits its audit atomically.
+- Local authenticated 500s were traced to 13 committed migrations missing from
+  the development database. `dev:all` now fails closed on pending, failed, or
+  unreachable Prisma migration state before launching any application writer;
+  migration deployment stays an explicit hard-drain operation. Generated
+  Next.js state is cleared before the production build and again before dev
+  startup so stale build locks and route artifacts cannot hide login pages.
+- Initial `ActiveContext` creation is a user-keyed no-overwrite upsert, closing
+  the concurrent first-request P2002/500 window without overwriting a context
+  selected by a concurrent switch. Revision migration `0960` repairs only
+  legacy requests with replacement-submission event evidence in their exact
+  request window and still aborts on ambiguous or unexplained duplicates.
+- Migration `0970` reconstructs only exact legacy publisher-withdrawal
+  reservations: pending rows require one pre-cutover debit and requester audit;
+  rejected rows also require one exact post-cutover reversal and matching
+  decision audit. Pending repairs add equal carry-forward/used amounts;
+  rejected repairs add only carry-forward. Withdrawable balance and lifetime
+  paid never change, and ambiguous history aborts instead of being guessed or
+  repaired with ad hoc SQL.
+- Migration `0980` makes a bounded categorical failure code mandatory for a
+  failed deposit attempt. Checkout creation is explicitly flag-gated, exact
+  retries bind every command and normalized Stripe fact, redirect hosts are
+  allowlisted, and raw provider diagnostics never become stored or returned
+  financial evidence.
+- The shared password form has a native POST fallback, preventing a
+  pre-hydration submit from leaking credential fields into a URL or access log.
+- Local Compose startup now blocks until the configured MinIO bucket exists and
+  is verified. Invalid names or app/server credential drift fail closed before
+  delivery-verification workers can consume jobs without durable snapshots;
+  production R2/S3 provisioning remains operator-owned.
+- Object-storage selection is atomic and environment-bound: development/test
+  can only use the fixed local MinIO service, production must explicitly choose
+  R2 or S3, provider secret sets cannot be mixed, and only worker lanes that can
+  consume delivery snapshots validate/receive the storage bundle.
+  Local startup was exercised twice idempotently; the restarted API/worker
+  selected MinIO, and an application-level PUT plus signed GET round-trip
+  returned 200 from localhost before the diagnostic object was removed.
+- Development seed funding no longer increments an existing wallet on every
+  run while reusing one ledger row. The unique synthetic deposit and balance
+  increment now commit atomically under a wallet row lock and bounded
+  serializable retry. Exact replays are no-ops; uniqueness races require a
+  fresh locked proof of the complete provider-free evidence and ledger parity.
+  Conflicting evidence aborts. The known-password fixture also refuses every
+  non-development/test mode, remote or indirect database, remote API target,
+  or database without the Compose-installed local sentinel before it performs
+  API or mutating database work; its package command does not override the
+  mode. A loopback-only API preflight independently proves the API runtime and
+  database sentinel before the first signup.
+- The already-drifted local seed wallet was corrected only after a validated
+  backup and exact ledger/evidence checks, under a row lock with a system audit
+  record. Reconciliation now has zero critical findings and no wallet drift;
+  one old paid order still has the expected workflow warning because it has
+  remained in customer review for more than seven days without a settlement.
+  No financial state was invented to clear that warning.
+- This is a mixed-version-incompatible financial release. Deployment requires
+  a maintenance window, hard drain of every old API/worker writer, ordered
+  migrations `0900` through `0980`, startup of only the evidence-aware image,
+  pre-provisioned evidence storage plus explicit R2/S3 selection on the API and
+  delivery-consuming Northflank lanes,
+  zero unexplained incident-query findings, and signed Stripe deposit/payout
+  canaries. Rollback after database guards land is a money freeze and forward
+  fix, never an old image or trigger removal.
+- The supplied non-production Neon database was backed up with PostgreSQL 18
+  tooling and migrated under a hard drain from 44 to all 59 repository
+  migrations. Independent Prisma status and catalog/data postflight checks
+  confirm no failed or missing migration, no prepared transaction, no
+  unvalidated financial constraint, every expected PR #84 schema guard, and
+  zero USD/minor-unit/currency-link/paid-order/Google-quarantine/encryption
+  violations.
+- A legacy payout-inbox poller reconnected twice after Render API and
+  Northflank were reported paused. The staging `guestpost_runtime` role is
+  therefore temporarily `NOLOGIN`, with zero remaining client sessions, and
+  the API/workers must remain stopped. Before restoring runtime login, verify
+  the realtime service, on-demand job, and maintenance/scheduled dispatcher are
+  all stopped and stage the exact PR #84 head in `recovery_only` mode. Restore
+  login only for that coordinated start, then require health, reconciliation,
+  signed Stripe deposit/payout canaries, and Finance/Security approval before
+  normal finance mode or merge. Rotate the supplied owner credential after the
+  cutover; it must never enter a frontend, runtime service, log, repository, or
+  Bedrock note.
+- Every new payout send repeats the canonical Finance/method/rollout gate under
+  final routing locks immediately before the durable claim. Only an exact aged
+  claim or a persisted Stripe Transfer recovery stage may bypass current
+  rollout switches for narrowly scoped reconciliation; no configuration flip
+  can mint a new send authority.
+- Validation is green: 121 API unit suites / 1,480 tests, 18 PostgreSQL API
+  integration suites / 146 tests, 29 shared suites / 326 tests, 13 integration
+  package suites / 104 tests, 8 API-client suites / 65 tests, and 33 worker
+  tests. The populated 59-migration finance upgrade rehearsal through `0980`
+  passes, including exact positive, idempotent no-op, same-amount collision,
+  and unsafe-evidence rejection coverage for the legacy reservation repair.
+  Database generation/build, focused delivery/revision concurrency suites, the
+  full repository policy/type/lint/documentation/dependency checks, and all 12
+  production builds pass. Clean-start browser checks pass for the shared login,
+  customer work queue/orders/billing/marketplace/campaigns, publisher
+  orders/earnings/withdrawals/payout methods/websites/integrations, and Admin
+  command/finance/settlement/dispute/verification/marketplace/governance pages.
+  The live normal-hold integration path passes 22 checks, the isolated zero-hold
+  full payout loop passes 28 checks, and the 10-way money race harness passes
+  20 checks without new reconciliation drift. After restoring the verified
+  pre-test local backup, fresh customer, publisher, and Super Admin browser
+  logins and dashboards loaded without runtime console errors.
+  GitHub then surfaced two high-severity development-tool alerts for the same
+  `js-yaml` advisory. Major-line-specific workspace floors now resolve 3.15.1
+  through Jest coverage tooling and 4.3.1 through the Nest CLI; dependency
+  policy enforces both and the full development-plus-production audit reports
+  no known vulnerabilities.
+  Populated staging migration evidence is complete. Matching-image
+  recovery-only health/reconciliation, signed Stripe deposit/payout canaries,
+  and recorded Finance/Security approval remain mandatory before the draft can
+  be marked ready or merged.
 
 ## Current Local Work: Staff Marketplace And Canonical Order Integrity
 
@@ -718,6 +887,13 @@ data.
   and the explicit Northflank service/job configuration; the repository
   intentionally defaults to compatibility `all` mode until that
   operator-controlled cutover occurs.
+- Financial evidence hardening requires an operator-controlled hard-drain
+  deployment and signed Stripe staging matrix. Keep payout/deposit execution
+  gates closed until the ordered migrations, one-version worker/API check,
+  populated-clone rehearsal, zero unvalidated financial constraints, incident
+  queries, normalized-claim checks, exact amount/currency/account payout
+  evidence, derivative-deposit redelivery, runtime-mode drills, and
+  late-failure quarantine all pass.
 
 ## Completed 2026-07-28: transitive dependency audit remediation
 

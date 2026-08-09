@@ -9,6 +9,13 @@ import {
 } from "@nestjs/common"
 import { Response } from "express"
 
+const SAFE_PUBLIC_SERVER_ERROR_CODES = new Set([
+  "DEPOSIT_PROVIDER_UNAVAILABLE",
+  "DEPOSIT_STATE_UNAVAILABLE",
+  "FINANCE_OPERATION_BLOCKED",
+  "STRIPE_CONNECT_UNAVAILABLE",
+])
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name)
@@ -52,6 +59,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 
   private canExposeServerError(exception: unknown): boolean {
+    if (exception instanceof HttpException) {
+      const response = exception.getResponse()
+      const code =
+        typeof response === "object" && response !== null
+          ? (response as { code?: unknown }).code
+          : undefined
+      return (
+        typeof code === "string" && SAFE_PUBLIC_SERVER_ERROR_CODES.has(code)
+      )
+    }
     return (
       exception instanceof IntegrationError &&
       exception.code === "PROVIDER_ERROR" &&
@@ -70,6 +87,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
     if (error.code === "TOKEN_EXPIRED" || error.code === "REAUTH_REQUIRED") {
       return HttpStatus.UNAUTHORIZED
+    }
+    if (error.code === "GOOGLE_METRICS_DISABLED") {
+      return HttpStatus.SERVICE_UNAVAILABLE
     }
     if (
       error.code === "PROVIDER_ERROR" &&

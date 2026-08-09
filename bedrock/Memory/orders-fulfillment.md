@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: orders-fulfillment
 project: guestpost-platform
-updated: 2026-07-19
+updated: 2026-08-03
 ---
 
 # Orders & Fulfillment
@@ -157,8 +157,9 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
   never enter `OrderEvent.metadata`; events carry only provenance and integrity
   references. Customer source content is created atomically with the DRAFT
   order but does not advance lifecycle status.
-- Publisher and Operations direct-order reads fail closed for DRAFT and
-  PENDING_PAYMENT orders, preventing pre-payment source-article disclosure.
+- Publisher order lists and Publisher/Operations direct-order reads fail closed
+  for DRAFT and PENDING_PAYMENT orders, preventing pre-payment brief and
+  source-article disclosure.
   Finance projections do not include article bodies.
 
 ## Order creation contract hardening (2026-07-24)
@@ -170,6 +171,10 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 - Listing service price, currency, version, availability, website, turnaround,
   warranty, and fulfillment channel remain server-derived. New clients submit
   the reviewed quote and receive `REQUOTE_REQUIRED` if it changed.
+- New listing-backed orders persist the exact revision entitlement. Historical
+  orders that predate this snapshot retain `NULL`; current mutable catalog
+  terms are not backfilled as historical evidence, and revision requests fail
+  closed until an explicit evidence-repair workflow exists.
 - Customer retries reuse an organization-scoped idempotency key.
 - Guest-post buyers may submit a plain-text/Markdown source article during
   creation. The body is capped at 200,000 characters and rendered as text.
@@ -197,6 +202,7 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 
 - The worker runs repeatable auto-accept and settlement auto-release sweeps; their payloads are signed and the registry guards against drift between scheduled jobs and processors.
 - Settlement review auto-approval consumes `QUEUES.SETTLEMENT`, while auto-release consumes the dedicated `QUEUES.SETTLEMENT_RELEASE`. BullMQ workers must not independently filter different job names from one shared queue because either worker can claim and discard the other's job; startup removes legacy auto-release repeatables from the old queue.
+- Automated release locks and reruns the canonical eligibility gate, then requires the newest immutable evidence for the active delivery to be a successful link/target/anchor observation no older than 12 hours. Missing, stale, future-dated, or failed evidence is counted as `freshnessBlocked` and performs no money write; the PostgreSQL transition guard mirrors the fixed window.
 - `SettlementApproval` timestamps are exposed as `approvedAt` (not `createdAt`), and `approvedBy` is a user ID or a `SYSTEM_*` actor token. The admin order-detail API enriches human approvers as `approvedByUser`; UI renderers must retain system-token labels and defensively handle missing/invalid timestamps.
 - Delivery verification can be reviewed from the staff queue, including evidence and intervention actions. Customer and staff views expose the review-window countdown.
 - The staff UI calls DNS ownership checks **Domain Verification** and keeps
@@ -208,6 +214,13 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
   publisher context when applicable, and the active delivery-version evidence.
   Staff retry, verify, reject, and re-verification actions address the order by
   `orderId`.
+- Every staff manual-delivery approval, including the legacy
+  `/admin/orders/:id/manual-verify` compatibility route, delegates to the same
+  active-delivery-version intervention. It requires a bounded audited override
+  reason, rechecks current staff authority under the order lock, advances the
+  delivery evidence and `Order` with optimistic guards, and writes event/audit
+  evidence atomically. A status-only manual verification is not a valid
+  settlement predicate.
 - Manual settlement approval requires a reason and is available to `FINANCE`
   and `SUPER_ADMIN` after customer approval. Super Admin retains the separate
   force-approval step for exceptional missing-customer-approval cases.
@@ -238,3 +251,26 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 - Create and idempotency-replay responses return the persisted post-total order with items and article versions, not the initial zero-value draft snapshot.
 - Local migration `20260723180000_order_article_versions` was applied successfully.
 - Validation: shared 108/108 tests, API 997/997 tests, focused shared/API/admin/portal/publisher builds, and live customer/publisher/Operations role flows passed.
+
+## 2026-08-02 cart and capture financial boundary
+
+- `ListingService.price`, `Order.amount`, and `OrderItem.price` are positive,
+  cent-exact USD amounts. Order creation and aggregation remain in Decimal
+  space and never persist a transitional zero-valued Order.
+- Add, remove, reprice, and capture serialize through the parent Order row in a
+  bounded `SERIALIZABLE` transaction. Exhausted cart retries return the stable
+  `ORDER_CART_CONCURRENCY_CONFLICT` response.
+- Capture proves at least one `PENDING_PAYMENT` item, exact item-sum/header
+  equality, one website identity, and the current ListingService currency and
+  price before locking/debiting the Wallet. Price drift commits an atomic
+  DRAFT requote and requires explicit customer confirmation.
+- PostgreSQL repeats the precision and capture checks. OrderItem insertion,
+  mutation, reassignment, and deletion are blocked after PAID state, PURCHASE
+  evidence, or Settlement creation.
+- A revision request remains active until replacement content is submitted for
+  customer review, at which point the service closes that exact request as
+  `APPROVED` while holding the parent Order lock. Migration `0960` repairs only
+  legacy nonterminal revisions with a `CONTENT_SUBMITTED` event strictly inside
+  that revision's request window; equal-timestamp or otherwise unexplained
+  duplicates fail preflight. A partial unique index then enforces at most one
+  nonterminal Revision per Order.

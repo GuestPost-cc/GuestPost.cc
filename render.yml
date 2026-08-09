@@ -36,8 +36,6 @@ services:
         value: json
       - key: DATABASE_URL
         sync: false
-      - key: DIRECT_DATABASE_URL
-        sync: false
       - key: REDIS_URL
         sync: false
       - key: BETTER_AUTH_SECRET
@@ -48,6 +46,13 @@ services:
         sync: false
       - key: INTEGRATION_ENCRYPTION_KEY
         sync: false
+      # Financial releases start fail-closed. A reviewed cutover changes these
+      # in the service dashboard only after migrations, incident queries, and
+      # signed sandbox canaries pass.
+      - key: FINANCE_RUNTIME_MODE
+        value: recovery_only
+      - key: PAYOUT_EXECUTION_ENABLED
+        value: "false"
       - key: TRUSTED_ORIGINS
         value: https://guestpost.pro.bd,https://app.guestpost.pro.bd,https://publisher.guestpost.pro.bd,https://admin.guestpost.pro.bd,https://api.guestpost.pro.bd
       - key: CORS_ORIGIN
@@ -76,6 +81,11 @@ services:
         value: "10"
       - key: PLATFORM_FEE_PERCENT
         value: "20"
+      # Pre-verification DoS budget for only the four canonical signed webhook
+      # POST paths. This is not authentication; controller signatures remain
+      # mandatory. Monitor provider 429/retry telemetry before tuning.
+      - key: WEBHOOK_INGRESS_RATE_LIMIT_MAX
+        value: "600"
       # Stripe credentials are supplied only in the Render Dashboard. New
       # money movement stays disabled until the migration, webhook, and
       # sandbox-certification gates in docs/STRIPE_STAGING_RUNBOOK.md pass.
@@ -107,6 +117,10 @@ services:
         sync: false
       - key: EMAIL_FROM
         value: GuestPost <noreply@guestpost.pro.bd>
+      - key: OBJECT_STORAGE_PROVIDER
+        value: r2
+      - key: R2_ACCOUNT_ID
+        sync: false
       - key: R2_ENDPOINT
         sync: false
       - key: R2_BUCKET
@@ -115,8 +129,6 @@ services:
         sync: false
       - key: R2_SECRET_ACCESS_KEY
         sync: false
-      - key: S3_REGION
-        value: auto
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET

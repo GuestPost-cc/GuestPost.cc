@@ -71,7 +71,9 @@ function DeliveryRow({ orderId }: { orderId: string }) {
   const verified =
     active.verificationStatus === "VERIFIED" ||
     ["APPROVED", "OVERRIDDEN"].includes(active.interventionStatus)
-  const fraud = deliveries.some((d: any) => d.fraudFlags?.length > 0)
+  const fraud = deliveries.some((d: any) =>
+    d.fraudFlags?.some((flag: any) => !flag.resolution),
+  )
   const vb = vBadge[active.verificationStatus] ?? vBadge.PENDING
 
   return (

@@ -6,6 +6,14 @@ import { LoginForm } from "../login-form"
 import { SignupForm } from "../signup-form"
 
 describe("auth forms", () => {
+  it("uses a POST fallback so credentials cannot enter the URL before hydration", () => {
+    render(<LoginForm onSubmit={vi.fn()} />)
+
+    expect(
+      screen.getByRole("button", { name: "Sign in" }).closest("form"),
+    ).toHaveAttribute("method", "post")
+  })
+
   it("does not submit empty login credentials and shows field errors", async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn().mockResolvedValue(undefined)

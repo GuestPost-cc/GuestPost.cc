@@ -1,7 +1,7 @@
 import { OrderStatus, ServiceType } from "@guestpost/database"
 import { OrdersService } from "../orders.service"
 
-describe("OrdersService.listOrders", () => {
+describe("OrdersService order-list scoping", () => {
   let prisma: any
   let service: OrdersService
 
@@ -97,5 +97,20 @@ describe("OrdersService.listOrders", () => {
       { fulfillmentDueAt: { sort: "asc", nulls: "last" } },
       { updatedAt: "desc" },
     ])
+  })
+
+  it("keeps unpaid customer drafts out of the publisher queue", async () => {
+    await service.listPublisherOrders("publisher-1", 25, 50)
+
+    const query = prisma.order.findMany.mock.calls[0][0]
+    expect(query.where).toEqual({
+      website: { publisherId: "publisher-1" },
+      status: {
+        notIn: [OrderStatus.DRAFT, OrderStatus.PENDING_PAYMENT],
+      },
+    })
+    expect(query.take).toBe(25)
+    expect(query.skip).toBe(50)
+    expect(prisma.order.count).toHaveBeenCalledWith({ where: query.where })
   })
 })

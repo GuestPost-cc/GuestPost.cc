@@ -51,24 +51,20 @@ describe("SyncService ownership and mapping scope", () => {
     mockDb.integrationSchedule.updateMany.mockResolvedValue({ count: 1 })
   })
 
-  it("signs queued sync jobs before Redis accepts them", async () => {
+  it("rejects new sync jobs before creating records or queue messages", async () => {
     mockDb.publisherIntegration.findFirst.mockResolvedValue({
       id: "integration-1",
       websiteIntegrations: [{ id: "link-1" }],
     })
     mockDb.integrationSync.create.mockResolvedValue({ id: "sync-1" })
 
-    await new SyncService().triggerSync(owner, "integration-1")
+    await expect(
+      new SyncService().triggerSync(owner, "integration-1"),
+    ).rejects.toMatchObject({ code: "GOOGLE_METRICS_DISABLED" })
 
-    expect(mockQueueAdd).toHaveBeenCalledWith(
-      "sync",
-      expect.objectContaining({
-        integrationId: "integration-1",
-        signature: expect.stringMatching(/^[0-9a-f]{64}$/),
-        iat: expect.any(Number),
-        v: 1,
-      }),
-    )
+    expect(mockDb.publisherIntegration.findFirst).not.toHaveBeenCalled()
+    expect(mockDb.integrationSync.create).not.toHaveBeenCalled()
+    expect(mockQueueAdd).not.toHaveBeenCalled()
   })
 
   it("authorizes sync-status reads through the owning integration", async () => {
@@ -100,7 +96,7 @@ describe("SyncService ownership and mapping scope", () => {
     })
   })
 
-  it("passes the exact website integration id to every provider sync", async () => {
+  it("quarantines stale queued syncs before credential or provider access", async () => {
     mockDb.integrationSync.findFirst.mockResolvedValueOnce({ id: "sync-1" })
     mockDb.publisherIntegration.findFirst.mockResolvedValue({
       id: "integration-1",
@@ -112,32 +108,21 @@ describe("SyncService ownership and mapping scope", () => {
       ],
     })
 
-    await new SyncService().processSyncJob({ integrationId: "integration-1" })
+    const result = await new SyncService().processSyncJob({
+      integrationId: "integration-1",
+      websiteIntegrationId: "link-1",
+    })
 
-    expect(mockDb.publisherIntegration.findFirst).toHaveBeenCalledWith(
+    expect(result).toEqual(
       expect.objectContaining({
-        include: expect.objectContaining({
-          websiteIntegrations: {
-            where: { status: { in: ["CONNECTED", "OUT_OF_SYNC"] } },
-          },
-        }),
+        success: false,
+        recordsProcessed: 0,
+        error: expect.stringContaining("temporarily disabled"),
       }),
     )
-    expect(mockProviderSync).toHaveBeenNthCalledWith(
-      1,
-      "access-token",
-      "sc-domain:one.example",
-      undefined,
-      undefined,
-      "link-1",
-    )
-    expect(mockProviderSync).toHaveBeenNthCalledWith(
-      2,
-      "access-token",
-      "sc-domain:two.example",
-      undefined,
-      undefined,
-      "link-2",
-    )
+    expect(mockDb.integrationSync.findFirst).not.toHaveBeenCalled()
+    expect(mockDb.publisherIntegration.findFirst).not.toHaveBeenCalled()
+    expect(mockProviderSync).not.toHaveBeenCalled()
+    expect(mockDb.websiteIntegration.update).not.toHaveBeenCalled()
   })
 })

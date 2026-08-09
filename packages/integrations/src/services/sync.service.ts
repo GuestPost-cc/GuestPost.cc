@@ -1,12 +1,16 @@
 import { createPrismaClient } from "@guestpost/database"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { Queue } from "bullmq"
-import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
+import {
+  IntegrationEncryptionService,
+  integrationTokenEncryptionContext,
+} from "../adapters/encryption.adapter"
 import {
   IntegrationNotFoundError,
   NoActiveCredentialError,
   SyncNotFoundError,
 } from "../errors"
+import { assertGoogleMetricsEnabled } from "../google-metrics-gate"
 import { getProvider } from "../providers"
 import { INTEGRATION_QUEUES } from "../queue-names"
 import { createIntegrationQueueConnection } from "../redis"
@@ -15,7 +19,12 @@ import { IntegrationSyncJobType } from "../types"
 import { wakeOnDemandWorker } from "../worker-wakeup"
 
 const db = createPrismaClient()
-const encryption = new IntegrationEncryptionService()
+let encryptionSingleton: IntegrationEncryptionService | undefined
+
+function integrationEncryption(): IntegrationEncryptionService {
+  encryptionSingleton ??= new IntegrationEncryptionService()
+  return encryptionSingleton
+}
 
 function createSyncQueue(): Queue {
   return new Queue(INTEGRATION_QUEUES.SYNC, {
@@ -53,6 +62,7 @@ export class SyncService {
     startDate?: string,
     endDate?: string,
   ): Promise<{ syncId: string; websiteIntegrationIds: string[] }> {
+    assertGoogleMetricsEnabled()
     const integration = await (db as any).publisherIntegration.findFirst({
       where: {
         id: integrationId,
@@ -108,6 +118,18 @@ export class SyncService {
 
   async processSyncJob(payload: SyncJobPayload): Promise<SyncResult> {
     const startMs = Date.now()
+    try {
+      assertGoogleMetricsEnabled()
+    } catch (error) {
+      return {
+        success: false,
+        recordsProcessed: 0,
+        syncedAt: new Date(),
+        error:
+          error instanceof Error ? error.message : "Google metrics disabled",
+        durationMs: Date.now() - startMs,
+      }
+    }
     const { integrationId, websiteIntegrationId } = payload
     const progress = { itemsCompleted: 0, itemsTotal: 0, recordsProcessed: 0 }
 
@@ -139,13 +161,17 @@ export class SyncService {
         },
       })
 
-      if (!integration?.connection) {
+      if (integration?.connection?.status !== "ACTIVE") {
         throw new NoActiveCredentialError()
       }
 
       // Decrypt access token
       const accessToken = (
-        encryption.decrypt(integration.connection.encryptedAccessToken) as {
+        integrationEncryption().decrypt(
+          integration.connection.encryptedAccessToken,
+          integration.connection.encryptionKeyVersion,
+          integrationTokenEncryptionContext(integration.connection, "access"),
+        ) as {
           value: string
         }
       ).value

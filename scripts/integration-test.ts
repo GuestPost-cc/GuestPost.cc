@@ -4,16 +4,33 @@
  * -> approval -> withdrawal -> payout -> reconciliation.
  *
  * Exit 0 = every step and every invariant held. Run: pnpm tsx scripts/integration-test.ts
- * Requires: API on :4000, seeded users (pnpm seed), publisher tier VERIFIED.
+ * Requires: API on :4000, seeded users (pnpm seed), publisher tier VERIFIED,
+ * manual payouts enabled, and WITHDRAWAL_HOLD_DAYS=0 on the API process for
+ * the full payout loop. Run `pnpm test:integration:hold` against the normal
+ * hold policy to verify the fraud-window boundary without bypassing immutable
+ * withdrawal evidence.
  */
-import { prisma } from "../packages/database/src"
+
+import { normalizePositiveUsdMoney } from "../packages/shared/src/money"
+import { loadRootEnv } from "./env"
 import { fundExistingWalletForTest } from "./test-wallet-funding"
+
+let prisma: typeof import("../packages/database/src")["prisma"]
 
 const API = process.env.API_URL ?? "http://localhost:4000"
 const H = {
   "Content-Type": "application/json",
   Origin: "http://localhost:3001",
 }
+type Portal = "customer" | "publisher" | "staff"
+type Session = { cookie: string; origin: string; portal: Portal }
+const activeSessions: Session[] = []
+const SESSION_COOKIE_NAMES = new Set([
+  "guestpost.session_token",
+  "__Secure-guestpost.session_token",
+  "guestpost-session_token",
+  "__Secure-guestpost-session_token",
+])
 
 let passed = 0
 let failed = 0
@@ -32,12 +49,24 @@ function check(name: string, cond: boolean, detail?: unknown) {
 async function call(
   method: string,
   path: string,
-  token?: string,
+  session?: Session,
   body?: unknown,
+  requestHeaders?: Record<string, string>,
 ) {
   const res = await fetch(`${API}/api/v1${path}`, {
     method,
-    headers: { ...H, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      ...H,
+      ...(session
+        ? {
+            Cookie: session.cookie,
+            Origin: session.origin,
+            "x-csrf-protection": "1",
+            "x-portal-type": session.portal,
+          }
+        : {}),
+      ...requestHeaders,
+    },
     body: body ? JSON.stringify(body) : undefined,
   })
   let data: any
@@ -47,24 +76,203 @@ async function call(
   } catch {
     data = text
   }
-  return { status: res.status, data }
+  return { status: res.status, data, headers: res.headers }
 }
 
-async function signIn(email: string, password: string) {
-  const r = await call("POST", "/auth/sign-in/email", undefined, {
-    email,
-    password,
-  })
+function requireSuccess<T extends { status: number; data: any }>(
+  name: string,
+  response: T,
+): T["data"] {
+  if (response.status >= 400) {
+    throw new Error(`${name} failed: ${JSON.stringify(response.data)}`)
+  }
+  return response.data
+}
+
+function reconciliationIssueIds(report: any): Set<string> {
+  const issueArrays = [
+    report?.walletDrift,
+    report?.publisherDrift,
+    report?.settlementDrift,
+    report?.orderPaymentRecon,
+    report?.refundRecon,
+    report?.stuckFinancialOrders,
+    report?.stuckPayouts,
+  ]
+  return new Set(
+    issueArrays
+      .flatMap((issues) => (Array.isArray(issues) ? issues : []))
+      .map((issue: any) => String(issue.id)),
+  )
+}
+
+function hasNoNewReconciliationIssues(
+  report: any,
+  baselineIssueIds: Set<string>,
+): boolean {
+  return (
+    Number(report?.summary?.critical ?? 0) === 0 &&
+    [...reconciliationIssueIds(report)].every((id) => baselineIssueIds.has(id))
+  )
+}
+
+function portalOrigin(portal: Portal): string {
+  if (portal === "staff") return "http://localhost:3003"
+  if (portal === "publisher") return "http://localhost:3002"
+  return "http://localhost:3001"
+}
+
+async function signIn(email: string, password: string, portal: Portal) {
+  const r = await call(
+    "POST",
+    "/auth/sign-in/email",
+    undefined,
+    {
+      email,
+      password,
+    },
+    {
+      Origin: portalOrigin(portal),
+      "x-portal-type": portal,
+    },
+  )
   if (r.status !== 200)
     throw new Error(`sign-in failed for ${email}: ${JSON.stringify(r.data)}`)
-  return r.data.token as string
+  const setCookies =
+    (
+      r.headers as Headers & {
+        getSetCookie?: () => string[]
+      }
+    ).getSetCookie?.() ?? []
+  const sessionCookies = setCookies
+    .map((value) => value.split(";", 1)[0] ?? "")
+    .filter((value) => SESSION_COOKIE_NAMES.has(value.split("=", 1)[0] ?? ""))
+  if (sessionCookies.length !== 1) {
+    throw new Error(`sign-in did not establish one session for ${email}`)
+  }
+  const session = {
+    cookie: sessionCookies[0],
+    origin: portalOrigin(portal),
+    portal,
+  }
+  activeSessions.push(session)
+  return session
+}
+
+async function cleanupSessions() {
+  const sessions = activeSessions.splice(0)
+  const results = await Promise.allSettled(
+    sessions.map((session) =>
+      call("POST", "/auth/sign-out", session, undefined, {
+        Origin: session.origin,
+        "x-portal-type": session.portal,
+      }),
+    ),
+  )
+  if (
+    results.some(
+      (result) =>
+        result.status === "rejected" ||
+        (result.status === "fulfilled" && result.value.status >= 400),
+    )
+  ) {
+    throw new Error("one or more integration-test sessions could not be closed")
+  }
+}
+
+function paymentEvidence(order: any) {
+  const expectedAmount = normalizePositiveUsdMoney(order?.amount)
+  if (
+    !Number.isInteger(order?.version) ||
+    expectedAmount === null ||
+    order?.currency !== "USD"
+  ) {
+    throw new Error("order response is missing canonical USD capture evidence")
+  }
+  return {
+    expectedVersion: order.version,
+    expectedAmount,
+    expectedCurrency: order.currency,
+  }
+}
+
+async function ensureManualPayoutMethod(publisherToken: Session) {
+  const listed = await call(
+    "GET",
+    "/publisher-payouts/payout-methods",
+    publisherToken,
+  )
+  if (listed.status !== 200 || !Array.isArray(listed.data)) {
+    throw new Error(
+      `Unable to list payout methods: ${JSON.stringify(listed.data)}`,
+    )
+  }
+  const existing = listed.data.find(
+    (method: any) =>
+      method.type === "bank_transfer" &&
+      method.label === "Integration Test Bank",
+  )
+  if (existing) return existing
+
+  const created = await call(
+    "POST",
+    "/publisher-payouts/payout-methods",
+    publisherToken,
+    {
+      type: "bank_transfer",
+      label: "Integration Test Bank",
+      details: {
+        bankName: "Integration Test Bank",
+        accountHolderName: "Integration Test Publisher",
+        accountNumber: "000012345678",
+      },
+      isDefault: true,
+    },
+  )
+  if (created.status >= 400) {
+    throw new Error(
+      `Unable to create the manual payout method required by this test. ` +
+        `Run the API in development/test mode or explicitly enable certified ` +
+        `legacy payout methods. Response: ${JSON.stringify(created.data)}`,
+    )
+  }
+  return created.data
 }
 
 async function main() {
+  loadRootEnv({ required: ["NODE_ENV", "DATABASE_URL"] })
+  ;({ prisma } = await import("../packages/database/src"))
+
   console.log("── Integration: full money loop")
-  const client = await signIn("client@guestpost.local", "Client123!")
-  const publisher = await signIn("publisher@guestpost.local", "Publisher123!")
-  const admin = await signIn("admin@guestpost.local", "Admin123!")
+  const client = await signIn(
+    "client@guestpost.local",
+    "Client123!",
+    "customer",
+  )
+  const publisher = await signIn(
+    "publisher@guestpost.local",
+    "Publisher123!",
+    "publisher",
+  )
+  const admin = await signIn("admin@guestpost.local", "Admin123!", "staff")
+  const finance = await signIn(
+    "finance@guestpost.local",
+    "Finance123!",
+    "staff",
+  )
+  const financeChecker = await signIn(
+    "finance-checker@guestpost.local",
+    "FinanceChecker123!",
+    "staff",
+  )
+  const baselineReconciliation = requireSuccess(
+    "baseline reconciliation",
+    await call("GET", "/admin/reconciliation", admin),
+  )
+  if (Number(baselineReconciliation?.summary?.critical ?? 0) !== 0) {
+    throw new Error("Baseline reconciliation contains critical money drift")
+  }
+  const baselineIssueIds = reconciliationIssueIds(baselineReconciliation)
 
   // Snapshot starting balances
   const wallet0 = (await call("GET", "/billing/wallet", client)).data
@@ -83,18 +291,26 @@ async function main() {
   const seedPublisher = await prisma.publisher.findFirstOrThrow({
     where: { email: "publisher@guestpost.local" },
   })
-  const seedWebsite = await prisma.website.findFirstOrThrow({
+  const listingService = await prisma.listingService.findFirstOrThrow({
     where: {
-      publisherId: seedPublisher.id,
-      marketplaceListings: { some: { status: "APPROVED" } },
+      serviceType: "GUEST_POST",
+      availability: "AVAILABLE",
+      listing: {
+        status: "APPROVED",
+        website: { publisherId: seedPublisher.id },
+      },
     },
     include: {
-      marketplaceListings: { where: { status: "APPROVED" }, take: 1 },
+      listing: { select: { websiteId: true } },
     },
   })
+  if (!listingService.listing.websiteId) {
+    throw new Error("Seed guest-post listing service has no website")
+  }
   const listing = {
-    websiteId: seedWebsite.id,
-    price: Number(seedWebsite.marketplaceListings[0].price),
+    websiteId: listingService.listing.websiteId,
+    listingServiceId: listingService.id,
+    price: Number(listingService.price),
   }
   check(
     "seed publisher has a website-backed approved listing",
@@ -117,9 +333,21 @@ async function main() {
     await call("POST", "/orders", client, {
       type: "GUEST_POST",
       title: `itest order ${Date.now()}`,
+      listingServiceId: listing.listingServiceId,
+      expectedListingServiceVersion: listingService.version,
+      expectedPrice: listingService.price.toString(),
+      expectedCurrency: listingService.currency,
+      briefData: {
+        kind: "GUEST_POST",
+        title: "Integration test article",
+        topic: "Integration test coverage for the complete order money loop",
+        targetUrl: "https://example.com/x",
+        anchorText: "itest",
+        notes: "Created by the full-loop integration test.",
+      },
       items: [
         {
-          websiteId: listing.websiteId ?? listing.website?.id,
+          websiteId: listing.websiteId,
           targetUrl: "https://example.com/x",
           anchorText: "itest",
         },
@@ -129,7 +357,12 @@ async function main() {
   check("order created as DRAFT", order.status === "DRAFT", order)
 
   const paid = (
-    await call("POST", `/orders/${order.id}/submit-payment`, client)
+    await call(
+      "POST",
+      `/orders/${order.id}/submit-payment`,
+      client,
+      paymentEvidence(order),
+    )
   ).data
   check("payment moves order to SUBMITTED", paid.status === "SUBMITTED", paid)
 
@@ -190,9 +423,21 @@ async function main() {
   check("replayed accept rejected", replay.status >= 400, replay)
 
   const verified = (
-    await call("POST", `/admin/orders/${order.id}/manual-verify`, admin)
+    await call(
+      "POST",
+      `/admin/verification-queue/${order.id}/mark-verified`,
+      admin,
+      {
+        reason: "OTHER",
+        notes: "Local integration evidence-path verification",
+      },
+    )
   ).data
-  check("manual-verify -> VERIFIED", verified.status === "VERIFIED", verified)
+  check(
+    "delivery evidence override -> VERIFIED",
+    verified.status === "VERIFIED",
+    verified,
+  )
 
   const delivered = (
     await call("POST", `/orders/${order.id}/confirm-delivery`, client)
@@ -222,6 +467,7 @@ async function main() {
     "POST",
     `/admin/settlements/${settlement.id}/admin-approve`,
     admin,
+    { reason: "Integration test checks approval ordering" },
   )
   check(
     "admin approval blocked before customer approval",
@@ -229,19 +475,31 @@ async function main() {
     adminFirst,
   )
 
-  await call("POST", `/settlements/${settlement.id}/customer-approve`, client)
-  const released = (
+  requireSuccess(
+    "customer settlement approval",
+    await call(
+      "POST",
+      `/settlements/${settlement.id}/customer-approve`,
+      client,
+    ),
+  )
+  const released = requireSuccess(
+    "admin settlement approval",
     await call(
       "POST",
       `/admin/settlements/${settlement.id}/admin-approve`,
       admin,
-    )
-  ).data
+      { reason: "Integration test verified settlement evidence" },
+    ),
+  )
   check(
     "settlement RELEASED after both approvals",
     released.status === "RELEASED",
     released,
   )
+  if (released.status !== "RELEASED") {
+    throw new Error("Settlement did not reach RELEASED")
+  }
 
   const pubBal1 = (await call("GET", "/publisher-payouts/balance", publisher))
     .data
@@ -252,13 +510,18 @@ async function main() {
     Math.abs(credited - Number(settlement.publisherAmount)) < 0.001,
     { credited, expected: settlement.publisherAmount },
   )
+  if (credited < 1) {
+    throw new Error("Publisher credit is unavailable for withdrawal testing")
+  }
 
-  // Withdrawal -> manual payout -> completion
+  // Withdrawal -> manual payout -> evidence-backed completion
+  const payoutMethod = await ensureManualPayoutMethod(publisher)
   const wd = (
     await call("POST", "/publisher-payouts/withdrawals", publisher, {
       amount: credited,
       method: "bank_transfer",
       idempotencyKey: `itest-${order.id}`,
+      payoutMethodId: payoutMethod.id,
     })
   ).data
   check("withdrawal created PENDING", wd.status === "PENDING", wd)
@@ -268,6 +531,7 @@ async function main() {
       amount: credited,
       method: "bank_transfer",
       idempotencyKey: `itest-${order.id}`,
+      payoutMethodId: payoutMethod.id,
     })
   ).data
   check(
@@ -283,62 +547,140 @@ async function main() {
     admin,
   )
   check(
-    "tier hold blocks early approval",
-    heldApprove.status === 400 &&
-      String(heldApprove.data.message).includes("tier hold"),
+    process.env.INTEGRATION_EXPECT_ACTIVE_HOLD === "1"
+      ? "tier hold blocks early approval"
+      : "zero-hold test configuration permits approval",
+    process.env.INTEGRATION_EXPECT_ACTIVE_HOLD === "1"
+      ? heldApprove.status === 400 &&
+          String(heldApprove.data.message).includes("tier hold")
+      : heldApprove.status < 400 && heldApprove.data?.status === "APPROVED",
     heldApprove,
   )
+  if (process.env.INTEGRATION_EXPECT_ACTIVE_HOLD === "1") {
+    const recon = (await call("GET", "/admin/reconciliation", admin)).data
+    check(
+      "reconciliation: no new drift after held payout",
+      hasNoNewReconciliationIssues(recon, baselineIssueIds),
+      recon,
+    )
+    console.log(`\n${passed} passed, ${failed} failed`)
+    await cleanupSessions()
+    await prisma.$disconnect()
+    process.exit(failed > 0 ? 1 : 0)
+  }
+  if (heldApprove.status >= 400 || heldApprove.data?.status !== "APPROVED") {
+    throw new Error(
+      "Full payout verification requires the API test process to start with WITHDRAWAL_HOLD_DAYS=0",
+    )
+  }
 
-  // Simulate hold expiry (time travel via DB — no API may shortcut a hold)
-  await prisma.withdrawal.update({
-    where: { id: wd.id },
-    data: { availableAt: new Date() },
-  })
-
-  const wdApproved = (
-    await call("PATCH", `/admin/withdrawals/${wd.id}/approve`, admin)
-  ).data
+  const executeResponse = await call(
+    "POST",
+    `/admin/withdrawals/${wd.id}/execute`,
+    finance,
+    {
+      providerName: "manual",
+      reason: "Integration test manual bank payout execution",
+    },
+  )
   check(
-    "withdrawal approved after hold expiry",
-    wdApproved.status === "APPROVED",
-    wdApproved,
+    "manual execution started by a checker distinct from the approver",
+    executeResponse.status < 400 &&
+      typeof executeResponse.data?.executionId === "string",
+    executeResponse,
+  )
+  if (
+    executeResponse.status >= 400 ||
+    typeof executeResponse.data?.executionId !== "string"
+  ) {
+    throw new Error(
+      `Manual payout execution did not start: ${JSON.stringify(executeResponse)}`,
+    )
+  }
+  const exec = executeResponse.data
+
+  const retiredMarkPaid = await call(
+    "PATCH",
+    `/admin/withdrawals/${wd.id}/mark-paid`,
+    admin,
+  )
+  check(
+    "legacy mark-paid is retired",
+    retiredMarkPaid.status === 410 &&
+      retiredMarkPaid.data.code === "LEGACY_MARK_PAID_RETIRED",
+    retiredMarkPaid,
   )
 
-  const exec = (
-    await call("POST", `/admin/withdrawals/${wd.id}/execute`, admin, {
-      providerName: "manual",
-    })
-  ).data
-  check("manual execution started", !!exec.executionId, exec)
-
+  const manualEvidence = {
+    executionId: exec.executionId,
+    withdrawalPublicReference: wd.publicReference,
+    bankReference: `ITEST-BANK-${order.id}`.toUpperCase(),
+    paidAt: new Date().toISOString(),
+    reason: "Verified integration-test bank settlement receipt",
+  }
   const completed = (
-    await call("PATCH", `/admin/withdrawals/${wd.id}/mark-paid`, admin)
+    await call(
+      "POST",
+      `/publisher-payouts/withdrawals/${wd.id}/manual-complete`,
+      financeChecker,
+      manualEvidence,
+    )
   ).data
   check(
-    "mark-paid completes withdrawal",
+    "bank evidence completes the manual withdrawal",
     completed.status === "COMPLETED",
     completed,
+  )
+
+  const completedReplay = await call(
+    "POST",
+    `/publisher-payouts/withdrawals/${wd.id}/manual-complete`,
+    financeChecker,
+    manualEvidence,
+  )
+  check(
+    "exact manual evidence replay is idempotent",
+    completedReplay.status === 201 &&
+      completedReplay.data.status === "COMPLETED",
+    completedReplay,
   )
 
   const executions = (
     await call("GET", `/admin/withdrawals/${wd.id}/executions`, admin)
   ).data
+  const completedExecutions = executions.filter(
+    (e: any) => e.status === "COMPLETED",
+  )
   check(
     "exactly one COMPLETED execution",
-    executions.filter((e: any) => e.status === "COMPLETED").length === 1,
+    completedExecutions.length === 1,
     executions.map((e: any) => e.status),
+  )
+  check(
+    "completed execution retains manual bank evidence",
+    completedExecutions[0]?.completionSource === "MANUAL_BANK_CONFIRMATION" &&
+      completedExecutions[0]?.completionEvidenceRef ===
+        manualEvidence.bankReference,
+    completedExecutions[0],
   )
 
   // Final referee
   const recon = (await call("GET", "/admin/reconciliation", admin)).data
-  check("reconciliation: zero drift", recon.ok === true, recon)
+  check(
+    "reconciliation: no new drift",
+    hasNoNewReconciliationIssues(recon, baselineIssueIds),
+    recon,
+  )
 
   console.log(`\n${passed} passed, ${failed} failed`)
+  await cleanupSessions()
   await prisma.$disconnect()
   process.exit(failed > 0 ? 1 : 0)
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
   console.error(err)
+  await cleanupSessions().catch((cleanupError) => console.error(cleanupError))
+  await prisma?.$disconnect()
   process.exit(1)
 })

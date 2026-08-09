@@ -50,6 +50,48 @@ describe("public marketplace metric visibility", () => {
     expect(JSON.stringify(result)).not.toContain("must-not-leak")
   })
 
+  it("projects only current, unexpired Ahrefs organic traffic", () => {
+    const current = project(
+      listing({
+        verificationStatus: "VERIFIED",
+        metricsHistory: [
+          {
+            key: "AHREFS_ORGANIC_TRAFFIC",
+            provider: "AHREFS",
+            source: "PUBLISHER_MANUAL",
+            status: "CURRENT",
+            value: "12345",
+            measuredAt: new Date("2026-07-20T00:00:00Z"),
+            collectedAt: new Date("2026-07-20T01:00:00Z"),
+            expiresAt: new Date("2099-01-01T00:00:00Z"),
+          },
+        ],
+        websiteIntegrations: [],
+      }),
+    )
+    const expired = project(
+      listing({
+        verificationStatus: "VERIFIED",
+        metricsHistory: [
+          {
+            key: "AHREFS_ORGANIC_TRAFFIC",
+            provider: "AHREFS",
+            source: "PUBLISHER_MANUAL",
+            status: "CURRENT",
+            value: "999999",
+            measuredAt: new Date("1999-10-01T00:00:00Z"),
+            collectedAt: new Date("1999-10-01T01:00:00Z"),
+            expiresAt: new Date("2000-01-01T00:00:00Z"),
+          },
+        ],
+        websiteIntegrations: [],
+      }),
+    )
+
+    expect(current.traffic).toBe(12_345)
+    expect(expired.traffic).toBeNull()
+  })
+
   it("hides legacy Google values when there is no linked synced property", () => {
     const result = project(
       listing({
@@ -61,7 +103,7 @@ describe("public marketplace metric visibility", () => {
     expect(result.siteMetrics).toBeUndefined()
   })
 
-  it("shows only the Google provider with an active successful link", () => {
+  it("hides Google values even when a legacy link appears active and synced", () => {
     const result = project(
       listing({
         verificationStatus: "VERIFIED",
@@ -87,11 +129,7 @@ describe("public marketplace metric visibility", () => {
       }),
     )
 
-    expect(result.siteMetrics).toEqual({
-      periodDays: 30,
-      gsc: { clicks: 12, impressions: 345 },
-      ga4: undefined,
-    })
+    expect(result.siteMetrics).toBeUndefined()
   })
 
   it.each([
@@ -116,5 +154,82 @@ describe("public marketplace metric visibility", () => {
       }),
     )
     expect(result.siteMetrics).toBeUndefined()
+  })
+})
+
+describe("Google metric quarantine across lightweight listing endpoints", () => {
+  const unsafeListing = {
+    id: "listing-unsafe",
+    status: "APPROVED",
+    fulfillmentType: "INTERNAL",
+    featured: false,
+    categories: [],
+    images: [],
+    tags: [],
+    metricsData: { source: "GSC", clicks: 999 },
+    trafficData: { source: "GA4", sessions: 888 },
+    traffic: 777,
+  }
+
+  function expectQuarantined(value: any) {
+    expect(value.metricsData).toBeUndefined()
+    expect(value.trafficData).toBeUndefined()
+    expect(value.siteMetrics).toBeUndefined()
+    expect(value.traffic).toBeNull()
+    expect(JSON.stringify(value)).not.toContain("999")
+    expect(JSON.stringify(value)).not.toContain("888")
+  }
+
+  it("quarantines internal-service listing projections", async () => {
+    const prisma = {
+      marketplaceListing: {
+        findMany: jest.fn().mockResolvedValue([unsafeListing]),
+      },
+    }
+    const service = new MarketplaceService(prisma as any, {} as any)
+
+    const result = await service.getServices()
+
+    expectQuarantined(result[0])
+  })
+
+  it("quarantines saved-list listing projections", async () => {
+    const prisma = {
+      marketplaceSavedList: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "saved-1",
+            items: [{ id: "item-1", listing: unsafeListing }],
+          },
+        ]),
+      },
+    }
+    const service = new MarketplaceService(prisma as any, {} as any)
+
+    const result = await service.getSavedLists("user-1")
+
+    expectQuarantined(result[0].items[0].listing)
+  })
+
+  it("quarantines stored recommendation listing projections", async () => {
+    const prisma = {
+      marketplaceRecommendation: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            listingId: unsafeListing.id,
+            score: 0.9,
+            reason: "similar",
+          },
+        ]),
+      },
+      marketplaceListing: {
+        findMany: jest.fn().mockResolvedValue([unsafeListing]),
+      },
+    }
+    const service = new MarketplaceService(prisma as any, {} as any)
+
+    const result = await service.getRecommendations("user-1", {} as any)
+
+    expectQuarantined(result[0])
   })
 })

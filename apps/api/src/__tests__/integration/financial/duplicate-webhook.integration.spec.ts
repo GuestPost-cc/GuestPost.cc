@@ -66,10 +66,10 @@ describe("[INTEGRATION] Financial — duplicate webhook idempotency", () => {
         settlementId: settlement.id,
         settlementStatus: SettlementStatus.CANCELLED,
         orderStatus: OrderStatus.REFUNDED,
-        walletAvailableBalance: 200,
+        walletAvailableBalance: 100,
         publisherWithdrawableBalance: 0,
-        transactionCount: 4,
-        transactionSum: 200,
+        transactionCount: 5,
+        transactionSum: 100,
       })
 
       // Verify only 1 REFUND transaction exists

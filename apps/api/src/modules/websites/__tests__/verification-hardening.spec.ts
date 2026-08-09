@@ -4,6 +4,7 @@
  * and verification rate limiting.
  */
 
+import { ListingStatus } from "@guestpost/database"
 import {
   computeTrustScore,
   enforceRevocation,
@@ -271,6 +272,7 @@ describe("WebsitesService hardening", () => {
     audit = { log: jest.fn().mockResolvedValue(undefined) }
     queue = { addJob: jest.fn().mockResolvedValue({ id: "j" }) }
     prisma = {
+      $transaction: jest.fn((callback) => callback(prisma)),
       publisher: {
         findUnique: jest
           .fn()
@@ -282,7 +284,10 @@ describe("WebsitesService hardening", () => {
         update: jest.fn().mockResolvedValue({}),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
-      marketplaceListing: { create: jest.fn().mockResolvedValue({}) },
+      marketplaceListing: {
+        create: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
       marketplaceCategory: { findMany: jest.fn() },
       auditLog: { count: jest.fn().mockResolvedValue(0) },
     }
@@ -413,6 +418,96 @@ describe("WebsitesService hardening", () => {
         entityId: "website-1",
       }),
       expect.any(Object),
+    )
+  })
+
+  it("rejects a non-USD service before creating financial catalog rows", async () => {
+    prisma.website.findFirst.mockResolvedValue(null)
+    prisma.marketplaceCategory.findMany.mockResolvedValue([
+      { id: "category-1", name: "Technology", slug: "technology" },
+    ])
+
+    await expect(
+      svc.createWebsite(
+        "p1",
+        "o1",
+        {
+          url: "https://example.com",
+          categoryIds: ["category-1"],
+          language: "English",
+          listingTitle: "Example technology placements",
+          description: "A focused technology publication for software buyers.",
+          manualMetrics: {
+            ahrefsOrganicTraffic: 1200,
+            ahrefsTrafficAsOf: new Date().toISOString().slice(0, 10),
+            mozDomainAuthority: 54,
+            mozDomainAuthorityAsOf: new Date().toISOString().slice(0, 10),
+          },
+          initialService: {
+            serviceType: "GUEST_POST",
+            price: 175,
+            currency: "EUR",
+            turnaroundDays: 7,
+          },
+        } as any,
+        { id: "u1" },
+      ),
+    ).rejects.toMatchObject({ response: { code: "UNSUPPORTED_CURRENCY" } })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it("does not let a general website edit retarget canonical domain identity", async () => {
+    prisma.website.findFirst.mockResolvedValue({
+      id: "w1",
+      url: "https://example.com",
+      domain: "example.com",
+      canonicalDomain: "example.com",
+      publisherId: "p1",
+    })
+
+    await expect(
+      svc.updateWebsite(
+        "p1",
+        "o1",
+        "w1",
+        { url: "https://attacker.example" },
+        { id: "u1" },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: "WEBSITE_DOMAIN_IMMUTABLE" },
+    })
+    expect(prisma.website.update).not.toHaveBeenCalled()
+  })
+
+  it("updates a same-domain URL projection and audit atomically", async () => {
+    const updated = {
+      id: "w1",
+      url: "https://www.example.com/about",
+      domain: "example.com",
+      canonicalDomain: "example.com",
+      publisherId: "p1",
+    }
+    prisma.website.findFirst.mockResolvedValue({
+      ...updated,
+      url: "https://example.com",
+    })
+    prisma.website.update.mockResolvedValue(updated)
+
+    await expect(
+      svc.updateWebsite("p1", "o1", "w1", { url: updated.url }, { id: "u1" }),
+    ).resolves.toEqual(updated)
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalledWith({
+      where: { websiteId: "w1", status: { not: ListingStatus.ARCHIVED } },
+      data: { websiteUrl: updated.url },
+    })
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "WEBSITE_UPDATED",
+        entityId: "w1",
+      }),
+      prisma,
     )
   })
 

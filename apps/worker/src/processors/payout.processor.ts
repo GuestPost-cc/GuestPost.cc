@@ -1,237 +1,530 @@
 import { prisma } from "@guestpost/database"
 import {
+  assertFinanceOperationAllowed,
+  assertStripeFinancialObjectMode,
   checkProviderTransferStatus,
-  normalizeProviderWebhook,
   QUEUES,
+  StripeConfigurationError,
 } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { finalizePayoutExecution } from "@guestpost/shared/dist/payout-finalization-core"
+import { mergePayoutProviderMetadata } from "@guestpost/shared/dist/payout-provider-metadata"
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.payout")
-// Prisma output is generated during the database build and is intentionally
-// not committed for every model. The schema/migration remain authoritative.
-const payoutWebhookEvent = (prisma as any).payoutWebhookEvent
 
-// Shared state transitions for "the provider says this transfer finished".
-// Used by both the webhook path and the status poller. All guards are
-// conditional updateMany — a concurrent webhook/poller loses the race cleanly.
-async function completeExecution(
-  execution: any,
-  source: string,
-  metadata: Record<string, unknown>,
-) {
-  await prisma.$transaction(async (tx: any) => {
-    const execUpdated = await tx.payoutExecution.updateMany({
-      where: {
-        id: execution.id,
-        status: { in: ["PROCESSING", "FAILED"] },
-        version: execution.version,
-      },
-      data: {
-        status: "COMPLETED",
-        ...(execution.provider?.name === "stripe_connect"
-          ? { stage: "BANK_PAID" }
-          : {}),
-        version: { increment: 1 },
-        providerMetadata: metadata as any,
-      },
-    })
-    if (execUpdated.count === 0)
-      throw new Error("Execution already transitioned or claimed for cancel")
+interface PayoutWebhookLease {
+  attempts: number
+  lockedAt: Date
+}
 
-    const wdUpdated = await tx.withdrawal.updateMany({
-      where: {
-        id: execution.withdrawalId,
-        status: { in: ["PROCESSING", "FAILED"] },
-        version: execution.withdrawal.version,
-      },
-      data: { status: "COMPLETED", version: { increment: 1 } },
-    })
-    if (wdUpdated.count === 0) {
-      throw new Error("Withdrawal state changed before completion could apply")
-    }
+function ownsPayoutWebhookLease(
+  event: any,
+  lease: PayoutWebhookLease,
+): boolean {
+  return (
+    event?.status === "PROCESSING" &&
+    event.attempts === lease.attempts &&
+    event.lockedAt instanceof Date &&
+    event.lockedAt.getTime() === lease.lockedAt.getTime()
+  )
+}
 
-    // Serialize lifetimePaid with every other balance mutation. The previous
-    // optimistic update ignored count=0, which could commit COMPLETED while
-    // silently skipping the financial aggregate update.
-    await tx.$queryRawUnsafe(
-      'SELECT "id" FROM "PublisherBalance" WHERE "publisherId" = $1 FOR UPDATE',
-      execution.withdrawal.publisherId,
-    )
-    const balance = await tx.publisherBalance.findUnique({
-      where: { publisherId: execution.withdrawal.publisherId },
-    })
-    if (!balance) throw new Error("Publisher balance missing during payout")
-    await tx.publisherBalance.update({
-      where: { publisherId: execution.withdrawal.publisherId },
-      data: {
-        lifetimePaid: { increment: Number(execution.amount) },
-        version: { increment: 1 },
-      },
-    })
+function payoutWebhookLeaseWhere(
+  id: string,
+  lease: PayoutWebhookLease,
+): Record<string, unknown> {
+  return {
+    id,
+    status: "PROCESSING",
+    attempts: lease.attempts,
+    lockedAt: lease.lockedAt,
+  }
+}
 
-    await tx.auditLog.create({
-      data: {
-        action:
-          source === "webhook"
-            ? "PAYOUT_WEBHOOK_COMPLETED"
-            : "PAYOUT_STATUS_POLL_COMPLETED",
-        entityType: "PayoutExecution",
-        entityId: execution.id,
-        metadata: {
-          providerExecutionId: execution.providerExecutionId,
-          source,
-          ...metadata,
-        },
-        userId: null,
-        organizationId: execution.withdrawal.publisher.organizationId,
-      },
-    })
+async function lockOwnedPayoutWebhookEvent(
+  tx: any,
+  id: string,
+  lease: PayoutWebhookLease,
+): Promise<any | null> {
+  await tx.$queryRawUnsafe(
+    'SELECT "id" FROM "PayoutWebhookEvent" WHERE "id" = $1 FOR UPDATE',
+    id,
+  )
+  const event = await tx.payoutWebhookEvent.findUnique({
+    where: { id },
   })
+  return ownsPayoutWebhookLease(event, lease) ? event : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+}
+
+function immutableProviderAccountId(execution: any): string | null {
+  if (!isRecord(execution?.providerMetadata)) return null
+  const snapshot = execution.providerMetadata.destinationSnapshot
+  if (!isRecord(snapshot)) return null
+  return typeof snapshot.providerAccountExternalId === "string" &&
+    snapshot.providerAccountExternalId.length > 0
+    ? snapshot.providerAccountExternalId
+    : null
+}
+
+function exactUsdMinorAmount(
+  amount: unknown,
+  currency: unknown,
+): bigint | null {
+  if (String(currency ?? "").toUpperCase() !== "USD") return null
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(String(amount ?? "").trim())
+  if (!match) return null
+  const fraction = match[2] ?? ""
+  if (fraction.length > 2 && /[1-9]/.test(fraction.slice(2))) return null
+  const minor =
+    BigInt(match[1]) * 100n + BigInt(fraction.padEnd(2, "0").slice(0, 2))
+  return minor > 0n ? minor : null
+}
+
+function normalizedMinorAmount(value: unknown): bigint | null {
+  if (typeof value === "bigint" && value > 0n) return value
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) {
+    return BigInt(value)
+  }
+  if (typeof value === "string" && /^[1-9]\d*$/.test(value)) {
+    return BigInt(value)
+  }
+  return null
+}
+
+async function completeExecution(
+  client: any,
+  execution: any,
+  source: "webhook" | "status-poll",
+  metadata: Record<string, unknown>,
+  webhookEventId?: string,
+  webhookLease?: PayoutWebhookLease,
+  providerEvidence?: {
+    providerAmountMinor?: number
+    providerCurrency?: string
+  },
+) {
+  if (source === "webhook" && (!webhookEventId || !webhookLease)) {
+    throw new Error("Payout webhook completion requires an exact claim lease")
+  }
+  const providerReference =
+    execution.provider?.name === "stripe_connect"
+      ? execution.providerPayoutId
+      : execution.providerExecutionId
+  if (!providerReference) {
+    throw new Error("Terminal provider object reference is missing")
+  }
+  return finalizePayoutExecution(
+    client,
+    source === "webhook"
+      ? {
+          executionId: execution.id,
+          withdrawalId: execution.withdrawalId,
+          providerName: execution.provider.name,
+          providerReference,
+          source: "PROVIDER_WEBHOOK",
+          webhookEventId: webhookEventId!,
+          webhookClaimAttempt: webhookLease!.attempts,
+          webhookClaimLockedAt: webhookLease!.lockedAt,
+          metadata,
+        }
+      : {
+          executionId: execution.id,
+          withdrawalId: execution.withdrawalId,
+          providerName: execution.provider.name,
+          providerReference,
+          source: "PROVIDER_STATUS_POLL",
+          evidenceAt: new Date(),
+          providerAmountMinor: providerEvidence?.providerAmountMinor,
+          providerCurrency: providerEvidence?.providerCurrency,
+          fee: metadata.fee,
+          metadata,
+        },
+  )
+}
+
+function assertFailureEvidenceMode(
+  execution: any,
+  webhookLivemode?: boolean | null,
+): void {
+  if (execution.provider.name === "stripe_connect") {
+    if (
+      webhookLivemode !== undefined &&
+      webhookLivemode !== execution.livemode
+    ) {
+      throw new StripeConfigurationError(
+        "STRIPE_PROVIDER_MODE_MISMATCH",
+        "Stripe failure webhook mode does not match its payout execution",
+      )
+    }
+    assertStripeFinancialObjectMode(execution.livemode, {
+      secretKey: process.env.STRIPE_SECRET_KEY,
+      liveModeEnabled: process.env.STRIPE_LIVE_MODE_ENABLED,
+    })
+    return
+  }
+  if (
+    execution.livemode !== null ||
+    (webhookLivemode !== undefined && webhookLivemode !== null)
+  ) {
+    throw new StripeConfigurationError(
+      "STRIPE_PROVIDER_MODE_MISMATCH",
+      "Non-Stripe payout failure evidence cannot contain a Stripe mode",
+    )
+  }
+}
+
+async function quarantineFailedWebhookModeFence(
+  tx: any,
+  execution: any,
+  webhookEventId: string,
+  webhookLease: PayoutWebhookLease,
+  error: StripeConfigurationError,
+): Promise<"quarantined"> {
+  const reason = `FailureModeFence:${error.code}`
+  const quarantined = await tx.payoutWebhookEvent.updateMany({
+    where: payoutWebhookLeaseWhere(webhookEventId, webhookLease),
+    data: {
+      status: "QUARANTINED",
+      lockedAt: null,
+      processedAt: new Date(),
+      lastError: reason,
+    },
+  })
+  if (quarantined.count !== 1) {
+    throw new Error(
+      "Payout webhook lease changed during failure mode quarantine",
+    )
+  }
+  const staff = await tx.staffMembership.findMany({
+    where: { role: { in: ["FINANCE", "SUPER_ADMIN"] } },
+    select: { userId: true },
+  })
+  if (staff.length > 0) {
+    await tx.notification.createMany({
+      data: staff.map((member: { userId: string }) => ({
+        userId: member.userId,
+        organizationId: null,
+        type: "PAYOUT_WEBHOOK_QUARANTINED",
+        message: `Payout failure webhook ${webhookEventId} failed its provider-mode fence`,
+        dedupKey: `payout-webhook-mode-fence:${webhookEventId}:${error.code}:${member.userId}`,
+      })),
+      skipDuplicates: true,
+    })
+  }
+  await tx.auditLog.create({
+    data: {
+      action: "PAYOUT_WEBHOOK_MODE_FENCE_QUARANTINED",
+      entityType: "PayoutExecution",
+      entityId: execution.id,
+      metadata: {
+        payoutWebhookEventId: webhookEventId,
+        webhookClaimAttempt: webhookLease.attempts,
+        webhookClaimLockedAt: webhookLease.lockedAt.toISOString(),
+        provider: execution.provider.name,
+        executionLivemode: execution.livemode,
+        configurationErrorCode: error.code,
+      },
+      userId: null,
+      organizationId: execution.withdrawal.publisher.organizationId,
+    },
+  })
+  return "quarantined"
 }
 
 async function failExecution(
+  client: any,
   execution: any,
-  source: string,
+  source: "webhook" | "status-poll",
   errorMessage: string,
   metadata: Record<string, unknown>,
+  webhookEventId?: string,
+  webhookLease?: PayoutWebhookLease,
+  webhookLivemode?: boolean | null,
 ) {
-  await prisma.$transaction(async (tx: any) => {
-    // A failed Stripe Payout leaves the earlier platform -> connected-balance
-    // Transfer in place. Keep funds reserved until finance cancels/reverses
-    // both stages; marking the withdrawal FAILED here would allow an unsafe
-    // local balance restoration while cash still sits in Stripe.
-    if (
-      execution.provider?.name === "stripe_connect" &&
-      execution.providerTransferId
-    ) {
+  return client.$transaction(
+    async (tx: any) => {
+      if (webhookEventId) {
+        if (
+          !webhookLease ||
+          !(await lockOwnedPayoutWebhookEvent(tx, webhookEventId, webhookLease))
+        ) {
+          return "ownership-lost"
+        }
+      }
+      await tx.$queryRawUnsafe(
+        'SELECT "id" FROM "Withdrawal" WHERE "id" = $1 FOR UPDATE',
+        execution.withdrawalId,
+      )
+      await tx.$queryRawUnsafe(
+        'SELECT "id" FROM "PayoutExecution" WHERE "id" = $1 FOR UPDATE',
+        execution.id,
+      )
+      const fresh = await tx.payoutExecution.findUnique({
+        where: { id: execution.id },
+        include: {
+          provider: true,
+          withdrawal: { include: { publisher: true } },
+        },
+      })
+      if (
+        fresh?.status !== "PROCESSING" ||
+        fresh.withdrawal.status !== "PROCESSING" ||
+        fresh.stage === "CANCEL_REQUESTED"
+      ) {
+        if (!webhookEventId || !webhookLease) {
+          throw new Error(
+            "Terminal failure conflicts with the current payout state",
+          )
+        }
+        const quarantined = await tx.payoutWebhookEvent.updateMany({
+          where: payoutWebhookLeaseWhere(webhookEventId, webhookLease),
+          data: {
+            status: "QUARANTINED",
+            lockedAt: null,
+            processedAt: new Date(),
+            lastError: "TerminalFailureConflictsWithLocalState",
+          },
+        })
+        if (quarantined.count !== 1) {
+          throw new Error(
+            "Payout webhook lease changed during failure quarantine",
+          )
+        }
+        const staff = await tx.staffMembership.findMany({
+          where: { role: { in: ["FINANCE", "SUPER_ADMIN"] } },
+          select: { userId: true },
+        })
+        if (staff.length > 0) {
+          await tx.notification.createMany({
+            data: staff.map((member: { userId: string }) => ({
+              userId: member.userId,
+              organizationId: null,
+              type: "PAYOUT_WEBHOOK_QUARANTINED",
+              message: `Critical terminal payout conflict for execution ${execution.id}`,
+              dedupKey: `payout-webhook-quarantine:${webhookEventId}:terminal-failure:${member.userId}`,
+            })),
+            skipDuplicates: true,
+          })
+        }
+        await tx.auditLog.create({
+          data: {
+            action: "PAYOUT_WEBHOOK_TERMINAL_CONFLICT_QUARANTINED",
+            entityType: "PayoutExecution",
+            entityId: execution.id,
+            metadata: {
+              payoutWebhookEventId: webhookEventId,
+              webhookClaimAttempt: webhookLease.attempts,
+              webhookClaimLockedAt: webhookLease.lockedAt.toISOString(),
+              localExecutionStatus: fresh?.status ?? null,
+              localWithdrawalStatus: fresh?.withdrawal?.status ?? null,
+              providerStatus: "FAILED",
+            },
+            userId: null,
+            organizationId:
+              fresh?.withdrawal?.publisher?.organizationId ?? null,
+          },
+        })
+        return "quarantined"
+      }
+
+      try {
+        assertFailureEvidenceMode(
+          fresh,
+          source === "webhook" ? webhookLivemode : undefined,
+        )
+      } catch (error) {
+        if (!(error instanceof StripeConfigurationError)) throw error
+        if (!webhookEventId || !webhookLease) throw error
+        return quarantineFailedWebhookModeFence(
+          tx,
+          fresh,
+          webhookEventId,
+          webhookLease,
+          error,
+        )
+      }
+
+      const observedAt = new Date()
+      const terminalFailure = {
+        source:
+          source === "webhook" ? "PROVIDER_WEBHOOK" : "PROVIDER_STATUS_POLL",
+        provider: fresh.provider.name,
+        providerExecutionId: fresh.providerExecutionId,
+        providerTransferId: fresh.providerTransferId,
+        providerPayoutId: fresh.providerPayoutId,
+        providerStatus: "FAILED",
+        observedAt: observedAt.toISOString(),
+        payoutWebhookEventId: webhookEventId ?? null,
+        webhookClaimAttempt: webhookLease?.attempts ?? null,
+        webhookClaimLockedAt: webhookLease?.lockedAt.toISOString() ?? null,
+      }
+      const evidenceMetadata = mergePayoutProviderMetadata(
+        fresh.providerMetadata,
+        metadata,
+      )
       const held = await tx.payoutExecution.updateMany({
         where: {
-          id: execution.id,
+          id: fresh.id,
           status: "PROCESSING",
-          version: execution.version,
+          version: fresh.version,
         },
         data: {
-          stage: "BANK_PAYOUT_RECOVERY_REQUIRED",
+          stage:
+            fresh.provider.name === "stripe_connect" && fresh.providerTransferId
+              ? "BANK_PAYOUT_RECOVERY_REQUIRED"
+              : "PROVIDER_FAILURE_REVIEW_REQUIRED",
           errorMessage,
-          providerMetadata: metadata as any,
+          providerMetadata: {
+            ...evidenceMetadata,
+            terminalFailure,
+          } as any,
           version: { increment: 1 },
         },
       })
-      if (held.count === 0) {
-        throw new Error("Execution already transitioned or claimed for cancel")
+      if (held.count !== 1) {
+        throw new Error("Execution changed while failure evidence was applied")
+      }
+      if (webhookEventId && webhookLease) {
+        const processed = await tx.payoutWebhookEvent.updateMany({
+          where: payoutWebhookLeaseWhere(webhookEventId, webhookLease),
+          data: {
+            status: "PROCESSED",
+            lockedAt: null,
+            processedAt: observedAt,
+            lastError: null,
+          },
+        })
+        if (processed.count !== 1) {
+          throw new Error(
+            "Payout webhook lease changed while failure evidence was applied",
+          )
+        }
       }
       await tx.auditLog.create({
         data: {
-          action: "PAYOUT_EXECUTION_RECOVERY_REQUIRED",
+          action: "PAYOUT_TERMINAL_FAILURE_REVIEW_REQUIRED",
           entityType: "PayoutExecution",
-          entityId: execution.id,
-          metadata: {
-            providerExecutionId: execution.providerExecutionId,
-            providerTransferId: execution.providerTransferId,
-            providerPayoutId: execution.providerPayoutId,
-            source,
-            ...metadata,
-          },
+          entityId: fresh.id,
+          metadata: terminalFailure,
           userId: null,
-          organizationId: execution.withdrawal.publisher.organizationId,
+          organizationId: fresh.withdrawal.publisher.organizationId,
         },
       })
-      return
-    }
-    const execUpdated = await tx.payoutExecution.updateMany({
-      where: {
-        id: execution.id,
-        status: "PROCESSING",
-        version: execution.version,
-      },
-      data: {
-        status: "FAILED",
-        version: { increment: 1 },
-        errorMessage,
-        providerMetadata: metadata as any,
-      },
-    })
-    if (execUpdated.count === 0)
-      throw new Error("Execution already transitioned or claimed for cancel")
-
-    const withdrawalUpdated = await tx.withdrawal.updateMany({
-      where: {
-        id: execution.withdrawalId,
-        status: "PROCESSING",
-        version: execution.withdrawal.version,
-      },
-      data: { status: "FAILED", version: { increment: 1 } },
-    })
-    if (withdrawalUpdated.count === 0) {
-      throw new Error("Withdrawal state changed before failure could apply")
-    }
-
-    await tx.auditLog.create({
-      data: {
-        action:
-          source === "webhook"
-            ? "PAYOUT_WEBHOOK_FAILED"
-            : "PAYOUT_STATUS_POLL_FAILED",
-        entityType: "PayoutExecution",
-        entityId: execution.id,
-        metadata: {
-          providerExecutionId: execution.providerExecutionId,
-          source,
-          error: errorMessage,
-          ...metadata,
-        },
-        userId: null,
-        organizationId: execution.withdrawal.publisher.organizationId,
-      },
-    })
-  })
+      return "held"
+    },
+    { isolationLevel: "Serializable" },
+  )
 }
 
-export async function handleCheckStatus(job: any) {
+async function promoteStalePayoutStages(
+  client: any,
+  staleBefore: Date,
+): Promise<void> {
+  const promotions = [
+    {
+      from: "TRANSFER_CREATED",
+      to: "TRANSFER_RECOVERY_REQUIRED",
+      referenceWhere: {
+        providerTransferId: { not: null },
+        providerPayoutId: null,
+      },
+      errorMessage:
+        "Local bank-payout stage did not finalize; recovery required",
+    },
+    {
+      from: "BANK_PAYOUT_CREATED",
+      to: "BANK_PAYOUT_RECOVERY_REQUIRED",
+      referenceWhere: { providerPayoutId: { not: null } },
+      errorMessage:
+        "Local payout finalization did not complete; reconcile provider status",
+    },
+  ] as const
+
+  for (const promotion of promotions) {
+    const candidates = await client.payoutExecution.findMany({
+      where: {
+        status: "PROCESSING",
+        stage: promotion.from,
+        ...promotion.referenceWhere,
+        updatedAt: { lt: staleBefore },
+      },
+      select: {
+        id: true,
+        withdrawalId: true,
+        version: true,
+        updatedAt: true,
+      },
+    })
+    for (const candidate of candidates) {
+      await client.$transaction(async (tx: any) => {
+        // All payout writers use the same parent-first order. This makes a
+        // delayed provider response and stale-stage recovery serialize without
+        // deadlocking or overwriting the evidence that won the race.
+        await tx.$queryRawUnsafe(
+          'SELECT "id" FROM "Withdrawal" WHERE "id" = $1 FOR UPDATE',
+          candidate.withdrawalId,
+        )
+        await tx.$queryRawUnsafe(
+          'SELECT "id" FROM "PayoutExecution" WHERE "id" = $1 AND "withdrawalId" = $2 FOR UPDATE',
+          candidate.id,
+          candidate.withdrawalId,
+        )
+        await tx.payoutExecution.updateMany({
+          where: {
+            id: candidate.id,
+            withdrawalId: candidate.withdrawalId,
+            version: candidate.version,
+            status: "PROCESSING",
+            stage: promotion.from,
+            ...promotion.referenceWhere,
+            updatedAt: candidate.updatedAt,
+          },
+          data: {
+            stage: promotion.to,
+            version: { increment: 1 },
+            errorMessage: promotion.errorMessage,
+          },
+        })
+      })
+    }
+  }
+}
+
+export async function handleCheckStatus(
+  job: any,
+  client: any = prisma,
+  statusChecker: typeof checkProviderTransferStatus = checkProviderTransferStatus,
+) {
+  assertFinanceOperationAllowed("recovery")
   const limit = job.data.limit ?? 50
   const staleProviderStage = new Date(Date.now() - 15 * 60 * 1000)
   // If the API process died between Stripe accepting one stage and local
   // finalization, promote the evidence to an explicit recovery state. The
   // original Stripe idempotency keys remain authoritative for any resume.
-  await prisma.payoutExecution.updateMany({
+  await promoteStalePayoutStages(client, staleProviderStage)
+  const pendingExecutions = await client.payoutExecution.findMany({
     where: {
       status: "PROCESSING",
-      stage: "TRANSFER_CREATED",
-      providerTransferId: { not: null },
-      providerPayoutId: null,
-      updatedAt: { lt: staleProviderStage },
-    },
-    data: {
-      stage: "TRANSFER_RECOVERY_REQUIRED",
-      errorMessage:
-        "Local bank-payout stage did not finalize; recovery required",
-    },
-  })
-  await prisma.payoutExecution.updateMany({
-    where: {
-      status: "PROCESSING",
-      stage: "BANK_PAYOUT_CREATED",
-      providerPayoutId: { not: null },
-      updatedAt: { lt: staleProviderStage },
-    },
-    data: {
-      stage: "BANK_PAYOUT_RECOVERY_REQUIRED",
-      errorMessage:
-        "Local payout finalization did not complete; reconcile provider status",
-    },
-  })
-  const pendingExecutions = await prisma.payoutExecution.findMany({
-    where: {
-      status: "PROCESSING",
-      providerExecutionId: { not: null },
+      OR: [
+        { providerExecutionId: { not: null } },
+        { providerPayoutId: { not: null } },
+      ],
       stage: {
         notIn: [
           "TRANSFER_RECOVERY_REQUIRED",
-          "BANK_PAYOUT_RECOVERY_REQUIRED",
+          "PROVIDER_SEND_CLAIMED",
+          "BANK_PAYOUT_SEND_CLAIMED",
+          "BANK_PAYOUT_RESUME_CLAIMED",
+          "PROVIDER_SEND_CLAIM_EXPIRED",
+          "BANK_PAYOUT_CLAIM_EXPIRED",
           "CANCEL_REQUESTED",
         ],
       },
@@ -250,41 +543,140 @@ export async function handleCheckStatus(job: any) {
   for (const execution of pendingExecutions) {
     let result
     try {
-      result = await checkProviderTransferStatus(
+      const connectedAccountId =
+        execution.provider.name === "stripe_connect"
+          ? immutableProviderAccountId(execution)
+          : null
+      const expectedAmountMinor =
+        execution.provider.name === "stripe_connect"
+          ? exactUsdMinorAmount(
+              execution.destinationAmount ?? execution.amount,
+              execution.destinationCurrency,
+            )
+          : null
+      if (
+        execution.provider.name === "stripe_connect" &&
+        (!connectedAccountId ||
+          expectedAmountMinor === null ||
+          expectedAmountMinor > BigInt(Number.MAX_SAFE_INTEGER) ||
+          !execution.requestedReference)
+      ) {
+        logger.error("immutable Stripe destination snapshot missing", {
+          executionId: execution.id,
+        })
+        skipped++
+        continue
+      }
+      if (execution.provider.name === "stripe_connect") {
+        assertStripeFinancialObjectMode(execution.livemode, {
+          secretKey: process.env.STRIPE_SECRET_KEY,
+          liveModeEnabled: process.env.STRIPE_LIVE_MODE_ENABLED,
+        })
+      } else if (execution.livemode !== null) {
+        logger.error("non-Stripe payout contains Stripe mode evidence", {
+          executionId: execution.id,
+        })
+        skipped++
+        continue
+      }
+      const providerStatusReference =
+        execution.provider.name === "stripe_connect"
+          ? (execution.providerPayoutId ?? execution.providerExecutionId)
+          : execution.providerExecutionId
+      if (!providerStatusReference) {
+        skipped++
+        continue
+      }
+      result = await statusChecker(
         execution.provider.name,
-        execution.providerExecutionId!,
+        providerStatusReference,
         {
-          connectedAccountId: (execution.providerMetadata as any)
-            ?.connectedAccountId,
+          connectedAccountId: connectedAccountId ?? undefined,
+          expectedAmountMinor:
+            expectedAmountMinor === null
+              ? undefined
+              : Number(expectedAmountMinor),
+          expectedCurrency: execution.destinationCurrency,
+          expectedPublicReference: execution.requestedReference ?? undefined,
         },
       )
     } catch (err: any) {
+      if (err instanceof StripeConfigurationError) {
+        logger.error("Stripe payout polling configuration rejected", {
+          code: err.code,
+        })
+        throw err
+      }
       // Provider API hiccup on one transfer must not abort the sweep
       logger.error("status check failed", {
         executionId: execution.id,
-        err: err?.message ?? String(err),
+        errorType: err instanceof Error ? err.name : typeof err,
       })
       skipped++
       continue
     }
     if (!result) {
-      // No API key configured or non-pollable provider — leave untouched
+      if (execution.provider.name === "stripe_connect") {
+        const error = new StripeConfigurationError(
+          "STRIPE_KEY_MISSING",
+          "Stripe payout polling cannot recover an active execution without a configured key",
+        )
+        logger.error("Stripe payout polling configuration rejected", {
+          code: error.code,
+        })
+        throw error
+      }
+      // A non-pollable provider stays reserved for an evidence-aware operator
+      // workflow. Never infer completion from a missing provider result.
+      skipped++
+      continue
+    }
+
+    if (
+      execution.provider.name === "stripe_connect" &&
+      (result.livemode !== execution.livemode ||
+        !isRecord(result.metadata) ||
+        result.metadata.livemode !== execution.livemode)
+    ) {
+      logger.error("Stripe payout status mode evidence mismatch", {
+        executionId: execution.id,
+      })
       skipped++
       continue
     }
 
     try {
       if (result.status === "COMPLETED") {
-        await completeExecution(execution, "status-poll", {
-          ...result.metadata,
-          fee: result.fee,
-        })
-        completed++
-        logger.info("execution completed via status poll", {
-          executionId: execution.id,
-        })
+        const finalized = await completeExecution(
+          client,
+          execution,
+          "status-poll",
+          {
+            ...result.metadata,
+            fee: result.fee,
+          },
+          undefined,
+          undefined,
+          {
+            providerAmountMinor: result.providerAmountMinor,
+            providerCurrency: result.providerCurrency,
+          },
+        )
+        if (finalized.kind === "conflict") {
+          skipped++
+          logger.error("provider completion evidence conflicted", {
+            executionId: execution.id,
+            code: finalized.code,
+          })
+        } else {
+          completed++
+          logger.info("execution completed via status poll", {
+            executionId: execution.id,
+          })
+        }
       } else if (result.status === "FAILED") {
         await failExecution(
+          client,
           execution,
           "status-poll",
           "Provider reports transfer failed/cancelled",
@@ -299,7 +691,7 @@ export async function handleCheckStatus(job: any) {
       // Lost a race against a webhook — fine, the state already moved
       logger.warn("transition skipped (lost race against webhook)", {
         executionId: execution.id,
-        err: err?.message ?? String(err),
+        errorType: err instanceof Error ? err.name : typeof err,
       })
       skipped++
     }
@@ -327,12 +719,14 @@ function inboxRetryAt(attempts: number): Date {
 }
 
 async function markInboxEvent(
+  eventStore: any,
   id: string,
-  status: "PROCESSED" | "FAILED" | "IGNORED",
+  lease: PayoutWebhookLease,
+  status: "PROCESSED" | "FAILED" | "IGNORED" | "QUARANTINED",
   data: Record<string, unknown> = {},
-) {
-  await payoutWebhookEvent.update({
-    where: { id },
+): Promise<boolean> {
+  const updated = await eventStore.updateMany({
+    where: payoutWebhookLeaseWhere(id, lease),
     data: {
       status,
       lockedAt: null,
@@ -340,17 +734,126 @@ async function markInboxEvent(
       ...data,
     },
   })
+  return updated.count === 1
 }
 
-async function processInboxEvent(event: any): Promise<string> {
-  if (!event.providerExecutionId) {
-    await markInboxEvent(event.id, "IGNORED", {
-      lastError: "MissingProviderExecutionId",
+function failedWebhookEnvelopeMatches(execution: any, event: any): boolean {
+  if (execution.provider.name === "stripe_connect") {
+    const expectedAccountId = immutableProviderAccountId(execution)
+    const expectedAmountMinor = exactUsdMinorAmount(
+      execution.destinationAmount ?? execution.amount,
+      execution.destinationCurrency,
+    )
+    return (
+      ["payout.failed", "payout.canceled"].includes(event.eventType) &&
+      Boolean(expectedAccountId) &&
+      typeof execution.livemode === "boolean" &&
+      event.livemode === execution.livemode &&
+      event.providerAccountExternalId === expectedAccountId &&
+      event.providerExecutionId === execution.providerPayoutId &&
+      expectedAmountMinor !== null &&
+      normalizedMinorAmount(event.payoutAmountMinor) === expectedAmountMinor &&
+      event.payoutCurrency === execution.destinationCurrency
+    )
+  }
+  if (execution.provider.name === "wise") {
+    return (
+      event.eventType === "transfers#state-change" &&
+      execution.livemode === null &&
+      event.livemode === null &&
+      event.providerAccountExternalId === null &&
+      event.providerExecutionId === execution.providerExecutionId
+    )
+  }
+  return false
+}
+
+async function quarantineWebhookEnvelope(
+  client: any,
+  execution: any,
+  event: any,
+  lease: PayoutWebhookLease,
+  reason: string,
+): Promise<boolean> {
+  return client.$transaction(async (tx: any) => {
+    if (!(await lockOwnedPayoutWebhookEvent(tx, event.id, lease))) {
+      return false
+    }
+    const quarantined = await tx.payoutWebhookEvent.updateMany({
+      where: payoutWebhookLeaseWhere(event.id, lease),
+      data: {
+        status: "QUARANTINED",
+        lockedAt: null,
+        processedAt: new Date(),
+        lastError: reason,
+      },
     })
-    return "ignored"
+    if (quarantined.count !== 1) {
+      throw new Error("Payout webhook lease changed during envelope quarantine")
+    }
+    const staff = await tx.staffMembership.findMany({
+      where: { role: { in: ["FINANCE", "SUPER_ADMIN"] } },
+      select: { userId: true },
+    })
+    if (staff.length > 0) {
+      await tx.notification.createMany({
+        data: staff.map((member: { userId: string }) => ({
+          userId: member.userId,
+          organizationId: null,
+          type: "PAYOUT_WEBHOOK_QUARANTINED",
+          message: `Payout webhook ${event.id} does not match immutable execution routing`,
+          dedupKey: `payout-webhook-envelope:${event.id}:${reason}:${member.userId}`,
+        })),
+        skipDuplicates: true,
+      })
+    }
+    await tx.auditLog.create({
+      data: {
+        action: "PAYOUT_WEBHOOK_ENVELOPE_QUARANTINED",
+        entityType: "PayoutExecution",
+        entityId: execution.id,
+        metadata: {
+          payoutWebhookEventId: event.id,
+          provider: event.provider,
+          eventType: event.eventType,
+          providerExecutionId: event.providerExecutionId,
+          providerAccountExternalId: event.providerAccountExternalId,
+          payoutAmountMinor: event.payoutAmountMinor?.toString() ?? null,
+          payoutCurrency: event.payoutCurrency,
+          webhookClaimAttempt: lease.attempts,
+          webhookClaimLockedAt: lease.lockedAt.toISOString(),
+          expectedProviderAccountExternalId:
+            immutableProviderAccountId(execution),
+          reason,
+        },
+        userId: null,
+        organizationId: execution.withdrawal?.publisher?.organizationId ?? null,
+      },
+    })
+    return true
+  })
+}
+
+async function processInboxEvent(
+  client: any,
+  event: any,
+  lease: PayoutWebhookLease,
+): Promise<string> {
+  const eventStore = client.payoutWebhookEvent
+  if (!event.providerExecutionId) {
+    const ignored = await markInboxEvent(
+      eventStore,
+      event.id,
+      lease,
+      "IGNORED",
+      {
+        lastError: "MissingProviderExecutionId",
+      },
+    )
+    return ignored ? "ignored" : "ownership-lost"
   }
 
-  const execution = await prisma.payoutExecution.findFirst({
+  const execution = await client.payoutExecution.findFirst({
     where: {
       OR: [
         { providerExecutionId: event.providerExecutionId },
@@ -369,19 +872,50 @@ async function processInboxEvent(event: any): Promise<string> {
       event.attempts >= INBOX_MAX_ATTEMPTS ||
       ageMs >= INBOX_MAX_RETRY_AGE_MS
     ) {
-      await prisma.$transaction(async (tx: any) => {
-        await tx.payoutWebhookEvent.update({
-          where: { id: event.id },
+      const terminal = ["COMPLETED", "FAILED"].includes(event.providerStatus)
+      const terminalized = await client.$transaction(async (tx: any) => {
+        if (!(await lockOwnedPayoutWebhookEvent(tx, event.id, lease))) {
+          return false
+        }
+        const updated = await tx.payoutWebhookEvent.updateMany({
+          where: payoutWebhookLeaseWhere(event.id, lease),
           data: {
-            status: "IGNORED",
+            status: terminal ? "QUARANTINED" : "IGNORED",
             lockedAt: null,
             processedAt: new Date(),
-            lastError: "ExecutionNotFoundAfterRetryWindow",
+            lastError: terminal
+              ? "TerminalExecutionNotFoundAfterRetryWindow"
+              : "ExecutionNotFoundAfterRetryWindow",
           },
         })
+        if (updated.count !== 1) {
+          throw new Error(
+            "Payout webhook lease changed during unmatched-event terminalization",
+          )
+        }
+        if (terminal) {
+          const staff = await tx.staffMembership.findMany({
+            where: { role: { in: ["FINANCE", "SUPER_ADMIN"] } },
+            select: { userId: true },
+          })
+          if (staff.length > 0) {
+            await tx.notification.createMany({
+              data: staff.map((member: { userId: string }) => ({
+                userId: member.userId,
+                organizationId: null,
+                type: "PAYOUT_WEBHOOK_QUARANTINED",
+                message: `Unmatched terminal payout webhook ${event.id} requires investigation`,
+                dedupKey: `payout-webhook-unmatched:${event.id}:${member.userId}`,
+              })),
+              skipDuplicates: true,
+            })
+          }
+        }
         await tx.auditLog.create({
           data: {
-            action: "PAYOUT_WEBHOOK_UNMATCHED",
+            action: terminal
+              ? "PAYOUT_WEBHOOK_UNMATCHED_TERMINAL_QUARANTINED"
+              : "PAYOUT_WEBHOOK_UNMATCHED",
             entityType: "PayoutWebhookEvent",
             entityId: event.id,
             metadata: {
@@ -389,66 +923,65 @@ async function processInboxEvent(event: any): Promise<string> {
               eventType: event.eventType,
               providerExecutionId: event.providerExecutionId,
               attempts: event.attempts,
+              webhookClaimAttempt: lease.attempts,
+              webhookClaimLockedAt: lease.lockedAt.toISOString(),
             },
             userId: null,
             organizationId: null,
           },
         })
+        return true
       })
-      return "ignored"
+      if (!terminalized) return "ownership-lost"
+      return terminal ? "quarantined" : "ignored"
     }
-    await markInboxEvent(event.id, "FAILED", {
-      availableAt: inboxRetryAt(event.attempts),
-      lastError: "ExecutionNotFoundYet",
-    })
-    return "retried"
-  }
-
-  if (execution.status === "COMPLETED") {
-    await markInboxEvent(event.id, "PROCESSED", { lastError: null })
-    return "processed"
+    const retried = await markInboxEvent(
+      eventStore,
+      event.id,
+      lease,
+      "FAILED",
+      {
+        availableAt: inboxRetryAt(event.attempts),
+        lastError: "ExecutionNotFoundYet",
+      },
+    )
+    return retried ? "retried" : "ownership-lost"
   }
 
   if (event.providerStatus === "COMPLETED") {
-    if (!["PROCESSING", "FAILED"].includes(execution.status)) {
-      await prisma.$transaction(async (tx: any) => {
-        await tx.payoutWebhookEvent.update({
-          where: { id: event.id },
-          data: {
-            status: "IGNORED",
-            lockedAt: null,
-            processedAt: new Date(),
-            lastError: "CompletedTransferConflictsWithLocalState",
-          },
-        })
-        await tx.auditLog.create({
-          data: {
-            action: "PAYOUT_WEBHOOK_STATE_CONFLICT",
-            entityType: "PayoutExecution",
-            entityId: execution.id,
-            metadata: {
-              payoutWebhookEventId: event.id,
-              providerExecutionId: event.providerExecutionId,
-              localStatus: execution.status,
-              providerStatus: event.providerStatus,
-            },
-            userId: null,
-            organizationId: execution.withdrawal.publisher.organizationId,
-          },
-        })
-      })
-      return "ignored"
+    const finalized = await completeExecution(
+      client,
+      execution,
+      "webhook",
+      {
+        provider: event.provider,
+        event: event.eventType,
+        rawStatus: event.rawStatus,
+      },
+      event.id,
+      lease,
+    )
+    if (
+      finalized.kind === "conflict" &&
+      finalized.code === "WEBHOOK_LEASE_LOST"
+    ) {
+      return "ownership-lost"
     }
-    await completeExecution(execution, "webhook", {
-      provider: event.provider,
-      event: event.eventType,
-      rawStatus: event.rawStatus,
-    })
-  } else if (
-    event.providerStatus === "FAILED" &&
-    execution.status === "PROCESSING"
-  ) {
-    await failExecution(
+    return finalized.kind === "conflict" ? "quarantined" : "processed"
+  }
+  if (event.providerStatus === "FAILED") {
+    if (!failedWebhookEnvelopeMatches(execution, event)) {
+      const quarantined = await quarantineWebhookEnvelope(
+        client,
+        execution,
+        event,
+        lease,
+        "TerminalWebhookEnvelopeMismatch",
+      )
+      return quarantined ? "quarantined" : "ownership-lost"
+    }
+    return failExecution(
+      client,
       execution,
       "webhook",
       "Provider reported transfer failed/cancelled",
@@ -457,18 +990,38 @@ async function processInboxEvent(event: any): Promise<string> {
         event: event.eventType,
         rawStatus: event.rawStatus,
       },
+      event.id,
+      lease,
+      event.livemode,
+    ).then((result) =>
+      result === "ownership-lost"
+        ? "ownership-lost"
+        : result === "quarantined"
+          ? "quarantined"
+          : "processed",
     )
   }
 
-  await markInboxEvent(event.id, "PROCESSED", { lastError: null })
-  return "processed"
+  const processed = await markInboxEvent(
+    eventStore,
+    event.id,
+    lease,
+    "PROCESSED",
+    { lastError: null },
+  )
+  return processed ? "processed" : "ownership-lost"
 }
 
 /** Drain cryptographically verified payout events from the Postgres inbox. */
-export async function processPayoutWebhookInbox(limit = 50) {
+export async function processPayoutWebhookInbox(
+  limit = 50,
+  client: any = prisma,
+  now = new Date(),
+) {
+  assertFinanceOperationAllowed("recovery")
+  const eventStore = client.payoutWebhookEvent
   const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 500)
-  const now = new Date()
-  await payoutWebhookEvent.updateMany({
+  await eventStore.updateMany({
     where: {
       status: "PROCESSING",
       lockedAt: { lt: new Date(now.getTime() - INBOX_LOCK_TIMEOUT_MS) },
@@ -481,10 +1034,20 @@ export async function processPayoutWebhookInbox(limit = 50) {
     },
   })
 
-  const candidates = await payoutWebhookEvent.findMany({
+  const candidates = await eventStore.findMany({
     where: {
       status: { in: ["PENDING", "FAILED"] },
       availableAt: { lte: now },
+      // Stripe account.updated changes routing eligibility rather than payout
+      // completion evidence. The API durably claims and applies those events
+      // through StripeConnectService under the recovery runtime gate. Leaving
+      // them in the inbox on failure preserves provider redelivery and avoids
+      // this generic processor incorrectly terminalizing them as an unmatched
+      // payout execution.
+      NOT: {
+        provider: "stripe_connect",
+        eventType: "account.updated",
+      },
     },
     orderBy: [{ receivedAt: "asc" }, { id: "asc" }],
     take: safeLimit,
@@ -493,38 +1056,70 @@ export async function processPayoutWebhookInbox(limit = 50) {
   let processed = 0
   let retried = 0
   let ignored = 0
+  let quarantined = 0
+  let ownershipLost = 0
   let claimedCount = 0
   for (const candidate of candidates) {
-    const claimed = await payoutWebhookEvent.updateMany({
+    const claimLockedAt = new Date()
+    const claimAttempts = Number(candidate.attempts) + 1
+    if (
+      !Number.isSafeInteger(candidate.attempts) ||
+      candidate.attempts < 0 ||
+      !Number.isSafeInteger(claimAttempts)
+    ) {
+      logger.error("payout inbox candidate attempt state is invalid", {
+        eventId: candidate.id,
+      })
+      continue
+    }
+    const claimed = await eventStore.updateMany({
       where: {
         id: candidate.id,
         status: { in: ["PENDING", "FAILED"] },
+        attempts: candidate.attempts,
+        lockedAt: null,
         availableAt: { lte: now },
       },
       data: {
         status: "PROCESSING",
-        lockedAt: new Date(),
+        lockedAt: claimLockedAt,
         attempts: { increment: 1 },
       },
     })
     if (claimed.count === 0) continue
     claimedCount++
 
-    const event = await payoutWebhookEvent.findUnique({
+    const lease = {
+      attempts: claimAttempts,
+      lockedAt: claimLockedAt,
+    }
+    const event = await eventStore.findUnique({
       where: { id: candidate.id },
     })
-    if (!event) continue
+    if (!ownsPayoutWebhookLease(event, lease)) {
+      ownershipLost++
+      continue
+    }
     try {
-      const result = await processInboxEvent(event)
+      const result = await processInboxEvent(client, event, lease)
       if (result === "processed") processed++
       else if (result === "retried") retried++
+      else if (result === "quarantined") quarantined++
+      else if (result === "ownership-lost") ownershipLost++
       else ignored++
     } catch (error) {
-      retried++
-      await markInboxEvent(event.id, "FAILED", {
-        availableAt: inboxRetryAt(event.attempts),
-        lastError: safeInboxError(error),
-      })
+      const retryOwned = await markInboxEvent(
+        eventStore,
+        event.id,
+        lease,
+        "FAILED",
+        {
+          availableAt: inboxRetryAt(event.attempts),
+          lastError: safeInboxError(error),
+        },
+      )
+      if (retryOwned) retried++
+      else ownershipLost++
       logger.error("payout inbox event failed", {
         eventId: event.id,
         error: safeInboxError(error),
@@ -532,99 +1127,21 @@ export async function processPayoutWebhookInbox(limit = 50) {
     }
   }
 
-  return { claimed: claimedCount, processed, retried, ignored }
+  return {
+    claimed: claimedCount,
+    processed,
+    retried,
+    ignored,
+    quarantined,
+    ownershipLost,
+  }
 }
 
 async function handleWebhook(job: any) {
-  const { provider, event, data, verified } = job.data
-  if (!provider || !event || !data) {
-    throw new Error("Missing provider, event, or data in webhook job")
-  }
-  if (!verified) {
-    logger.error(
-      "unverified webhook job rejected — must be verified by API before queueing",
-      { provider, event },
-    )
-    throw new Error(
-      "Unverified webhook — signature check required before enqueueing",
-    )
-  }
-  logger.info("processing webhook event", { provider, event })
-
-  // Real Wise payloads carry the transfer id at data.resource.id and state at
-  // current_state; Stripe at data.object.id / status. The normalizer maps both
-  // (and pre-normalized internal payloads) through the same status maps the
-  // poller uses — raw provider shapes previously matched nothing and every
-  // genuine webhook was skipped.
-  const normalized = normalizeProviderWebhook(provider, data)
-  if (!normalized.providerExecutionId) {
-    logger.warn("no providerExecutionId in webhook data", { provider, event })
-    return { skipped: true, reason: "No providerExecutionId" }
-  }
-  const execution = await prisma.payoutExecution.findFirst({
-    where: {
-      OR: [
-        { providerExecutionId: normalized.providerExecutionId },
-        { providerPayoutId: normalized.providerExecutionId },
-      ],
-      provider: { is: { name: provider } },
-    },
-    include: {
-      provider: true,
-      withdrawal: { include: { publisher: true } },
-    },
-  })
-  if (!execution) {
-    logger.warn("no execution found for providerExecutionId", {
-      providerExecutionId: normalized.providerExecutionId,
-    })
-    return { skipped: true, reason: "Execution not found" }
-  }
-
-  if (execution.status !== "PROCESSING") {
-    logger.warn("execution not PROCESSING — ignoring webhook", {
-      executionId: execution.id,
-      status: execution.status,
-    })
-    return {
-      skipped: true,
-      reason: `Execution is ${execution.status}, not PROCESSING`,
-    }
-  }
-
-  const webhookStatus = normalized.status
-  if (webhookStatus === "COMPLETED") {
-    await completeExecution(execution, "webhook", {
-      provider,
-      event,
-      rawStatus: normalized.rawStatus,
-    })
-    logger.info("withdrawal completed via webhook", {
-      withdrawalId: execution.withdrawalId,
-      executionId: execution.id,
-    })
-  } else if (webhookStatus === "FAILED") {
-    await failExecution(
-      execution,
-      "webhook",
-      normalized.error ?? "Provider reported failure",
-      { provider, event, rawStatus: normalized.rawStatus },
-    )
-    logger.info("withdrawal failed via webhook", {
-      withdrawalId: execution.withdrawalId,
-      executionId: execution.id,
-    })
-  } else {
-    logger.info("webhook state non-terminal — no transition", {
-      rawStatus: normalized.rawStatus,
-      executionId: execution.id,
-    })
-  }
-  return {
-    executionId: execution.id,
-    webhookStatus,
-    rawStatus: normalized.rawStatus,
-  }
+  // Legacy queue jobs are wake signals only. Financial truth enters through
+  // the cryptographically verified, durable Postgres inbox; queued payloads
+  // are never interpreted as evidence.
+  return processPayoutWebhookInbox(job.data?.limit ?? 50)
 }
 
 export function createPayoutWorker() {

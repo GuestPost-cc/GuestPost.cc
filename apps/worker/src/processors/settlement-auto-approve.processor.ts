@@ -18,6 +18,7 @@
 
 import { prisma } from "@guestpost/database"
 import {
+  assertFinanceOperationAllowed,
   countStaleReviewSettlements,
   makeAutoApproveOnError,
   QUEUES,
@@ -57,6 +58,7 @@ export function createSettlementAutoApproveWorker() {
         logger.warn("unexpected job name — skipping", { jobName: job.name })
         return
       }
+      assertFinanceOperationAllowed("operator_decision")
 
       const batchSize = clampBatchSize(
         (job.data as { batchSize?: number }).batchSize,

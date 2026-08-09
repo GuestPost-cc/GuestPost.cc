@@ -1,4 +1,5 @@
 import { CancellationResponsibility } from "@guestpost/database"
+import { Transform } from "class-transformer"
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -183,18 +184,6 @@ export class BulkRetryVerificationDto {
   websiteIds!: string[]
 }
 
-const VERIFY_METHODS = [
-  "MANUAL_CHECK",
-  "ADMIN_OVERRIDE",
-  "PUBLISHER_REPLY",
-] as const
-
-export class ManualVerifyDto {
-  @IsString()
-  @IsIn(VERIFY_METHODS as unknown as string[])
-  method!: (typeof VERIFY_METHODS)[number]
-}
-
 export class SubmitPlatformContentDto {
   // Submitted content blob — bounded but allows real article-length bodies.
   // 200KB is the practical upper bound (~50k tokens of markdown/HTML).
@@ -225,20 +214,32 @@ export class ReasonRequiredDto {
   reason!: string
 }
 
-// Withdrawal reverse — reason optional today (legacy compat); bound it.
 export class ReverseWithdrawalDto {
-  @IsOptional()
   @IsString()
   @MinLength(10)
   @MaxLength(2_000)
-  reason?: string
+  reason!: string
+}
+
+// A payout command can cross the database/provider boundary or repair an
+// ambiguous provider outcome. Requiring a short, bounded operator rationale at
+// the HTTP boundary gives Finance an intentional-action record without
+// allowing an unbounded string into audit/provider metadata.
+export class PayoutOperatorReasonDto {
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10, {
+    message: "Reason must be at least 10 characters for audit clarity",
+  })
+  @MaxLength(500)
+  reason!: string
 }
 
 // Provider names are kebab-case identifiers ("manual", "wise", "stripe").
 // The service's PayoutProviderService rejects unknown providers — this DTO
 // just bounds the string surface so a 10MB body or weird chars can't reach
 // the service in the first place.
-export class ExecuteWithdrawalDto {
+export class ExecuteWithdrawalDto extends PayoutOperatorReasonDto {
   @IsString()
   @MinLength(2)
   @MaxLength(50)
@@ -383,7 +384,7 @@ export class UpdateSupportTicketStatusDto {
 export class UpdatePlatformFeeDto {
   // Fee must be 0–100 inclusive. Bounds check is in the DTO so a malformed
   // payload never reaches the service; the service still clamps for safety.
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(100)
   platformFeePct!: number

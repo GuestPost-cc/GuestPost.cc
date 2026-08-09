@@ -1,8 +1,8 @@
 /**
  * Phase 7.14 — structured-log emission regression guard for the body-cap
- * silent-failure finding (#14). Asserts that both worker processors that
+ * silent-failure finding (#14). Asserts that both worker fetch boundaries that
  * use readBodyWithCap emit the structured fields (reason, maxBodySize,
- * contentLength) in their catch handler for BODY_TOO_LARGE.
+ * contentLength) in their BODY_TOO_LARGE handler.
  *
  * Same defense-in-depth class as phase-7-11-safe-fetch-adoption.spec.ts.
  * Catches a future refactor that strips the telemetry fields while
@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-const PROCESSORS_DIR = join(
+const WORKER_SRC_DIR = join(
   __dirname,
   "..",
   "..",
@@ -20,12 +20,11 @@ const PROCESSORS_DIR = join(
   "apps",
   "worker",
   "src",
-  "processors",
 )
 
 const TARGET_FILES = [
-  join(PROCESSORS_DIR, "delivery-verification.processor.ts"),
-  join(PROCESSORS_DIR, "verification.processor.ts"),
+  join(WORKER_SRC_DIR, "delivery-verification-fetch.ts"),
+  join(WORKER_SRC_DIR, "processors", "verification.processor.ts"),
 ]
 
 const REQUIRED_FIELDS = [

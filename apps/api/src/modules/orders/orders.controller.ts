@@ -25,6 +25,13 @@ import {
   CreateCancellationRequestDto,
   RespondCancellationRequestDto,
 } from "./dto/order-cancellation.dto"
+import { SubmitPaymentDto } from "./dto/submit-payment.dto"
+import {
+  projectExternalCancellationRequest,
+  projectExternalOrder,
+  projectExternalOrderDispute,
+  projectExternalOrderReview,
+} from "./order-visibility"
 import { OrdersService } from "./orders.service"
 import {
   type CancellationActorContext,
@@ -154,7 +161,7 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  submitContentForReview(
+  async submitContentForReview(
     @Param("id") id: string,
     @Body() body: { content?: string },
     @CurrentUser() user: any,
@@ -166,11 +173,14 @@ export class OrdersController {
         "Content must be 200,000 characters or fewer",
       )
     }
-    return this.fulfillment.submitContentForReview(
-      id,
-      user.publisherId,
-      user.id,
-      content,
+    return projectExternalOrder(
+      await this.fulfillment.submitContentForReview(
+        id,
+        user.publisherId,
+        user.id,
+        content,
+      ),
+      "PUBLISHER",
     )
   }
 
@@ -184,7 +194,13 @@ export class OrdersController {
     @Body() body: AddOrderItemDto,
     @CurrentUser() user: any,
   ) {
-    return this.orders.addOrderItem(id, user.organizationId, body, user.id)
+    return this.orders.addOrderItem(
+      id,
+      user.organizationId,
+      body,
+      user.id,
+      user.customerRole,
+    )
   }
 
   @Delete(":id/items/:itemId")
@@ -197,7 +213,13 @@ export class OrdersController {
     @Param("itemId") itemId: string,
     @CurrentUser() user: any,
   ) {
-    return this.orders.removeOrderItem(id, itemId, user.organizationId)
+    return this.orders.removeOrderItem(
+      id,
+      itemId,
+      user.organizationId,
+      user.id,
+      user.customerRole,
+    )
   }
 
   // ─── CUSTOMER ACTIONS ─────────────────────────────────────
@@ -214,12 +236,17 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  submitPayment(@Param("id") id: string, @CurrentUser() user: any) {
+  submitPayment(
+    @Param("id") id: string,
+    @Body() body: SubmitPaymentDto,
+    @CurrentUser() user: any,
+  ) {
     return this.payment.submitPayment(
       id,
       user.id,
       user.organizationId,
       user.customerRole,
+      body,
     )
   }
 
@@ -228,49 +255,60 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  cancelOrder(
+  async cancelOrder(
     @Param("id") id: string,
     @Body() body: CancelOrderDto,
     @CurrentUser() user: any,
   ) {
-    return this.cancellation.cancelNow(id, cancellationActor(user), body)
+    return projectExternalOrder(
+      await this.cancellation.cancelNow(id, cancellationActor(user), body),
+      "CUSTOMER",
+    )
   }
 
   @Get(":id/cancellation-preview")
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
-  cancellationPreview(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.cancellation.preview(id, cancellationActor(user))
+  async cancellationPreview(@Param("id") id: string, @CurrentUser() user: any) {
+    const preview = await this.cancellation.preview(id, cancellationActor(user))
+    return {
+      ...preview,
+      activeRequest: projectExternalCancellationRequest(preview.activeRequest),
+    }
   }
 
   @Post(":id/cancellation-requests")
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
-  requestCancellation(
+  async requestCancellation(
     @Param("id") id: string,
     @Body() body: CreateCancellationRequestDto,
     @CurrentUser() user: any,
   ) {
-    return this.cancellation.createRequest(id, cancellationActor(user), body)
+    return projectExternalCancellationRequest(
+      await this.cancellation.createRequest(id, cancellationActor(user), body),
+    )
   }
 
   @Post(":id/cancellation-requests/:requestId/respond")
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
-  respondToCancellation(
+  async respondToCancellation(
     @Param("id") id: string,
     @Param("requestId") requestId: string,
     @Body() body: RespondCancellationRequestDto,
     @CurrentUser() user: any,
   ) {
-    return this.cancellation.respond(
-      id,
-      requestId,
-      cancellationActor(user),
-      body,
+    return projectExternalCancellationRequest(
+      await this.cancellation.respond(
+        id,
+        requestId,
+        cancellationActor(user),
+        body,
+      ),
     )
   }
 
@@ -283,8 +321,11 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  approveContent(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.review.approveContent(id, user.organizationId, user.id)
+  async approveContent(@Param("id") id: string, @CurrentUser() user: any) {
+    return projectExternalOrder(
+      await this.review.approveContent(id, user.organizationId, user.id),
+      "CUSTOMER",
+    )
   }
 
   @Post(":id/request-revision")
@@ -292,12 +333,20 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  requestRevision(
+  async requestRevision(
     @Param("id") id: string,
     @Body("notes") notes: string,
     @CurrentUser() user: any,
   ) {
-    return this.review.requestRevision(id, user.organizationId, user.id, notes)
+    return projectExternalOrder(
+      await this.review.requestRevision(
+        id,
+        user.organizationId,
+        user.id,
+        notes,
+      ),
+      "CUSTOMER",
+    )
   }
 
   // Phase 6.9 — Audit finding R-3. confirm-delivery creates the Settlement
@@ -308,8 +357,11 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  confirmDelivery(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.review.confirmDelivery(id, user.organizationId, user.id)
+  async confirmDelivery(@Param("id") id: string, @CurrentUser() user: any) {
+    return projectExternalOrder(
+      await this.review.confirmDelivery(id, user.organizationId, user.id),
+      "CUSTOMER",
+    )
   }
 
   // Per-order review (customer, after delivery). Feeds the publisher rating.
@@ -318,17 +370,19 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  submitReview(
+  async submitReview(
     @Param("id") id: string,
     @Body() body: { rating: number; comment?: string },
     @CurrentUser() user: any,
   ) {
-    return this.review.submitReview(
-      id,
-      user.organizationId,
-      user.id,
-      Number(body.rating),
-      body.comment,
+    return projectExternalOrderReview(
+      await this.review.submitReview(
+        id,
+        user.organizationId,
+        user.id,
+        Number(body.rating),
+        body.comment,
+      ),
     )
   }
 
@@ -336,11 +390,14 @@ export class OrdersController {
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
-  getReview(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.review.getReview(id, {
-      organizationId: user.userType === "CUSTOMER" ? user.organizationId : null,
-      publisherId: user.userType === "PUBLISHER" ? user.publisherId : null,
-    })
+  async getReview(@Param("id") id: string, @CurrentUser() user: any) {
+    return projectExternalOrderReview(
+      await this.review.getReview(id, {
+        organizationId:
+          user.userType === "CUSTOMER" ? user.organizationId : null,
+        publisherId: user.userType === "PUBLISHER" ? user.publisherId : null,
+      }),
+    )
   }
 
   // Manual fallback: customer accepts the delivery when the automated check
@@ -376,12 +433,14 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  openDispute(
+  async openDispute(
     @Param("id") id: string,
     @Body("reason") reason: string,
     @CurrentUser() user: any,
   ) {
-    return this.dispute.openDispute(id, user.organizationId, user.id, reason)
+    return projectExternalOrderDispute(
+      await this.dispute.openDispute(id, user.organizationId, user.id, reason),
+    )
   }
 
   // ─── PUBLISHER ACTIONS ────────────────────────────────────
@@ -391,8 +450,11 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  acceptOrder(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.fulfillment.acceptOrder(id, user.publisherId, user.id)
+  async acceptOrder(@Param("id") id: string, @CurrentUser() user: any) {
+    return projectExternalOrder(
+      await this.fulfillment.acceptOrder(id, user.publisherId, user.id),
+      "PUBLISHER",
+    )
   }
 
   @Post(":id/decline")
@@ -400,12 +462,15 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  declineOrder(
+  async declineOrder(
     @Param("id") id: string,
     @Body() body: CancelOrderDto,
     @CurrentUser() user: any,
   ) {
-    return this.cancellation.decline(id, cancellationActor(user), body)
+    return projectExternalOrder(
+      await this.cancellation.decline(id, cancellationActor(user), body),
+      "PUBLISHER",
+    )
   }
 
   @Post(":id/submit-content")
@@ -413,16 +478,19 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  submitContent(
+  async submitContent(
     @Param("id") id: string,
     @Body("content") content: string,
     @CurrentUser() user: any,
   ) {
-    return this.fulfillment.submitContent(
-      id,
-      user.publisherId,
-      user.id,
-      content,
+    return projectExternalOrder(
+      await this.fulfillment.submitContent(
+        id,
+        user.publisherId,
+        user.id,
+        content,
+      ),
+      "PUBLISHER",
     )
   }
 
@@ -431,8 +499,11 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  markContentReady(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.fulfillment.markContentReady(id, user.publisherId, user.id)
+  async markContentReady(@Param("id") id: string, @CurrentUser() user: any) {
+    return projectExternalOrder(
+      await this.fulfillment.markContentReady(id, user.publisherId, user.id),
+      "PUBLISHER",
+    )
   }
 
   @Post(":id/submit-for-review")
@@ -440,8 +511,11 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  submitForReview(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.fulfillment.submitForReview(id, user.publisherId, user.id)
+  async submitForReview(@Param("id") id: string, @CurrentUser() user: any) {
+    return projectExternalOrder(
+      await this.fulfillment.submitForReview(id, user.publisherId, user.id),
+      "PUBLISHER",
+    )
   }
 
   @Post(":id/mark-published")
@@ -449,12 +523,15 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  markPublished(
+  async markPublished(
     @Param("id") id: string,
     @Body("url") url: string,
     @CurrentUser() user: any,
   ) {
-    return this.fulfillment.markPublished(id, user.publisherId, user.id, url)
+    return projectExternalOrder(
+      await this.fulfillment.markPublished(id, user.publisherId, user.id, url),
+      "PUBLISHER",
+    )
   }
 }
 

@@ -102,6 +102,11 @@ export class CampaignsService {
     websiteId?: string
     campaignId?: string
     idempotencyKey?: string
+    listingServiceId?: string
+    briefData?: Record<string, unknown>
+    expectedListingServiceVersion?: number
+    expectedPrice?: string | number
+    expectedCurrency?: string
   }) {
     return this.client.post<{ id: string; status: string }>(
       "/campaigns/orders",

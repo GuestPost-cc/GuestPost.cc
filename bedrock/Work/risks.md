@@ -1,12 +1,17 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-07-23
+updated: 2026-08-03
 ---
 
 # Risks
 
-Updated 2026-07-20 after the Stripe-first provider-neutral finance groundwork. All historical audit findings at Medium severity or above are closed; the remaining items are staging gates, strategic/long-horizon risks, and operator-action follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
+Updated 2026-08-03 after the financial evidence, order capture, settlement,
+Google-metric quarantine, integration-encryption hardening, and exact legacy
+withdrawal-reservation repair. All
+historical audit findings at Medium severity or above are closed; the remaining
+items are staging gates, strategic/long-horizon risks, and operator-action
+follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
 
 The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
 
@@ -18,12 +23,84 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   staff reviews and backfills them. New platform-site creation fails closed on
   the required manual evidence and queues both automated providers, so this is
   a legacy data-completeness issue rather than an authorization bypass.
+- **The finance evidence release is mixed-version incompatible.** Database
+  triggers intentionally reject old payout, dispute, provider-inbox,
+  cancellation, catalog/order capture, revision, delivery/fraud, settlement,
+  and completion write shapes. A rolling deployment or rollback to the prior
+  application would create an outage. Mitigation: hard-drain all old writers,
+  apply all 59 migrations in the complete ordered chain through `0980`, start
+  only the matching image, keep money gates closed, rehearse on a populated
+  clone, require every financial constraint to be validated, and forward-fix.
+  Short-timeout SHARE barriers make preflights fail rather than race a
+  still-active old writer.
+- **Legacy withdrawal-reservation repair is intentionally narrow.** Migration
+  `0970` accepts only an exact pre-cutover request debit/audit; a rejected row
+  additionally needs one exact post-cutover reversal and matching decision
+  audit, with no payout execution. Pending repair adds equal carry-forward and
+  used amounts; rejected repair adds only carry-forward. Missing, duplicate,
+  contradictory, or ambiguous evidence blocks deployment. Preserve the rows
+  and investigate; never improvise allocation or balance SQL to force the
+  preflight through.
+- **Google performance metrics are unavailable until exact domain binding is
+  implemented.** GSC/GA4 OAuth, discovery, linking, sync, schedules, daily
+  writes, summaries, and public projection intentionally fail closed. Raw rows
+  are untrusted forensic history. Re-enable only through the append-only GSC
+  property / GA4 web-stream / canonical-domain evidence contract in ADR 0008;
+  do not remove the quarantine as an availability shortcut.
+- **Provider revocation is not yet a durable saga.** Integration disconnect
+  performs the external provider revocation while its database transaction is
+  open. If revocation succeeds and the local commit later rolls back, the row
+  can remain `ACTIVE` while its credential is externally invalid, causing an
+  availability/reconciliation mismatch. Google integrations are quarantined,
+  so this is not a current data-publication or money-path release blocker.
+  Before re-enabling them, move revocation to a durable state machine/outbox or
+  add authenticated reconciliation that converges local status without ever
+  claiming an unproven disconnect.
+- **Historical payout ambiguity cannot be repaired by inventing claims.** The
+  migration deliberately classifies pre-reference executions whose predecessor
+  may already have called a provider as `LEGACY_PROVIDER_OUTCOME_UNKNOWN`.
+  `PayoutExecutionClaim` is authoritative only when created atomically by the
+  evidence-aware writer. Mitigation: keep liability reserved, retrieve provider
+  truth, and use an incident-reviewed repair; never backfill a claim to justify
+  replay.
+- **Runtime mode is an operational availability boundary.** Missing or
+  malformed production configuration becomes `locked`, which preserves signed
+  inbound evidence but blocks recovery and reconciliation workers. This is
+  money-safe but can increase MTTR. Mitigation: alert on resolved mode, rehearse
+  `normal -> recovery_only -> locked` behavior, and require an explicit
+  evidence-backed decision before reopening `normal`.
+- **Stripe deposit crash-gap recovery depends on provider redelivery.** The
+  normalized checkout inbox cannot independently replay a wallet credit and no
+  authenticated Checkout/PaymentIntent catch-up worker exists. Stripe
+  redelivery plus stale/failed/quarantined reconciliation alerts contain the
+  risk; an independent retrieval path remains strategic work.
+- **A late provider failure after payout completion needs incident
+  adjudication.** The event is quarantined and alerted without automatically
+  rewriting `lifetimePaid`, allocations, or completed state. Bounded
+  revalidation and a reviewed compensating workflow remain future MTTR work.
+- **There is no generic financial repair command.** Nonzero legacy
+  dispute/ledger or wallet-cash-out findings block reopening the affected money
+  path until provider truth supports an incident-specific typed, idempotent,
+  independently reviewed command. Direct balance SQL and generic adjustment
+  endpoints are not accepted repair mechanisms.
+- **Wise is not certified.** Automated Wise sends, automated completion, and
+  claimed-send replay must remain disabled until terminal amount/currency
+  evidence, idempotency retention, cancellation, and provider-side
+  reconciliation are proven.
+- **Hard payout master-key rotation is not yet supported.** The runtime has
+  versioned derivation under one master key, but no dual-key/keyring reader or
+  resumable verified re-encryption command. Directly replacing the secret
+  would make historical payout ciphertext unreadable. Mitigation: soft
+  rotations may increment the version without changing the key; suspected
+  compromise requires finance lock, decrypt revocation, old-key preservation,
+  and a dedicated independently reviewed migration before replacement.
 
 ## Closed in this batch (no longer active)
 
 | Risk (was) | Phase that closed it |
 |---|---|
 | Privesc via `updateUserRole` publisher path | Phase 6.7 (per-handler `@StaffRoles` + fail-closed guard + admin RBAC matrix) |
+| Future wallet credits or older reservations remained spendable despite durable open/lost chargeback exposure | 2026-07-29 finance containment: shared Wallet row lock, reserve- and capture-time exposure gates, stable 409, and PostgreSQL serial-order tests |
 | Float money math (`Number(amount) * feeFraction`) | Closed in original Phase 9 (batch 9, 2026-06-11) — Decimal end-to-end + `splitPlatformFee` rounds once and subtracts |
 | `submitPayment` silently re-charges drifted listing price without consent | Phase 6.9 (`assertOwnerOrCreator` + price-drift 409) |
 | Confirm-delivery → settlement creation non-atomic | Phase 6.9 status-guarded `updateMany` in confirmDelivery |
@@ -130,11 +207,27 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 
 - **No double-entry ledger.** Reconciliation core (`packages/shared/src/reconciliation-core.ts`) is the interim drift detector; single-entry bookkeeping remains. Money conservation is provable via reconciliation; accounting audit will eventually require dual-entry escrow / revenue accounts. Medium-term re-architecture.
 - **Item-level settlements not implemented.** Settlement is computed at the order level. Multi-website orders are blocked at order creation (one-website-per-order invariant), so the risk is currently mitigated, but a future "shopping cart" UX would need item-level work.
-- **Provider-side reconciliation remains partly manual.** Stripe Connect now persists each Transfer/Payout stage, uses stable provider idempotency keys, and promotes stale active handoffs into explicit recovery states instead of restoring funds. Wise still has an ambiguous send/write window, and neither provider has a complete automatic provider-list-versus-`PayoutExecution` comparison. Operators must reconcile provider-side before retrying or canceling an uncertain execution.
+- **Provider-side reconciliation remains partly manual.** Stripe Connect now
+  persists each Transfer/Payout stage, uses stable provider idempotency keys,
+  and promotes stale active handoffs into explicit recovery states instead of
+  restoring funds. Automated Wise execution is disabled, and there is no
+  complete automatic provider-list-versus-`PayoutExecution` comparison.
+  Operators must establish provider truth before retrying, cancelling, or
+  compensating an uncertain execution.
 - **Latent pool-deadlock in colder audit-write paths.** 18/66 audit.log calls pass `tx`; hot money paths fixed in batch 15. Phase 6.9's sweep got 20+ more; remaining cold paths (some admin actions, support fan-out edge cases) still write outside the tx via `this.prisma.auditLog.create` and swallow errors. Acceptable for current scale; revisit if cold-path drift surfaces.
-- **Dispute resolution non-idempotent.** RESTORE/REJECT restore hardcoded PUBLISHED regardless of pre-dispute status. REFUND resolution: refund commits, dispute update fails → unresolvable. Lower-priority cleanup.
+- **Order-dispute resolution remains non-idempotent.** This is separate from
+  the new Stripe `PaymentDispute` chargeback cases: RESTORE/REJECT restore a
+  hardcoded PUBLISHED state regardless of the pre-dispute state, and the
+  order-dispute REFUND path can still split refund and dispute transitions.
+  Lower-priority cleanup.
 - **Listing reviews default APPROVED without purchase verification.** Low-volume today; opens fake-review attack vector at scale.
-- **Single-currency only.** `currency` is free-text USD default; non-USD orders today would settle as USD-as-its-own-currency. Stripe Connect onboarding is therefore restricted to accounts whose default currency is USD, and a non-USD account cannot be enabled. Phase 7.1 surfaces a warning (`meta.currencyMismatch`) when any non-USD Order exists in the revenue dashboard range. Multi-currency requires an explicit, end-to-end rollout rather than relaxing this guard.
+- **Single-currency only.** Exact case-sensitive USD is now enforced in
+  services and PostgreSQL across catalog, order, wallet, ledger, settlement,
+  revenue, balance, withdrawal, and payout evidence. Historical non-USD facts
+  block migration instead of being relabelled. Multi-currency requires a new
+  ADR, per-currency balances/liabilities, typed amount-currency identities, FX
+  evidence, provider certification, and a rehearsed migration; never relax one
+  check in isolation.
 
 ### Risks introduced by this batch (new)
 

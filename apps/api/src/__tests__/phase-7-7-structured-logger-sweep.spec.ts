@@ -61,12 +61,18 @@ function listProductionTsFiles(rootDirs: string[]): string[] {
     `git -C ${repoRoot} ls-files ${rootDirs.map((d) => `'${d}'`).join(" ")}`,
     { encoding: "utf8" },
   )
-  return result
-    .split("\n")
-    .filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts"))
-    .filter((f) => !f.includes("__tests__/"))
-    .filter((f) => !f.endsWith(".spec.ts"))
-    .filter((f) => !f.endsWith(".test.ts"))
+  return (
+    result
+      .split("\n")
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts"))
+      // `git ls-files` includes tracked files deleted in the working tree until
+      // the deletion is staged. Ignore those paths so this guard behaves the
+      // same before and after staging a legitimate production-file removal.
+      .filter((f) => fs.existsSync(path.join(repoRoot, f)))
+      .filter((f) => !f.includes("__tests__/"))
+      .filter((f) => !f.endsWith(".spec.ts"))
+      .filter((f) => !f.endsWith(".test.ts"))
+  )
 }
 
 describe("Phase 7.7 B — console.* sweep regression guard", () => {

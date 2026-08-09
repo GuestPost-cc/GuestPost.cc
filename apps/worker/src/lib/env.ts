@@ -3,6 +3,7 @@
 // Consolidates ad-hoc process.env reads that were scattered across processors.
 // Hard-required vars cause exit(1) on startup. Optional vars warn once.
 
+import { resolveFinanceRuntimeMode } from "@guestpost/shared"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 
 const logger = createLogger("worker.env")
@@ -42,6 +43,22 @@ export function validateEnv(): void {
       })
       process.exit(1)
     }
+  }
+
+  const financeMode = resolveFinanceRuntimeMode(
+    process.env.FINANCE_RUNTIME_MODE,
+    process.env.NODE_ENV,
+  )
+  if (!financeMode.valid) {
+    logger.error(
+      "FINANCE_RUNTIME_MODE is missing or invalid; financial mutations are locked",
+      {
+        mode: financeMode.mode,
+        configured: financeMode.configured,
+      },
+    )
+  } else {
+    logger.info("finance runtime mode validated", { mode: financeMode.mode })
   }
 
   for (const key of OPTIONAL_WARN) {

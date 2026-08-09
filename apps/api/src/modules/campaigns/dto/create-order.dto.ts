@@ -1,5 +1,12 @@
 import { ServiceType } from "@guestpost/database"
-import { IsEnum, IsOptional, IsString, IsUrl, MaxLength } from "class-validator"
+import {
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+} from "class-validator"
 
 export class CreateOrderDto {
   @IsEnum(ServiceType)
@@ -35,6 +42,23 @@ export class CreateOrderDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(100)
+  @MaxLength(200)
   idempotencyKey?: string
+
+  @IsString()
+  @IsOptional()
+  listingServiceId?: string
+
+  @IsObject()
+  @IsOptional()
+  briefData?: Record<string, unknown>
+
+  @IsOptional()
+  expectedListingServiceVersion?: unknown
+
+  @IsOptional()
+  expectedPrice?: unknown
+
+  @IsOptional()
+  expectedCurrency?: unknown
 }

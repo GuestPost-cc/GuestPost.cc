@@ -14,6 +14,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ArrayUnique,
+  Equals,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -51,12 +52,13 @@ export class ListingServiceInput {
   serviceType!: ServiceType
 
   @Type(() => Number)
-  @IsNumber()
-  @Min(0)
+  @IsNumber({ allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 })
+  @Min(0.01)
   price!: number
 
   @IsOptional()
   @IsString()
+  @Equals("USD")
   currency?: string = "USD"
 
   @Type(() => Number)
@@ -95,12 +97,13 @@ export class ListingServiceInput {
 export class UpdateListingServiceInput {
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
-  @Min(0)
+  @IsNumber({ allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 })
+  @Min(0.01)
   price?: number
 
   @IsOptional()
   @IsString()
+  @Equals("USD")
   currency?: string
 
   @IsOptional()
@@ -356,6 +359,7 @@ export class CreateListingDto {
 
   @IsOptional()
   @IsString()
+  @Equals("USD")
   currency?: string = "USD"
 
   @IsOptional()

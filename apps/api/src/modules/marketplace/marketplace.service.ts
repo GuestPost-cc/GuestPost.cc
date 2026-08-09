@@ -4,8 +4,15 @@ import {
   ServiceAvailability,
   type ServiceType,
   WebsiteMetricKey,
+  WebsiteMetricProvider,
+  WebsiteMetricStatus,
 } from "@guestpost/database"
-import { computeListingPhase, QUEUES } from "@guestpost/shared"
+import {
+  computeListingPhase,
+  normalizePositiveUsdMoney,
+  QUEUES,
+  USD_CURRENCY,
+} from "@guestpost/shared"
 import {
   BadRequestException,
   ForbiddenException,
@@ -50,6 +57,10 @@ const publicWebsiteInclude = {
   },
 } satisfies Prisma.WebsiteInclude
 
+const MAX_CANONICAL_ORGANIC_TRAFFIC = 2_147_483_647
+
+type SqlSearchSort = "recommended" | "traffic" | "price_asc" | "price_desc"
+
 // Phase 7: the LISTING_TYPE_TO_SERVICE_TYPE bridge map was removed. Clients
 // now send `services[]` directly; the legacy single-service shape is gone.
 
@@ -60,16 +71,28 @@ export class MarketplaceService {
     private readonly queue: QueueService,
   ) {}
 
-  private hasVisibleGoogleConnection(website: any, provider: string) {
-    return Boolean(
-      website?.websiteIntegrations?.some(
-        (link: any) =>
-          link.integration?.provider === provider &&
-          link.integration?.status === "ACTIVE" &&
-          ["CONNECTED", "SYNCING", "OUT_OF_SYNC"].includes(link.status) &&
-          link.syncedAt,
-      ),
-    )
+  private requireUsd(currency: unknown, field = "currency"): "USD" {
+    if (currency !== undefined && currency !== USD_CURRENCY) {
+      throw new BadRequestException({
+        code: "UNSUPPORTED_CURRENCY",
+        message: `${field} must be exactly USD`,
+      })
+    }
+    return USD_CURRENCY
+  }
+
+  private requirePositiveUsdPrice(
+    value: unknown,
+    field = "Service price",
+  ): Prisma.Decimal {
+    const normalized = normalizePositiveUsdMoney(value)
+    if (!normalized) {
+      throw new BadRequestException({
+        code: "INVALID_USD_PRICE",
+        message: `${field} must be a positive USD amount with at most two decimal places`,
+      })
+    }
+    return new Prisma.Decimal(normalized)
   }
 
   private projectDomainMetrics(website: any) {
@@ -79,11 +102,73 @@ export class MarketplaceService {
     return serializeMarketplaceDomainMetrics(metrics)
   }
 
+  private canonicalOrganicTrafficFilter(asOf: Date, minValue = 0) {
+    return {
+      key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+      provider: WebsiteMetricProvider.AHREFS,
+      status: WebsiteMetricStatus.CURRENT,
+      value: {
+        gte: minValue,
+        lte: MAX_CANONICAL_ORGANIC_TRAFFIC,
+      },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: asOf } }],
+    }
+  }
+
+  private canonicalOrganicTrafficSql(
+    asOf: Date,
+    listingAlias: "listing" | "candidate" = "listing",
+  ) {
+    const websiteId =
+      listingAlias === "candidate"
+        ? Prisma.sql`candidate."websiteId"`
+        : Prisma.sql`listing."websiteId"`
+    return Prisma.sql`(
+      SELECT metric."value"
+      FROM "WebsiteMetric" metric
+      WHERE metric."websiteId" = ${websiteId}
+        AND metric."key" = ${WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC}::"WebsiteMetricKey"
+        AND metric."provider" = ${WebsiteMetricProvider.AHREFS}::"WebsiteMetricProvider"
+        AND metric."status" = ${WebsiteMetricStatus.CURRENT}::"WebsiteMetricStatus"
+        AND (metric."expiresAt" IS NULL OR metric."expiresAt" > ${asOf})
+        AND metric."value" BETWEEN 0 AND ${MAX_CANONICAL_ORGANIC_TRAFFIC}
+        AND metric."value" = trunc(metric."value")
+      LIMIT 1
+    )`
+  }
+
+  private projectCanonicalOrganicTraffic(
+    website: any,
+    asOf = new Date(),
+  ): number | null {
+    const metric = Array.isArray(website?.metricsHistory)
+      ? website.metricsHistory.find(
+          (item: any) =>
+            item.key === WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC &&
+            item.provider === WebsiteMetricProvider.AHREFS &&
+            item.status === WebsiteMetricStatus.CURRENT &&
+            (!item.expiresAt ||
+              new Date(item.expiresAt).getTime() > asOf.getTime()),
+        )
+      : null
+    if (!metric) return null
+    const value = Number(metric.value)
+    return Number.isSafeInteger(value) &&
+      value >= 0 &&
+      value <= MAX_CANONICAL_ORGANIC_TRAFFIC
+      ? value
+      : null
+  }
+
   // Strips internal/sensitive fields before a listing leaves a PUBLIC route.
   // The raw row leaked publisher email/tier/org, internal ids, and raw
   // provider metric dumps (semrush/traffic) to anyone scraping the public
   // marketplace. Whitelist what a buyer legitimately needs to see.
-  private toPublicListing(listing: any, websiteUnlocked = false) {
+  private toPublicListing(
+    listing: any,
+    websiteUnlocked = false,
+    metricsAsOf = new Date(),
+  ) {
     const {
       websiteUrl,
       sampleUrl,
@@ -129,30 +214,12 @@ export class MarketplaceService {
     const serviceTypes = Array.from(
       new Set(availableServices.map((s: any) => s.serviceType)),
     )
-    const gscMetrics =
-      this.hasVisibleGoogleConnection(website, "GOOGLE_SEARCH_CONSOLE") &&
-      metricsData &&
-      typeof metricsData === "object" &&
-      (metricsData as any).source === "GSC"
-        ? {
-            clicks: Number((metricsData as any).clicks ?? 0),
-            impressions: Number((metricsData as any).impressions ?? 0),
-          }
-        : undefined
-    const ga4Metrics =
-      this.hasVisibleGoogleConnection(website, "GOOGLE_ANALYTICS") &&
-      trafficData &&
-      typeof trafficData === "object" &&
-      (trafficData as any).source === "GA4"
-        ? {
-            sessions: Number((trafficData as any).sessions ?? 0),
-            users: Number((trafficData as any).users ?? 0),
-            pageviews: Number((trafficData as any).pageviews ?? 0),
-          }
-        : undefined
-
     return {
       ...rest,
+      // Never surface a legacy GA4-derived listing.traffic value. The only
+      // public traffic fact during the Google quarantine is the normalized
+      // source-aware Ahrefs metric tied to this Website.
+      traffic: this.projectCanonicalOrganicTraffic(website, metricsAsOf),
       websiteUrl: websiteUnlocked ? websiteUrl : null,
       sampleUrl: websiteUnlocked ? sampleUrl : null,
       signupUrl: websiteUnlocked ? signupUrl : null,
@@ -168,10 +235,10 @@ export class MarketplaceService {
       // Temporary compatibility projection for older card/detail consumers.
       // New writes and filters use categories[] exclusively.
       category: categories[0] ?? null,
-      siteMetrics:
-        gscMetrics || ga4Metrics
-          ? { periodDays: 30, gsc: gscMetrics, ga4: ga4Metrics }
-          : undefined,
+      // Google property-to-domain binding is quarantined. Never trust legacy
+      // denormalized JSON or even an apparently ACTIVE link until the binding
+      // model carries verifiable canonical-domain evidence.
+      siteMetrics: undefined,
       domainMetrics: this.projectDomainMetrics(website),
       // Listing-level attribution: PLATFORM-owned listings render as
       // "Listed by GuestPost.cc"; PUBLISHER-owned expose the publisher card.
@@ -219,10 +286,26 @@ export class MarketplaceService {
   }
 
   private withCategoryProjection(listing: any) {
+    const {
+      metricsData: _quarantinedSearchConsoleData,
+      trafficData: _quarantinedAnalyticsData,
+      traffic: _quarantinedDenormalizedTraffic,
+      ...safeListing
+    } = listing
     const categories = Array.isArray(listing?.categories)
       ? listing.categories.map((link: any) => link.category ?? link)
       : []
-    return { ...listing, categories, category: categories[0] ?? null }
+    // These lightweight projections do not load source-aware WebsiteMetric
+    // rows, so they cannot prove an organic-traffic value came from Ahrefs.
+    // Omit raw Google payloads and fail closed instead of returning legacy
+    // denormalized traffic from a potentially mismatched Google property.
+    return {
+      ...safeListing,
+      traffic: null,
+      siteMetrics: undefined,
+      categories,
+      category: categories[0] ?? null,
+    }
   }
 
   // Lightweight read used by the order-creation UI to power the service
@@ -289,6 +372,7 @@ export class MarketplaceService {
       limit = 20,
       ownershipType,
     } = dto
+    const metricsAsOf = new Date()
 
     const where: any = {
       status: ListingStatus.APPROVED,
@@ -305,9 +389,8 @@ export class MarketplaceService {
       }
     }
 
-    if (ownershipType) {
-      where.website = { ownershipType: ownershipType as any }
-    }
+    const websiteFilter: Record<string, unknown> = {}
+    if (ownershipType) websiteFilter.ownershipType = ownershipType as any
 
     if (country) {
       where.country = { equals: country, mode: "insensitive" }
@@ -350,8 +433,8 @@ export class MarketplaceService {
       serviceFilter.turnaroundDays = { lte: maxTurnaroundDays }
     where.services = { some: serviceFilter }
 
-    // DR / traffic remain listing-level (they're properties of the website,
-    // not of a service).
+    // DR remains a compatibility listing field. Traffic is a website fact and
+    // is filtered/ranked only through its source-aware canonical metric row.
     if (minDR !== undefined || maxDR !== undefined) {
       where.domainRating = {}
       if (minDR !== undefined) where.domainRating.gte = minDR
@@ -359,8 +442,11 @@ export class MarketplaceService {
     }
 
     if (minTraffic !== undefined) {
-      where.traffic = { gte: minTraffic }
+      websiteFilter.metricsHistory = {
+        some: this.canonicalOrganicTrafficFilter(metricsAsOf, minTraffic),
+      }
     }
+    if (Object.keys(websiteFilter).length > 0) where.website = websiteFilter
 
     if (tags && tags.length > 0) {
       where.tags = {
@@ -396,7 +482,7 @@ export class MarketplaceService {
         orderBy = [{ domainRating: "desc" }]
         break
       case "traffic":
-        orderBy = [{ traffic: "desc" }]
+        // Handled below with the canonical WebsiteMetric query.
         break
       case "price_asc":
       case "price_desc":
@@ -414,7 +500,8 @@ export class MarketplaceService {
         orderBy = [{ reviews: { _count: "desc" } }]
         break
       default:
-        orderBy = [{ featured: "desc" }, { traffic: "desc" }]
+        // Recommended/default rank is handled below with canonical traffic.
+        break
     }
 
     const include = {
@@ -437,14 +524,24 @@ export class MarketplaceService {
     }>
     let listings: SearchListingRow[]
     let total: number
-    if (sortBy === "price_asc" || sortBy === "price_desc") {
+    const sqlSort: SqlSearchSort | null =
+      sortBy === "price_asc" || sortBy === "price_desc" || sortBy === "traffic"
+        ? sortBy
+        : sortBy === undefined || sortBy === "recommended"
+          ? "recommended"
+          : null
+    if (sqlSort) {
       const [orderedIds, listingCount] = await Promise.all([
-        this.findPriceSortedListingIds(dto, page, limit, sortBy),
+        this.findSqlSortedListingIds(dto, page, limit, sqlSort, metricsAsOf),
         this.prisma.marketplaceListing.count({ where }),
       ])
       total = listingCount
       const rows = await this.prisma.marketplaceListing.findMany({
-        where: { id: { in: orderedIds } },
+        // Re-apply every eligibility predicate after the raw rank query. A
+        // listing can be paused or otherwise edited between the two reads;
+        // never expose a row that is no longer public just because its ID was
+        // eligible milliseconds earlier.
+        where: { AND: [where, { id: { in: orderedIds } }] },
         include,
       })
       const rowsById = new Map(rows.map((row) => [row.id, row]))
@@ -480,6 +577,7 @@ export class MarketplaceService {
           avgRating,
         },
         websiteUnlocked,
+        metricsAsOf,
       )
     })
 
@@ -494,11 +592,12 @@ export class MarketplaceService {
     }
   }
 
-  private async findPriceSortedListingIds(
+  private async findSqlSortedListingIds(
     dto: SearchListingsDto,
     page: number,
     limit: number,
-    sortBy: "price_asc" | "price_desc",
+    sortBy: SqlSearchSort,
+    metricsAsOf: Date,
   ): Promise<string[]> {
     const listingConditions: Prisma.Sql[] = [
       Prisma.sql`listing."status" = ${ListingStatus.APPROVED}::"ListingStatus"`,
@@ -506,6 +605,7 @@ export class MarketplaceService {
     const serviceConditions: Prisma.Sql[] = [
       Prisma.sql`service."availability" = ${ServiceAvailability.AVAILABLE}::"ServiceAvailability"`,
     ]
+    const canonicalTraffic = this.canonicalOrganicTrafficSql(metricsAsOf)
 
     const categorySlugs = dto.categories?.length
       ? dto.categories
@@ -600,7 +700,9 @@ export class MarketplaceService {
       listingConditions.push(Prisma.sql`listing."domainRating" <= ${dto.maxDR}`)
     }
     if (dto.minTraffic !== undefined) {
-      listingConditions.push(Prisma.sql`listing."traffic" >= ${dto.minTraffic}`)
+      listingConditions.push(
+        Prisma.sql`${canonicalTraffic} >= ${dto.minTraffic}`,
+      )
     }
     if (dto.tags?.length) {
       listingConditions.push(
@@ -670,13 +772,19 @@ export class MarketplaceService {
       )`,
     )
 
-    const direction =
-      sortBy === "price_asc" ? Prisma.raw("ASC") : Prisma.raw("DESC")
+    const orderBy =
+      sortBy === "price_asc" || sortBy === "price_desc"
+        ? Prisma.sql`(${matchingService}) ${
+            sortBy === "price_asc" ? Prisma.raw("ASC") : Prisma.raw("DESC")
+          }, listing."createdAt" DESC, listing."id" ASC`
+        : sortBy === "traffic"
+          ? Prisma.sql`${canonicalTraffic} DESC NULLS LAST, listing."createdAt" DESC, listing."id" ASC`
+          : Prisma.sql`listing."featured" DESC, ${canonicalTraffic} DESC NULLS LAST, listing."createdAt" DESC, listing."id" ASC`
     const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       SELECT listing."id"
       FROM "MarketplaceListing" listing
       WHERE ${Prisma.join(listingConditions, " AND ")}
-      ORDER BY (${matchingService}) ${direction}, listing."createdAt" DESC, listing."id" ASC
+      ORDER BY ${orderBy}
       LIMIT ${limit}
       OFFSET ${(page - 1) * limit}
     `)
@@ -1023,6 +1131,7 @@ export class MarketplaceService {
     activePublisherId: string | null,
     dto: CreateListingDto,
   ) {
+    this.requireUsd(dto.currency, "Listing currency")
     const slug = slugify(dto.title)
 
     // Check for duplicate slug
@@ -1280,6 +1389,8 @@ export class MarketplaceService {
     if (!dto.services || dto.services.length === 0) return null
     const seen = new Set<ServiceType>()
     for (const s of dto.services) {
+      this.requireUsd(s.currency, `Service ${s.serviceType} currency`)
+      this.requirePositiveUsdPrice(s.price, `Service ${s.serviceType} price`)
       if (seen.has(s.serviceType)) {
         throw new BadRequestException(
           `Duplicate service ${s.serviceType} in listing`,
@@ -1299,8 +1410,14 @@ export class MarketplaceService {
     return {
       create: services.map((s) => ({
         serviceType: s.serviceType,
-        price: new Prisma.Decimal(s.price),
-        currency: s.currency ?? "USD",
+        price: this.requirePositiveUsdPrice(
+          s.price,
+          `Service ${s.serviceType} price`,
+        ),
+        currency: this.requireUsd(
+          s.currency,
+          `Service ${s.serviceType} currency`,
+        ),
         turnaroundDays: s.turnaroundDays,
         revisionRounds: s.revisionRounds ?? 2,
         warrantyDays: s.warrantyDays,
@@ -1332,18 +1449,22 @@ export class MarketplaceService {
         organizationId: true,
         ownerType: true,
         websiteId: true,
+        currency: true,
       },
     })
     if (!listing) throw new NotFoundException("Listing not found")
     await this.assertListingWriteAccess(actor, listing)
+    this.requireUsd(listing.currency, "Persisted listing currency")
+    this.requireUsd(input.currency, "Service currency")
+    const price = this.requirePositiveUsdPrice(input.price)
 
     try {
       const created = await this.prisma.listingService.create({
         data: {
           listingId,
           serviceType: input.serviceType,
-          price: new Prisma.Decimal(input.price),
-          currency: input.currency ?? "USD",
+          price,
+          currency: this.requireUsd(input.currency, "Service currency"),
           turnaroundDays: input.turnaroundDays,
           revisionRounds: input.revisionRounds ?? 2,
           warrantyDays: input.warrantyDays,
@@ -1392,6 +1513,7 @@ export class MarketplaceService {
             organizationId: true,
             ownerType: true,
             websiteId: true,
+            currency: true,
           },
         },
       },
@@ -1400,6 +1522,9 @@ export class MarketplaceService {
       throw new NotFoundException("Service not found on this listing")
     }
     await this.assertListingWriteAccess(actor, service.listing)
+    this.requireUsd(service.listing.currency, "Persisted listing currency")
+    this.requireUsd(service.currency, "Persisted service currency")
+    this.requireUsd(input.currency, "Service currency")
 
     // Version-guarded update — concurrent edits or a stale tab cannot silently
     // overwrite each other. The optimistic lock matches the pattern used
@@ -1408,8 +1533,8 @@ export class MarketplaceService {
       version: { increment: 1 },
     }
     if (input.price !== undefined)
-      updateData.price = new Prisma.Decimal(input.price)
-    if (input.currency !== undefined) updateData.currency = input.currency
+      updateData.price = this.requirePositiveUsdPrice(input.price)
+    if (input.currency !== undefined) updateData.currency = USD_CURRENCY
     if (input.turnaroundDays !== undefined)
       updateData.turnaroundDays = input.turnaroundDays
     if (input.revisionRounds !== undefined)
@@ -2340,49 +2465,78 @@ export class MarketplaceService {
       const ownServiceTypes = listing.services.map((s) => s.serviceType)
       const ownCategoryIds = listing.categories.map((item) => item.categoryId)
 
+      const recommendationMatches: Prisma.Sql[] = [
+        Prisma.sql`candidate."publisherId" IS NOT DISTINCT FROM ${listing.publisherId}`,
+      ]
+      if (ownCategoryIds.length > 0) {
+        recommendationMatches.push(Prisma.sql`EXISTS (
+          SELECT 1
+          FROM "MarketplaceListingCategory" listing_category
+          WHERE listing_category."listingId" = candidate."id"
+            AND listing_category."categoryId" IN (${Prisma.join(ownCategoryIds)})
+        )`)
+      }
+      if (ownServiceTypes.length > 0) {
+        recommendationMatches.push(Prisma.sql`EXISTS (
+          SELECT 1
+          FROM "ListingService" service
+          WHERE service."listingId" = candidate."id"
+            AND service."availability" = ${ServiceAvailability.AVAILABLE}::"ServiceAvailability"
+            AND service."serviceType"::text IN (${Prisma.join(ownServiceTypes)})
+        )`)
+      }
+
+      const metricsAsOf = new Date()
+      const canonicalTraffic = this.canonicalOrganicTrafficSql(
+        metricsAsOf,
+        "candidate",
+      )
+      const rankedIds = await this.prisma.$queryRaw<Array<{ id: string }>>(
+        Prisma.sql`
+          SELECT candidate."id"
+          FROM "MarketplaceListing" candidate
+          WHERE candidate."id" <> ${listingId}
+            AND candidate."status" = ${ListingStatus.APPROVED}::"ListingStatus"
+            AND (${Prisma.join(recommendationMatches, " OR ")})
+          ORDER BY ${canonicalTraffic} DESC NULLS LAST,
+                   candidate."createdAt" DESC,
+                   candidate."id" ASC
+          LIMIT ${limit}
+        `,
+      )
+      if (rankedIds.length === 0) return []
+
       const recommendations = await this.prisma.marketplaceListing.findMany({
         where: {
-          id: { not: listingId },
+          id: { in: rankedIds.map((row) => row.id) },
           status: ListingStatus.APPROVED,
-          OR: [
-            ...(ownCategoryIds.length > 0
-              ? [
-                  {
-                    categories: {
-                      some: { categoryId: { in: ownCategoryIds } },
-                    },
-                  },
-                ]
-              : []),
-            ...(ownServiceTypes.length > 0
-              ? [
-                  {
-                    services: {
-                      some: {
-                        availability: "AVAILABLE" as const,
-                        serviceType: { in: ownServiceTypes },
-                      },
-                    },
-                  },
-                ]
-              : []),
-            { publisherId: listing.publisherId },
-          ],
         },
         include: {
           categories: { include: { category: true } },
           images: { where: { isPrimary: true }, take: 1 },
           tags: { include: { tag: true } },
         },
-        take: limit,
-        orderBy: { traffic: "desc" },
       })
 
-      return recommendations.map((recommendation) => ({
-        ...this.withCategoryProjection(recommendation),
-        tags: recommendation.tags.map((tag) => tag.tag),
-        image: recommendation.images[0]?.url || null,
-      }))
+      const recommendationsById = new Map(
+        recommendations.map((recommendation) => [
+          recommendation.id,
+          recommendation,
+        ]),
+      )
+
+      return rankedIds.flatMap(({ id }) => {
+        const recommendation = recommendationsById.get(id)
+        return recommendation
+          ? [
+              {
+                ...this.withCategoryProjection(recommendation),
+                tags: recommendation.tags.map((tag) => tag.tag),
+                image: recommendation.images[0]?.url || null,
+              },
+            ]
+          : []
+      })
     }
 
     // Trending - get most viewed in last 7 days

@@ -26,6 +26,8 @@ function mockPrisma() {
       groupBy: jest.fn().mockResolvedValue([]),
     },
     depositAttempt: { findMany: jest.fn().mockResolvedValue([]) },
+    paymentDispute: { findMany: jest.fn().mockResolvedValue([]) },
+    paymentProviderEvent: { findMany: jest.fn().mockResolvedValue([]) },
     platformRevenue: { findMany: jest.fn().mockResolvedValue([]) },
   }
 }
@@ -285,6 +287,787 @@ describe("runReconciliation with mock prisma", () => {
     expect(report.ok).toBe(false)
   })
 
+  it("accepts a disputed deposit whose original wallet-credit ledger still exists", async () => {
+    const prisma = mockPrisma()
+    prisma.depositAttempt.findMany.mockResolvedValue([
+      {
+        id: "deposit-disputed",
+        publicReference: "GP-DP-DISPUTED",
+        status: "DISPUTED",
+        walletCredit: "25.00",
+        currency: "USD",
+        ledgerTransactionId: "tx-deposit",
+        ledgerTransaction: {
+          id: "tx-deposit",
+          amount: "25.00",
+          currency: "USD",
+          type: "DEPOSIT",
+        },
+        paymentDisputes: [{ status: "OPEN" }],
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (issue) =>
+          issue.entityId === "deposit-disputed" &&
+          issue.code === ReconciliationCode.DEPOSIT_LEDGER_WITHOUT_SUCCESS,
+      ),
+    ).toBe(false)
+  })
+
+  it.each([
+    "SUCCEEDED",
+    "PARTIALLY_REFUNDED",
+    "REFUNDED",
+    "DISPUTED",
+    "CHARGEBACK",
+  ])("accepts exact processed deposit evidence after the attempt becomes %s", async (status) => {
+    const prisma = mockPrisma()
+    prisma.paymentProviderEvent.findMany.mockResolvedValue([
+      {
+        id: `deposit-inbox-${status}`,
+        provider: "stripe",
+        providerEventId: `evt_deposit_${status}`,
+        eventType: "checkout.session.completed",
+        objectId: "cs_exact",
+        depositAttemptId: "attempt-exact",
+        livemode: false,
+        status: "PROCESSED",
+        receivedAt: new Date(),
+        depositAttempt: {
+          id: "attempt-exact",
+          walletId: "wallet-1",
+          provider: "stripe",
+          providerSessionId: "cs_exact",
+          providerPaymentId: "pi_exact",
+          walletCredit: "10.00",
+          currency: "USD",
+          status,
+          ledgerTransactionId: "tx-exact",
+          ledgerTransaction: {
+            id: "tx-exact",
+            walletId: "wallet-1",
+            amount: "10.00",
+            currency: "USD",
+            type: "DEPOSIT",
+            provider: "stripe",
+            providerRef: "pi_exact",
+          },
+        },
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === `deposit-inbox-${status}` &&
+          row.code === ReconciliationCode.DEPOSIT_PROCESSED_EVIDENCE_MISMATCH,
+      ),
+    ).toBe(false)
+  })
+
+  it("classifies a historical Stripe event with no persisted mode as unverified", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentProviderEvent.findMany.mockResolvedValue([
+      {
+        id: "deposit-inbox-legacy-mode",
+        provider: "stripe",
+        providerEventId: "evt_legacy_mode",
+        eventType: "checkout.session.completed",
+        objectId: "cs_exact",
+        depositAttemptId: "attempt-exact",
+        livemode: null,
+        status: "PROCESSED",
+        receivedAt: new Date(),
+        depositAttempt: {
+          id: "attempt-exact",
+          walletId: "wallet-1",
+          provider: "stripe",
+          providerSessionId: "cs_exact",
+          providerPaymentId: "pi_exact",
+          walletCredit: "10.00",
+          currency: "USD",
+          status: "SUCCEEDED",
+          ledgerTransactionId: "tx-exact",
+          ledgerTransaction: {
+            id: "tx-exact",
+            walletId: "wallet-1",
+            amount: "10.00",
+            currency: "USD",
+            type: "DEPOSIT",
+            provider: "stripe",
+            providerRef: "pi_exact",
+          },
+        },
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === "deposit-inbox-legacy-mode" &&
+          row.code ===
+            ReconciliationCode.PAYMENT_PROVIDER_EVENT_MODE_UNVERIFIED,
+      ),
+    ).toBe(true)
+  })
+
+  it("detects a disputed deposit status with no matching durable case", async () => {
+    const prisma = mockPrisma()
+    prisma.depositAttempt.findMany.mockResolvedValue([
+      {
+        id: "deposit-status-orphan",
+        publicReference: "DP-ORPHAN",
+        status: "DISPUTED",
+        walletCredit: "25.00",
+        currency: "USD",
+        ledgerTransactionId: "tx-deposit-orphan",
+        ledgerTransaction: {
+          id: "tx-deposit-orphan",
+          amount: "25.00",
+          currency: "USD",
+          type: "DEPOSIT",
+        },
+        paymentDisputes: [],
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (issue) =>
+          issue.entityId === "deposit-status-orphan" &&
+          issue.code ===
+            ReconciliationCode.PAYMENT_DISPUTE_DEPOSIT_EVIDENCE_MISMATCH,
+      ),
+    ).toBe(true)
+  })
+
+  it("alerts on failed, stale, and quarantined deposit-success inbox rows", async () => {
+    const prisma = mockPrisma()
+    const staleTime = new Date(Date.now() - 16 * 60 * 1000)
+    prisma.paymentProviderEvent.findMany.mockResolvedValue([
+      {
+        id: "deposit-inbox-failed",
+        providerEventId: "evt_deposit_failed",
+        eventType: "checkout.session.completed",
+        objectId: "cs_failed",
+        status: "FAILED",
+        receivedAt: new Date(),
+      },
+      {
+        id: "deposit-inbox-stale",
+        providerEventId: "evt_deposit_stale",
+        eventType: "checkout.session.async_payment_succeeded",
+        objectId: "cs_stale",
+        status: "PROCESSING",
+        lockedAt: staleTime,
+        receivedAt: staleTime,
+      },
+      {
+        id: "deposit-inbox-quarantined",
+        providerEventId: "evt_deposit_quarantined",
+        eventType: "checkout.session.completed",
+        objectId: "cs_quarantined",
+        status: "QUARANTINED",
+        receivedAt: new Date(),
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(report.orderPaymentRecon.map((row) => row.code)).toEqual(
+      expect.arrayContaining([
+        ReconciliationCode.DEPOSIT_INBOX_FAILED,
+        ReconciliationCode.DEPOSIT_INBOX_STALE,
+        ReconciliationCode.DEPOSIT_INBOX_QUARANTINED,
+      ]),
+    )
+  })
+
+  it("detects processed deposit events without exact attempt-ledger evidence", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentProviderEvent.findMany.mockResolvedValue([
+      {
+        id: "deposit-inbox-processed-mismatch",
+        provider: "stripe",
+        providerEventId: "evt_deposit_processed_mismatch",
+        eventType: "checkout.session.completed",
+        objectId: "cs_expected",
+        depositAttemptId: "attempt-1",
+        livemode: false,
+        status: "PROCESSED",
+        receivedAt: new Date(),
+        depositAttempt: {
+          id: "attempt-1",
+          walletId: "wallet-1",
+          provider: "stripe",
+          providerSessionId: "cs_different",
+          providerPaymentId: "pi_1",
+          walletCredit: "10.00",
+          currency: "USD",
+          status: "SUCCEEDED",
+          ledgerTransactionId: "tx-1",
+          ledgerTransaction: {
+            id: "tx-1",
+            walletId: "wallet-1",
+            amount: "10.00",
+            currency: "USD",
+            type: "DEPOSIT",
+            provider: "stripe",
+            providerRef: "pi_1",
+          },
+        },
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === "deposit-inbox-processed-mismatch" &&
+          row.code === ReconciliationCode.DEPOSIT_PROCESSED_EVIDENCE_MISMATCH,
+      ),
+    ).toBe(true)
+  })
+
+  it("detects a processed dispute webhook with no durable case", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentProviderEvent.findMany.mockResolvedValue([
+      {
+        id: "inbox-1",
+        provider: "stripe",
+        providerEventId: "evt_dispute_1",
+        eventType: "charge.dispute.created",
+        objectId: "dp_missing",
+        paymentDisputeId: null,
+        status: "PROCESSED",
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+    const issue = report.orderPaymentRecon.find(
+      (row) =>
+        row.code === ReconciliationCode.PAYMENT_DISPUTE_PROCESSED_NO_CASE,
+    )
+
+    expect(issue).toMatchObject({
+      severity: "critical",
+      entityId: "inbox-1",
+      metadata: {
+        providerEventId: "evt_dispute_1",
+        providerDisputeId: "dp_missing",
+      },
+    })
+  })
+
+  it("surfaces quarantined dispute inbox evidence as critical", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentProviderEvent.findMany.mockResolvedValue([
+      {
+        id: "inbox-quarantined",
+        provider: "stripe",
+        providerEventId: "evt_quarantined",
+        eventType: "charge.dispute.created",
+        objectId: "dp_quarantined",
+        paymentDisputeId: null,
+        status: "QUARANTINED",
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === "inbox-quarantined" &&
+          row.code === ReconciliationCode.PAYMENT_DISPUTE_INBOX_QUARANTINED,
+      ),
+    ).toBe(true)
+  })
+
+  it("detects a processed inbox row whose normalized identity differs from its mapped case", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentDispute.findMany.mockResolvedValue([
+      {
+        id: "case-event-mismatch",
+        provider: "stripe",
+        providerDisputeId: "dp_event_mismatch",
+        providerPaymentId: "pi_expected",
+        providerChargeId: "ch_1",
+        depositAttemptId: "attempt-1",
+        amount: "10.00",
+        currency: "USD",
+        heldAmount: "0.00",
+        shortfallAmount: "10.00",
+        currentExposureAmount: "10.00",
+        status: "OPEN",
+        walletId: "wallet-1",
+        holdTransaction: null,
+        resolutionTransaction: null,
+      },
+    ])
+    prisma.paymentProviderEvent.findMany.mockResolvedValue([
+      {
+        id: "inbox-event-mismatch",
+        provider: "stripe",
+        providerEventId: "evt_event_mismatch",
+        eventType: "charge.dispute.created",
+        objectId: "dp_event_mismatch",
+        paymentDisputeId: "case-event-mismatch",
+        depositAttemptId: "attempt-1",
+        providerPaymentId: "pi_wrong",
+        providerChargeId: "ch_1",
+        disputeAmountMinor: 1000n,
+        disputeCurrency: "USD",
+        providerStatus: "needs_response",
+        livemode: false,
+        eventFingerprint: "a".repeat(64),
+        status: "PROCESSED",
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === "inbox-event-mismatch" &&
+          row.code ===
+            ReconciliationCode.PAYMENT_DISPUTE_EVENT_EVIDENCE_MISMATCH,
+      ),
+    ).toBe(true)
+  })
+
+  it("detects cumulative disputes above one originating deposit", async () => {
+    const prisma = mockPrisma()
+    const paymentDispute = (id: string, amount: string) => ({
+      id,
+      provider: "stripe",
+      providerDisputeId: `dp_${id}`,
+      providerPaymentId: "pi_shared",
+      providerChargeId: null,
+      depositAttemptId: "attempt-shared",
+      depositTransactionId: "deposit-shared",
+      amount,
+      currency: "USD",
+      heldAmount: "0.00",
+      shortfallAmount: amount,
+      currentExposureAmount: amount,
+      status: "OPEN",
+      walletId: "wallet-1",
+      depositAttempt: {
+        id: "attempt-shared",
+        walletId: "wallet-1",
+        walletCredit: "100.00",
+        currency: "USD",
+        provider: "stripe",
+        providerPaymentId: "pi_shared",
+        ledgerTransactionId: "deposit-shared",
+        status: "DISPUTED",
+      },
+      depositTransaction: {
+        id: "deposit-shared",
+        walletId: "wallet-1",
+        amount: "100.00",
+        currency: "USD",
+        type: "DEPOSIT",
+        provider: "stripe",
+        providerRef: "pi_shared",
+      },
+      holdTransaction: null,
+      resolutionTransaction: null,
+    })
+    prisma.paymentDispute.findMany.mockResolvedValue([
+      paymentDispute("one", "60.00"),
+      paymentDispute("two", "60.00"),
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === "deposit-shared" &&
+          row.code ===
+            ReconciliationCode.PAYMENT_DISPUTE_CUMULATIVE_AMOUNT_EXCEEDED,
+      ),
+    ).toBe(true)
+  })
+
+  it("detects a payment-dispute ledger row with no deferred case link", async () => {
+    const prisma = mockPrisma()
+    prisma.transaction.findMany.mockImplementation(({ where }: any) => {
+      if (where?.reference?.startsWith !== "payment-dispute:") {
+        return Promise.resolve([])
+      }
+      return Promise.resolve([
+        {
+          id: "orphan-hold",
+          walletId: "wallet-1",
+          amount: "-10.00",
+          reference: "payment-dispute:stripe:dp_orphan:hold",
+          paymentDisputeHold: null,
+          paymentDisputeResolution: null,
+        },
+      ])
+    })
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === "orphan-hold" &&
+          row.code === ReconciliationCode.PAYMENT_DISPUTE_ORPHAN_LEDGER,
+      ),
+    ).toBe(true)
+  })
+
+  it("detects an open dispute whose reservation does not equal its hold", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentDispute.findMany.mockResolvedValue([
+      {
+        id: "case-open",
+        provider: "stripe",
+        providerDisputeId: "dp_open",
+        amount: "100.00",
+        currency: "USD",
+        heldAmount: "60.00",
+        shortfallAmount: "40.00",
+        currentExposureAmount: "40.00",
+        status: "OPEN",
+        walletId: "wallet-1",
+        holdTransaction: {
+          id: "hold-wrong",
+          walletId: "wallet-1",
+          amount: "-50.00",
+          currency: "USD",
+          type: "RESERVATION",
+          reference: "payment-dispute:stripe:dp_open:hold",
+        },
+        resolutionTransaction: null,
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.code === ReconciliationCode.PAYMENT_DISPUTE_OPEN_HOLD_MISMATCH,
+      ),
+    ).toBe(true)
+  })
+
+  it("accepts exact WON hold and resolution evidence with zero current exposure", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentDispute.findMany.mockResolvedValue([
+      {
+        id: "case-won",
+        provider: "stripe",
+        providerDisputeId: "dp_won",
+        amount: "100.00",
+        currency: "USD",
+        heldAmount: "60.00",
+        shortfallAmount: "40.00",
+        currentExposureAmount: "0.00",
+        status: "WON",
+        walletId: "wallet-1",
+        holdTransaction: {
+          id: "hold-1",
+          walletId: "wallet-1",
+          amount: "-60.00",
+          currency: "USD",
+          type: "RESERVATION",
+          reference: "payment-dispute:stripe:dp_won:hold",
+        },
+        resolutionTransaction: {
+          id: "release-1",
+          walletId: "wallet-1",
+          amount: "60.00",
+          currency: "USD",
+          type: "RESERVATION",
+          reference: "payment-dispute:stripe:dp_won:won",
+        },
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+    const caseIssues = report.orderPaymentRecon.filter(
+      (row) => row.entityId === "case-won",
+    )
+
+    expect(caseIssues).toEqual([])
+  })
+
+  it("detects a WON dispute missing its immutable historical hold", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentDispute.findMany.mockResolvedValue([
+      {
+        id: "case-won-no-hold",
+        provider: "stripe",
+        providerDisputeId: "dp_won_no_hold",
+        amount: "100.00",
+        currency: "USD",
+        heldAmount: "60.00",
+        shortfallAmount: "40.00",
+        currentExposureAmount: "0.00",
+        status: "WON",
+        walletId: "wallet-1",
+        holdTransaction: null,
+        resolutionTransaction: {
+          id: "release-1",
+          walletId: "wallet-1",
+          amount: "60.00",
+          currency: "USD",
+          type: "RESERVATION",
+          reference: "payment-dispute:stripe:dp_won_no_hold:won",
+        },
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === "case-won-no-hold" &&
+          row.code ===
+            ReconciliationCode.PAYMENT_DISPUTE_TERMINAL_HOLD_MISMATCH,
+      ),
+    ).toBe(true)
+  })
+
+  it("accepts LOST-before-open direct recovery without a historical hold", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentDispute.findMany.mockResolvedValue([
+      {
+        id: "case-lost-direct",
+        provider: "stripe",
+        providerDisputeId: "dp_lost_direct",
+        amount: "100.00",
+        currency: "USD",
+        heldAmount: "60.00",
+        shortfallAmount: "40.00",
+        currentExposureAmount: "40.00",
+        status: "LOST",
+        walletId: "wallet-1",
+        holdTransaction: null,
+        resolutionTransaction: {
+          id: "debit-1",
+          walletId: "wallet-1",
+          amount: "-60.00",
+          currency: "USD",
+          type: "CHARGEBACK",
+          reference: "payment-dispute:stripe:dp_lost_direct:lost",
+        },
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    const caseIssues = report.orderPaymentRecon.filter(
+      (row) => row.entityId === "case-lost-direct",
+    )
+    expect(
+      caseIssues.some(
+        (row) =>
+          row.code ===
+            ReconciliationCode.PAYMENT_DISPUTE_TERMINAL_HOLD_MISMATCH ||
+          row.code ===
+            ReconciliationCode.PAYMENT_DISPUTE_TERMINAL_RESOLUTION_MISMATCH,
+      ),
+    ).toBe(false)
+    expect(
+      caseIssues.some(
+        (row) =>
+          row.code === ReconciliationCode.PAYMENT_DISPUTE_UNCOVERED_EXPOSURE,
+      ),
+    ).toBe(true)
+  })
+
+  it("detects current exposure that diverges from status and booked shortfall", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentDispute.findMany.mockResolvedValue([
+      {
+        id: "case-exposure-drift",
+        provider: "stripe",
+        providerDisputeId: "dp_exposure_drift",
+        amount: "100.00",
+        currency: "USD",
+        heldAmount: "60.00",
+        shortfallAmount: "40.00",
+        currentExposureAmount: "25.00",
+        status: "OPEN",
+        walletId: "wallet-1",
+        holdTransaction: {
+          id: "hold-1",
+          walletId: "wallet-1",
+          amount: "-60.00",
+          currency: "USD",
+          type: "RESERVATION",
+          reference: "payment-dispute:stripe:dp_exposure_drift:hold",
+        },
+        resolutionTransaction: null,
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === "case-exposure-drift" &&
+          row.code === ReconciliationCode.PAYMENT_DISPUTE_EXPOSURE_MISMATCH,
+      ),
+    ).toBe(true)
+  })
+
+  it("accepts zero-held cases only when they have no zero-value ledger rows", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentDispute.findMany.mockResolvedValue([
+      {
+        id: "case-open-no-funds",
+        provider: "stripe",
+        providerDisputeId: "dp_open_no_funds",
+        amount: "100.00",
+        currency: "USD",
+        heldAmount: "0.00",
+        shortfallAmount: "100.00",
+        currentExposureAmount: "100.00",
+        status: "OPEN",
+        walletId: "wallet-1",
+        holdTransaction: null,
+        resolutionTransaction: null,
+      },
+      {
+        id: "case-won-before-open",
+        provider: "stripe",
+        providerDisputeId: "dp_won_before_open",
+        amount: "100.00",
+        currency: "USD",
+        heldAmount: "0.00",
+        shortfallAmount: "100.00",
+        currentExposureAmount: "0.00",
+        status: "WON",
+        walletId: "wallet-1",
+        holdTransaction: null,
+        resolutionTransaction: null,
+      },
+      {
+        id: "case-lost-no-funds",
+        provider: "stripe",
+        providerDisputeId: "dp_lost_no_funds",
+        amount: "100.00",
+        currency: "USD",
+        heldAmount: "0.00",
+        shortfallAmount: "100.00",
+        currentExposureAmount: "100.00",
+        status: "LOST",
+        walletId: "wallet-1",
+        holdTransaction: null,
+        resolutionTransaction: null,
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+    const zeroHeldCaseIds = new Set([
+      "case-open-no-funds",
+      "case-won-before-open",
+      "case-lost-no-funds",
+    ])
+
+    const zeroHeldEvidenceIssues = report.orderPaymentRecon.filter(
+      (row) =>
+        zeroHeldCaseIds.has(row.entityId) &&
+        [
+          ReconciliationCode.PAYMENT_DISPUTE_OPEN_HOLD_MISMATCH,
+          ReconciliationCode.PAYMENT_DISPUTE_TERMINAL_HOLD_MISMATCH,
+          ReconciliationCode.PAYMENT_DISPUTE_TERMINAL_RESOLUTION_MISMATCH,
+        ].includes(row.code),
+    )
+    expect(zeroHeldEvidenceIssues).toEqual([])
+  })
+
+  it("flags a zero-value ledger row attached to a zero-held case", async () => {
+    const prisma = mockPrisma()
+    prisma.paymentDispute.findMany.mockResolvedValue([
+      {
+        id: "case-zero-ledger",
+        provider: "stripe",
+        providerDisputeId: "dp_zero_ledger",
+        amount: "100.00",
+        currency: "USD",
+        heldAmount: "0.00",
+        shortfallAmount: "100.00",
+        currentExposureAmount: "100.00",
+        status: "OPEN",
+        walletId: "wallet-1",
+        holdTransaction: {
+          id: "hold-zero",
+          walletId: "wallet-1",
+          amount: "0.00",
+          currency: "USD",
+          type: "RESERVATION",
+          reference: "payment-dispute:stripe:dp_zero_ledger:hold",
+        },
+        resolutionTransaction: null,
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.orderPaymentRecon.some(
+        (row) =>
+          row.entityId === "case-zero-ledger" &&
+          row.code === ReconciliationCode.PAYMENT_DISPUTE_OPEN_HOLD_MISMATCH,
+      ),
+    ).toBe(true)
+  })
+
+  it("surfaces every legacy wallet-backed withdrawal as critical evidence debt", async () => {
+    const prisma = mockPrisma()
+    prisma.transaction.findMany.mockImplementation(({ where }: any) => {
+      if (where?.type !== "WITHDRAWAL") return Promise.resolve([])
+      return Promise.resolve([
+        {
+          id: "wallet-withdrawal-1",
+          type: "WITHDRAWAL",
+          walletId: "wallet-1",
+          amount: "-75.00",
+          reference: "withdrawal:legacy-1",
+          createdAt: new Date(),
+        },
+      ])
+    })
+
+    const report = await runReconciliation(prisma as any)
+    const issue = report.orderPaymentRecon.find(
+      (row) =>
+        row.code === ReconciliationCode.WALLET_WITHDRAWAL_WITHOUT_EXECUTION,
+    )
+
+    expect(issue).toMatchObject({
+      severity: "critical",
+      entityId: "wallet-withdrawal-1",
+      metadata: {
+        transactionId: "wallet-withdrawal-1",
+        walletId: "wallet-1",
+      },
+    })
+  })
+
   it("handles negative PURCHASE convention (no false PAYMENT_AMOUNT_MISMATCH)", async () => {
     const prisma = mockPrisma()
     prisma.transaction.findMany.mockResolvedValue([
@@ -324,6 +1107,179 @@ describe("runReconciliation with mock prisma", () => {
     )
     expect(noTxIssues.length).toBe(1)
     expect(noTxIssues[0].severity).toBe("critical")
+  })
+
+  it("flags completed payouts with missing canonical evidence", async () => {
+    const prisma = mockPrisma()
+    prisma.payoutExecution.findMany.mockImplementation(async (args: any) =>
+      args?.where?.status === "COMPLETED"
+        ? [
+            {
+              id: "execution-bad-evidence",
+              completionSource: "PROVIDER_RESPONSE",
+              completionEvidenceRef: null,
+              completionEvidenceAt: null,
+              completedAt: new Date(),
+              completionActorUserId: null,
+              completionWebhookEventId: null,
+              bankTraceReference: null,
+              providerExecutionId: "wise-1",
+              providerPayoutId: null,
+              provider: { name: "wise" },
+              withdrawal: {
+                id: "withdrawal-1",
+                status: "COMPLETED",
+                publisherId: "publisher-1",
+                amount: "100.00",
+              },
+            },
+          ]
+        : [],
+    )
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.stuckPayouts.some(
+        (row) =>
+          row.code === ReconciliationCode.PAYOUT_COMPLETION_EVIDENCE_INVALID,
+      ),
+    ).toBe(true)
+  })
+
+  it("flags every legacy-unverified payout completion for Finance substantiation", async () => {
+    const prisma = mockPrisma()
+    prisma.payoutExecution.findMany.mockImplementation(async (args: any) =>
+      args?.where?.status === "COMPLETED"
+        ? [
+            {
+              id: "execution-legacy",
+              completionSource: "LEGACY_UNVERIFIED",
+              completionEvidenceRef: "po_legacy",
+              completionEvidenceAt: null,
+              completedAt: new Date(),
+              completionActorUserId: null,
+              completionWebhookEventId: null,
+              bankTraceReference: null,
+              providerExecutionId: "po_legacy",
+              providerPayoutId: "po_legacy",
+              provider: { name: "stripe_connect" },
+              withdrawal: {
+                id: "withdrawal-legacy-completed",
+                status: "COMPLETED",
+                publisherId: "publisher-1",
+                amount: "100.00",
+              },
+            },
+          ]
+        : [],
+    )
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.stuckPayouts.find(
+        (row) =>
+          row.code === ReconciliationCode.PAYOUT_LEGACY_COMPLETION_UNVERIFIED,
+      ),
+    ).toMatchObject({
+      severity: "critical",
+      entityId: "execution-legacy",
+      metadata: { completionSource: "LEGACY_UNVERIFIED" },
+    })
+  })
+
+  it("distinguishes stale recoverable claims from expired review-only claims", async () => {
+    const prisma = mockPrisma()
+    prisma.payoutExecution.findMany.mockImplementation(async (args: any) => {
+      if (Array.isArray(args?.where?.OR)) {
+        return [
+          {
+            id: "execution-stale-claim",
+            withdrawalId: "withdrawal-stale",
+            stage: "BANK_PAYOUT_SEND_CLAIMED",
+            updatedAt: new Date(Date.now() - 20 * 60 * 1000),
+            providerExecutionId: "tr_1",
+            providerPayoutId: null,
+          },
+          {
+            id: "execution-expired-claim",
+            withdrawalId: "withdrawal-expired",
+            stage: "BANK_PAYOUT_CLAIM_EXPIRED",
+            updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+            providerExecutionId: "tr_2",
+            providerPayoutId: null,
+          },
+        ]
+      }
+      return []
+    })
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.stuckPayouts.find(
+        (row) => row.code === ReconciliationCode.PAYOUT_CLAIM_STALE,
+      ),
+    ).toMatchObject({
+      severity: "warning",
+      entityId: "execution-stale-claim",
+    })
+    expect(
+      report.stuckPayouts.find(
+        (row) => row.code === ReconciliationCode.PAYOUT_CLAIM_EXPIRED,
+      ),
+    ).toMatchObject({
+      severity: "critical",
+      entityId: "execution-expired-claim",
+    })
+  })
+
+  it("flags pending withdrawals with missing requester provenance", async () => {
+    const prisma = mockPrisma()
+    prisma.withdrawal.findMany.mockImplementation(async (args: any) =>
+      args?.where?.requestedBy === null
+        ? [
+            {
+              id: "withdrawal-legacy",
+              publisherId: "publisher-1",
+              amount: "25.00",
+              status: "PENDING",
+            },
+          ]
+        : [],
+    )
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.stuckPayouts.some(
+        (row) =>
+          row.code === ReconciliationCode.PAYOUT_REQUESTER_PROVENANCE_MISSING,
+      ),
+    ).toBe(true)
+  })
+
+  it("flags quarantined payout webhooks as critical", async () => {
+    const prisma = {
+      ...mockPrisma(),
+      payoutWebhookEvent: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "webhook-quarantined",
+            provider: "wise",
+            providerExecutionId: "transfer-1",
+          },
+        ]),
+      },
+    }
+
+    const report = await runReconciliation(prisma as any)
+    const issue = report.stuckPayouts.find(
+      (row) => row.code === ReconciliationCode.PAYOUT_WEBHOOK_QUARANTINED,
+    )
+
+    expect(issue?.severity).toBe("critical")
   })
 
   it("computes summary correctly", async () => {

@@ -34,8 +34,13 @@ export class ActiveContextService {
       activePublisherId = pubMembership?.publisherId ?? null
     }
 
-    ctx = await this.prisma.activeContext.create({
-      data: { userId, activeOrganizationId, activePublisherId },
+    ctx = await this.prisma.activeContext.upsert({
+      where: { userId },
+      create: { userId, activeOrganizationId, activePublisherId },
+      // Another authenticated request may have created or deliberately
+      // switched this user's context while we derived the fallback above.
+      // Keep that newer authority rather than overwriting it.
+      update: {},
     })
     return ctx
   }
