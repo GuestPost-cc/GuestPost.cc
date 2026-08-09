@@ -6,11 +6,14 @@ overrides:
   # ranges include patched releases; CI verifies the resolved versions.
   "@hono/node-server": 2.0.10
   ioredis: 5.11.1
-  "minimatch@3.1.5>brace-expansion": 5.0.8
-  "minimatch@10.2.5>brace-expansion": 5.0.8
-  dompurify: 3.4.12
-  fast-uri: 3.1.4
-  postcss: 8.5.20
+  "minimatch@3.1.5>brace-expansion": 5.0.9
+  "minimatch@10.2.5>brace-expansion": 5.0.9
+  dompurify: 3.4.13
+  fast-uri: 3.1.5
+  hono: 4.12.34
+  ip-address: 10.3.1
+  nanoid: 3.3.17
+  postcss: 8.5.23
   sharp: 0.35.3
   shell-quote: 1.9.0
   valibot: 1.4.2
@@ -45,7 +48,13 @@ minimumReleaseAgeExclude:
   - '@sentry/replay-canvas@10.58.0'
   - '@sentry/replay@10.58.0'
   - '@sentry/vercel-edge@10.58.0'
-  - brace-expansion@5.0.8
+  - brace-expansion@5.0.9
+  - dompurify@3.4.13
+  - fast-uri@3.1.5
+  - hono@4.12.34
+  - ip-address@10.3.1
+  - nanoid@3.3.17
+  - postcss@8.5.23
 onlyBuiltDependencies:
   - "@nestjs/core"
   - "@prisma/client"
