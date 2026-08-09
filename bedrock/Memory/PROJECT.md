@@ -184,6 +184,12 @@ Open/partial items require architectural design discussion.
   Northflank. Schema migrations use a separate administrative path; rotating
   the database-owner password must not interrupt API, frontend, worker, or job
   workloads.
+- A financial hard-drain may temporarily set the runtime role to `NOLOGIN` if
+  a hosted worker/job reconnects after the control plane reports it paused.
+  Terminate transaction-free old-image sessions, prove a repeated zero-client
+  drain, migrate through the direct owner path, and keep the login fence until
+  the exact evidence-aware image is staged for a coordinated `recovery_only`
+  start. Never reopen an old image against the guarded schema.
 - Stripe staging uses one restricted API key plus three non-reused webhook
   signing boundaries: customer deposits, platform transfers, and connected-
   account payouts. Deposit and Connect capabilities are enabled independently;

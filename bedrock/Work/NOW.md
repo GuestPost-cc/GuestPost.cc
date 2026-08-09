@@ -123,14 +123,24 @@ merged or deployed. GitHub `main` through dependency consolidation commit
   zero unexplained incident-query findings, and signed Stripe deposit/payout
   canaries. Rollback after database guards land is a money freeze and forward
   fix, never an old image or trigger removal.
-- The supplied staging Neon database is current only through the pre-PR branch
-  state. Preflight found an old pooled `guestpost_runtime` connection still
-  active, while the available owner credential has `BYPASSRLS` and is suitable
-  only for migrations. PR #84 migrations have therefore not been applied:
-  Render API and every Northflank worker/job must be paused, runtime connection
-  count must reach zero, and an expiring backup must be recorded before the
-  ordered `0900`-`0980` hard-drain cutover. The owner credential must never be
-  placed in a frontend, runtime service, log, repository, or Bedrock note.
+- The supplied non-production Neon database was backed up with PostgreSQL 18
+  tooling and migrated under a hard drain from 44 to all 59 repository
+  migrations. Independent Prisma status and catalog/data postflight checks
+  confirm no failed or missing migration, no prepared transaction, no
+  unvalidated financial constraint, every expected PR #84 schema guard, and
+  zero USD/minor-unit/currency-link/paid-order/Google-quarantine/encryption
+  violations.
+- A legacy payout-inbox poller reconnected twice after Render API and
+  Northflank were reported paused. The staging `guestpost_runtime` role is
+  therefore temporarily `NOLOGIN`, with zero remaining client sessions, and
+  the API/workers must remain stopped. Before restoring runtime login, verify
+  the realtime service, on-demand job, and maintenance/scheduled dispatcher are
+  all stopped and stage the exact PR #84 head in `recovery_only` mode. Restore
+  login only for that coordinated start, then require health, reconciliation,
+  signed Stripe deposit/payout canaries, and Finance/Security approval before
+  normal finance mode or merge. Rotate the supplied owner credential after the
+  cutover; it must never enter a frontend, runtime service, log, repository, or
+  Bedrock note.
 - Every new payout send repeats the canonical Finance/method/rollout gate under
   final routing locks immediately before the durable claim. Only an exact aged
   claim or a persisted Stripe Transfer recovery stage may bypass current
@@ -158,7 +168,8 @@ merged or deployed. GitHub `main` through dependency consolidation commit
   through Jest coverage tooling and 4.3.1 through the Nest CLI; dependency
   policy enforces both and the full development-plus-production audit reports
   no known vulnerabilities.
-  Populated staging migration evidence, signed Stripe deposit/payout canaries,
+  Populated staging migration evidence is complete. Matching-image
+  recovery-only health/reconciliation, signed Stripe deposit/payout canaries,
   and recorded Finance/Security approval remain mandatory before the draft can
   be marked ready or merged.
 
