@@ -481,6 +481,15 @@ Order aggregate lock. Eligibility requires all of the following:
 - every cancellation request is safely terminal (`REJECTED`, `WITHDRAWN`, or
   `APPROVED` with the explicit `CONTINUE_ORDER` resolution).
 
+A staff manual-delivery override is evidence only when the canonical
+active-delivery-version intervention accepts it. The transition must require a
+bounded audited reason, recheck current staff authority while holding the Order
+lock, advance the delivery version and Order with optimistic guards, and append
+the event and audit facts atomically. Compatibility routes must delegate to
+that same transition. Updating only `Order.status`, `verifiedAt`, or
+`verifyMethod` is not delivery evidence and must never make a settlement
+eligible.
+
 Revision and cancellation states are terminal allowlists: a future enum value
 blocks settlement until reviewed. PostgreSQL serializes blocker writes through
 the Order row and independently rejects an ineligible Settlement insert or

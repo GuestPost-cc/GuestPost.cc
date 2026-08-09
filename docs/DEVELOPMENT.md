@@ -103,8 +103,24 @@ testing is finished.
 ## Testing
 
 - API unit tests: `pnpm --filter @guestpost/api test`
+- API database integration tests:
+  `pnpm --filter @guestpost/api test:integration`
+- Normal publisher fraud-window/withdrawal-hold boundary against the running
+  development stack: `pnpm test:integration:hold`
+- Full evidence-backed payout loop against an isolated local stack started for
+  that run with `WITHDRAWAL_HOLD_DAYS=0`: `pnpm test:integration`
+- Money race/idempotency harness against the same isolated zero-hold stack:
+  `pnpm test:concurrency`
 - E2E tests: `npx playwright test`
 - UI component tests: `pnpm --filter @guestpost/ui test:coverage`
+
+The zero-hold override is test-process configuration, not persisted data or a
+normal development policy. Stop every regular API/worker first, set the
+override only on the isolated `dev:all` process, and restore the normal stack
+afterward. The harnesses never edit `Withdrawal.availableAt` or another
+immutable withdrawal envelope to simulate elapsed time. Both snapshot the
+existing reconciliation issue IDs before creating evidence, reject any
+critical baseline drift, and fail if their run creates a new issue.
 
 `pnpm seed` is a local-fixture command, not a staging or production bootstrap.
 It requires explicit development/test mode plus a direct loopback PostgreSQL

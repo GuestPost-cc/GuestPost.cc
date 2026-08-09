@@ -214,6 +214,13 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
   publisher context when applicable, and the active delivery-version evidence.
   Staff retry, verify, reject, and re-verification actions address the order by
   `orderId`.
+- Every staff manual-delivery approval, including the legacy
+  `/admin/orders/:id/manual-verify` compatibility route, delegates to the same
+  active-delivery-version intervention. It requires a bounded audited override
+  reason, rechecks current staff authority under the order lock, advances the
+  delivery evidence and `Order` with optimistic guards, and writes event/audit
+  evidence atomically. A status-only manual verification is not a valid
+  settlement predicate.
 - Manual settlement approval requires a reason and is available to `FINANCE`
   and `SUPER_ADMIN` after customer approval. Super Admin retains the separate
   force-approval step for exceptional missing-customer-approval cases.

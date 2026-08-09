@@ -4,8 +4,10 @@
  * reconciliation endpoint — cached balances must still equal the ledger.
  *
  * Run: pnpm tsx scripts/concurrency-test.ts
- * Requires: API on :4000, seeded DB, and manual payouts enabled in this
- * development/test environment.
+ * Requires: API on :4000, seeded DB, manual payouts enabled, and the API test
+ * process started with WITHDRAWAL_HOLD_DAYS=0. Hold enforcement is covered by
+ * `pnpm test:integration:hold`; immutable withdrawal envelopes must never be
+ * edited to simulate elapsed time.
  */
 
 import { normalizePositiveUsdMoney } from "../packages/shared/src/money"
@@ -75,6 +77,43 @@ async function call(
     data = text
   }
   return { status: res.status, data, headers: res.headers }
+}
+
+function requireSuccess<T extends { status: number; data: any }>(
+  name: string,
+  response: T,
+): T["data"] {
+  if (response.status >= 400) {
+    throw new Error(`${name} failed: ${JSON.stringify(response.data)}`)
+  }
+  return response.data
+}
+
+function reconciliationIssueIds(report: any): Set<string> {
+  const issueArrays = [
+    report?.walletDrift,
+    report?.publisherDrift,
+    report?.settlementDrift,
+    report?.orderPaymentRecon,
+    report?.refundRecon,
+    report?.stuckFinancialOrders,
+    report?.stuckPayouts,
+  ]
+  return new Set(
+    issueArrays
+      .flatMap((issues) => (Array.isArray(issues) ? issues : []))
+      .map((issue: any) => String(issue.id)),
+  )
+}
+
+function hasNoNewReconciliationIssues(
+  report: any,
+  baselineIssueIds: Set<string>,
+): boolean {
+  return (
+    Number(report?.summary?.critical ?? 0) === 0 &&
+    [...reconciliationIssueIds(report)].every((id) => baselineIssueIds.has(id))
+  )
 }
 
 function portalOrigin(portal: Portal): string {
@@ -252,10 +291,22 @@ async function orderToSettlement(
     if (r.status >= 400)
       throw new Error(`setup ${path} failed: ${JSON.stringify(r.data)}`)
   }
-  await call("POST", `/admin/orders/${order.id}/manual-verify`, admin, {
-    method: "MANUAL_ADMIN",
-  })
-  await call("POST", `/orders/${order.id}/confirm-delivery`, client)
+  requireSuccess(
+    "delivery evidence override",
+    await call(
+      "POST",
+      `/admin/verification-queue/${order.id}/mark-verified`,
+      admin,
+      {
+        reason: "OTHER",
+        notes: "Local concurrency evidence-path verification",
+      },
+    ),
+  )
+  requireSuccess(
+    "delivery confirmation",
+    await call("POST", `/orders/${order.id}/confirm-delivery`, client),
+  )
   const settlement = await prisma.settlement.findFirst({
     where: { orderId: order.id, status: { not: "CANCELLED" } },
   })
@@ -288,19 +339,33 @@ async function main() {
     "FinanceChecker123!",
     "staff",
   )
+  const baselineReconciliation = requireSuccess(
+    "baseline reconciliation",
+    await call("GET", "/admin/reconciliation", admin),
+  )
+  if (Number(baselineReconciliation?.summary?.critical ?? 0) !== 0) {
+    throw new Error("Baseline reconciliation contains critical money drift")
+  }
+  const baselineIssueIds = reconciliationIssueIds(baselineReconciliation)
   const payoutMethod = await ensureManualPayoutMethod(publisher)
 
   const wallet = (await call("GET", "/billing/wallet", client)).data
-  const site = await prisma.website.findFirstOrThrow({
-    where: { domain: "techinsider.example.com" },
+  const seedPublisher = await prisma.publisher.findFirstOrThrow({
+    where: { email: "publisher@guestpost.local" },
   })
   const listingService = await prisma.listingService.findFirstOrThrow({
     where: {
       serviceType: "GUEST_POST",
       availability: "AVAILABLE",
-      listing: { websiteId: site.id, status: "APPROVED" },
+      listing: {
+        status: "APPROVED",
+        website: { publisherId: seedPublisher.id },
+      },
     },
+    include: { listing: { include: { website: true } } },
   })
+  const site = listingService.listing.website
+  if (!site) throw new Error("Concurrency listing has no publisher website")
   const price = Number(listingService.price)
 
   // ── Attack 1: double payment — N parallel submit-payment on ONE order ──
@@ -445,7 +510,9 @@ async function main() {
   })
   const releaseResults = await Promise.all(
     Array.from({ length: PAR }, () =>
-      call("POST", `/admin/settlements/${settlementId}/admin-approve`, admin),
+      call("POST", `/admin/settlements/${settlementId}/admin-approve`, admin, {
+        reason: "Concurrency test verified settlement evidence",
+      }),
     ),
   )
   const releaseOk = releaseResults.filter((r) => r.status < 400).length
@@ -519,10 +586,14 @@ async function main() {
     listingService,
   )
   await call("POST", `/settlements/${s2.settlementId}/customer-approve`, client)
-  await call(
-    "POST",
-    `/admin/settlements/${s2.settlementId}/admin-approve`,
-    admin,
+  requireSuccess(
+    "second settlement admin approval",
+    await call(
+      "POST",
+      `/admin/settlements/${s2.settlementId}/admin-approve`,
+      admin,
+      { reason: "Concurrency test verified second settlement evidence" },
+    ),
   )
   const idemKey = `ctest-idem-${Date.now()}`
   const idemResults = await Promise.all(
@@ -555,10 +626,6 @@ async function main() {
   // ── Attack 6: payout execute race — N parallel execute on one APPROVED withdrawal ──
   console.log(`── Attack 6: ${PAR} parallel manual payout executions`)
   const target = idemRows[0]
-  await prisma.withdrawal.update({
-    where: { id: target.id },
-    data: { availableAt: new Date() },
-  })
   const approval = await call(
     "PATCH",
     `/admin/withdrawals/${target.id}/approve`,
@@ -578,6 +645,7 @@ async function main() {
     Array.from({ length: PAR }, () =>
       call("POST", `/admin/withdrawals/${target.id}/execute`, finance, {
         providerName: "manual",
+        reason: "Concurrency test manual bank payout execution",
       }),
     ),
   )
@@ -642,6 +710,7 @@ async function main() {
 
   const manualEvidence = {
     executionId: execRows[0].id,
+    withdrawalPublicReference: target.publicReference,
     bankReference: `CTEST-BANK-${target.id}`.toUpperCase(),
     paidAt: new Date().toISOString(),
     reason: "Verified concurrency-test bank settlement receipt",
@@ -689,9 +758,9 @@ async function main() {
   // ── Final referee ──
   const recon = (await call("GET", "/admin/reconciliation", admin)).data
   check(
-    "reconciliation after all attacks: zero drift",
-    recon.ok === true,
-    recon.ok ? undefined : recon,
+    "reconciliation after all attacks: no new drift",
+    hasNoNewReconciliationIssues(recon, baselineIssueIds),
+    recon,
   )
 
   console.log(`\n${passed} passed, ${failed} failed`)

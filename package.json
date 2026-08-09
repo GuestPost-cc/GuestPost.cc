@@ -35,6 +35,7 @@
     "seed": "pnpm tsx scripts/seed.ts",
     "seed:users": "pnpm tsx scripts/seed.ts",
     "test:integration": "pnpm tsx scripts/integration-test.ts",
+    "test:integration:hold": "INTEGRATION_EXPECT_ACTIVE_HOLD=1 pnpm tsx scripts/integration-test.ts",
     "test:concurrency": "pnpm tsx scripts/concurrency-test.ts",
     "test:migrations:finance": "bash scripts/verify-financial-migration-upgrade.sh",
     "test:load": "pnpm tsx scripts/load-test.ts",

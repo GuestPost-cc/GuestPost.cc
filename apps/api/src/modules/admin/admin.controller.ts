@@ -67,7 +67,6 @@ import {
   CreateStaffDto,
   ExecuteWithdrawalDto,
   ForceVerifyWebsitesDto,
-  ManualVerifyDto,
   MarkPlatformPublishedDto,
   MarkVerifiedDto,
   PauseWebsiteDto,
@@ -462,11 +461,19 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   manualVerify(
     @Param("id") id: string,
-    @Body() body: ManualVerifyDto,
+    @Body() body: MarkVerifiedDto,
     @CurrentUser() user: any,
   ) {
-    const method = body.method
-    return this.admin.manualVerify(id, method, user.id)
+    // Compatibility alias for older admin clients. Route every manual
+    // verification through the evidence-bearing delivery-version workflow;
+    // mutating Order.status alone can never satisfy settlement eligibility.
+    return this.verificationQueue.markVerified(
+      id,
+      user.id,
+      user.staffRole,
+      body.reason,
+      body.notes,
+    )
   }
 
   // ── Verification queue ────────────────────────────────────────────────────

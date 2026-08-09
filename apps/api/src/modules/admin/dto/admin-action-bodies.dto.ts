@@ -184,18 +184,6 @@ export class BulkRetryVerificationDto {
   websiteIds!: string[]
 }
 
-// Keep the HTTP contract identical to the persisted
-// DeliveryVerificationMethod enum. This endpoint is an admin action, so it
-// may only record MANUAL_ADMIN; AUTO and CUSTOMER_MANUAL are produced by
-// their own evidence-bearing workflows.
-const VERIFY_METHODS = ["MANUAL_ADMIN"] as const
-
-export class ManualVerifyDto {
-  @IsString()
-  @IsIn(VERIFY_METHODS as unknown as string[])
-  method!: (typeof VERIFY_METHODS)[number]
-}
-
 export class SubmitPlatformContentDto {
   // Submitted content blob — bounded but allows real article-length bodies.
   // 200KB is the practical upper bound (~50k tokens of markdown/HTML).

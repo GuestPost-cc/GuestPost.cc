@@ -2,8 +2,8 @@
 
 **Phase**: Draft PR #84 (`agent/financial-integrity-hardening`) contains the
 completed financial hardening plus local schema/login recovery work. It is not
-merged or deployed. The branch was created from and re-fetched against GitHub
-`main` commit `9b47247`; `origin/main` remains an ancestor of the branch.
+merged or deployed. GitHub `main` through dependency consolidation commit
+`c55c4d9` is merged into the branch and remains its ancestor.
 
 ## Current Local Work: Financial Evidence And Release Integrity
 
@@ -29,6 +29,11 @@ merged or deployed. The branch was created from and re-fetched against GitHub
   release. Auto-release additionally requires successful current-delivery
   evidence no older than 12 hours. Blocker writes and settlement writes are
   serialized by database triggers; one exact release ledger row is required.
+- Staff delivery overrides, including the legacy compatibility route, all use
+  the canonical active-delivery-version intervention. An audited bounded reason
+  and current staff authority are required under the order lock; no endpoint
+  may advance only `Order.status` without updating the immutable delivery
+  evidence that settlement eligibility consumes.
 - Delivery verification is durable and bounded: enqueue failures persist for
   retry, worker fetches cap redirects/body/time, superseded delivery evidence
   cannot authorize settlement, and structured warnings surface freshness
@@ -118,12 +123,20 @@ merged or deployed. The branch was created from and re-fetched against GitHub
   zero unexplained incident-query findings, and signed Stripe deposit/payout
   canaries. Rollback after database guards land is a money freeze and forward
   fix, never an old image or trigger removal.
+- The supplied staging Neon database is current only through the pre-PR branch
+  state. Preflight found an old pooled `guestpost_runtime` connection still
+  active, while the available owner credential has `BYPASSRLS` and is suitable
+  only for migrations. PR #84 migrations have therefore not been applied:
+  Render API and every Northflank worker/job must be paused, runtime connection
+  count must reach zero, and an expiring backup must be recorded before the
+  ordered `0900`-`0980` hard-drain cutover. The owner credential must never be
+  placed in a frontend, runtime service, log, repository, or Bedrock note.
 - Every new payout send repeats the canonical Finance/method/rollout gate under
   final routing locks immediately before the durable claim. Only an exact aged
   claim or a persisted Stripe Transfer recovery stage may bypass current
   rollout switches for narrowly scoped reconciliation; no configuration flip
   can mint a new send authority.
-- Validation is green: 120 API unit suites / 1,479 tests, 18 PostgreSQL API
+- Validation is green: 121 API unit suites / 1,480 tests, 18 PostgreSQL API
   integration suites / 146 tests, 29 shared suites / 326 tests, 13 integration
   package suites / 104 tests, 8 API-client suites / 65 tests, and 33 worker
   tests. The populated 59-migration finance upgrade rehearsal through `0980`
@@ -135,6 +148,11 @@ merged or deployed. The branch was created from and re-fetched against GitHub
   customer work queue/orders/billing/marketplace/campaigns, publisher
   orders/earnings/withdrawals/payout methods/websites/integrations, and Admin
   command/finance/settlement/dispute/verification/marketplace/governance pages.
+  The live normal-hold integration path passes 22 checks, the isolated zero-hold
+  full payout loop passes 28 checks, and the 10-way money race harness passes
+  20 checks without new reconciliation drift. After restoring the verified
+  pre-test local backup, fresh customer, publisher, and Super Admin browser
+  logins and dashboards loaded without runtime console errors.
   Populated staging migration evidence, signed Stripe deposit/payout canaries,
   and recorded Finance/Security approval remain mandatory before the draft can
   be marked ready or merged.

@@ -5,7 +5,10 @@
  *
  * Exit 0 = every step and every invariant held. Run: pnpm tsx scripts/integration-test.ts
  * Requires: API on :4000, seeded users (pnpm seed), publisher tier VERIFIED,
- * and manual payouts enabled in this development/test environment.
+ * manual payouts enabled, and WITHDRAWAL_HOLD_DAYS=0 on the API process for
+ * the full payout loop. Run `pnpm test:integration:hold` against the normal
+ * hold policy to verify the fraud-window boundary without bypassing immutable
+ * withdrawal evidence.
  */
 
 import { normalizePositiveUsdMoney } from "../packages/shared/src/money"
@@ -74,6 +77,43 @@ async function call(
     data = text
   }
   return { status: res.status, data, headers: res.headers }
+}
+
+function requireSuccess<T extends { status: number; data: any }>(
+  name: string,
+  response: T,
+): T["data"] {
+  if (response.status >= 400) {
+    throw new Error(`${name} failed: ${JSON.stringify(response.data)}`)
+  }
+  return response.data
+}
+
+function reconciliationIssueIds(report: any): Set<string> {
+  const issueArrays = [
+    report?.walletDrift,
+    report?.publisherDrift,
+    report?.settlementDrift,
+    report?.orderPaymentRecon,
+    report?.refundRecon,
+    report?.stuckFinancialOrders,
+    report?.stuckPayouts,
+  ]
+  return new Set(
+    issueArrays
+      .flatMap((issues) => (Array.isArray(issues) ? issues : []))
+      .map((issue: any) => String(issue.id)),
+  )
+}
+
+function hasNoNewReconciliationIssues(
+  report: any,
+  baselineIssueIds: Set<string>,
+): boolean {
+  return (
+    Number(report?.summary?.critical ?? 0) === 0 &&
+    [...reconciliationIssueIds(report)].every((id) => baselineIssueIds.has(id))
+  )
 }
 
 function portalOrigin(portal: Portal): string {
@@ -225,6 +265,14 @@ async function main() {
     "FinanceChecker123!",
     "staff",
   )
+  const baselineReconciliation = requireSuccess(
+    "baseline reconciliation",
+    await call("GET", "/admin/reconciliation", admin),
+  )
+  if (Number(baselineReconciliation?.summary?.critical ?? 0) !== 0) {
+    throw new Error("Baseline reconciliation contains critical money drift")
+  }
+  const baselineIssueIds = reconciliationIssueIds(baselineReconciliation)
 
   // Snapshot starting balances
   const wallet0 = (await call("GET", "/billing/wallet", client)).data
@@ -375,11 +423,21 @@ async function main() {
   check("replayed accept rejected", replay.status >= 400, replay)
 
   const verified = (
-    await call("POST", `/admin/orders/${order.id}/manual-verify`, admin, {
-      method: "MANUAL_ADMIN",
-    })
+    await call(
+      "POST",
+      `/admin/verification-queue/${order.id}/mark-verified`,
+      admin,
+      {
+        reason: "OTHER",
+        notes: "Local integration evidence-path verification",
+      },
+    )
   ).data
-  check("manual-verify -> VERIFIED", verified.status === "VERIFIED", verified)
+  check(
+    "delivery evidence override -> VERIFIED",
+    verified.status === "VERIFIED",
+    verified,
+  )
 
   const delivered = (
     await call("POST", `/orders/${order.id}/confirm-delivery`, client)
@@ -409,6 +467,7 @@ async function main() {
     "POST",
     `/admin/settlements/${settlement.id}/admin-approve`,
     admin,
+    { reason: "Integration test checks approval ordering" },
   )
   check(
     "admin approval blocked before customer approval",
@@ -416,19 +475,31 @@ async function main() {
     adminFirst,
   )
 
-  await call("POST", `/settlements/${settlement.id}/customer-approve`, client)
-  const released = (
+  requireSuccess(
+    "customer settlement approval",
+    await call(
+      "POST",
+      `/settlements/${settlement.id}/customer-approve`,
+      client,
+    ),
+  )
+  const released = requireSuccess(
+    "admin settlement approval",
     await call(
       "POST",
       `/admin/settlements/${settlement.id}/admin-approve`,
       admin,
-    )
-  ).data
+      { reason: "Integration test verified settlement evidence" },
+    ),
+  )
   check(
     "settlement RELEASED after both approvals",
     released.status === "RELEASED",
     released,
   )
+  if (released.status !== "RELEASED") {
+    throw new Error("Settlement did not reach RELEASED")
+  }
 
   const pubBal1 = (await call("GET", "/publisher-payouts/balance", publisher))
     .data
@@ -439,6 +510,9 @@ async function main() {
     Math.abs(credited - Number(settlement.publisherAmount)) < 0.001,
     { credited, expected: settlement.publisherAmount },
   )
+  if (credited < 1) {
+    throw new Error("Publisher credit is unavailable for withdrawal testing")
+  }
 
   // Withdrawal -> manual payout -> evidence-backed completion
   const payoutMethod = await ensureManualPayoutMethod(publisher)
@@ -473,26 +547,32 @@ async function main() {
     admin,
   )
   check(
-    "tier hold blocks early approval",
-    heldApprove.status === 400 &&
-      String(heldApprove.data.message).includes("tier hold"),
+    process.env.INTEGRATION_EXPECT_ACTIVE_HOLD === "1"
+      ? "tier hold blocks early approval"
+      : "zero-hold test configuration permits approval",
+    process.env.INTEGRATION_EXPECT_ACTIVE_HOLD === "1"
+      ? heldApprove.status === 400 &&
+          String(heldApprove.data.message).includes("tier hold")
+      : heldApprove.status < 400 && heldApprove.data?.status === "APPROVED",
     heldApprove,
   )
-
-  // Simulate hold expiry (time travel via DB — no API may shortcut a hold)
-  await prisma.withdrawal.update({
-    where: { id: wd.id },
-    data: { availableAt: new Date() },
-  })
-
-  const wdApproved = (
-    await call("PATCH", `/admin/withdrawals/${wd.id}/approve`, admin)
-  ).data
-  check(
-    "withdrawal approved after hold expiry",
-    wdApproved.status === "APPROVED",
-    wdApproved,
-  )
+  if (process.env.INTEGRATION_EXPECT_ACTIVE_HOLD === "1") {
+    const recon = (await call("GET", "/admin/reconciliation", admin)).data
+    check(
+      "reconciliation: no new drift after held payout",
+      hasNoNewReconciliationIssues(recon, baselineIssueIds),
+      recon,
+    )
+    console.log(`\n${passed} passed, ${failed} failed`)
+    await cleanupSessions()
+    await prisma.$disconnect()
+    process.exit(failed > 0 ? 1 : 0)
+  }
+  if (heldApprove.status >= 400 || heldApprove.data?.status !== "APPROVED") {
+    throw new Error(
+      "Full payout verification requires the API test process to start with WITHDRAWAL_HOLD_DAYS=0",
+    )
+  }
 
   const executeResponse = await call(
     "POST",
@@ -500,6 +580,7 @@ async function main() {
     finance,
     {
       providerName: "manual",
+      reason: "Integration test manual bank payout execution",
     },
   )
   check(
@@ -532,6 +613,7 @@ async function main() {
 
   const manualEvidence = {
     executionId: exec.executionId,
+    withdrawalPublicReference: wd.publicReference,
     bankReference: `ITEST-BANK-${order.id}`.toUpperCase(),
     paidAt: new Date().toISOString(),
     reason: "Verified integration-test bank settlement receipt",
@@ -584,7 +666,11 @@ async function main() {
 
   // Final referee
   const recon = (await call("GET", "/admin/reconciliation", admin)).data
-  check("reconciliation: zero drift", recon.ok === true, recon)
+  check(
+    "reconciliation: no new drift",
+    hasNoNewReconciliationIssues(recon, baselineIssueIds),
+    recon,
+  )
 
   console.log(`\n${passed} passed, ${failed} failed`)
   await cleanupSessions()

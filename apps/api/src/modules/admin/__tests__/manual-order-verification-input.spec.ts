@@ -1,18 +1,21 @@
 import { validate } from "class-validator"
-import { ManualVerifyDto } from "../dto/admin-action-bodies.dto"
+import { MarkVerifiedDto } from "../dto/admin-action-bodies.dto"
 
-describe("ManualVerifyDto", () => {
-  it("accepts only the canonical persisted admin verification method", async () => {
-    const canonical = Object.assign(new ManualVerifyDto(), {
+describe("manual order verification input", () => {
+  it("requires an audited delivery override reason", async () => {
+    const canonical = Object.assign(new MarkVerifiedDto(), {
+      reason: "OTHER",
+      notes: "Evidence reviewed by operations",
+    })
+    const legacyStatusOnly = Object.assign(new MarkVerifiedDto(), {
       method: "MANUAL_ADMIN",
     })
-    const obsolete = Object.assign(new ManualVerifyDto(), {
-      method: "MANUAL_CHECK",
+    const unknownReason = Object.assign(new MarkVerifiedDto(), {
+      reason: "UNREVIEWED_OVERRIDE",
     })
-    const automatic = Object.assign(new ManualVerifyDto(), { method: "AUTO" })
 
     await expect(validate(canonical)).resolves.toEqual([])
-    await expect(validate(obsolete)).resolves.not.toEqual([])
-    await expect(validate(automatic)).resolves.not.toEqual([])
+    await expect(validate(legacyStatusOnly)).resolves.not.toEqual([])
+    await expect(validate(unknownReason)).resolves.not.toEqual([])
   })
 })

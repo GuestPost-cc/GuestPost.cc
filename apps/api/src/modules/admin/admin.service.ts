@@ -2198,57 +2198,6 @@ export class AdminService {
     return { orders: visibleOrders, pagination: { take, skip, total } }
   }
 
-  async manualVerify(orderId: string, method: "MANUAL_ADMIN", userId: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
-    if (!order) throw new NotFoundException("Order not found")
-    if (order.status !== "PUBLISHED")
-      throw new BadRequestException(
-        "Order must be in PUBLISHED status to verify",
-      )
-
-    return this.prisma.$transaction(async (tx: any) => {
-      const verified = await tx.order.updateMany({
-        where: { id: orderId, version: order.version },
-        data: {
-          status: "VERIFIED",
-          verifiedAt: new Date(),
-          verifiedBy: userId,
-          verifyMethod: method,
-          version: { increment: 1 },
-        },
-      })
-      if (verified.count === 0) {
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
-        )
-      }
-      const updated = await tx.order.findUniqueOrThrow({
-        where: { id: orderId },
-      })
-
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "VERIFIED_MANUAL",
-          actorId: userId,
-          message: `Order manually verified by admin via ${method}`,
-          metadata: { verifyMethod: method, verifiedBy: userId },
-        },
-      })
-
-      await this.audit.log({
-        action: "ORDER_MANUAL_VERIFY",
-        entityType: "Order",
-        entityId: orderId,
-        metadata: { fromStatus: order.status, verifyMethod: method },
-        userId,
-        organizationId: order.organizationId,
-      })
-
-      return updated
-    })
-  }
-
   async listMarketplaceListings(params: {
     status?: string
     type?: string
