@@ -71,6 +71,8 @@ Delivery approval and fraud adjudication are separate commands:
   `FALSE_POSITIVE`.
 - Only Finance or Super Admin may classify `AUTHORIZED_REUSE` or
   `RISK_ACCEPTED` because those decisions knowingly authorize money-adjacent
+  risk. `AUTHORIZED_REUSE` is valid only for a `URL_REUSED` signal; other
+  signal types must be classified as a false positive or explicitly accepted
   risk.
 
 Every fraud resolution requires a 20–1,000 character reason and one allowlisted
@@ -80,6 +82,15 @@ The current staff membership, role, staff user type, and ban state are
 revalidated under the Order lock. The role, disposition, evidence reference,
 order/delivery identity, signal type, and order status are snapshotted in the
 append-only resolution and audit evidence.
+
+Re-verification honors a classified staff disposition only when the delivery
+version, signal type, and complete signal details exactly match the adjudicated
+flag. The worker validates the classification, role-at-time snapshot, and any
+required evidence reference again under the Order lock, then records
+`ORDER_DELIVERY_FRAUD_DISPOSITION_REUSED`. Changed details—including an
+increased reused-URL conflict count—are new evidence and create a new immutable
+flag and hold. Historical resolutions without a classified disposition always
+fail closed and cannot authorize a retry.
 
 The manual-approve and Super Admin verification-override paths fail with
 `DELIVERY_FRAUD_REVIEW_REQUIRED` while any order-level hold remains. They never
@@ -118,7 +129,8 @@ hold even if an application caller is defective.
 5. Resolve each flag independently. Resolution alone does not change Order or
    delivery status.
 6. Re-run automated verification, manually approve, reject, or wait for the
-   customer fallback as appropriate.
+   customer fallback as appropriate. An exact recurrence reuses the classified
+   disposition; changed fraud evidence returns to the queue as a new hold.
 7. Confirm that the settlement review shows no current fraud hold before any
    money release decision.
 

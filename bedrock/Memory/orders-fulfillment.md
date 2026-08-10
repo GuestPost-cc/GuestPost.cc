@@ -234,10 +234,17 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
   positive verification override reject every unresolved order-level hold.
   Operations can resolve a classified false positive; authorizing URL reuse or
   accepting known risk requires Finance or Super Admin plus a bounded evidence
-  reference. Every resolution keeps the immutable original flag and snapshots
+  reference. `AUTHORIZED_REUSE` is accepted only for a `URL_REUSED` signal.
+  Every resolution keeps the immutable original flag and snapshots
   the disposition, evidence reference, reason, resolver, and role-at-time. New
   raw SQL inserts are held to the same classification/role policy by the
   database disposition guard.
+- Re-verification reuses a classified staff disposition only for the same
+  delivery version, fraud type, and deeply equal signal details. The worker
+  revalidates the classification, role-at-time, and required reference under
+  the Order lock and audits the reuse. Changed evidence, including a larger URL
+  reuse count, creates a new flag and hold; legacy unclassified resolutions
+  fail closed.
 - The Admin verification compatibility routes delegate to the canonical
   intervention service. Finance has read/adjudication access to the queue but
   cannot perform Operations delivery actions. Successful manual verification

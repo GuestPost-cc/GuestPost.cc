@@ -282,6 +282,34 @@ describe("DeliveryInterventionService", () => {
       expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
     })
 
+    it("does not authorize reuse for a different fraud signal", async () => {
+      prisma.deliveryFraudFlag.findUnique
+        .mockResolvedValueOnce({ orderId: "o1" })
+        .mockResolvedValueOnce({
+          id: "flag-1",
+          orderId: "o1",
+          deliveryVersionId: "v1",
+          type: "DOMAIN_MISMATCH",
+          resolution: null,
+        })
+      prisma.staffMembership.findUnique.mockResolvedValue({
+        role: "FINANCE",
+        user: { userType: "STAFF", banned: false },
+      })
+
+      await expect(
+        svc.resolveFraudFlag(
+          "flag-1",
+          "finance-1",
+          "FINANCE",
+          reason,
+          "AUTHORIZED_REUSE",
+          "CASE-1024",
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException)
+      expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
+    })
+
     it("records a Finance-authorized risk with its evidence reference", async () => {
       prisma.deliveryFraudFlag.findUnique
         .mockResolvedValueOnce({ orderId: "o1" })

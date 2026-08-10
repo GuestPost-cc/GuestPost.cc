@@ -263,6 +263,15 @@ merged or deployed. GitHub `main` through dependency consolidation commit
   staff type, and ban state are revalidated in the locked transaction. Raw SQL
   writers are held to the same classification and role policy by migration
   `20260811120000_delivery_fraud_resolution_dispositions`.
+- Re-verification now preserves an exact classified disposition instead of
+  regenerating the same hold. The comparison is delivery-version and signal
+  scoped, requires deeply equal details and valid role/evidence snapshots, and
+  writes a dedicated reuse audit. Changed evidence and legacy unclassified
+  resolutions fail closed into a new hold.
+- Manual verification notes are normalized at the request boundary. `OTHER`
+  requires at least 20 meaningful characters after trimming; enumerated reasons
+  accept bounded short optional notes, and non-string/oversized input is
+  rejected.
 - The legacy Admin queue approval/rejection routes delegate to the canonical
   intervention service. Manual verification records the customer review
   deadline, and a negative override clears the old deadline. Finance can read

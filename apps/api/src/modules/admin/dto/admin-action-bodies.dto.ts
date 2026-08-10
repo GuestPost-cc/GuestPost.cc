@@ -20,6 +20,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateBy,
   ValidateIf,
 } from "class-validator"
 
@@ -152,15 +153,31 @@ export class MarkVerifiedDto {
   @IsIn(VERIFICATION_OVERRIDE_REASONS as unknown as string[])
   reason!: (typeof VERIFICATION_OVERRIDE_REASONS)[number]
 
-  @ValidateIf(
-    (input: MarkVerifiedDto) =>
-      input.reason === "OTHER" || input.notes !== undefined,
-  )
-  @IsString()
-  @MinLength(20, {
-    message: "Notes must explain an OTHER verification reason",
+  @Transform(({ value }) => {
+    if (typeof value !== "string") return value
+    // Preserve an oversized raw value so validation cannot be bypassed with
+    // leading/trailing whitespace. In-bounds values are normalized before the
+    // reason-dependent check and before the service records audit evidence.
+    if (value.length > 800) return value
+    return value.trim() || undefined
   })
-  @MaxLength(800)
+  @ValidateBy({
+    name: "verificationOverrideNotes",
+    validator: {
+      validate: (value: unknown, args) => {
+        const input = args?.object as MarkVerifiedDto
+        if (value === undefined) return input.reason !== "OTHER"
+        if (typeof value !== "string" || value.length > 800) return false
+        return input.reason !== "OTHER" || value.length >= 20
+      },
+      defaultMessage: (args) => {
+        const input = args?.object as MarkVerifiedDto
+        return input.reason === "OTHER"
+          ? "Notes must explain an OTHER verification reason with at least 20 characters"
+          : "Notes must be a string no longer than 800 characters"
+      },
+    },
+  })
   notes?: string
 }
 

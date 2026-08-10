@@ -225,6 +225,11 @@ export class DeliveryInterventionService {
             "Only Finance or Super Admin may accept or authorize a known delivery risk",
           )
         }
+        if (disposition === "AUTHORIZED_REUSE" && flag.type !== "URL_REUSED") {
+          throw new BadRequestException(
+            "AUTHORIZED_REUSE applies only to a URL_REUSED fraud signal",
+          )
+        }
 
         const resolution = await tx.deliveryFraudFlagResolution.create({
           data: {

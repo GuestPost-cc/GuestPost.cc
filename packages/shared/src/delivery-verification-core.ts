@@ -10,6 +10,7 @@
 // comparisons use normalized URLs.
 
 import { createHash } from "node:crypto"
+import { isDeepStrictEqual } from "node:util"
 import * as cheerio from "cheerio"
 import { recordCommunicationOutbox } from "./communication-outbox-core"
 import { runLockedOrderSerializableTransaction } from "./order-aggregate-lock"
@@ -200,6 +201,160 @@ interface FraudCandidate {
   details: Record<string, unknown>
 }
 
+type ClassifiedFraudDisposition =
+  | "FALSE_POSITIVE"
+  | "AUTHORIZED_REUSE"
+  | "RISK_ACCEPTED"
+
+const CLASSIFIED_FRAUD_DISPOSITIONS = new Set<ClassifiedFraudDisposition>([
+  "FALSE_POSITIVE",
+  "AUTHORIZED_REUSE",
+  "RISK_ACCEPTED",
+])
+
+interface ReusedFraudDisposition {
+  candidate: FraudCandidate
+  fraudFlagId: string
+  resolutionId: string
+  disposition: ClassifiedFraudDisposition
+}
+
+function classifiedStaffDisposition(
+  resolution: any,
+  deliveryVersionId: string,
+  fraudType: string,
+): ClassifiedFraudDisposition | null {
+  if (resolution?.kind !== "STAFF_CLEARED") return null
+  const evidence = resolution.evidence
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+    return null
+  }
+  const disposition = evidence.disposition as ClassifiedFraudDisposition
+  if (
+    !CLASSIFIED_FRAUD_DISPOSITIONS.has(disposition) ||
+    (disposition === "AUTHORIZED_REUSE" && fraudType !== "URL_REUSED") ||
+    typeof resolution.resolvedByUserId !== "string" ||
+    resolution.resolvedByUserId.length === 0 ||
+    evidence.fraudType !== fraudType ||
+    evidence.adjudicatedDeliveryVersionId !== deliveryVersionId ||
+    evidence.roleAtTime !== resolution.resolvedByRole
+  ) {
+    return null
+  }
+  const reference = evidence.evidenceReference
+  if (
+    reference !== null &&
+    reference !== undefined &&
+    (typeof reference !== "string" ||
+      reference.trim().length === 0 ||
+      reference.length > 200)
+  ) {
+    return null
+  }
+  if (disposition === "AUTHORIZED_REUSE" || disposition === "RISK_ACCEPTED") {
+    if (
+      (resolution.resolvedByRole !== "FINANCE" &&
+        resolution.resolvedByRole !== "SUPER_ADMIN") ||
+      typeof reference !== "string" ||
+      reference.trim().length === 0 ||
+      reference.length > 200
+    ) {
+      return null
+    }
+  } else if (
+    resolution.resolvedByRole !== "OPERATIONS" &&
+    resolution.resolvedByRole !== "FINANCE" &&
+    resolution.resolvedByRole !== "SUPER_ADMIN"
+  ) {
+    return null
+  }
+  return disposition
+}
+
+async function evaluateFraudCandidatesUnderLock(
+  tx: any,
+  deliveryVersionId: string,
+  candidates: FraudCandidate[],
+): Promise<{
+  candidatesToCreate: FraudCandidate[]
+  hasUnresolvedCandidate: boolean
+  reusedDispositions: ReusedFraudDisposition[]
+}> {
+  if (candidates.length === 0) {
+    return {
+      candidatesToCreate: [],
+      hasUnresolvedCandidate: false,
+      reusedDispositions: [],
+    }
+  }
+
+  const history = await tx.deliveryFraudFlag.findMany({
+    where: {
+      deliveryVersionId,
+      type: { in: [...new Set(candidates.map((candidate) => candidate.type))] },
+    },
+    select: {
+      id: true,
+      type: true,
+      details: true,
+      resolution: {
+        select: {
+          id: true,
+          kind: true,
+          resolvedByUserId: true,
+          resolvedByRole: true,
+          evidence: true,
+        },
+      },
+    },
+  })
+
+  const candidatesToCreate: FraudCandidate[] = []
+  const reusedDispositions: ReusedFraudDisposition[] = []
+  let hasUnresolvedCandidate = false
+
+  for (const candidate of candidates) {
+    const sameType = history.filter((flag: any) => flag.type === candidate.type)
+    if (sameType.some((flag: any) => flag.resolution == null)) {
+      hasUnresolvedCandidate = true
+      continue
+    }
+    const accepted = sameType.find((flag: any) => {
+      if (!isDeepStrictEqual(flag.details ?? null, candidate.details)) {
+        return false
+      }
+      return (
+        classifiedStaffDisposition(
+          flag.resolution,
+          deliveryVersionId,
+          candidate.type,
+        ) != null
+      )
+    })
+    if (accepted) {
+      const disposition = classifiedStaffDisposition(
+        accepted.resolution,
+        deliveryVersionId,
+        candidate.type,
+      )
+      if (!disposition) {
+        candidatesToCreate.push(candidate)
+        continue
+      }
+      reusedDispositions.push({
+        candidate,
+        fraudFlagId: accepted.id,
+        resolutionId: accepted.resolution.id,
+        disposition,
+      })
+      continue
+    }
+    candidatesToCreate.push(candidate)
+  }
+
+  return { candidatesToCreate, hasUnresolvedCandidate, reusedDispositions }
+}
+
 // Fraud heuristics are deliberately read-only. Candidates are persisted only
 // inside the final Order-locked verification transaction, after the active
 // delivery pointer and optimistic version have been revalidated. This keeps a
@@ -218,12 +373,27 @@ async function detectFraudCandidates(
   const reuse = await prisma.orderDeliveryVersion.findFirst({
     where: { normalizedUrl: version.normalizedUrl, orderId: { not: order.id } },
     select: { id: true, orderId: true },
+    orderBy: { id: "asc" },
   })
-  if (reuse)
+  if (reuse) {
+    // Count is part of the adjudicated evidence fingerprint. A disposition for
+    // one known reuse remains valid on retry, while an additional conflicting
+    // delivery is new evidence and must create a fresh hold.
+    const reuseCount = await prisma.orderDeliveryVersion.count({
+      where: {
+        normalizedUrl: version.normalizedUrl,
+        orderId: { not: order.id },
+      },
+    })
     flags.push({
       type: "URL_REUSED",
-      details: { otherOrderId: reuse.orderId, otherVersionId: reuse.id },
+      details: {
+        otherOrderId: reuse.orderId,
+        otherVersionId: reuse.id,
+        reuseCount,
+      },
     })
+  }
 
   // 2. Target URL mismatch (order expected a target but it wasn't matched)
   if (order.targetUrl && !analysis.targetUrlMatched) {
@@ -557,38 +727,29 @@ export async function runDeliveryVerification(
     analysis,
   )
   const fraudTypes = fraudCandidates.map((flag) => flag.type)
-  // A technically passing page is not an automatically verified delivery when
-  // it also generated a fraud signal. Keep it in manual review until every
-  // immutable hold has an explicit, separately audited adjudication.
-  const requiresFraudReview =
-    snapshotStored && checksPass && fraudTypes.length > 0
-  const newStatus = snapshotStored
-    ? checksPass && !requiresFraudReview
+  const baseStatus = snapshotStored
+    ? checksPass
       ? "VERIFIED"
-      : requiresFraudReview
-        ? "MANUAL_REVIEW"
-        : "FAILED"
+      : "FAILED"
     : "MANUAL_REVIEW"
-  const failureReason = snapshotStorageError
+  const baseFailureReason = snapshotStorageError
     ? `Permanent delivery snapshot unavailable: ${snapshotStorageError}`
-    : requiresFraudReview
-      ? "Delivery requires staff fraud review"
-      : checksPass
-        ? null
-        : [
-            !analysis.targetUrlMatched && order.targetUrl
-              ? "target URL not found on page"
-              : null,
-            !analysis.anchorFound && order.anchorText
-              ? "anchor text mismatch"
-              : null,
-          ]
-            .filter(Boolean)
-            .join("; ") || "link verification failed"
+    : checksPass
+      ? null
+      : [
+          !analysis.targetUrlMatched && order.targetUrl
+            ? "target URL not found on page"
+            : null,
+          !analysis.anchorFound && order.anchorText
+            ? "anchor text mismatch"
+            : null,
+        ]
+          .filter(Boolean)
+          .join("; ") || "link verification failed"
 
-  let committedStatus = newStatus
-  let committedFailureReason = failureReason
-  let committedRequiresFraudReview = requiresFraudReview
+  let committedStatus = baseStatus
+  let committedFailureReason = baseFailureReason
+  let committedRequiresFraudReview = false
 
   try {
     const transition = await runLockedOrderSerializableTransaction(
@@ -611,23 +772,36 @@ export async function runDeliveryVerification(
         }
         if (current.order.status !== "PUBLISHED") return "stale" as const
 
+        // Evaluate immutable history only after the active delivery and signed
+        // generation are revalidated under the Order lock. A classified staff
+        // disposition is reusable for the exact same signal details; changed
+        // evidence remains a new flag and hold. Legacy/unclassified resolution
+        // rows fail closed and are never treated as authorization.
+        const fraudEvaluation = await evaluateFraudCandidatesUnderLock(
+          tx,
+          version.id,
+          fraudCandidates,
+        )
         const currentFraudHold =
-          newStatus === "VERIFIED"
+          baseStatus === "VERIFIED"
             ? await tx.deliveryFraudHold.findFirst({
                 where: { orderId: order.id },
                 select: { fraudFlagId: true },
               })
             : null
         const effectiveRequiresFraudReview =
-          requiresFraudReview || currentFraudHold != null
+          baseStatus === "VERIFIED" &&
+          (currentFraudHold != null ||
+            fraudEvaluation.hasUnresolvedCandidate ||
+            fraudEvaluation.candidatesToCreate.length > 0)
         const effectiveStatus =
-          newStatus === "VERIFIED" && effectiveRequiresFraudReview
+          baseStatus === "VERIFIED" && effectiveRequiresFraudReview
             ? "MANUAL_REVIEW"
-            : newStatus
+            : baseStatus
         const effectiveFailureReason =
           effectiveStatus === "MANUAL_REVIEW" && effectiveRequiresFraudReview
             ? "Delivery requires staff fraud review"
-            : failureReason
+            : baseFailureReason
         const effectivePass = effectiveStatus === "VERIFIED"
 
         if (snapshotStored && snapshotObjectKey) {
@@ -667,6 +841,22 @@ export async function runDeliveryVerification(
             ? { htmlObjectKey: snapshotObjectKey, htmlHash }
             : { error: snapshotStorageError, htmlHash },
         )
+        for (const reused of fraudEvaluation.reusedDispositions) {
+          await audit(
+            tx,
+            "ORDER_DELIVERY_FRAUD_DISPOSITION_REUSED",
+            order,
+            version,
+            null,
+            {
+              fraudFlagId: reused.fraudFlagId,
+              resolutionId: reused.resolutionId,
+              fraudType: reused.candidate.type,
+              disposition: reused.disposition,
+              detectedDetails: reused.candidate.details,
+            },
+          )
+        }
 
         const upd = await tx.orderDeliveryVersion.updateMany({
           where: {
@@ -715,18 +905,10 @@ export async function runDeliveryVerification(
         }
 
         const createdFraudFlags: Array<{ id: string; type: string }> = []
-        for (const flag of fraudCandidates) {
-          // The Order lock serializes this check+insert. The database unique
-          // constraint remains the final guard for non-cooperating clients.
-          const exists = await tx.deliveryFraudFlag.findFirst({
-            where: {
-              deliveryVersionId: version.id,
-              type: flag.type,
-              resolution: null,
-            },
-            select: { id: true },
-          })
-          if (exists) continue
+        for (const flag of fraudEvaluation.candidatesToCreate) {
+          // The Order lock serializes the history evaluation and this insert.
+          // The database hold uniqueness remains the final guard for
+          // non-cooperating writers.
           const createdFlag = await tx.deliveryFraudFlag.create({
             data: {
               orderId: order.id,
@@ -792,6 +974,14 @@ export async function runDeliveryVerification(
               htmlHash,
               snapshotStored,
               fraudTypes,
+              reusedFraudDispositions: fraudEvaluation.reusedDispositions.map(
+                (reused) => ({
+                  fraudFlagId: reused.fraudFlagId,
+                  resolutionId: reused.resolutionId,
+                  fraudType: reused.candidate.type,
+                  disposition: reused.disposition,
+                }),
+              ),
               reason: effectiveFailureReason,
             },
           },
@@ -814,6 +1004,14 @@ export async function runDeliveryVerification(
             htmlHash,
             snapshotStored,
             fraudTypes,
+            reusedFraudDispositions: fraudEvaluation.reusedDispositions.map(
+              (reused) => ({
+                fraudFlagId: reused.fraudFlagId,
+                resolutionId: reused.resolutionId,
+                fraudType: reused.candidate.type,
+                disposition: reused.disposition,
+              }),
+            ),
             reason: effectiveFailureReason,
           },
         )
