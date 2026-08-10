@@ -10,8 +10,9 @@ import {
   ErrorState,
   Input,
   Label,
+  NotificationPreferencesForm,
+  type NotificationPreferenceValue,
   Separator,
-  Switch,
 } from "@guestpost/ui"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery } from "@tanstack/react-query"
@@ -26,7 +27,7 @@ import {
   User,
 } from "lucide-react"
 import { useTheme } from "next-themes"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -45,32 +46,11 @@ const themeOptions = [
   { value: "dark", label: "Dark", icon: Moon },
 ]
 
-const NOTIF_STORAGE_KEY = "notification-preferences"
-
-interface NotificationPrefs {
-  emailOrders: boolean
-  emailEarnings: boolean
-  emailMarketing: boolean
-}
-
-function loadNotificationPrefs(): NotificationPrefs {
-  if (typeof window === "undefined") {
-    return { emailOrders: true, emailEarnings: true, emailMarketing: false }
-  }
-  const stored = localStorage.getItem(NOTIF_STORAGE_KEY)
-  if (stored) {
-    try {
-      return JSON.parse(stored)
-    } catch {}
-  }
-  return { emailOrders: true, emailEarnings: true, emailMarketing: false }
-}
-
 export default function SettingsPage() {
   const { user, refresh } = useAuth()
   const { theme, setTheme } = useTheme()
-  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(
-    loadNotificationPrefs,
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferenceValue[]>(
+    [],
   )
 
   const {
@@ -81,6 +61,20 @@ export default function SettingsPage() {
     queryKey: ["wallet"],
     queryFn: () => api.billing.getWallet(),
   })
+
+  const {
+    data: notificationPreferences,
+    isLoading: notificationPreferencesLoading,
+    error: notificationPreferencesError,
+  } = useQuery({
+    queryKey: ["notification-preferences"],
+    queryFn: () => api.notifications.preferences(),
+    enabled: Boolean(user?.id),
+  })
+
+  useEffect(() => {
+    if (notificationPreferences) setNotifPrefs(notificationPreferences)
+  }, [notificationPreferences])
 
   const {
     register,
@@ -102,12 +96,13 @@ export default function SettingsPage() {
   })
 
   const notifMutation = useMutation({
-    mutationFn: (prefs: NotificationPrefs) => {
-      localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(prefs))
-      return Promise.resolve()
+    mutationFn: (preferences: NotificationPreferenceValue[]) =>
+      api.notifications.updatePreferences(preferences),
+    onSuccess: (preferences) => {
+      setNotifPrefs(preferences)
+      toast.success("Notification preferences saved")
     },
-    onSuccess: () => toast.success("Notification preferences saved"),
-    onError: () => toast.error("Failed to save preferences"),
+    onError: (mutationError: Error) => toast.error(mutationError.message),
   })
 
   const onProfileSubmit = (data: ProfileForm) => {
@@ -200,77 +195,20 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="emailOrders" className="font-medium">
-                    Order Updates
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive emails about order status changes
-                  </p>
-                </div>
-                <Switch
-                  id="emailOrders"
-                  checked={notifPrefs.emailOrders}
-                  onCheckedChange={(checked) =>
-                    setNotifPrefs((prev) => ({ ...prev, emailOrders: checked }))
-                  }
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="emailEarnings" className="font-medium">
-                    Earnings Reports
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive weekly earnings summaries
-                  </p>
-                </div>
-                <Switch
-                  id="emailEarnings"
-                  checked={notifPrefs.emailEarnings}
-                  onCheckedChange={(checked) =>
-                    setNotifPrefs((prev) => ({
-                      ...prev,
-                      emailEarnings: checked,
-                    }))
-                  }
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="emailMarketing" className="font-medium">
-                    Marketing
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive promotional offers and updates
-                  </p>
-                </div>
-                <Switch
-                  id="emailMarketing"
-                  checked={notifPrefs.emailMarketing}
-                  onCheckedChange={(checked) =>
-                    setNotifPrefs((prev) => ({
-                      ...prev,
-                      emailMarketing: checked,
-                    }))
-                  }
-                />
-              </div>
-              <Button
-                onClick={() => notifMutation.mutate(notifPrefs)}
-                disabled={notifMutation.isPending}
-                className="mt-2"
-              >
-                {notifMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Save Preferences
-              </Button>
-            </div>
+            {notificationPreferencesError ? (
+              <ErrorState
+                title="Failed to load notification preferences"
+                description={(notificationPreferencesError as Error).message}
+              />
+            ) : (
+              <NotificationPreferencesForm
+                preferences={notifPrefs}
+                loading={notificationPreferencesLoading}
+                saving={notifMutation.isPending}
+                onChange={setNotifPrefs}
+                onSave={() => notifMutation.mutate(notifPrefs)}
+              />
+            )}
           </CardContent>
         </Card>
 

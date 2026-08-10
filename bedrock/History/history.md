@@ -1,7 +1,7 @@
 ---
 area: history
 project: GuestPost.cc
-updated: 2026-08-02
+updated: 2026-08-10
 ---
 
 # Project History
@@ -13,11 +13,11 @@ This is not a git replacement.
 
 ## Timeline Notes
 
+- [2026-08-09-backfill](timeline/2026-08-09-backfill.md)
 - [2026-08-02-backfill](timeline/2026-08-02-backfill.md)
 - [2026-07-16-catchup](timeline/2026-07-16-catchup.md)
 - [2026-07-16-backfill](timeline/2026-07-16-backfill.md)
 - [2026-07-02-backfill](timeline/2026-07-02-backfill.md)
-- [2026-06-15-backfill](timeline/2026-06-15-backfill.md)
 
 ## Recent Activity
 

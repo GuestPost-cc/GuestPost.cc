@@ -75,6 +75,11 @@ export type ActiveContext = Prisma.ActiveContextModel
  */
 export type Organization = Prisma.OrganizationModel
 /**
+ * Model BillingProfile
+ *
+ */
+export type BillingProfile = Prisma.BillingProfileModel
+/**
  * Model Membership
  *
  */
@@ -329,6 +334,31 @@ export type TicketMessage = Prisma.TicketMessageModel
  *
  */
 export type Notification = Prisma.NotificationModel
+/**
+ * Model CommunicationEvent
+ *
+ */
+export type CommunicationEvent = Prisma.CommunicationEventModel
+/**
+ * Model CommunicationDelivery
+ *
+ */
+export type CommunicationDelivery = Prisma.CommunicationDeliveryModel
+/**
+ * Model FinancialDocument
+ *
+ */
+export type FinancialDocument = Prisma.FinancialDocumentModel
+/**
+ * Model NotificationPreference
+ *
+ */
+export type NotificationPreference = Prisma.NotificationPreferenceModel
+/**
+ * Model EmailSuppression
+ *
+ */
+export type EmailSuppression = Prisma.EmailSuppressionModel
 /**
  * Model AuditLog
  *

@@ -7,6 +7,7 @@ import {
 export const MAINTENANCE_DISPATCH_TASK = "maintenance-dispatch"
 
 export const MAINTENANCE_TASK_NAMES = [
+  "communication-outbox",
   "payout-reconcile",
   "payment-dispute-inbox",
   "delivery-verification-dispatch",
@@ -28,6 +29,7 @@ const MAINTENANCE_FINANCE_OPERATION: Record<
   MaintenanceTaskName,
   FinanceOperationKind
 > = {
+  "communication-outbox": "read",
   "payout-reconcile": "recovery",
   "payment-dispute-inbox": "recovery",
   "delivery-verification-dispatch": "new_liability",
@@ -79,6 +81,10 @@ export function maintenanceTasksDueAt(now: Date): MaintenanceTaskName[] {
   // Recover delivery rows committed while Redis was unavailable. The sweep
   // itself is bounded and deterministic, so every dispatcher slot is safe.
   tasks.push("delivery-verification-dispatch")
+  // Every slot recovers durable communication deliveries that were recorded
+  // while Redis, queue enqueueing, or a realtime worker was unavailable.
+  tasks.push("communication-outbox")
+
   if (minute % 10 === 0) tasks.push("payout-reconcile")
   if (minute % 15 === 0) {
     tasks.push("settlement-auto-approve", "cancellation-timeouts")

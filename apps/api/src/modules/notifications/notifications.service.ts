@@ -26,6 +26,19 @@ export class NotificationsService {
     const [items, total, unreadCount] = await this.prisma.$transaction([
       this.prisma.notification.findMany({
         where,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          message: true,
+          category: true,
+          severity: true,
+          actionPath: true,
+          read: true,
+          readAt: true,
+          organizationId: true,
+          createdAt: true,
+        },
         orderBy: { createdAt: "desc" },
         take: limit,
         skip: (page - 1) * limit,
@@ -54,7 +67,7 @@ export class NotificationsService {
   async markRead(userId: string, id: string) {
     const result = await this.prisma.notification.updateMany({
       where: { id, userId },
-      data: { read: true },
+      data: { read: true, readAt: new Date() },
     })
     if (result.count === 0)
       throw new NotFoundException("Notification not found")
@@ -64,7 +77,7 @@ export class NotificationsService {
   async markAllRead(userId: string) {
     const result = await this.prisma.notification.updateMany({
       where: { userId, read: false },
-      data: { read: true },
+      data: { read: true, readAt: new Date() },
     })
     return { ok: true, marked: result.count }
   }

@@ -3,6 +3,7 @@ import { QUEUES } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
+import { recordPublisherTierCommunications } from "../lib/publisher-tier-communications"
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
@@ -36,6 +37,7 @@ export function createPublisherTrustWorker() {
         sourceEvent,
         reason,
       })
+      await recordPublisherTierCommunications(res)
       return res ?? { skipped: "publisher_not_found" }
     },
     { connection, concurrency: 4 },

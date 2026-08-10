@@ -181,11 +181,16 @@ export async function recomputePublisherTrustCore(
         organizationId: null,
       },
     })
-    await notifyOps(
-      prisma,
-      "PUBLISHER_TIER_CHANGED",
-      `Publisher ${publisher.name ?? publisherId} ${direction}: ${oldTier} → ${tier} (trust ${oldScore ?? "?"} → ${score}, via ${opts.sourceEvent})`,
-    )
+    // Compatibility for lightweight callers that do not expose the durable
+    // communication outbox. Production API/worker paths record the typed
+    // publisher + staff deliveries after this core returns.
+    if (!prisma.communicationEvent) {
+      await notifyOps(
+        prisma,
+        "PUBLISHER_TIER_CHANGED",
+        `Publisher ${publisher.name ?? publisherId} ${direction}: ${oldTier} → ${tier} (trust ${oldScore ?? "?"} → ${score}, via ${opts.sourceEvent})`,
+      )
+    }
   }
 
   trustLogger.info("recompute", {

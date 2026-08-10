@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-07-29
+updated: 2026-08-10
 ---
 
 # GuestPost.cc
@@ -61,19 +61,57 @@ Open/partial items require architectural design discussion.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 985 unit tests + integration tests
-- **apps/worker** — BullMQ queue processor
+- **apps/api** — NestJS REST API, 1,016 unit tests + integration tests
+- **apps/worker** — BullMQ queue processor (14 tests)
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard
 - **apps/publisher** — Publisher dashboard
 - **apps/website** — Public marketing site
-- **packages/shared** — Shared utilities (102 tests)
+- **packages/shared** — Shared utilities (122 tests)
 - **packages/database** — Prisma schema + migrations
 - **packages/ui** — Shared component library
 - **packages/api-client** — Generated API client
 
 ## Key Patterns
 
+- User communications use a PostgreSQL-backed transactional outbox rather than
+  sending mail inside request transactions. `CommunicationEvent` is the
+  idempotent domain-event boundary; per-recipient `CommunicationDelivery` rows
+  independently track in-app and email delivery, leases, attempts, and final
+  outcomes. The API records events with the domain mutation, and BullMQ only
+  wakes the worker; the database sweep remains the durable recovery path.
+- `packages/shared/src/communications.ts` is the communication catalog and
+  policy source of truth. User preferences are scoped to notification channel,
+  category, and individual event, but required security, financial, deadline,
+  and staff-operational communications cannot be disabled. Recipient and
+  preference checks are repeated immediately before email delivery; banned or
+  unverified users and suppressed addresses fail closed.
+- Email rendering is centralized, escapes all dynamic content, accepts only
+  application-relative action paths, and resolves them against allowlisted
+  HTTPS application origins (HTTP is local-development only). Production email
+  delivery requires explicit live mode, SMTP TLS configuration, valid origins,
+  deterministic message IDs, bounded retry leases, and hard-bounce
+  suppression. Logs must not contain recipient addresses or raw provider
+  payloads.
+- Financial email attachments are issued only for captured order payments,
+  order refunds, and successful wallet deposits. Each event transaction creates
+  one immutable `FinancialDocument` snapshot (paid invoice, credit note, or
+  deposit receipt) with exact minor-unit totals, organization billing identity,
+  issuer identity, and a deterministic sequence-backed document number. Credit
+  notes retain their original-invoice relationship. PostgreSQL rejects updates
+  and deletes after issue.
+- `packages/shared/src/financial-document-outbox-core.ts` is the issuance source
+  of truth for both API- and worker-originated events. The email worker validates
+  the snapshotted document against the claimed event, aggregate, organization,
+  and expected kind before generating an in-memory branded PDF. Attachment
+  filename, SHA-256 digest, and size are recorded on the delivery; malformed or
+  mismatched claimed attachments fail closed. PDFs use no remote resources,
+  JavaScript, forms, or embedded files and are capped at 5 MiB.
+- Organization owners manage the reusable billing profile. Issued documents do
+  not change when that profile is later edited. The configured issuer legal
+  identity and tax treatment are production release gates; the product does not
+  infer tax or claim tax compliance that has not been reviewed for the operating
+  entity and customer jurisdictions.
 - The public website uses separate client header and server footer components,
   a website-scoped editorial trust theme, server-first marketing pages, and
   reduced-motion-safe CSS animation. Canonical site/blog/account origins and

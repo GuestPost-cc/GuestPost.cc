@@ -8,20 +8,18 @@ import {
   getSettlementReviewDays,
   QUEUE_JOBS,
   QUEUES,
+  recordCommunicationOutbox,
   resolveOrderCancellationConfig,
   resolvePlatformFeePolicyCore,
   runLockedOrderSerializableTransaction,
   WorkflowDecisionService,
 } from "@guestpost/shared"
-import {
-  signJobPayload,
-  verifyJobPayload,
-} from "@guestpost/shared/dist/job-signing"
+import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { refundUnacceptedPaidOrderInTransaction } from "@guestpost/shared/dist/order-refund-core"
 import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
 import * as Sentry from "@sentry/node"
-import { Queue } from "bullmq"
+import { recordPublisherTierCommunications } from "../lib/publisher-tier-communications"
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
@@ -40,6 +38,39 @@ async function resolveListingUnitPrice(
     select: { price: true },
   })
   return service?.price ?? null
+}
+
+async function customerOrderRecipients(tx: any, order: any) {
+  const memberships = await tx.membership.findMany({
+    where: {
+      organizationId: order.organizationId,
+      status: "ACTIVE",
+      role: "OWNER",
+    },
+    select: { userId: true },
+  })
+  return [
+    ...new Set<string>([
+      order.customerId,
+      ...memberships.map((item: { userId: string }) => item.userId),
+    ]),
+  ]
+}
+
+async function publisherRecipients(tx: any, publisherId?: string | null) {
+  if (!publisherId) return []
+  const memberships = await tx.publisherMembership.findMany({
+    where: { publisherId },
+    select: { userId: true },
+  })
+  return memberships.map((item: { userId: string }) => item.userId)
+}
+
+function safeThreshold(envKey: string, fallback: number): number {
+  const raw = process.env[envKey]
+  if (raw === undefined || raw.trim() === "") return fallback
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
 }
 
 export function createAutoAcceptWorker() {
@@ -182,15 +213,64 @@ async function runOrderAcceptanceTimeoutSweep() {
         },
         (data, auditTx) => auditTx.auditLog.create({ data }),
       )
+      const recipients = [
+        ...new Set<string>([
+          ...(await customerOrderRecipients(tx, order)),
+          ...(await publisherRecipients(tx, order.website?.publisherId)),
+        ]),
+      ]
+      await recordCommunicationOutbox(tx, {
+        type: "ORDER_REFUNDED",
+        aggregateType: "Order",
+        aggregateId: order.id,
+        organizationId: order.organizationId,
+        title: "Order refund completed",
+        message: `${Number(order.amount).toFixed(2)} ${order.currency} was returned to the customer wallet because order ${order.id} was not accepted in time.`,
+        actionPath: `/dashboard/orders/${order.id}`,
+        payload: { amount: Number(order.amount), currency: order.currency },
+        dedupKey: `order:${order.id}:refunded`,
+        recipientUserIds: recipients,
+      })
+      if (
+        Number(order.amount) >
+        safeThreshold("ADMIN_REFUND_NOTIFICATION_THRESHOLD", 100)
+      ) {
+        const staff = await tx.staffMembership.findMany({
+          where: {
+            role: { in: ["SUPER_ADMIN", "FINANCE"] },
+            user: { banned: false },
+          },
+          select: { userId: true },
+        })
+        await recordCommunicationOutbox(tx, {
+          type: "STAFF_HIGH_VALUE_REFUND",
+          aggregateType: "Order",
+          aggregateId: order.id,
+          organizationId: order.organizationId,
+          title: "High-value automatic refund",
+          message: `${Number(order.amount).toFixed(2)} ${order.currency} was refunded for unaccepted order ${order.id}.`,
+          actionPath: `/dashboard/orders/${order.id}`,
+          payload: { amount: Number(order.amount), currency: order.currency },
+          dedupKey: `staff:order:${order.id}:high-value-refund`,
+          recipientUserIds: staff.map(
+            (item: { userId: string }) => item.userId,
+          ),
+        })
+      }
       return true
     })
     if (didRefund) {
       refunded++
       if (responsibility === "PUBLISHER" && order.website?.publisherId) {
-        await recomputePublisherTrustCore(prisma, order.website.publisherId, {
-          sourceEvent: "ORDER_ACCEPTANCE_TIMEOUT",
-          reason: `order ${order.id} was not accepted`,
-        })
+        const result = await recomputePublisherTrustCore(
+          prisma,
+          order.website.publisherId,
+          {
+            sourceEvent: "ORDER_ACCEPTANCE_TIMEOUT",
+            reason: `order ${order.id} was not accepted`,
+          },
+        )
+        await recordPublisherTierCommunications(result)
       }
     }
   }
@@ -495,10 +575,87 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
                 },
               },
             })
+            await recordCommunicationOutbox(tx, {
+              type: "SETTLEMENT_CREATED",
+              aggregateType: "Settlement",
+              aggregateId: settlement.id,
+              organizationId: canonicalOrder.organizationId,
+              title: "Settlement created",
+              message: `A ${net.toFixed(2)} ${canonicalOrder.currency} settlement was created for order ${canonicalOrder.id}.`,
+              actionPath: "/dashboard/earnings",
+              payload: {
+                amount: net.toNumber(),
+                currency: canonicalOrder.currency,
+                orderId: canonicalOrder.id,
+              },
+              dedupKey: `settlement:${settlement.id}:created`,
+              recipientUserIds: await publisherRecipients(tx, publisherId),
+            })
           } else {
             throw new Error(
               `Order ${canonicalOrder.id} has no canonical publisher for auto-accept settlement`,
             )
+          }
+
+          const partyRecipients = [
+            ...new Set<string>([
+              ...(await customerOrderRecipients(tx, canonicalOrder)),
+              ...(await publisherRecipients(tx, publisherId)),
+            ]),
+          ]
+          await recordCommunicationOutbox(tx, {
+            type: "ORDER_DELIVERED",
+            aggregateType: "Order",
+            aggregateId: canonicalOrder.id,
+            organizationId: canonicalOrder.organizationId,
+            title: "Order delivered",
+            message: `Order ${canonicalOrder.id} was automatically accepted after its review window ended.`,
+            actionPath: `/dashboard/orders/${canonicalOrder.id}`,
+            dedupKey: `order:${canonicalOrder.id}:delivered`,
+            recipientUserIds: partyRecipients,
+          })
+          if (channel === "PLATFORM") {
+            await recordCommunicationOutbox(tx, {
+              type: "ORDER_COMPLETED",
+              aggregateType: "Order",
+              aggregateId: canonicalOrder.id,
+              organizationId: canonicalOrder.organizationId,
+              title: "Order completed",
+              message: `Order ${canonicalOrder.id} is complete.`,
+              actionPath: `/dashboard/orders/${canonicalOrder.id}`,
+              dedupKey: `order:${canonicalOrder.id}:completed`,
+              recipientUserIds: partyRecipients,
+            })
+            if (
+              grossAmount.greaterThan(
+                safeThreshold("ADMIN_HIGH_VALUE_ORDER_THRESHOLD", 500),
+              )
+            ) {
+              const staff = await tx.staffMembership.findMany({
+                where: {
+                  role: { in: ["SUPER_ADMIN", "OPERATIONS", "FINANCE"] },
+                  user: { banned: false },
+                },
+                select: { userId: true },
+              })
+              await recordCommunicationOutbox(tx, {
+                type: "STAFF_HIGH_VALUE_ORDER_COMPLETED",
+                aggregateType: "Order",
+                aggregateId: canonicalOrder.id,
+                organizationId: canonicalOrder.organizationId,
+                title: "High-value order completed",
+                message: `Order ${canonicalOrder.id} completed at ${grossAmount.toFixed(2)} ${canonicalOrder.currency}.`,
+                actionPath: `/dashboard/orders/${canonicalOrder.id}`,
+                payload: {
+                  amount: grossAmount.toNumber(),
+                  currency: canonicalOrder.currency,
+                },
+                dedupKey: `staff:order:${canonicalOrder.id}:high-value-completed`,
+                recipientUserIds: staff.map(
+                  (item: { userId: string }) => item.userId,
+                ),
+              })
+            }
           }
 
           return true
@@ -563,7 +720,17 @@ async function runReviewReminderSweep(): Promise<ReminderResult> {
       customerId: true,
       organizationId: true,
       listing: { select: { title: true } },
-      customer: { select: { email: true, name: true } },
+      customer: {
+        select: {
+          email: true,
+          emailVerified: true,
+          banned: true,
+          emailSuppressions: {
+            where: { active: true },
+            select: { email: true },
+          },
+        },
+      },
     },
   })
 
@@ -592,47 +759,32 @@ async function runReviewReminderSweep(): Promise<ReminderResult> {
     if (existing) continue
 
     try {
-      await prisma.orderEvent.create({
-        data: {
-          orderId: order.id,
-          eventType: "REVIEW_REMINDER",
-          actorId: null,
-          message: `Review reminder — ${daysRemaining} day(s) remaining before auto-accept`,
-          metadata: {
-            day: daysRemaining,
-            channel: "email",
-            autoAcceptAt: order.autoAcceptAt.toISOString(),
-          },
-        },
-      })
-
-      // Best-effort notification creation for the email worker
-      await prisma.notification
-        .create({
+      await prisma.$transaction(async (tx) => {
+        await tx.orderEvent.create({
           data: {
-            userId: order.customerId,
-            organizationId: order.organizationId,
-            type: "REVIEW_REMINDER",
-            message: `Your order review window expires in ${daysRemaining} day(s). Review your order before auto-acceptance.`,
-            dedupKey: `review-reminder-${order.id}-day-${daysRemaining}`,
+            orderId: order.id,
+            eventType: "REVIEW_REMINDER",
+            actorId: null,
+            message: `Review reminder — ${daysRemaining} day(s) remaining before auto-accept`,
+            metadata: {
+              day: daysRemaining,
+              channel: "email",
+              autoAcceptAt: order.autoAcceptAt!.toISOString(),
+            },
           },
         })
-        .catch(() => {})
-
-      // Enqueue review reminder email
-      const listingTitle = (order as any).listing?.title ?? "Order"
-      const customerName = (order as any).customer?.name ?? "Customer"
-      const customerEmail = (order as any).customer?.email
-      if (customerEmail) {
-        const subject = `Review reminder: ${daysRemaining} day(s) left to review your order`
-        const html = buildReminderEmailHtml({
-          customerName,
-          listingTitle,
-          orderId: order.id,
-          daysRemaining,
+        await recordCommunicationOutbox(tx, {
+          type: "ORDER_REVIEW_REMINDER",
+          aggregateType: "Order",
+          aggregateId: order.id,
+          organizationId: order.organizationId,
+          title: "Order review deadline approaching",
+          message: `Your order review window expires in ${daysRemaining} day(s). Review the delivery before automatic acceptance.`,
+          actionPath: `/dashboard/orders/${order.id}`,
+          dedupKey: `order:${order.id}:review-reminder:${daysRemaining}`,
+          recipientUserIds: [order.customerId],
         })
-        enqueueReminderEmail(customerEmail, subject, html)
-      }
+      })
 
       reminded++
     } catch (err) {
@@ -651,52 +803,4 @@ async function runReviewReminderSweep(): Promise<ReminderResult> {
   })
 
   return { scanned: pending.length, reminded, durationMs }
-}
-
-// Lazy email queue producer — created once, reused across sweep iterations.
-let emailQueue: Queue | null = null
-function getEmailQueue(): Queue {
-  if (!emailQueue) emailQueue = new Queue(QUEUES.EMAIL, { connection })
-  return emailQueue
-}
-
-function buildReminderEmailHtml(opts: {
-  customerName: string
-  listingTitle: string
-  orderId: string
-  daysRemaining: number
-}): string {
-  const baseUrl = process.env.APP_URL ?? "https://guestpost.cc"
-  const reviewUrl = `${baseUrl}/orders/${opts.orderId}/review`
-  return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
-<h2>Review reminder</h2>
-<p>Hi ${opts.customerName},</p>
-<p>Your order <strong>${opts.listingTitle}</strong> is awaiting your review.</p>
-<p>You have <strong>${opts.daysRemaining} day(s)</strong> left to review and accept or request changes before the order is automatically accepted.</p>
-<p><a href="${reviewUrl}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">Review your order</a></p>
-<p>If you take no action, the order will be auto-accepted after the review window expires.</p>
-<hr style="margin-top:24px;border:none;border-top:1px solid #e5e7eb;"/>
-<p style="color:#6b7280;font-size:12px;">GuestPost.cc · Order #${opts.orderId}</p>
-</div>`
-}
-
-function enqueueReminderEmail(to: string, subject: string, html: string): void {
-  getEmailQueue()
-    .add(
-      QUEUE_JOBS[QUEUES.EMAIL].SEND_REMINDER_EMAIL,
-      signJobPayload({ to, subject, html }),
-      {
-        jobId: `reminder-${to}-${subject.slice(0, 40)}`,
-        removeOnComplete: { count: 100, age: 86400 },
-        removeOnFail: { count: 50, age: 604800 },
-        attempts: 5,
-        backoff: { type: "exponential", delay: 5000 },
-      },
-    )
-    .catch((err) => {
-      logger.error("failed to enqueue reminder email", {
-        to,
-        err: String(err),
-      })
-    })
 }

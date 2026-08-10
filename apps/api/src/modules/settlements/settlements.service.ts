@@ -17,9 +17,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
+import { notificationThreshold } from "../../common/notification-config"
 import {
   resolvePlatformFeePolicy,
   splitPlatformFee,
@@ -28,6 +30,7 @@ import { PrismaService } from "../../common/prisma.service"
 import { checkPublisherBalanceInvariant } from "../../common/publisher-balance-invariants"
 import { lockPublisherBalanceForUpdate } from "../../common/publisher-balance-lock"
 import { AuditService } from "../audit/audit.service"
+import { CommunicationsService } from "../communications/communications.service"
 import { assertOwnerOrCreator } from "../orders/services/owner-or-creator"
 import { QueueService } from "../queues/queue.service"
 import { evaluateSettlementEligibilityTx } from "./settlement-eligibility"
@@ -48,6 +51,7 @@ export class SettlementsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   // organizationId is null for staff callers — they may create settlements for any org
@@ -537,6 +541,95 @@ export class SettlementsService {
     },
     summary: SettlementReleaseSummary,
   ) {
+    if (this.communications) {
+      try {
+        const publisherRecipients =
+          await this.communications.publisherRecipients(settlement.publisherId)
+        const debtApplied = new Decimal(summary.debtApplied)
+        const publisherMessage = debtApplied.greaterThan(0)
+          ? `Settlement of ${summary.publisherAmount} ${summary.currency} was released: ${summary.debtApplied} ${summary.currency} repaid outstanding debt and ${summary.credited} ${summary.currency} was credited to your withdrawable balance.`
+          : `Settlement of ${summary.publisherAmount} ${summary.currency} has been credited to your withdrawable balance.`
+        const publisherEvent = await this.communications.record({
+          type: "SETTLEMENT_RELEASED",
+          aggregateType: "Settlement",
+          aggregateId: settlement.id,
+          organizationId: settlement.order.organizationId,
+          title: "Settlement released",
+          message: publisherMessage,
+          actionPath: "/dashboard/earnings",
+          dedupKey: `settlement:${settlement.id}:released:publisher`,
+          recipientUserIds: publisherRecipients,
+        })
+        this.communications.dispatchBestEffort(publisherEvent.eventId)
+
+        const customerRecipients =
+          await this.communications.customerOrderRecipients(settlement.orderId)
+        const customerEvent = await this.communications.record({
+          type: "SETTLEMENT_RELEASED",
+          aggregateType: "Settlement",
+          aggregateId: settlement.id,
+          organizationId: settlement.order.organizationId,
+          title: "Order settlement released",
+          message: `Settlement for order ${settlement.orderId} has been released.`,
+          actionPath: `/dashboard/orders/${settlement.orderId}`,
+          dedupKey: `settlement:${settlement.id}:released:customer`,
+          recipientUserIds: customerRecipients,
+        })
+        this.communications.dispatchBestEffort(customerEvent.eventId)
+
+        const completedEvent = await this.communications.record({
+          type: "ORDER_COMPLETED",
+          aggregateType: "Order",
+          aggregateId: settlement.orderId,
+          organizationId: settlement.order.organizationId,
+          title: "Order completed",
+          message: `Order ${settlement.orderId} is complete and its settlement has been released.`,
+          actionPath: `/dashboard/orders/${settlement.orderId}`,
+          dedupKey: `order:${settlement.orderId}:completed`,
+          recipientUserIds: [
+            ...new Set([...customerRecipients, ...publisherRecipients]),
+          ],
+        })
+        this.communications.dispatchBestEffort(completedEvent.eventId)
+
+        if (
+          new Decimal(summary.publisherAmount).greaterThan(
+            notificationThreshold(
+              "ADMIN_SETTLEMENT_NOTIFICATION_THRESHOLD",
+              500,
+            ),
+          )
+        ) {
+          const staffRecipients = await this.communications.staffRecipients([
+            "SUPER_ADMIN",
+            "FINANCE",
+          ])
+          const staffEvent = await this.communications.record({
+            type: "STAFF_HIGH_VALUE_SETTLEMENT",
+            aggregateType: "Settlement",
+            aggregateId: settlement.id,
+            organizationId: settlement.order.organizationId,
+            title: "High-value settlement released",
+            message: `${summary.publisherAmount} ${summary.currency} was released for order ${settlement.orderId}.`,
+            actionPath: "/dashboard/finance",
+            payload: {
+              amount: summary.publisherAmount,
+              currency: summary.currency,
+              orderId: settlement.orderId,
+            },
+            dedupKey: `staff:settlement:${settlement.id}:high-value`,
+            recipientUserIds: staffRecipients,
+          })
+          this.communications.dispatchBestEffort(staffEvent.eventId)
+        }
+        return
+      } catch (error) {
+        this.logger.warn(
+          `Failed to record durable settlement communications for ${settlement.id}: ${error}`,
+        )
+      }
+    }
+
     let memberships: Array<{ userId: string }> = []
     let publisher: { organizationId: string } | null = null
     try {

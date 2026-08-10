@@ -16,13 +16,16 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
+import { notificationThreshold } from "../../../common/notification-config"
 import { PrismaService } from "../../../common/prisma.service"
 import { checkPublisherBalanceInvariant } from "../../../common/publisher-balance-invariants"
 import { lockPublisherBalanceForUpdate } from "../../../common/publisher-balance-lock"
 import { AuditService } from "../../audit/audit.service"
+import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
 
 export interface RefundOptions {
@@ -49,6 +52,7 @@ export class RefundService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   private assertCanonicalUsd(
@@ -466,6 +470,63 @@ export class RefundService {
       tx,
     )
 
+    if (this.communications) {
+      const recipients = await this.communications.customerOrderRecipients(
+        order.id,
+        tx,
+      )
+      await this.communications.record(
+        {
+          type: "ORDER_REFUNDED",
+          aggregateType: "Order",
+          aggregateId: order.id,
+          organizationId: order.organizationId,
+          title: "Order refund completed",
+          message: `${amount.toFixed(2)} ${order.currency} was returned to your wallet for order ${order.id}.`,
+          actionPath: `/dashboard/orders/${order.id}`,
+          payload: {
+            amount: amount.toString(),
+            currency: order.currency,
+            responsibility,
+          },
+          dedupKey: `order:${order.id}:refunded`,
+          recipientUserIds: recipients,
+          actorUserId: userId,
+        },
+        tx,
+      )
+      if (
+        amount.greaterThan(
+          notificationThreshold("ADMIN_REFUND_NOTIFICATION_THRESHOLD", 100),
+        )
+      ) {
+        const staffRecipients = await this.communications.staffRecipients(
+          ["SUPER_ADMIN", "FINANCE"],
+          tx,
+        )
+        await this.communications.record(
+          {
+            type: "STAFF_HIGH_VALUE_REFUND",
+            aggregateType: "Order",
+            aggregateId: order.id,
+            organizationId: order.organizationId,
+            title: "High-value refund completed",
+            message: `${amount.toFixed(2)} ${order.currency} was refunded for order ${order.id}.`,
+            actionPath: `/dashboard/orders/${order.id}`,
+            payload: {
+              amount: amount.toString(),
+              currency: order.currency,
+              responsibility,
+            },
+            dedupKey: `staff:order:${order.id}:refund:${refundTransaction.id}`,
+            recipientUserIds: staffRecipients,
+            actorUserId: userId,
+          },
+          tx,
+        )
+      }
+    }
+
     return {
       order: updated,
       refundTransactionId: refundTransaction.id,
@@ -512,6 +573,48 @@ export class RefundService {
         },
         update: {},
       })
+    }
+
+    if (this.communications) {
+      await this.communications.record(
+        {
+          type: "PUBLISHER_DEBT_CREATED",
+          aggregateType: "Order",
+          aggregateId: args.orderId,
+          organizationId: publisher.organizationId,
+          title: "Outstanding publisher debt recorded",
+          message: `${args.amount.toFixed(2)} ${args.currency} was recorded as outstanding debt after the refund for order ${args.orderId}. Future settlement earnings will repay this debt before funds become withdrawable.`,
+          actionPath: "/dashboard/earnings",
+          dedupKey: `publisher-debt:${args.orderId}`,
+          recipientUserIds: publisher.publisherMemberships.map(
+            (membership: { userId: string }) => membership.userId,
+          ),
+        },
+        tx,
+      )
+      const staffRecipients = await this.communications.staffRecipients(
+        ["SUPER_ADMIN", "FINANCE"],
+        tx,
+      )
+      await this.communications.record(
+        {
+          type: "STAFF_PUBLISHER_DEBT_CREATED",
+          aggregateType: "Order",
+          aggregateId: args.orderId,
+          organizationId: publisher.organizationId,
+          title: "Publisher debt requires monitoring",
+          message: `${args.amount.toFixed(2)} ${args.currency} of publisher debt was created for order ${args.orderId}.`,
+          actionPath: `/dashboard/orders/${args.orderId}`,
+          payload: {
+            amount: args.amount.toString(),
+            currency: args.currency,
+            publisherId: args.publisherId,
+          },
+          dedupKey: `staff:publisher-debt:${args.orderId}`,
+          recipientUserIds: staffRecipients,
+        },
+        tx,
+      )
     }
   }
 }

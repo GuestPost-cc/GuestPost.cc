@@ -1,5 +1,6 @@
 import { Prisma, type WithdrawalStatus } from "@guestpost/database"
 import {
+  type CommunicationEventType,
   evaluatePayoutMethodEligibility,
   getWithdrawalHoldDays,
   isCertifiedWithdrawalMethodType,
@@ -24,12 +25,14 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
 import { PrismaService } from "../../common/prisma.service"
 import { checkPublisherBalanceInvariant } from "../../common/publisher-balance-invariants"
 import { AuditService } from "../audit/audit.service"
+import { CommunicationsService } from "../communications/communications.service"
 import { QueueService } from "../queues/queue.service"
 import type { CompleteManualWithdrawalDto } from "./dto/complete-manual-withdrawal.dto"
 import type { CreatePayoutMethodDto } from "./dto/create-payout-method.dto"
@@ -80,6 +83,7 @@ export class PublisherPayoutsService {
     private readonly queue: QueueService,
     private readonly encryption: PayoutEncryptionService,
     readonly _execution: PayoutExecutionService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   private async runSerializable<T>(
@@ -1152,6 +1156,29 @@ export class PublisherPayoutsService {
           tx,
         )
 
+        if (this.communications) {
+          const recipients = await this.communications.publisherRecipients(
+            publisherId,
+            false,
+            tx,
+          )
+          await this.communications.record(
+            {
+              type: "PAYOUT_WITHDRAWAL_REQUESTED",
+              aggregateType: "Withdrawal",
+              aggregateId: created.id,
+              organizationId: currentPublisher.organizationId,
+              title: "Withdrawal requested",
+              message: `Withdrawal of ${created.amount} ${created.currency} was requested and is now under review.`,
+              actionPath: "/dashboard/withdrawals",
+              dedupKey: `withdrawal:${created.id}:withdrawal_requested`,
+              recipientUserIds: recipients,
+              actorUserId: userId,
+            },
+            tx,
+          )
+        }
+
         return created
       })
     } catch (error: unknown) {
@@ -1398,6 +1425,7 @@ export class PublisherPayoutsService {
     await this.notifyPublisherMembers(
       result.publisherId,
       result.organizationId,
+      result.updated.id,
       "WITHDRAWAL_APPROVED",
       `Withdrawal of ${result.amount} has been approved.`,
     )
@@ -1408,9 +1436,45 @@ export class PublisherPayoutsService {
   private async notifyPublisherMembers(
     publisherId: string,
     organizationId: string,
+    withdrawalId: string,
     type: string,
     message: string,
   ) {
+    if (this.communications) {
+      const eventTypes: Record<string, CommunicationEventType> = {
+        WITHDRAWAL_REQUESTED: "PAYOUT_WITHDRAWAL_REQUESTED",
+        WITHDRAWAL_APPROVED: "PAYOUT_WITHDRAWAL_APPROVED",
+        WITHDRAWAL_PROCESSING: "PAYOUT_WITHDRAWAL_PROCESSING",
+        WITHDRAWAL_COMPLETED: "PAYOUT_WITHDRAWAL_COMPLETED",
+        WITHDRAWAL_REJECTED: "PAYOUT_WITHDRAWAL_FAILED",
+        WITHDRAWAL_FAILED: "PAYOUT_WITHDRAWAL_FAILED",
+        WITHDRAWAL_REVERSED: "PAYOUT_WITHDRAWAL_REVERSED",
+      }
+      const eventType = eventTypes[type]
+      if (!eventType) {
+        this.logger.warn(`Unsupported payout communication type: ${type}`)
+        return
+      }
+      const recipients =
+        await this.communications.publisherRecipients(publisherId)
+      const event = await this.communications.record({
+        type: eventType,
+        aggregateType: "Withdrawal",
+        aggregateId: withdrawalId,
+        organizationId,
+        title: type
+          .replace(/^WITHDRAWAL_/, "Withdrawal ")
+          .replace(/_/g, " ")
+          .toLowerCase()
+          .replace(/^./, (character) => character.toUpperCase()),
+        message,
+        actionPath: "/dashboard/withdrawals",
+        dedupKey: `withdrawal:${withdrawalId}:${type.toLowerCase()}`,
+        recipientUserIds: recipients,
+      })
+      this.communications.dispatchBestEffort(event.eventId)
+      return
+    }
     const memberships = await this.prisma.publisherMembership.findMany({
       where: { publisherId },
       select: { userId: true },
@@ -1502,6 +1566,7 @@ export class PublisherPayoutsService {
       await this.notifyPublisherMembers(
         updated.publisherId,
         publisher.organizationId,
+        id,
         "WITHDRAWAL_COMPLETED",
         `Withdrawal of ${updated.amount} has been paid.`,
       )
@@ -1736,6 +1801,7 @@ export class PublisherPayoutsService {
     await this.notifyPublisherMembers(
       result.withdrawal.publisherId,
       result.withdrawal.publisher.organizationId,
+      id,
       "WITHDRAWAL_REJECTED",
       `Withdrawal of ${result.withdrawal.amount} was rejected. Contact support if you need more information.`,
     )

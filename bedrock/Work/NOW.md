@@ -173,6 +173,52 @@ merged or deployed. GitHub `main` through dependency consolidation commit
   and recorded Finance/Security approval remain mandatory before the draft can
   be marked ready or merged.
 
+## Current Local Work: Durable Notifications And Email
+
+- Added a typed communication catalog covering account, marketplace, deposit,
+  order, cancellation, dispute, settlement, payout, support, publisher-trust,
+  reconciliation, fraud, chargeback, and staff-risk lifecycles. Domain services
+  record idempotent events transactionally and resolve role-appropriate
+  recipients without depending on unaudited administrator email lists.
+- Added a PostgreSQL outbox with independent in-app/email delivery records,
+  conditional worker leases, retries, deterministic message IDs, periodic
+  recovery sweeps, hard-bounce suppression, and delivery-time account and
+  preference rechecks. Queue publication is only a best-effort wake-up, so a
+  Redis interruption cannot lose committed communications.
+- Added customer, publisher, and staff notification settings backed by the API.
+  Users can control eligible channels, categories, and individual events;
+  mandatory security, money, deadline, and staff-operational messages remain
+  enforceable. Staff-only settings and events are rejected for non-staff users.
+- Rebuilt application email rendering around one responsive escaped branded
+  layout with text alternatives, allowlisted application origins, safe relative
+  action paths, explicit TLS/live-mode gates, and recipient-safe logging.
+- Extended notification bells with server-supplied titles, severity, read time,
+  and safe local navigation while preserving server-side authorization and
+  projections.
+- Added owner-managed organization billing profiles and immutable financial
+  document snapshots. Captured order payments attach paid invoices, refunds
+  attach linked credit notes, and successful wallet deposits attach deposit
+  receipts. The worker produces branded in-memory PDFs, validates event/document
+  ownership and type, enforces a 5 MiB cap, and records attachment filename,
+  SHA-256, and size after SMTP delivery.
+- Added `docs/COMMUNICATIONS_AND_FINANCIAL_DOCUMENTS.md` as the implementation,
+  security, operations, compliance-boundary, extension, and rollback contract.
+- Validation passes: 104 API suites / 1,016 tests, 3 API-client suites / 50
+  tests, 14 worker tests, 14 shared suites / 122 tests, 9 focused auth template
+  tests, and 8 focused notification UI tests. Database, shared, auth, API,
+  worker, API-client, UI, portal, publisher, and admin TypeScript checks pass;
+  Prisma validation and repository whitespace checks pass.
+- Release gates: apply migration
+  `20260809180000_durable_communications` and then
+  `20260810120000_financial_document_attachments` before starting the API or
+  worker; configure the complete `INVOICE_*` issuer identity, have the operating
+  entity/tax wording reviewed for the production jurisdictions, and retain the
+  configured USD-only product boundary;
+  configure valid HTTPS application origins and SMTP/TLS secrets; set
+  `EMAIL_DELIVERY_MODE=live` only after transport verification; then confirm the
+  outbox sweep, retry, suppression, one representative event from each audience,
+  and a rendered/received example of each financial attachment kind in staging.
+
 ## Current Local Work: Staff Marketplace And Canonical Order Integrity
 
 - Rebuilt the Admin marketplace list and detail workflows for Super Admin,

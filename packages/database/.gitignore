@@ -8,3 +8,9 @@ node_modules
 !/src/prisma/models/
 /src/prisma/models/*
 !/src/prisma/models/LegalAcceptance.ts
+!/src/prisma/models/CommunicationEvent.ts
+!/src/prisma/models/CommunicationDelivery.ts
+!/src/prisma/models/NotificationPreference.ts
+!/src/prisma/models/EmailSuppression.ts
+!/src/prisma/models/BillingProfile.ts
+!/src/prisma/models/FinancialDocument.ts

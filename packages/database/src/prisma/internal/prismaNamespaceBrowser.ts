@@ -58,6 +58,7 @@ export const ModelName = {
   Verification: 'Verification',
   ActiveContext: 'ActiveContext',
   Organization: 'Organization',
+  BillingProfile: 'BillingProfile',
   Membership: 'Membership',
   PublisherMembership: 'PublisherMembership',
   StaffMembership: 'StaffMembership',
@@ -109,6 +110,11 @@ export const ModelName = {
   Ticket: 'Ticket',
   TicketMessage: 'TicketMessage',
   Notification: 'Notification',
+  CommunicationEvent: 'CommunicationEvent',
+  CommunicationDelivery: 'CommunicationDelivery',
+  FinancialDocument: 'FinancialDocument',
+  NotificationPreference: 'NotificationPreference',
+  EmailSuppression: 'EmailSuppression',
   AuditLog: 'AuditLog',
   MarketplaceCategory: 'MarketplaceCategory',
   MarketplaceTag: 'MarketplaceTag',
@@ -259,6 +265,26 @@ export const OrganizationScalarFieldEnum = {
 } as const
 
 export type OrganizationScalarFieldEnum = (typeof OrganizationScalarFieldEnum)[keyof typeof OrganizationScalarFieldEnum]
+
+
+export const BillingProfileScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  legalName: 'legalName',
+  billingEmail: 'billingEmail',
+  addressLine1: 'addressLine1',
+  addressLine2: 'addressLine2',
+  city: 'city',
+  region: 'region',
+  postalCode: 'postalCode',
+  countryCode: 'countryCode',
+  taxIdType: 'taxIdType',
+  taxId: 'taxId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BillingProfileScalarFieldEnum = (typeof BillingProfileScalarFieldEnum)[keyof typeof BillingProfileScalarFieldEnum]
 
 
 export const MembershipScalarFieldEnum = {
@@ -1253,15 +1279,123 @@ export type TicketMessageScalarFieldEnum = (typeof TicketMessageScalarFieldEnum)
 export const NotificationScalarFieldEnum = {
   id: 'id',
   type: 'type',
+  title: 'title',
   message: 'message',
+  category: 'category',
+  severity: 'severity',
+  actionPath: 'actionPath',
   read: 'read',
+  readAt: 'readAt',
   userId: 'userId',
   organizationId: 'organizationId',
+  eventId: 'eventId',
   dedupKey: 'dedupKey',
   createdAt: 'createdAt'
 } as const
 
 export type NotificationScalarFieldEnum = (typeof NotificationScalarFieldEnum)[keyof typeof NotificationScalarFieldEnum]
+
+
+export const CommunicationEventScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  category: 'category',
+  severity: 'severity',
+  aggregateType: 'aggregateType',
+  aggregateId: 'aggregateId',
+  organizationId: 'organizationId',
+  title: 'title',
+  message: 'message',
+  actionPath: 'actionPath',
+  payload: 'payload',
+  dedupKey: 'dedupKey',
+  status: 'status',
+  attempts: 'attempts',
+  availableAt: 'availableAt',
+  lockedAt: 'lockedAt',
+  processedAt: 'processedAt',
+  lastError: 'lastError',
+  requestId: 'requestId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CommunicationEventScalarFieldEnum = (typeof CommunicationEventScalarFieldEnum)[keyof typeof CommunicationEventScalarFieldEnum]
+
+
+export const CommunicationDeliveryScalarFieldEnum = {
+  id: 'id',
+  eventId: 'eventId',
+  userId: 'userId',
+  channel: 'channel',
+  status: 'status',
+  attempts: 'attempts',
+  availableAt: 'availableAt',
+  lockedAt: 'lockedAt',
+  provider: 'provider',
+  providerMessageId: 'providerMessageId',
+  lastError: 'lastError',
+  sentAt: 'sentAt',
+  failedAt: 'failedAt',
+  bouncedAt: 'bouncedAt',
+  complainedAt: 'complainedAt',
+  attachmentName: 'attachmentName',
+  attachmentSha256: 'attachmentSha256',
+  attachmentSize: 'attachmentSize',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CommunicationDeliveryScalarFieldEnum = (typeof CommunicationDeliveryScalarFieldEnum)[keyof typeof CommunicationDeliveryScalarFieldEnum]
+
+
+export const FinancialDocumentScalarFieldEnum = {
+  id: 'id',
+  sequenceNumber: 'sequenceNumber',
+  kind: 'kind',
+  numberPrefix: 'numberPrefix',
+  aggregateType: 'aggregateType',
+  aggregateId: 'aggregateId',
+  organizationId: 'organizationId',
+  relatedDocumentId: 'relatedDocumentId',
+  currency: 'currency',
+  subtotal: 'subtotal',
+  taxAmount: 'taxAmount',
+  total: 'total',
+  issuedAt: 'issuedAt',
+  snapshot: 'snapshot',
+  dedupKey: 'dedupKey',
+  createdAt: 'createdAt'
+} as const
+
+export type FinancialDocumentScalarFieldEnum = (typeof FinancialDocumentScalarFieldEnum)[keyof typeof FinancialDocumentScalarFieldEnum]
+
+
+export const NotificationPreferenceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  category: 'category',
+  channel: 'channel',
+  enabled: 'enabled',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NotificationPreferenceScalarFieldEnum = (typeof NotificationPreferenceScalarFieldEnum)[keyof typeof NotificationPreferenceScalarFieldEnum]
+
+
+export const EmailSuppressionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  email: 'email',
+  reason: 'reason',
+  active: 'active',
+  sourceRef: 'sourceRef',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type EmailSuppressionScalarFieldEnum = (typeof EmailSuppressionScalarFieldEnum)[keyof typeof EmailSuppressionScalarFieldEnum]
 
 
 export const AuditLogScalarFieldEnum = {

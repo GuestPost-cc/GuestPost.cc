@@ -18,10 +18,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
 import {
   CancellationResponseAction,
@@ -54,6 +56,7 @@ export class OrderCancellationService {
     private readonly refund: RefundService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   async preview(orderId: string, actor: CancellationActorContext) {
@@ -369,7 +372,13 @@ export class OrderCancellationService {
             },
             tx,
           )
-          await this.notifyCounterparty(tx, order, actor.kind, request.id)
+          await this.notifyCounterparty(
+            tx,
+            order,
+            actor.kind,
+            actor.userId,
+            request.id,
+          )
           return request
         },
       )
@@ -485,6 +494,17 @@ export class OrderCancellationService {
             organizationId: order.organizationId,
           },
           tx,
+        )
+        await this.recordCancellationCommunication(
+          tx,
+          order,
+          requestId,
+          "ORDER_CANCELLATION_RESPONDED",
+          "Cancellation request updated",
+          body.action === CancellationResponseAction.ACCEPT
+            ? `Cancellation for order ${orderId} was accepted and the refund was issued.`
+            : `Cancellation for order ${orderId} was contested and sent for staff review.`,
+          actor.userId,
         )
         return tx.orderCancellationRequest.findUniqueOrThrow({
           where: { id: requestId },
@@ -629,6 +649,15 @@ export class OrderCancellationService {
           },
           tx,
         )
+        await this.recordCancellationCommunication(
+          tx,
+          request.order,
+          requestId,
+          "ORDER_CANCELLATION_RESOLVED",
+          "Cancellation review completed",
+          `Cancellation review for order ${request.orderId} was resolved as ${body.resolution}.`,
+          staffUserId,
+        )
         return tx.orderCancellationRequest.findUniqueOrThrow({
           where: { id: requestId },
         })
@@ -724,6 +753,15 @@ export class OrderCancellationService {
             organizationId: request.order.organizationId,
           },
           tx,
+        )
+        await this.recordCancellationCommunication(
+          tx,
+          request.order,
+          requestId,
+          "ORDER_CANCELLATION_RESOLVED",
+          "Cancellation refund approved",
+          `The cancellation refund for order ${request.orderId} was approved.`,
+          financeUserId,
         )
         return tx.orderCancellationRequest.findUniqueOrThrow({
           where: { id: requestId },
@@ -936,7 +974,70 @@ export class OrderCancellationService {
       },
       tx,
     )
+    await this.recordCancellationCommunication(
+      tx,
+      order,
+      order.id,
+      "ORDER_CANCELLED",
+      "Order cancelled",
+      `Order ${order.id} was cancelled.`,
+      actorUserId,
+    )
     return tx.order.findUniqueOrThrow({ where: { id: order.id } })
+  }
+
+  private async recordCancellationCommunication(
+    tx: any,
+    order: any,
+    aggregateId: string,
+    type:
+      | "ORDER_CANCELLED"
+      | "ORDER_CANCELLATION_RESPONDED"
+      | "ORDER_CANCELLATION_RESOLVED",
+    title: string,
+    message: string,
+    actorUserId?: string,
+  ) {
+    if (!this.communications) return
+    const publisherId =
+      order.website?.publisherId ??
+      (order.websiteId
+        ? (
+            await tx.website.findUnique({
+              where: { id: order.websiteId },
+              select: { publisherId: true },
+            })
+          )?.publisherId
+        : null)
+    const recipients = [
+      ...new Set<string>([
+        ...(await this.communications.customerOrderRecipients(order.id, tx)),
+        ...(await this.communications.publisherRecipients(
+          publisherId,
+          false,
+          tx,
+        )),
+      ]),
+    ]
+    await this.communications.record(
+      {
+        type,
+        aggregateType:
+          type === "ORDER_CANCELLED" ? "Order" : "CancellationRequest",
+        aggregateId,
+        organizationId: order.organizationId,
+        title,
+        message,
+        actionPath: `/dashboard/orders/${order.id}`,
+        dedupKey:
+          type === "ORDER_CANCELLED"
+            ? `order:${order.id}:cancelled`
+            : `cancel-request:${aggregateId}:${type.toLowerCase()}`,
+        recipientUserIds: recipients,
+        actorUserId,
+      },
+      tx,
+    )
   }
 
   private async loadOrder(db: any, orderId: string) {
@@ -1197,6 +1298,7 @@ export class OrderCancellationService {
     tx: any,
     order: any,
     requesterType: CancellationActorContext["kind"],
+    requesterUserId: string,
     requestId: string,
   ) {
     let recipients: Array<{ userId: string }> = []
@@ -1225,10 +1327,26 @@ export class OrderCancellationService {
     } else {
       recipients = [{ userId: order.customerId }]
     }
-    for (const recipient of recipients) {
-      const { responseWindowHours } = resolveOrderCancellationConfig(
-        process.env,
+    const { responseWindowHours } = resolveOrderCancellationConfig(process.env)
+    if (this.communications) {
+      await this.communications.record(
+        {
+          type: "ORDER_CANCELLATION_REQUESTED",
+          aggregateType: "CancellationRequest",
+          aggregateId: requestId,
+          organizationId: order.organizationId,
+          title: "Cancellation response required",
+          message: `Cancellation request ${requestId} needs your response within ${responseWindowHours} hours.`,
+          actionPath: `/dashboard/orders/${order.id}`,
+          dedupKey: `cancel-request:${requestId}:counterparty`,
+          recipientUserIds: recipients.map((recipient) => recipient.userId),
+          actorUserId: requesterUserId,
+        },
+        tx,
       )
+      return
+    }
+    for (const recipient of recipients) {
       await tx.notification.create({
         data: {
           userId: recipient.userId,

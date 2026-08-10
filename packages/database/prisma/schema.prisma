@@ -48,6 +48,60 @@ enum StaffRole {
   FINANCE
 }
 
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum NotificationCategory {
+  SECURITY
+  ACCOUNT
+  ORDERS
+  BILLING
+  SETTLEMENTS
+  PAYOUTS
+  MARKETPLACE
+  SUPPORT
+  STAFF_ALERTS
+  PRODUCT
+}
+
+enum NotificationSeverity {
+  INFO
+  SUCCESS
+  WARNING
+  CRITICAL
+}
+
+enum CommunicationEventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum CommunicationDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  SUPPRESSED
+  BOUNCED
+  COMPLAINED
+}
+
+enum EmailSuppressionReason {
+  HARD_BOUNCE
+  COMPLAINT
+  ADMINISTRATIVE
+}
+
+enum FinancialDocumentKind {
+  PAID_INVOICE
+  CREDIT_NOTE
+  DEPOSIT_RECEIPT
+}
+
 // Deprecated: kept for migration compatibility, will be removed
 enum UserRole {
   OWNER
@@ -489,6 +543,9 @@ model User {
   tickets                       Ticket[]
   messages                      TicketMessage[]
   notifications                 Notification[]
+  notificationPreferences       NotificationPreference[]
+  communicationDeliveries       CommunicationDelivery[]
+  emailSuppressions             EmailSuppression[]
   auditLogs                     AuditLog[]
   sessions                      Session[]
   accounts                      Account[]
@@ -607,6 +664,31 @@ model Organization {
   activeContexts       ActiveContext[]
   depositAttempts      DepositAttempt[]
   websiteImportBatches WebsiteImportBatch[]
+  billingProfile       BillingProfile?
+}
+
+// Mutable billing identity used only as the source for future documents.
+// Every issued financial document receives its own immutable party snapshot,
+// so later corrections never rewrite accounting history.
+model BillingProfile {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  legalName      String   @db.VarChar(160)
+  billingEmail   String?  @db.VarChar(320)
+  addressLine1   String   @db.VarChar(160)
+  addressLine2   String?  @db.VarChar(160)
+  city           String   @db.VarChar(100)
+  region         String?  @db.VarChar(100)
+  postalCode     String   @db.VarChar(32)
+  countryCode    String   @db.VarChar(2)
+  taxIdType      String?  @db.VarChar(32)
+  taxId          String?  @db.VarChar(64)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([countryCode])
 }
 
 enum MembershipStatus {
@@ -2292,34 +2374,172 @@ model TicketMessage {
 }
 
 model Notification {
-  id             String   @id @default(cuid())
+  id             String               @id @default(cuid())
   type           String
+  title          String?              @db.VarChar(160)
   message        String
-  read           Boolean  @default(false)
+  category       NotificationCategory @default(ACCOUNT)
+  severity       NotificationSeverity @default(INFO)
+  actionPath     String?              @db.VarChar(512)
+  read           Boolean              @default(false)
+  readAt         DateTime?
   // Phase 8.12 — made nullable with onDelete: SetNull so user deletion
   // nullifies the reference without losing notification history.
   userId         String?
   // Nullable: staff/system notifications (e.g. chargeback alerts) have no org.
   organizationId String?
+  // Nullable for legacy rows. Durable communication events use this relation
+  // to guarantee one in-app delivery per logical event and recipient.
+  eventId        String?
   // Phase 7.4 (audit #12) — when writers supply a deterministic key (e.g.
   // `recon:walletDrift:wallet-abc:user-xyz:2026-06-16`), the unique constraint
   // below catches BullMQ-retry duplicates. NULL = no dedup applies (legacy
   // path; the partial unique index below excludes NULL rows, so multiple
   // NULLs coexist freely). Builders live in packages/shared/src/notification-dedup-keys.ts.
-  dedupKey       String?  @db.VarChar(256)
-  createdAt      DateTime @default(now())
+  dedupKey       String?              @db.VarChar(256)
+  createdAt      DateTime             @default(now())
 
   // Phase 7.4 FK; Phase 8.12 added onDelete: SetNull.
-  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  organization Organization? @relation(fields: [organizationId], references: [id])
+  user         User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization?       @relation(fields: [organizationId], references: [id])
+  event        CommunicationEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   // Partial unique — see migration 20260616100000_phase74_notification_dedup.
   // Prisma doesn't model partial uniques directly; this @@unique mirrors the
   // SQL constraint name. NULL dedupKey rows are exempt.
   @@unique([userId, dedupKey], map: "Notification_userId_dedupKey_key")
+  @@unique([eventId, userId], map: "Notification_eventId_userId_key")
   @@index([userId, read, createdAt])
   @@index([organizationId, createdAt])
   @@index([read])
+}
+
+// Immutable logical event recorded in the same database transaction as the
+// canonical business mutation. BullMQ accelerates delivery, but this row is
+// the recovery boundary when queue enqueueing or a worker deployment fails.
+model CommunicationEvent {
+  id             String                   @id @default(cuid())
+  type           String                   @db.VarChar(96)
+  category       NotificationCategory
+  severity       NotificationSeverity     @default(INFO)
+  aggregateType  String                   @db.VarChar(64)
+  aggregateId    String                   @db.VarChar(191)
+  organizationId String?
+  title          String                   @db.VarChar(160)
+  message        String                   @db.VarChar(2000)
+  actionPath     String?                  @db.VarChar(512)
+  payload        Json?
+  dedupKey       String                   @unique @db.VarChar(256)
+  status         CommunicationEventStatus @default(PENDING)
+  attempts       Int                      @default(0)
+  availableAt    DateTime                 @default(now())
+  lockedAt       DateTime?
+  processedAt    DateTime?
+  lastError      String?                  @db.VarChar(100)
+  requestId      String?                  @db.VarChar(128)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  deliveries    CommunicationDelivery[]
+  notifications Notification[]
+
+  @@index([status, availableAt, createdAt])
+  @@index([aggregateType, aggregateId])
+  @@index([organizationId, createdAt])
+  @@index([requestId])
+}
+
+model CommunicationDelivery {
+  id                String                      @id @default(cuid())
+  eventId           String
+  userId            String?
+  channel           NotificationChannel
+  status            CommunicationDeliveryStatus @default(PENDING)
+  attempts          Int                         @default(0)
+  availableAt       DateTime                    @default(now())
+  lockedAt          DateTime?
+  provider          String?                     @db.VarChar(32)
+  providerMessageId String?                     @db.VarChar(191)
+  lastError         String?                     @db.VarChar(100)
+  sentAt            DateTime?
+  failedAt          DateTime?
+  bouncedAt         DateTime?
+  complainedAt      DateTime?
+  attachmentName    String?                     @db.VarChar(191)
+  attachmentSha256  String?                     @db.Char(64)
+  attachmentSize    Int?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  event CommunicationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, userId, channel])
+  @@index([channel, status, availableAt, createdAt])
+  @@index([provider, providerMessageId])
+  @@index([userId, createdAt])
+}
+
+// Immutable accounting artifact metadata and rendering snapshot. PDFs are
+// generated in memory from this row at delivery time; the snapshot, sequence,
+// and issuer prefix guarantee that retries reproduce the same document facts.
+// The migration installs a database trigger that rejects UPDATE and DELETE.
+model FinancialDocument {
+  id                String                @id @default(cuid())
+  sequenceNumber    BigInt                @unique @default(autoincrement())
+  kind              FinancialDocumentKind
+  numberPrefix      String                @db.VarChar(12)
+  aggregateType     String                @db.VarChar(64)
+  aggregateId       String                @db.VarChar(191)
+  organizationId    String?
+  relatedDocumentId String?
+  currency          String                @db.VarChar(3)
+  subtotal          Decimal               @db.Decimal(18, 2)
+  taxAmount         Decimal               @db.Decimal(18, 2)
+  total             Decimal               @db.Decimal(18, 2)
+  issuedAt          DateTime              @default(now())
+  snapshot          Json
+  dedupKey          String                @unique @db.VarChar(256)
+  createdAt         DateTime              @default(now())
+
+  relatedDocument FinancialDocument?  @relation("FinancialDocumentAdjustments", fields: [relatedDocumentId], references: [id], onDelete: Restrict)
+  adjustments     FinancialDocument[] @relation("FinancialDocumentAdjustments")
+
+  @@unique([kind, aggregateType, aggregateId])
+  @@index([organizationId, issuedAt])
+  @@index([aggregateType, aggregateId])
+  @@index([relatedDocumentId])
+}
+
+model NotificationPreference {
+  id        String               @id @default(cuid())
+  userId    String
+  category  NotificationCategory
+  channel   NotificationChannel
+  enabled   Boolean              @default(true)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, channel])
+  @@index([userId, enabled])
+}
+
+model EmailSuppression {
+  id        String                 @id @default(cuid())
+  userId    String
+  email     String                 @db.VarChar(320)
+  reason    EmailSuppressionReason
+  active    Boolean                @default(true)
+  sourceRef String?                @db.VarChar(191)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, email])
+  @@index([email, active])
 }
 
 model AuditLog {

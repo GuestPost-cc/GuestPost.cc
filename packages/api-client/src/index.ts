@@ -71,6 +71,13 @@ export type { DepositCapabilityResponse } from "./services/billing"
 export { BillingService } from "./services/billing"
 export type { Campaign } from "./services/campaigns"
 export { CampaignsService } from "./services/campaigns"
+export type {
+  BillingProfile,
+  BillingProfileInput,
+  OrganizationDetail,
+  OrganizationMember,
+  Team,
+} from "./services/identity"
 export { IdentityService } from "./services/identity"
 export { IntegrationsService } from "./services/integrations"
 export { integrationKeys } from "./services/integrations/keys"
@@ -89,6 +96,8 @@ export { MarketplaceService } from "./services/marketplace"
 export type {
   NotificationItem,
   NotificationListResponse,
+  NotificationPreference,
+  NotificationPreferenceCategory,
 } from "./services/notifications"
 export { NotificationsService } from "./services/notifications"
 export type {

@@ -1,10 +1,26 @@
 "use client"
 
-import { Button, Card, CardContent, Input, Label, Switch } from "@guestpost/ui"
+import {
+  Button,
+  Card,
+  CardContent,
+  Input,
+  Label,
+  NotificationPreferencesForm,
+  type NotificationPreferenceValue,
+  Switch,
+} from "@guestpost/ui"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { RefreshCw, Save, Settings, ShieldCheck, UserRound } from "lucide-react"
-import { useState } from "react"
+import {
+  Bell,
+  RefreshCw,
+  Save,
+  Settings,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -25,12 +41,31 @@ type ProfileForm = z.infer<typeof profileSchema>
 export default function SettingsPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const [notificationPreferences, setNotificationPreferences] = useState<
+    NotificationPreferenceValue[]
+  >([])
 
   const { data: profileData } = useQuery({
     queryKey: ["admin-settings"],
     queryFn: () => api.identity.me(),
     enabled: !!user?.id,
   })
+
+  const {
+    data: notificationPreferenceData,
+    isLoading: notificationPreferencesLoading,
+    error: notificationPreferencesError,
+  } = useQuery({
+    queryKey: ["notification-preferences"],
+    queryFn: () => api.notifications.preferences(),
+    enabled: Boolean(user?.id),
+  })
+
+  useEffect(() => {
+    if (notificationPreferenceData) {
+      setNotificationPreferences(notificationPreferenceData)
+    }
+  }, [notificationPreferenceData])
 
   const {
     register,
@@ -48,6 +83,16 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-settings"] })
     },
     onError: () => toast.error("Failed to update profile"),
+  })
+
+  const notificationMutation = useMutation({
+    mutationFn: (preferences: NotificationPreferenceValue[]) =>
+      api.notifications.updatePreferences(preferences),
+    onSuccess: (preferences) => {
+      setNotificationPreferences(preferences)
+      toast.success("Notification preferences updated")
+    },
+    onError: (mutationError: Error) => toast.error(mutationError.message),
   })
 
   // Maintenance mode requires a backend endpoint — currently inactive
@@ -88,6 +133,37 @@ export default function SettingsPage() {
                 </dd>
               </div>
             </dl>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardContent className="p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Bell className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-lg font-semibold">
+                  Notification preferences
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Choose where you receive operational and account updates.
+                </p>
+              </div>
+            </div>
+            {notificationPreferencesError ? (
+              <AdminNotice title="Preferences unavailable" tone="warning">
+                {(notificationPreferencesError as Error).message}
+              </AdminNotice>
+            ) : (
+              <NotificationPreferencesForm
+                preferences={notificationPreferences}
+                loading={notificationPreferencesLoading}
+                saving={notificationMutation.isPending}
+                onChange={setNotificationPreferences}
+                onSave={() =>
+                  notificationMutation.mutate(notificationPreferences)
+                }
+              />
+            )}
           </CardContent>
         </Card>
 

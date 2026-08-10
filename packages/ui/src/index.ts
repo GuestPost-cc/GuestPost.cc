@@ -145,6 +145,12 @@ export type {
   NotificationBellProps,
 } from "./components/notification-bell"
 export { NotificationBell } from "./components/notification-bell"
+export type {
+  NotificationPreferenceCategory,
+  NotificationPreferencesFormProps,
+  NotificationPreferenceValue,
+} from "./components/notification-preferences-form"
+export { NotificationPreferencesForm } from "./components/notification-preferences-form"
 export type { OrderLifecycleProgressProps } from "./components/order-lifecycle-progress"
 export { OrderLifecycleProgress } from "./components/order-lifecycle-progress"
 export { PageHeader } from "./components/page-header"

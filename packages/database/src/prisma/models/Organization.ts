@@ -208,6 +208,7 @@ export type OrganizationWhereInput = {
   activeContexts?: Prisma.ActiveContextListRelationFilter
   depositAttempts?: Prisma.DepositAttemptListRelationFilter
   websiteImportBatches?: Prisma.WebsiteImportBatchListRelationFilter
+  billingProfile?: Prisma.XOR<Prisma.BillingProfileNullableScalarRelationFilter, Prisma.BillingProfileWhereInput> | null
 }
 
 export type OrganizationOrderByWithRelationInput = {
@@ -232,6 +233,7 @@ export type OrganizationOrderByWithRelationInput = {
   activeContexts?: Prisma.ActiveContextOrderByRelationAggregateInput
   depositAttempts?: Prisma.DepositAttemptOrderByRelationAggregateInput
   websiteImportBatches?: Prisma.WebsiteImportBatchOrderByRelationAggregateInput
+  billingProfile?: Prisma.BillingProfileOrderByWithRelationInput
 }
 
 export type OrganizationWhereUniqueInput = Prisma.AtLeast<{
@@ -259,6 +261,7 @@ export type OrganizationWhereUniqueInput = Prisma.AtLeast<{
   activeContexts?: Prisma.ActiveContextListRelationFilter
   depositAttempts?: Prisma.DepositAttemptListRelationFilter
   websiteImportBatches?: Prisma.WebsiteImportBatchListRelationFilter
+  billingProfile?: Prisma.XOR<Prisma.BillingProfileNullableScalarRelationFilter, Prisma.BillingProfileWhereInput> | null
 }, "id" | "slug">
 
 export type OrganizationOrderByWithAggregationInput = {
@@ -309,6 +312,7 @@ export type OrganizationCreateInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateInput = {
@@ -333,6 +337,7 @@ export type OrganizationUncheckedCreateInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUpdateInput = {
@@ -357,6 +362,7 @@ export type OrganizationUpdateInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateInput = {
@@ -381,6 +387,7 @@ export type OrganizationUncheckedUpdateInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateManyInput = {
@@ -465,6 +472,20 @@ export type OrganizationUpdateOneWithoutActiveContextsNestedInput = {
   delete?: Prisma.OrganizationWhereInput | boolean
   connect?: Prisma.OrganizationWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrganizationUpdateToOneWithWhereWithoutActiveContextsInput, Prisma.OrganizationUpdateWithoutActiveContextsInput>, Prisma.OrganizationUncheckedUpdateWithoutActiveContextsInput>
+}
+
+export type OrganizationCreateNestedOneWithoutBillingProfileInput = {
+  create?: Prisma.XOR<Prisma.OrganizationCreateWithoutBillingProfileInput, Prisma.OrganizationUncheckedCreateWithoutBillingProfileInput>
+  connectOrCreate?: Prisma.OrganizationCreateOrConnectWithoutBillingProfileInput
+  connect?: Prisma.OrganizationWhereUniqueInput
+}
+
+export type OrganizationUpdateOneRequiredWithoutBillingProfileNestedInput = {
+  create?: Prisma.XOR<Prisma.OrganizationCreateWithoutBillingProfileInput, Prisma.OrganizationUncheckedCreateWithoutBillingProfileInput>
+  connectOrCreate?: Prisma.OrganizationCreateOrConnectWithoutBillingProfileInput
+  upsert?: Prisma.OrganizationUpsertWithoutBillingProfileInput
+  connect?: Prisma.OrganizationWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrganizationUpdateToOneWithWhereWithoutBillingProfileInput, Prisma.OrganizationUpdateWithoutBillingProfileInput>, Prisma.OrganizationUncheckedUpdateWithoutBillingProfileInput>
 }
 
 export type OrganizationCreateNestedOneWithoutMembershipsInput = {
@@ -680,6 +701,7 @@ export type OrganizationCreateWithoutActiveContextsInput = {
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutActiveContextsInput = {
@@ -703,6 +725,7 @@ export type OrganizationUncheckedCreateWithoutActiveContextsInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutActiveContextsInput = {
@@ -742,6 +765,7 @@ export type OrganizationUpdateWithoutActiveContextsInput = {
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutActiveContextsInput = {
@@ -763,6 +787,119 @@ export type OrganizationUncheckedUpdateWithoutActiveContextsInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
+}
+
+export type OrganizationCreateWithoutBillingProfileInput = {
+  id?: string
+  name: string
+  slug: string
+  plan?: string
+  settings?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutOrganizationInput
+  teams?: Prisma.TeamCreateNestedManyWithoutOrganizationInput
+  publishers?: Prisma.PublisherCreateNestedManyWithoutOrganizationInput
+  campaigns?: Prisma.CampaignCreateNestedManyWithoutOrganizationInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutOrganizationInput
+  orders?: Prisma.OrderCreateNestedManyWithoutOrganizationInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutOrganizationInput
+  notifications?: Prisma.NotificationCreateNestedManyWithoutOrganizationInput
+  auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
+  apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
+  marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
+  depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+}
+
+export type OrganizationUncheckedCreateWithoutBillingProfileInput = {
+  id?: string
+  name: string
+  slug: string
+  plan?: string
+  settings?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutOrganizationInput
+  teams?: Prisma.TeamUncheckedCreateNestedManyWithoutOrganizationInput
+  publishers?: Prisma.PublisherUncheckedCreateNestedManyWithoutOrganizationInput
+  campaigns?: Prisma.CampaignUncheckedCreateNestedManyWithoutOrganizationInput
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutOrganizationInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutOrganizationInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrganizationInput
+  notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganizationInput
+  auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+  apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
+  depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+}
+
+export type OrganizationCreateOrConnectWithoutBillingProfileInput = {
+  where: Prisma.OrganizationWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrganizationCreateWithoutBillingProfileInput, Prisma.OrganizationUncheckedCreateWithoutBillingProfileInput>
+}
+
+export type OrganizationUpsertWithoutBillingProfileInput = {
+  update: Prisma.XOR<Prisma.OrganizationUpdateWithoutBillingProfileInput, Prisma.OrganizationUncheckedUpdateWithoutBillingProfileInput>
+  create: Prisma.XOR<Prisma.OrganizationCreateWithoutBillingProfileInput, Prisma.OrganizationUncheckedCreateWithoutBillingProfileInput>
+  where?: Prisma.OrganizationWhereInput
+}
+
+export type OrganizationUpdateToOneWithWhereWithoutBillingProfileInput = {
+  where?: Prisma.OrganizationWhereInput
+  data: Prisma.XOR<Prisma.OrganizationUpdateWithoutBillingProfileInput, Prisma.OrganizationUncheckedUpdateWithoutBillingProfileInput>
+}
+
+export type OrganizationUpdateWithoutBillingProfileInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  settings?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutOrganizationNestedInput
+  teams?: Prisma.TeamUpdateManyWithoutOrganizationNestedInput
+  publishers?: Prisma.PublisherUpdateManyWithoutOrganizationNestedInput
+  campaigns?: Prisma.CampaignUpdateManyWithoutOrganizationNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutOrganizationNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutOrganizationNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutOrganizationNestedInput
+  notifications?: Prisma.NotificationUpdateManyWithoutOrganizationNestedInput
+  auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
+  apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
+  depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+}
+
+export type OrganizationUncheckedUpdateWithoutBillingProfileInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  settings?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutOrganizationNestedInput
+  teams?: Prisma.TeamUncheckedUpdateManyWithoutOrganizationNestedInput
+  publishers?: Prisma.PublisherUncheckedUpdateManyWithoutOrganizationNestedInput
+  campaigns?: Prisma.CampaignUncheckedUpdateManyWithoutOrganizationNestedInput
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutOrganizationNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutOrganizationNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrganizationNestedInput
+  notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganizationNestedInput
+  auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+  apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
 }
@@ -788,6 +925,7 @@ export type OrganizationCreateWithoutMembershipsInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutMembershipsInput = {
@@ -811,6 +949,7 @@ export type OrganizationUncheckedCreateWithoutMembershipsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutMembershipsInput = {
@@ -850,6 +989,7 @@ export type OrganizationUpdateWithoutMembershipsInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutMembershipsInput = {
@@ -873,6 +1013,7 @@ export type OrganizationUncheckedUpdateWithoutMembershipsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutTeamsInput = {
@@ -896,6 +1037,7 @@ export type OrganizationCreateWithoutTeamsInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutTeamsInput = {
@@ -919,6 +1061,7 @@ export type OrganizationUncheckedCreateWithoutTeamsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutTeamsInput = {
@@ -958,6 +1101,7 @@ export type OrganizationUpdateWithoutTeamsInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutTeamsInput = {
@@ -981,6 +1125,7 @@ export type OrganizationUncheckedUpdateWithoutTeamsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutPublishersInput = {
@@ -1004,6 +1149,7 @@ export type OrganizationCreateWithoutPublishersInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutPublishersInput = {
@@ -1027,6 +1173,7 @@ export type OrganizationUncheckedCreateWithoutPublishersInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutPublishersInput = {
@@ -1066,6 +1213,7 @@ export type OrganizationUpdateWithoutPublishersInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutPublishersInput = {
@@ -1089,6 +1237,7 @@ export type OrganizationUncheckedUpdateWithoutPublishersInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutWebsiteImportBatchesInput = {
@@ -1112,6 +1261,7 @@ export type OrganizationCreateWithoutWebsiteImportBatchesInput = {
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutWebsiteImportBatchesInput = {
@@ -1135,6 +1285,7 @@ export type OrganizationUncheckedCreateWithoutWebsiteImportBatchesInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutWebsiteImportBatchesInput = {
@@ -1174,6 +1325,7 @@ export type OrganizationUpdateWithoutWebsiteImportBatchesInput = {
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutWebsiteImportBatchesInput = {
@@ -1197,6 +1349,7 @@ export type OrganizationUncheckedUpdateWithoutWebsiteImportBatchesInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutOrdersInput = {
@@ -1220,6 +1373,7 @@ export type OrganizationCreateWithoutOrdersInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutOrdersInput = {
@@ -1243,6 +1397,7 @@ export type OrganizationUncheckedCreateWithoutOrdersInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutOrdersInput = {
@@ -1282,6 +1437,7 @@ export type OrganizationUpdateWithoutOrdersInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutOrdersInput = {
@@ -1305,6 +1461,7 @@ export type OrganizationUncheckedUpdateWithoutOrdersInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutCampaignsInput = {
@@ -1328,6 +1485,7 @@ export type OrganizationCreateWithoutCampaignsInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutCampaignsInput = {
@@ -1351,6 +1509,7 @@ export type OrganizationUncheckedCreateWithoutCampaignsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutCampaignsInput = {
@@ -1390,6 +1549,7 @@ export type OrganizationUpdateWithoutCampaignsInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutCampaignsInput = {
@@ -1413,6 +1573,7 @@ export type OrganizationUncheckedUpdateWithoutCampaignsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutApiKeysInput = {
@@ -1436,6 +1597,7 @@ export type OrganizationCreateWithoutApiKeysInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutApiKeysInput = {
@@ -1459,6 +1621,7 @@ export type OrganizationUncheckedCreateWithoutApiKeysInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutApiKeysInput = {
@@ -1498,6 +1661,7 @@ export type OrganizationUpdateWithoutApiKeysInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutApiKeysInput = {
@@ -1521,6 +1685,7 @@ export type OrganizationUncheckedUpdateWithoutApiKeysInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutWalletsInput = {
@@ -1544,6 +1709,7 @@ export type OrganizationCreateWithoutWalletsInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutWalletsInput = {
@@ -1567,6 +1733,7 @@ export type OrganizationUncheckedCreateWithoutWalletsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutWalletsInput = {
@@ -1606,6 +1773,7 @@ export type OrganizationUpdateWithoutWalletsInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutWalletsInput = {
@@ -1629,6 +1797,7 @@ export type OrganizationUncheckedUpdateWithoutWalletsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutDepositAttemptsInput = {
@@ -1652,6 +1821,7 @@ export type OrganizationCreateWithoutDepositAttemptsInput = {
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutDepositAttemptsInput = {
@@ -1675,6 +1845,7 @@ export type OrganizationUncheckedCreateWithoutDepositAttemptsInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutDepositAttemptsInput = {
@@ -1714,6 +1885,7 @@ export type OrganizationUpdateWithoutDepositAttemptsInput = {
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutDepositAttemptsInput = {
@@ -1737,6 +1909,7 @@ export type OrganizationUncheckedUpdateWithoutDepositAttemptsInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutTicketsInput = {
@@ -1760,6 +1933,7 @@ export type OrganizationCreateWithoutTicketsInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutTicketsInput = {
@@ -1783,6 +1957,7 @@ export type OrganizationUncheckedCreateWithoutTicketsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutTicketsInput = {
@@ -1822,6 +1997,7 @@ export type OrganizationUpdateWithoutTicketsInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutTicketsInput = {
@@ -1845,6 +2021,7 @@ export type OrganizationUncheckedUpdateWithoutTicketsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutNotificationsInput = {
@@ -1868,6 +2045,7 @@ export type OrganizationCreateWithoutNotificationsInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutNotificationsInput = {
@@ -1891,6 +2069,7 @@ export type OrganizationUncheckedCreateWithoutNotificationsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutNotificationsInput = {
@@ -1930,6 +2109,7 @@ export type OrganizationUpdateWithoutNotificationsInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutNotificationsInput = {
@@ -1953,6 +2133,7 @@ export type OrganizationUncheckedUpdateWithoutNotificationsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutAuditLogsInput = {
@@ -1976,6 +2157,7 @@ export type OrganizationCreateWithoutAuditLogsInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutAuditLogsInput = {
@@ -1999,6 +2181,7 @@ export type OrganizationUncheckedCreateWithoutAuditLogsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutAuditLogsInput = {
@@ -2038,6 +2221,7 @@ export type OrganizationUpdateWithoutAuditLogsInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutAuditLogsInput = {
@@ -2061,6 +2245,7 @@ export type OrganizationUncheckedUpdateWithoutAuditLogsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutMarketplaceListingsInput = {
@@ -2084,6 +2269,7 @@ export type OrganizationCreateWithoutMarketplaceListingsInput = {
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutMarketplaceListingsInput = {
@@ -2107,6 +2293,7 @@ export type OrganizationUncheckedCreateWithoutMarketplaceListingsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
   depositAttempts?: Prisma.DepositAttemptUncheckedCreateNestedManyWithoutOrganizationInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutOrganizationInput
+  billingProfile?: Prisma.BillingProfileUncheckedCreateNestedOneWithoutOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutMarketplaceListingsInput = {
@@ -2146,6 +2333,7 @@ export type OrganizationUpdateWithoutMarketplaceListingsInput = {
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUpdateOneWithoutOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutMarketplaceListingsInput = {
@@ -2169,6 +2357,7 @@ export type OrganizationUncheckedUpdateWithoutMarketplaceListingsInput = {
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
   depositAttempts?: Prisma.DepositAttemptUncheckedUpdateManyWithoutOrganizationNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutOrganizationNestedInput
+  billingProfile?: Prisma.BillingProfileUncheckedUpdateOneWithoutOrganizationNestedInput
 }
 
 
@@ -2341,6 +2530,7 @@ export type OrganizationSelect<ExtArgs extends runtime.Types.Extensions.Internal
   activeContexts?: boolean | Prisma.Organization$activeContextsArgs<ExtArgs>
   depositAttempts?: boolean | Prisma.Organization$depositAttemptsArgs<ExtArgs>
   websiteImportBatches?: boolean | Prisma.Organization$websiteImportBatchesArgs<ExtArgs>
+  billingProfile?: boolean | Prisma.Organization$billingProfileArgs<ExtArgs>
   _count?: boolean | Prisma.OrganizationCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["organization"]>
 
@@ -2390,6 +2580,7 @@ export type OrganizationInclude<ExtArgs extends runtime.Types.Extensions.Interna
   activeContexts?: boolean | Prisma.Organization$activeContextsArgs<ExtArgs>
   depositAttempts?: boolean | Prisma.Organization$depositAttemptsArgs<ExtArgs>
   websiteImportBatches?: boolean | Prisma.Organization$websiteImportBatchesArgs<ExtArgs>
+  billingProfile?: boolean | Prisma.Organization$billingProfileArgs<ExtArgs>
   _count?: boolean | Prisma.OrganizationCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OrganizationIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -2412,6 +2603,7 @@ export type $OrganizationPayload<ExtArgs extends runtime.Types.Extensions.Intern
     activeContexts: Prisma.$ActiveContextPayload<ExtArgs>[]
     depositAttempts: Prisma.$DepositAttemptPayload<ExtArgs>[]
     websiteImportBatches: Prisma.$WebsiteImportBatchPayload<ExtArgs>[]
+    billingProfile: Prisma.$BillingProfilePayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2829,6 +3021,7 @@ export interface Prisma__OrganizationClient<T, Null = never, ExtArgs extends run
   activeContexts<T extends Prisma.Organization$activeContextsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organization$activeContextsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ActiveContextPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   depositAttempts<T extends Prisma.Organization$depositAttemptsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organization$depositAttemptsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DepositAttemptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   websiteImportBatches<T extends Prisma.Organization$websiteImportBatchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organization$websiteImportBatchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebsiteImportBatchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  billingProfile<T extends Prisma.Organization$billingProfileArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organization$billingProfileArgs<ExtArgs>>): Prisma.Prisma__BillingProfileClient<runtime.Types.Result.GetResult<Prisma.$BillingProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3591,6 +3784,25 @@ export type Organization$websiteImportBatchesArgs<ExtArgs extends runtime.Types.
   take?: number
   skip?: number
   distinct?: Prisma.WebsiteImportBatchScalarFieldEnum | Prisma.WebsiteImportBatchScalarFieldEnum[]
+}
+
+/**
+ * Organization.billingProfile
+ */
+export type Organization$billingProfileArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the BillingProfile
+   */
+  select?: Prisma.BillingProfileSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the BillingProfile
+   */
+  omit?: Prisma.BillingProfileOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.BillingProfileInclude<ExtArgs> | null
+  where?: Prisma.BillingProfileWhereInput
 }
 
 /**

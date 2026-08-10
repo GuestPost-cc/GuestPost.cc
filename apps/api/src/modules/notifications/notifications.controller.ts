@@ -1,10 +1,44 @@
-import { Controller, Get, Param, Patch, Post, Query } from "@nestjs/common"
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from "@nestjs/common"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { CommunicationsService } from "../communications/communications.service"
+import { UpdateNotificationPreferencesDto } from "./dto/notification-preferences.dto"
 import { NotificationsService } from "./notifications.service"
 
 @Controller("notifications")
 export class NotificationsController {
-  constructor(private readonly notifications: NotificationsService) {}
+  constructor(
+    private readonly notifications: NotificationsService,
+    private readonly communications: CommunicationsService,
+  ) {}
+
+  @Get("preferences")
+  preferences(@CurrentUser() user: any) {
+    return this.communications.getPreferences(
+      user.id,
+      user.userType === "STAFF" || Boolean(user.staffRole),
+    )
+  }
+
+  @Put("preferences")
+  updatePreferences(
+    @CurrentUser() user: any,
+    @Body() body: UpdateNotificationPreferencesDto,
+  ) {
+    return this.communications.updatePreferences(
+      user.id,
+      user.userType === "STAFF" || Boolean(user.staffRole),
+      body.preferences,
+    )
+  }
 
   @Get()
   list(

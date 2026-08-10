@@ -3,10 +3,34 @@ import type { HttpClient } from "../client"
 export interface NotificationItem {
   id: string
   type: string
+  title: string | null
   message: string
+  category:
+    | "SECURITY"
+    | "ACCOUNT"
+    | "ORDERS"
+    | "BILLING"
+    | "SETTLEMENTS"
+    | "PAYOUTS"
+    | "MARKETPLACE"
+    | "SUPPORT"
+    | "STAFF_ALERTS"
+    | "PRODUCT"
+  severity: "INFO" | "SUCCESS" | "WARNING" | "CRITICAL"
+  actionPath: string | null
   read: boolean
+  readAt: string | null
   organizationId: string | null
   createdAt: string
+}
+
+export type NotificationPreferenceCategory = NotificationItem["category"]
+
+export interface NotificationPreference {
+  category: NotificationPreferenceCategory
+  mutable: boolean
+  inApp: boolean
+  email: boolean
 }
 
 export interface NotificationListResponse {
@@ -48,6 +72,27 @@ export class NotificationsService {
   markAllRead() {
     return this.client.post<{ ok: boolean; marked: number }>(
       "/notifications/mark-all-read",
+    )
+  }
+
+  preferences() {
+    return this.client.get<NotificationPreference[]>(
+      "/notifications/preferences",
+    )
+  }
+
+  updatePreferences(preferences: NotificationPreference[]) {
+    return this.client.put<NotificationPreference[]>(
+      "/notifications/preferences",
+      {
+        json: {
+          preferences: preferences.map(({ category, inApp, email }) => ({
+            category,
+            inApp,
+            email,
+          })),
+        },
+      },
     )
   }
 }

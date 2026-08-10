@@ -391,6 +391,7 @@ export const ModelName = {
   Verification: 'Verification',
   ActiveContext: 'ActiveContext',
   Organization: 'Organization',
+  BillingProfile: 'BillingProfile',
   Membership: 'Membership',
   PublisherMembership: 'PublisherMembership',
   StaffMembership: 'StaffMembership',
@@ -442,6 +443,11 @@ export const ModelName = {
   Ticket: 'Ticket',
   TicketMessage: 'TicketMessage',
   Notification: 'Notification',
+  CommunicationEvent: 'CommunicationEvent',
+  CommunicationDelivery: 'CommunicationDelivery',
+  FinancialDocument: 'FinancialDocument',
+  NotificationPreference: 'NotificationPreference',
+  EmailSuppression: 'EmailSuppression',
   AuditLog: 'AuditLog',
   MarketplaceCategory: 'MarketplaceCategory',
   MarketplaceTag: 'MarketplaceTag',
@@ -486,7 +492,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "billingProfile" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "communicationEvent" | "communicationDelivery" | "financialDocument" | "notificationPreference" | "emailSuppression" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1005,6 +1011,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.OrganizationCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.OrganizationCountAggregateOutputType> | number
+        }
+      }
+    }
+    BillingProfile: {
+      payload: Prisma.$BillingProfilePayload<ExtArgs>
+      fields: Prisma.BillingProfileFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.BillingProfileFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.BillingProfileFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload>
+        }
+        findFirst: {
+          args: Prisma.BillingProfileFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.BillingProfileFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload>
+        }
+        findMany: {
+          args: Prisma.BillingProfileFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload>[]
+        }
+        create: {
+          args: Prisma.BillingProfileCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload>
+        }
+        createMany: {
+          args: Prisma.BillingProfileCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.BillingProfileCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload>[]
+        }
+        delete: {
+          args: Prisma.BillingProfileDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload>
+        }
+        update: {
+          args: Prisma.BillingProfileUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload>
+        }
+        deleteMany: {
+          args: Prisma.BillingProfileDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.BillingProfileUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.BillingProfileUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload>[]
+        }
+        upsert: {
+          args: Prisma.BillingProfileUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BillingProfilePayload>
+        }
+        aggregate: {
+          args: Prisma.BillingProfileAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateBillingProfile>
+        }
+        groupBy: {
+          args: Prisma.BillingProfileGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BillingProfileGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.BillingProfileCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BillingProfileCountAggregateOutputType> | number
         }
       }
     }
@@ -4782,6 +4862,376 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    CommunicationEvent: {
+      payload: Prisma.$CommunicationEventPayload<ExtArgs>
+      fields: Prisma.CommunicationEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunicationEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunicationEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunicationEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunicationEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload>
+        }
+        findMany: {
+          args: Prisma.CommunicationEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload>[]
+        }
+        create: {
+          args: Prisma.CommunicationEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload>
+        }
+        createMany: {
+          args: Prisma.CommunicationEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunicationEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunicationEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload>
+        }
+        update: {
+          args: Prisma.CommunicationEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunicationEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunicationEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunicationEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunicationEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationEventPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunicationEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunicationEvent>
+        }
+        groupBy: {
+          args: Prisma.CommunicationEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunicationEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunicationEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunicationEventCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunicationDelivery: {
+      payload: Prisma.$CommunicationDeliveryPayload<ExtArgs>
+      fields: Prisma.CommunicationDeliveryFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunicationDeliveryFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunicationDeliveryFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunicationDeliveryFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunicationDeliveryFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload>
+        }
+        findMany: {
+          args: Prisma.CommunicationDeliveryFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload>[]
+        }
+        create: {
+          args: Prisma.CommunicationDeliveryCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload>
+        }
+        createMany: {
+          args: Prisma.CommunicationDeliveryCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunicationDeliveryCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunicationDeliveryDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload>
+        }
+        update: {
+          args: Prisma.CommunicationDeliveryUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunicationDeliveryDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunicationDeliveryUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunicationDeliveryUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunicationDeliveryUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunicationDeliveryPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunicationDeliveryAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunicationDelivery>
+        }
+        groupBy: {
+          args: Prisma.CommunicationDeliveryGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunicationDeliveryGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunicationDeliveryCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunicationDeliveryCountAggregateOutputType> | number
+        }
+      }
+    }
+    FinancialDocument: {
+      payload: Prisma.$FinancialDocumentPayload<ExtArgs>
+      fields: Prisma.FinancialDocumentFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FinancialDocumentFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FinancialDocumentFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload>
+        }
+        findFirst: {
+          args: Prisma.FinancialDocumentFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FinancialDocumentFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload>
+        }
+        findMany: {
+          args: Prisma.FinancialDocumentFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload>[]
+        }
+        create: {
+          args: Prisma.FinancialDocumentCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload>
+        }
+        createMany: {
+          args: Prisma.FinancialDocumentCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FinancialDocumentCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload>[]
+        }
+        delete: {
+          args: Prisma.FinancialDocumentDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload>
+        }
+        update: {
+          args: Prisma.FinancialDocumentUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload>
+        }
+        deleteMany: {
+          args: Prisma.FinancialDocumentDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FinancialDocumentUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FinancialDocumentUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload>[]
+        }
+        upsert: {
+          args: Prisma.FinancialDocumentUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FinancialDocumentPayload>
+        }
+        aggregate: {
+          args: Prisma.FinancialDocumentAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFinancialDocument>
+        }
+        groupBy: {
+          args: Prisma.FinancialDocumentGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FinancialDocumentGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FinancialDocumentCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FinancialDocumentCountAggregateOutputType> | number
+        }
+      }
+    }
+    NotificationPreference: {
+      payload: Prisma.$NotificationPreferencePayload<ExtArgs>
+      fields: Prisma.NotificationPreferenceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.NotificationPreferenceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.NotificationPreferenceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload>
+        }
+        findFirst: {
+          args: Prisma.NotificationPreferenceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.NotificationPreferenceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload>
+        }
+        findMany: {
+          args: Prisma.NotificationPreferenceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload>[]
+        }
+        create: {
+          args: Prisma.NotificationPreferenceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload>
+        }
+        createMany: {
+          args: Prisma.NotificationPreferenceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.NotificationPreferenceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload>[]
+        }
+        delete: {
+          args: Prisma.NotificationPreferenceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload>
+        }
+        update: {
+          args: Prisma.NotificationPreferenceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload>
+        }
+        deleteMany: {
+          args: Prisma.NotificationPreferenceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.NotificationPreferenceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.NotificationPreferenceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload>[]
+        }
+        upsert: {
+          args: Prisma.NotificationPreferenceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NotificationPreferencePayload>
+        }
+        aggregate: {
+          args: Prisma.NotificationPreferenceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateNotificationPreference>
+        }
+        groupBy: {
+          args: Prisma.NotificationPreferenceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NotificationPreferenceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.NotificationPreferenceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NotificationPreferenceCountAggregateOutputType> | number
+        }
+      }
+    }
+    EmailSuppression: {
+      payload: Prisma.$EmailSuppressionPayload<ExtArgs>
+      fields: Prisma.EmailSuppressionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.EmailSuppressionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.EmailSuppressionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload>
+        }
+        findFirst: {
+          args: Prisma.EmailSuppressionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.EmailSuppressionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload>
+        }
+        findMany: {
+          args: Prisma.EmailSuppressionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload>[]
+        }
+        create: {
+          args: Prisma.EmailSuppressionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload>
+        }
+        createMany: {
+          args: Prisma.EmailSuppressionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.EmailSuppressionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload>[]
+        }
+        delete: {
+          args: Prisma.EmailSuppressionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload>
+        }
+        update: {
+          args: Prisma.EmailSuppressionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload>
+        }
+        deleteMany: {
+          args: Prisma.EmailSuppressionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.EmailSuppressionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.EmailSuppressionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload>[]
+        }
+        upsert: {
+          args: Prisma.EmailSuppressionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailSuppressionPayload>
+        }
+        aggregate: {
+          args: Prisma.EmailSuppressionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateEmailSuppression>
+        }
+        groupBy: {
+          args: Prisma.EmailSuppressionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EmailSuppressionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.EmailSuppressionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EmailSuppressionCountAggregateOutputType> | number
+        }
+      }
+    }
     AuditLog: {
       payload: Prisma.$AuditLogPayload<ExtArgs>
       fields: Prisma.AuditLogFieldRefs
@@ -7072,6 +7522,26 @@ export const OrganizationScalarFieldEnum = {
 export type OrganizationScalarFieldEnum = (typeof OrganizationScalarFieldEnum)[keyof typeof OrganizationScalarFieldEnum]
 
 
+export const BillingProfileScalarFieldEnum = {
+  id: 'id',
+  organizationId: 'organizationId',
+  legalName: 'legalName',
+  billingEmail: 'billingEmail',
+  addressLine1: 'addressLine1',
+  addressLine2: 'addressLine2',
+  city: 'city',
+  region: 'region',
+  postalCode: 'postalCode',
+  countryCode: 'countryCode',
+  taxIdType: 'taxIdType',
+  taxId: 'taxId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BillingProfileScalarFieldEnum = (typeof BillingProfileScalarFieldEnum)[keyof typeof BillingProfileScalarFieldEnum]
+
+
 export const MembershipScalarFieldEnum = {
   id: 'id',
   role: 'role',
@@ -8064,15 +8534,123 @@ export type TicketMessageScalarFieldEnum = (typeof TicketMessageScalarFieldEnum)
 export const NotificationScalarFieldEnum = {
   id: 'id',
   type: 'type',
+  title: 'title',
   message: 'message',
+  category: 'category',
+  severity: 'severity',
+  actionPath: 'actionPath',
   read: 'read',
+  readAt: 'readAt',
   userId: 'userId',
   organizationId: 'organizationId',
+  eventId: 'eventId',
   dedupKey: 'dedupKey',
   createdAt: 'createdAt'
 } as const
 
 export type NotificationScalarFieldEnum = (typeof NotificationScalarFieldEnum)[keyof typeof NotificationScalarFieldEnum]
+
+
+export const CommunicationEventScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  category: 'category',
+  severity: 'severity',
+  aggregateType: 'aggregateType',
+  aggregateId: 'aggregateId',
+  organizationId: 'organizationId',
+  title: 'title',
+  message: 'message',
+  actionPath: 'actionPath',
+  payload: 'payload',
+  dedupKey: 'dedupKey',
+  status: 'status',
+  attempts: 'attempts',
+  availableAt: 'availableAt',
+  lockedAt: 'lockedAt',
+  processedAt: 'processedAt',
+  lastError: 'lastError',
+  requestId: 'requestId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CommunicationEventScalarFieldEnum = (typeof CommunicationEventScalarFieldEnum)[keyof typeof CommunicationEventScalarFieldEnum]
+
+
+export const CommunicationDeliveryScalarFieldEnum = {
+  id: 'id',
+  eventId: 'eventId',
+  userId: 'userId',
+  channel: 'channel',
+  status: 'status',
+  attempts: 'attempts',
+  availableAt: 'availableAt',
+  lockedAt: 'lockedAt',
+  provider: 'provider',
+  providerMessageId: 'providerMessageId',
+  lastError: 'lastError',
+  sentAt: 'sentAt',
+  failedAt: 'failedAt',
+  bouncedAt: 'bouncedAt',
+  complainedAt: 'complainedAt',
+  attachmentName: 'attachmentName',
+  attachmentSha256: 'attachmentSha256',
+  attachmentSize: 'attachmentSize',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CommunicationDeliveryScalarFieldEnum = (typeof CommunicationDeliveryScalarFieldEnum)[keyof typeof CommunicationDeliveryScalarFieldEnum]
+
+
+export const FinancialDocumentScalarFieldEnum = {
+  id: 'id',
+  sequenceNumber: 'sequenceNumber',
+  kind: 'kind',
+  numberPrefix: 'numberPrefix',
+  aggregateType: 'aggregateType',
+  aggregateId: 'aggregateId',
+  organizationId: 'organizationId',
+  relatedDocumentId: 'relatedDocumentId',
+  currency: 'currency',
+  subtotal: 'subtotal',
+  taxAmount: 'taxAmount',
+  total: 'total',
+  issuedAt: 'issuedAt',
+  snapshot: 'snapshot',
+  dedupKey: 'dedupKey',
+  createdAt: 'createdAt'
+} as const
+
+export type FinancialDocumentScalarFieldEnum = (typeof FinancialDocumentScalarFieldEnum)[keyof typeof FinancialDocumentScalarFieldEnum]
+
+
+export const NotificationPreferenceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  category: 'category',
+  channel: 'channel',
+  enabled: 'enabled',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NotificationPreferenceScalarFieldEnum = (typeof NotificationPreferenceScalarFieldEnum)[keyof typeof NotificationPreferenceScalarFieldEnum]
+
+
+export const EmailSuppressionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  email: 'email',
+  reason: 'reason',
+  active: 'active',
+  sourceRef: 'sourceRef',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type EmailSuppressionScalarFieldEnum = (typeof EmailSuppressionScalarFieldEnum)[keyof typeof EmailSuppressionScalarFieldEnum]
 
 
 export const AuditLogScalarFieldEnum = {
@@ -9553,6 +10131,104 @@ export type ListEnumTicketMessageTypeFieldRefInput<$PrismaModel> = FieldRefInput
 
 
 /**
+ * Reference to a field of type 'NotificationCategory'
+ */
+export type EnumNotificationCategoryFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'NotificationCategory'>
+
+
+
+/**
+ * Reference to a field of type 'NotificationCategory[]'
+ */
+export type ListEnumNotificationCategoryFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'NotificationCategory[]'>
+
+
+
+/**
+ * Reference to a field of type 'NotificationSeverity'
+ */
+export type EnumNotificationSeverityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'NotificationSeverity'>
+
+
+
+/**
+ * Reference to a field of type 'NotificationSeverity[]'
+ */
+export type ListEnumNotificationSeverityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'NotificationSeverity[]'>
+
+
+
+/**
+ * Reference to a field of type 'CommunicationEventStatus'
+ */
+export type EnumCommunicationEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunicationEventStatus'>
+
+
+
+/**
+ * Reference to a field of type 'CommunicationEventStatus[]'
+ */
+export type ListEnumCommunicationEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunicationEventStatus[]'>
+
+
+
+/**
+ * Reference to a field of type 'NotificationChannel'
+ */
+export type EnumNotificationChannelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'NotificationChannel'>
+
+
+
+/**
+ * Reference to a field of type 'NotificationChannel[]'
+ */
+export type ListEnumNotificationChannelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'NotificationChannel[]'>
+
+
+
+/**
+ * Reference to a field of type 'CommunicationDeliveryStatus'
+ */
+export type EnumCommunicationDeliveryStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunicationDeliveryStatus'>
+
+
+
+/**
+ * Reference to a field of type 'CommunicationDeliveryStatus[]'
+ */
+export type ListEnumCommunicationDeliveryStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunicationDeliveryStatus[]'>
+
+
+
+/**
+ * Reference to a field of type 'FinancialDocumentKind'
+ */
+export type EnumFinancialDocumentKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FinancialDocumentKind'>
+
+
+
+/**
+ * Reference to a field of type 'FinancialDocumentKind[]'
+ */
+export type ListEnumFinancialDocumentKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FinancialDocumentKind[]'>
+
+
+
+/**
+ * Reference to a field of type 'EmailSuppressionReason'
+ */
+export type EnumEmailSuppressionReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EmailSuppressionReason'>
+
+
+
+/**
+ * Reference to a field of type 'EmailSuppressionReason[]'
+ */
+export type ListEnumEmailSuppressionReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EmailSuppressionReason[]'>
+
+
+
+/**
  * Reference to a field of type 'ListingStatus'
  */
 export type EnumListingStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ListingStatus'>
@@ -9864,6 +10540,7 @@ export type GlobalOmitConfig = {
   verification?: Prisma.VerificationOmit
   activeContext?: Prisma.ActiveContextOmit
   organization?: Prisma.OrganizationOmit
+  billingProfile?: Prisma.BillingProfileOmit
   membership?: Prisma.MembershipOmit
   publisherMembership?: Prisma.PublisherMembershipOmit
   staffMembership?: Prisma.StaffMembershipOmit
@@ -9915,6 +10592,11 @@ export type GlobalOmitConfig = {
   ticket?: Prisma.TicketOmit
   ticketMessage?: Prisma.TicketMessageOmit
   notification?: Prisma.NotificationOmit
+  communicationEvent?: Prisma.CommunicationEventOmit
+  communicationDelivery?: Prisma.CommunicationDeliveryOmit
+  financialDocument?: Prisma.FinancialDocumentOmit
+  notificationPreference?: Prisma.NotificationPreferenceOmit
+  emailSuppression?: Prisma.EmailSuppressionOmit
   auditLog?: Prisma.AuditLogOmit
   marketplaceCategory?: Prisma.MarketplaceCategoryOmit
   marketplaceTag?: Prisma.MarketplaceTagOmit

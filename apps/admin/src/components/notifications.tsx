@@ -2,6 +2,7 @@
 
 import { NotificationBell } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { api } from "../lib/api"
 
@@ -10,6 +11,7 @@ import { api } from "../lib/api"
 // for orders, settlements, withdrawals, payouts, disputes, and chargebacks.
 export function Notifications() {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [limit, setLimit] = useState(10)
 
@@ -46,6 +48,15 @@ export function Notifications() {
       loading={open && listQ.isLoading}
       onOpenChange={setOpen}
       onMarkRead={(id) => markRead.mutate(id)}
+      onOpenItem={(item) => {
+        if (
+          item.actionPath?.startsWith("/") &&
+          !item.actionPath.startsWith("//")
+        ) {
+          setOpen(false)
+          router.push(item.actionPath)
+        }
+      }}
       onMarkAllRead={() => markAll.mutate()}
       onLoadMore={() => setLimit((l) => l + 10)}
       hasMore={items.length < total}

@@ -19,7 +19,8 @@
     "bullmq": "^5.80.12",
     "dotenv": "^17.4.2",
     "ioredis": "^5.11.1",
-    "nodemailer": "^9.0.3"
+    "nodemailer": "^9.0.3",
+    "pdf-lib": "1.17.1"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",

@@ -10,8 +10,9 @@ import {
   ErrorState,
   Input,
   Label,
+  NotificationPreferencesForm,
+  type NotificationPreferenceValue,
   Separator,
-  Switch,
 } from "@guestpost/ui"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import {
@@ -55,13 +56,9 @@ export default function SettingsPage() {
     paypalEmail: "",
   })
 
-  const [notifications, setNotifications] = useState({
-    emailOrders: true,
-    emailEarnings: true,
-    emailMarketing: false,
-    pushOrders: true,
-    pushEarnings: true,
-  })
+  const [notificationPreferences, setNotificationPreferences] = useState<
+    NotificationPreferenceValue[]
+  >([])
 
   const {
     data: profileData,
@@ -71,6 +68,16 @@ export default function SettingsPage() {
     queryKey: ["publisher-settings"],
     queryFn: () => api.identity.me(),
     enabled: !!user?.id,
+  })
+
+  const {
+    data: notificationPreferenceData,
+    isLoading: notificationPreferencesLoading,
+    error: notificationPreferencesError,
+  } = useQuery({
+    queryKey: ["notification-preferences"],
+    queryFn: () => api.notifications.preferences(),
+    enabled: Boolean(user?.id),
   })
 
   useEffect(() => {
@@ -84,10 +91,14 @@ export default function SettingsPage() {
         ? JSON.parse((profileData as any).metadata)
         : {}
       if (meta.payment) setPayment((prev) => ({ ...prev, ...meta.payment }))
-      if (meta.emailOrders !== undefined)
-        setNotifications((prev) => ({ ...prev, ...meta }))
     } catch {}
   }, [profileData])
+
+  useEffect(() => {
+    if (notificationPreferenceData) {
+      setNotificationPreferences(notificationPreferenceData)
+    }
+  }, [notificationPreferenceData])
 
   const profileMutation = useMutation({
     mutationFn: (data: { name: string }) => api.identity.updateProfile(data),
@@ -114,22 +125,21 @@ export default function SettingsPage() {
   })
 
   const notificationsMutation = useMutation({
-    mutationFn: () =>
-      api.identity.updateProfile({
-        name: user?.name ?? "",
-        metadata: JSON.stringify(notifications),
-      } as any),
-    onSuccess: () => {
+    mutationFn: (preferences: NotificationPreferenceValue[]) =>
+      api.notifications.updatePreferences(preferences),
+    onSuccess: (preferences) => {
+      setNotificationPreferences(preferences)
       toast.success("Notification preferences updated")
     },
-    onError: () => {
-      toast.error("Failed to update notifications")
+    onError: (mutationError: Error) => {
+      toast.error(mutationError.message)
     },
   })
 
   const handleSaveProfile = () => profileMutation.mutate({ name: profile.name })
   const handleSavePayment = () => paymentMutation.mutate()
-  const handleSaveNotifications = () => notificationsMutation.mutate()
+  const handleSaveNotifications = () =>
+    notificationsMutation.mutate(notificationPreferences)
 
   if (error)
     return (
@@ -325,108 +335,21 @@ export default function SettingsPage() {
             Choose how you want to be notified about updates
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <p className="text-sm font-medium">Email Notifications</p>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>New Orders</Label>
-                <p className="text-sm text-muted-foreground">
-                  Get notified when you receive a new order
-                </p>
-              </div>
-              <Switch
-                checked={notifications.emailOrders}
-                onCheckedChange={(checked) =>
-                  setNotifications({ ...notifications, emailOrders: checked })
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Earnings Updates</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive updates about your earnings and withdrawals
-                </p>
-              </div>
-              <Switch
-                checked={notifications.emailEarnings}
-                onCheckedChange={(checked) =>
-                  setNotifications({ ...notifications, emailEarnings: checked })
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Marketing & Tips</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive tips and promotional offers
-                </p>
-              </div>
-              <Switch
-                checked={notifications.emailMarketing}
-                onCheckedChange={(checked) =>
-                  setNotifications({
-                    ...notifications,
-                    emailMarketing: checked,
-                  })
-                }
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-4">
-            <p className="text-sm font-medium">Push Notifications</p>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Order Updates</Label>
-                <p className="text-sm text-muted-foreground">
-                  Get push notifications for order changes
-                </p>
-              </div>
-              <Switch
-                checked={notifications.pushOrders}
-                onCheckedChange={(checked) =>
-                  setNotifications({ ...notifications, pushOrders: checked })
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Earnings Alerts</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive alerts for earnings and withdrawals
-                </p>
-              </div>
-              <Switch
-                checked={notifications.pushEarnings}
-                onCheckedChange={(checked) =>
-                  setNotifications({ ...notifications, pushEarnings: checked })
-                }
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button
-              onClick={handleSaveNotifications}
-              disabled={notificationsMutation.isPending}
-            >
-              {notificationsMutation.isPending ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Preferences
-                </>
-              )}
-            </Button>
-          </div>
+        <CardContent>
+          {notificationPreferencesError ? (
+            <ErrorState
+              title="Failed to load notification preferences"
+              description={(notificationPreferencesError as Error).message}
+            />
+          ) : (
+            <NotificationPreferencesForm
+              preferences={notificationPreferences}
+              loading={notificationPreferencesLoading}
+              saving={notificationsMutation.isPending}
+              onChange={setNotificationPreferences}
+              onSave={handleSaveNotifications}
+            />
+          )}
         </CardContent>
       </Card>
 

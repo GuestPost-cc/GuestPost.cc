@@ -12,12 +12,45 @@ const REQUIRED = ["DATABASE_URL"] as const
 
 const PRODUCTION_REQUIRED = ["QUEUE_SIGNING_SECRET"] as const
 
+const EMAIL_REQUIRED = [
+  "SMTP_HOST",
+  "SMTP_USER",
+  "SMTP_PASS",
+  "EMAIL_FROM",
+  "NEXT_PUBLIC_PORTAL_URL",
+  "NEXT_PUBLIC_PUBLISHER_URL",
+  "NEXT_PUBLIC_ADMIN_URL",
+  "INVOICE_ISSUER_LEGAL_NAME",
+  "INVOICE_ISSUER_ADDRESS_LINE_1",
+  "INVOICE_ISSUER_CITY",
+  "INVOICE_ISSUER_POSTAL_CODE",
+  "INVOICE_ISSUER_COUNTRY_CODE",
+  "INVOICE_SUPPORT_EMAIL",
+] as const
+
 const OPTIONAL_WARN = [
   // Without SENTRY_DSN, the worker still runs — Sentry just no-ops.
   "SENTRY_DSN",
   "AHREFS_API_KEY",
   "OPENPAGERANK_API_KEY",
 ] as const
+
+function validPublicOrigin(value: string | undefined): boolean {
+  if (!value) return false
+  try {
+    const parsed = new URL(value)
+    return (
+      parsed.protocol === "https:" &&
+      !parsed.username &&
+      !parsed.password &&
+      parsed.pathname === "/" &&
+      !parsed.search &&
+      !parsed.hash
+    )
+  } catch {
+    return false
+  }
+}
 
 export function validateEnv(): void {
   const missing: string[] = []
@@ -42,6 +75,53 @@ export function validateEnv(): void {
         missing: missingProd,
       })
       process.exit(1)
+    }
+
+    const emailMode = (process.env.EMAIL_DELIVERY_MODE ?? "live").toLowerCase()
+    if (
+      !(["disabled", "capture", "live"] as const).includes(emailMode as any)
+    ) {
+      logger.error("FATAL: invalid EMAIL_DELIVERY_MODE", {
+        allowed: ["disabled", "capture", "live"],
+      })
+      process.exit(1)
+    }
+    if (emailMode !== "disabled") {
+      const missingEmail = EMAIL_REQUIRED.filter(
+        (key) => !process.env[key]?.trim(),
+      )
+      if (missingEmail.length > 0) {
+        logger.error(
+          "FATAL: email delivery is enabled but configuration is missing",
+          {
+            missing: missingEmail,
+          },
+        )
+        process.exit(1)
+      }
+      const port = Number(process.env.SMTP_PORT ?? 587)
+      if (!Number.isSafeInteger(port) || port <= 0 || port > 65_535) {
+        logger.error("FATAL: SMTP_PORT must be a valid TCP port")
+        process.exit(1)
+      }
+      if (
+        !process.env.EMAIL_FROM?.includes("@") ||
+        /[\r\n]/.test(process.env.EMAIL_FROM)
+      ) {
+        logger.error("FATAL: EMAIL_FROM must be a safe mailbox value")
+        process.exit(1)
+      }
+      const invalidOrigins = [
+        "NEXT_PUBLIC_PORTAL_URL",
+        "NEXT_PUBLIC_PUBLISHER_URL",
+        "NEXT_PUBLIC_ADMIN_URL",
+      ].filter((key) => !validPublicOrigin(process.env[key]))
+      if (invalidOrigins.length > 0) {
+        logger.error("FATAL: email application origins must be HTTPS origins", {
+          invalid: invalidOrigins,
+        })
+        process.exit(1)
+      }
     }
   }
 

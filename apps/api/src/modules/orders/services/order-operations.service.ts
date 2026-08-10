@@ -10,9 +10,11 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
 import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderDeliveryService } from "./order-delivery.service"
@@ -26,6 +28,7 @@ export class OrderOperationsService {
     private readonly queue: QueueService,
     private readonly delivery: OrderDeliveryService,
     private readonly cancellation: OrderCancellationService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   private async createFinalArticleVersion(
@@ -333,6 +336,7 @@ export class OrderOperationsService {
     }
     await this.cancellation.assertNoActiveCancellation(orderId)
 
+    let communicationEventId: string | null = null
     const updated = await runLockedOrderSerializableTransaction(
       this.prisma,
       orderId,
@@ -404,16 +408,39 @@ export class OrderOperationsService {
           },
           tx,
         )
+        if (this.communications) {
+          const event = await this.communications.record(
+            {
+              type: "ORDER_CONTENT_READY",
+              aggregateType: "Order",
+              aggregateId: orderId,
+              organizationId: order.organizationId,
+              title: "Content ready for review",
+              message: `Content for order ${orderId} is ready for your review.`,
+              actionPath: `/dashboard/orders/${orderId}`,
+              dedupKey: `order:${orderId}:content-ready:v${order.version + 1}`,
+              recipientUserIds:
+                await this.communications.customerOrderRecipients(orderId, tx),
+              actorUserId: userId,
+            },
+            tx,
+          )
+          communicationEventId = event.eventId
+        }
         return tx.order.findUniqueOrThrow({ where: { id: orderId } })
       },
     )
 
-    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: order.customerId,
-      organizationId: order.organizationId,
-      type: "CONTENT_READY_FOR_REVIEW",
-      message: "Your content is ready for review",
-    })
+    if (communicationEventId) {
+      this.communications?.dispatchBestEffort(communicationEventId)
+    } else {
+      await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+        userId: order.customerId,
+        organizationId: order.organizationId,
+        type: "CONTENT_READY_FOR_REVIEW",
+        message: "Your content is ready for review",
+      })
+    }
     return updated
   }
 
@@ -464,6 +491,7 @@ export class OrderOperationsService {
       )
     await this.cancellation.assertNoActiveCancellation(orderId)
 
+    let communicationEventId: string | null = null
     const updated = await this.prisma.$transaction(async (tx: any) => {
       const fresh = await this.transition(
         orderId,
@@ -491,15 +519,40 @@ export class OrderOperationsService {
         },
         tx,
       )
+      if (this.communications) {
+        const event = await this.communications.record(
+          {
+            type: "ORDER_CONTENT_READY",
+            aggregateType: "Order",
+            aggregateId: orderId,
+            organizationId: order.organizationId,
+            title: "Content ready for review",
+            message: `Content for order ${orderId} is ready for your review.`,
+            actionPath: `/dashboard/orders/${orderId}`,
+            dedupKey: `order:${orderId}:content-ready:v${order.version + 1}`,
+            recipientUserIds: await this.communications.customerOrderRecipients(
+              orderId,
+              tx,
+            ),
+            actorUserId: userId,
+          },
+          tx,
+        )
+        communicationEventId = event.eventId
+      }
       return fresh
     })
 
-    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: order.customerId,
-      organizationId: order.organizationId,
-      type: "CONTENT_READY_FOR_REVIEW",
-      message: "Your content is ready for review",
-    })
+    if (communicationEventId) {
+      this.communications?.dispatchBestEffort(communicationEventId)
+    } else {
+      await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+        userId: order.customerId,
+        organizationId: order.organizationId,
+        type: "CONTENT_READY_FOR_REVIEW",
+        message: "Your content is ready for review",
+      })
+    }
     return updated
   }
 

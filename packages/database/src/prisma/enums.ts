@@ -68,6 +68,81 @@ export const StaffRole = {
 export type StaffRole = (typeof StaffRole)[keyof typeof StaffRole]
 
 
+export const NotificationChannel = {
+  IN_APP: 'IN_APP',
+  EMAIL: 'EMAIL'
+} as const
+
+export type NotificationChannel = (typeof NotificationChannel)[keyof typeof NotificationChannel]
+
+
+export const NotificationCategory = {
+  SECURITY: 'SECURITY',
+  ACCOUNT: 'ACCOUNT',
+  ORDERS: 'ORDERS',
+  BILLING: 'BILLING',
+  SETTLEMENTS: 'SETTLEMENTS',
+  PAYOUTS: 'PAYOUTS',
+  MARKETPLACE: 'MARKETPLACE',
+  SUPPORT: 'SUPPORT',
+  STAFF_ALERTS: 'STAFF_ALERTS',
+  PRODUCT: 'PRODUCT'
+} as const
+
+export type NotificationCategory = (typeof NotificationCategory)[keyof typeof NotificationCategory]
+
+
+export const NotificationSeverity = {
+  INFO: 'INFO',
+  SUCCESS: 'SUCCESS',
+  WARNING: 'WARNING',
+  CRITICAL: 'CRITICAL'
+} as const
+
+export type NotificationSeverity = (typeof NotificationSeverity)[keyof typeof NotificationSeverity]
+
+
+export const CommunicationEventStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  PROCESSED: 'PROCESSED',
+  FAILED: 'FAILED'
+} as const
+
+export type CommunicationEventStatus = (typeof CommunicationEventStatus)[keyof typeof CommunicationEventStatus]
+
+
+export const CommunicationDeliveryStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+  SUPPRESSED: 'SUPPRESSED',
+  BOUNCED: 'BOUNCED',
+  COMPLAINED: 'COMPLAINED'
+} as const
+
+export type CommunicationDeliveryStatus = (typeof CommunicationDeliveryStatus)[keyof typeof CommunicationDeliveryStatus]
+
+
+export const EmailSuppressionReason = {
+  HARD_BOUNCE: 'HARD_BOUNCE',
+  COMPLAINT: 'COMPLAINT',
+  ADMINISTRATIVE: 'ADMINISTRATIVE'
+} as const
+
+export type EmailSuppressionReason = (typeof EmailSuppressionReason)[keyof typeof EmailSuppressionReason]
+
+
+export const FinancialDocumentKind = {
+  PAID_INVOICE: 'PAID_INVOICE',
+  CREDIT_NOTE: 'CREDIT_NOTE',
+  DEPOSIT_RECEIPT: 'DEPOSIT_RECEIPT'
+} as const
+
+export type FinancialDocumentKind = (typeof FinancialDocumentKind)[keyof typeof FinancialDocumentKind]
+
+
 export const UserRole = {
   OWNER: 'OWNER',
   MANAGER: 'MANAGER',

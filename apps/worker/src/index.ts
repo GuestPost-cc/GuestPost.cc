@@ -66,6 +66,22 @@ const logger = createLogger("worker.bootstrap")
 
 // Stuck-payout safety net: webhooks are the primary completion signal, this
 // poll catches transfers whose webhook was lost or never configured.
+async function registerCommunicationOutboxSweep(): Promise<RegisteredJob> {
+  const everyMs = 5 * 60 * 1000
+  const jobName = QUEUE_JOBS[QUEUES.EMAIL].SWEEP_OUTBOX
+  const queue = new Queue(QUEUES.EMAIL, { connection })
+  await queue.removeRepeatable(jobName, { every: everyMs }).catch(() => {})
+  await queue.add(jobName, signJobPayload({}, 0), {
+    repeat: { every: everyMs },
+    jobId: jobName,
+    removeOnComplete: { count: 20 },
+    removeOnFail: { count: 20 },
+  })
+  await queue.close()
+  logger.info("registered communication outbox sweep", { intervalMs: everyMs })
+  return { name: jobName, queue: QUEUES.EMAIL }
+}
+
 async function registerPayoutStatusPoll(): Promise<RegisteredJob> {
   const queue = new Queue(QUEUES.PAYOUT, { connection })
   // Stale repeatable jobs signed with a previous iat (from an old worker boot)
@@ -546,6 +562,12 @@ async function assertObjectStorageReadiness(): Promise<void> {
 function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
   const cancellation = resolveOrderCancellationConfig(process.env)
   const tasks: Record<string, ScheduledTaskConfig> = {
+    "communication-outbox": {
+      queue: QUEUES.EMAIL,
+      jobName: QUEUE_JOBS[QUEUES.EMAIL].SWEEP_OUTBOX,
+      data: {},
+      createWorker: createEmailWorker,
+    },
     "payout-reconcile": {
       queue: QUEUES.PAYOUT,
       jobName: QUEUE_JOBS[QUEUES.PAYOUT].CHECK_STATUS,
@@ -665,6 +687,10 @@ async function removeHybridRepeatables(): Promise<void> {
   // schedules whose ownership moved to Northflank; deleting an entire queue's
   // repeatable registry could silently disable a future feature.
   const ownedSchedules: Array<{ queue: string; names: string[] }> = [
+    {
+      queue: QUEUES.EMAIL,
+      names: [QUEUE_JOBS[QUEUES.EMAIL].SWEEP_OUTBOX],
+    },
     {
       queue: QUEUES.PAYOUT,
       names: [QUEUE_JOBS[QUEUES.PAYOUT].CHECK_STATUS],
@@ -975,6 +1001,7 @@ async function bootstrap() {
       count: workers.length,
     })
     const registeredJobs = await Promise.all([
+      registerCommunicationOutboxSweep(),
       registerPayoutStatusPoll(),
       registerReconciliationSweep(),
       registerPaymentDisputeInbox(),
