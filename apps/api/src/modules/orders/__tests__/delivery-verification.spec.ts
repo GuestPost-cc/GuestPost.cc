@@ -586,9 +586,9 @@ describe("runDeliveryVerification", () => {
       id: "vX",
       orderId: "OTHER",
     })
-    prisma.orderDeliveryVersion.count
-      .mockResolvedValueOnce(2)
-      .mockResolvedValueOnce(2)
+    prisma.orderDeliveryVersion.count.mockImplementation(({ where }: any) =>
+      Promise.resolve(where?.normalizedUrl ? 2 : 0),
+    )
     prisma.deliveryFraudFlag.findMany.mockResolvedValue([
       {
         id: "flag-resolved",

@@ -369,6 +369,34 @@ describe("DeliveryInterventionService", () => {
         prisma,
       )
     })
+    it("blocks a positive override while a fraud hold remains", async () => {
+      prisma.orderDeliveryVersion.findUnique.mockResolvedValue(
+        versionWith("FAILED"),
+      )
+      prisma.staffMembership.findUnique.mockResolvedValue({
+        role: "SUPER_ADMIN",
+        user: { userType: "STAFF", banned: false },
+      })
+      prisma.deliveryFraudHold.findMany.mockResolvedValue([
+        {
+          fraudFlagId: "flag-1",
+          deliveryVersionId: "v1",
+          type: "URL_REUSED",
+        },
+      ])
+
+      await expect(
+        svc.override("v1", "admin", "SUPER_ADMIN", "VERIFIED", reason),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DELIVERY_FRAUD_REVIEW_REQUIRED",
+        }),
+      })
+
+      expect(prisma.orderDeliveryVersion.updateMany).not.toHaveBeenCalled()
+      expect(prisma.order.updateMany).not.toHaveBeenCalled()
+      expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
+    })
     it("forbids non-SUPER_ADMIN", async () => {
       await expect(
         svc.override("v1", "u1", "OPERATIONS", "VERIFIED", reason),

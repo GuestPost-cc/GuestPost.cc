@@ -26,7 +26,7 @@ describe("delivery fraud disposition migration security contract", () => {
     expect(sql).toMatch(/BETWEEN 1 AND 200/)
   })
 
-  it("installs the classification guard before the existing resolution guard", () => {
+  it("installs the classification guard as a BEFORE INSERT trigger", () => {
     expect(sql).toMatch(
       /CREATE TRIGGER "DeliveryFraudFlagResolution_classification_guard"/,
     )

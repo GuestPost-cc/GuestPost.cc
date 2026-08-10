@@ -2312,6 +2312,10 @@ BEGIN
     RAISE EXCEPTION 'Delivery fraud resolution/hold/evidence guards are missing';
   END IF;
 
+  -- This constraint is intentionally NOT VALID: immutable historical rows
+  -- predate classified dispositions, while PostgreSQL still enforces the
+  -- check for every new insert. Do not require convalidated here unless a
+  -- separate evidence-preserving historical backfill is introduced first.
   SELECT COUNT(*)
     INTO fraud_resolution_constraint_count
     FROM pg_constraint

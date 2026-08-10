@@ -219,6 +219,10 @@ interface ReusedFraudDisposition {
   disposition: ClassifiedFraudDisposition
 }
 
+/**
+ * Revalidates the immutable staff classification before it can authorize an
+ * identical fraud signal on a later verification generation.
+ */
 function classifiedStaffDisposition(
   resolution: any,
   deliveryVersionId: string,
@@ -271,6 +275,10 @@ function classifiedStaffDisposition(
   return disposition
 }
 
+/**
+ * Separates active/new fraud evidence from exact, classified adjudications.
+ * This must run only after the caller holds the canonical Order lock.
+ */
 async function evaluateFraudCandidatesUnderLock(
   tx: any,
   deliveryVersionId: string,
@@ -319,34 +327,25 @@ async function evaluateFraudCandidatesUnderLock(
       hasUnresolvedCandidate = true
       continue
     }
-    const accepted = sameType.find((flag: any) => {
-      if (!isDeepStrictEqual(flag.details ?? null, candidate.details)) {
-        return false
-      }
-      return (
-        classifiedStaffDisposition(
-          flag.resolution,
-          deliveryVersionId,
-          candidate.type,
-        ) != null
-      )
-    })
-    if (accepted) {
+    let reused: ReusedFraudDisposition | null = null
+    for (const flag of sameType) {
+      if (!isDeepStrictEqual(flag.details ?? null, candidate.details)) continue
       const disposition = classifiedStaffDisposition(
-        accepted.resolution,
+        flag.resolution,
         deliveryVersionId,
         candidate.type,
       )
-      if (!disposition) {
-        candidatesToCreate.push(candidate)
-        continue
-      }
-      reusedDispositions.push({
+      if (!disposition) continue
+      reused = {
         candidate,
-        fraudFlagId: accepted.id,
-        resolutionId: accepted.resolution.id,
+        fraudFlagId: flag.id,
+        resolutionId: flag.resolution.id,
         disposition,
-      })
+      }
+      break
+    }
+    if (reused) {
+      reusedDispositions.push(reused)
       continue
     }
     candidatesToCreate.push(candidate)
@@ -747,9 +746,9 @@ export async function runDeliveryVerification(
           .filter(Boolean)
           .join("; ") || "link verification failed"
 
-  let committedStatus = baseStatus
-  let committedFailureReason = baseFailureReason
-  let committedRequiresFraudReview = false
+  let committedStatus: string
+  let committedFailureReason: string | null
+  let committedRequiresFraudReview: boolean
 
   try {
     const transition = await runLockedOrderSerializableTransaction(

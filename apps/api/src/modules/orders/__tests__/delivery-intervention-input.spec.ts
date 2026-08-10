@@ -39,9 +39,17 @@ describe("delivery intervention input", () => {
         reason: "Finance accepted the risk without attaching case evidence.",
       },
     )
+    const falsePositiveWithoutReference = Object.assign(
+      new ResolveDeliveryFraudFlagDto(),
+      {
+        disposition: "FALSE_POSITIVE",
+        reason: "Operations confirmed the signal was raised in error.",
+      },
+    )
 
     await expect(validate(override)).resolves.toEqual([])
     await expect(validate(fraud)).resolves.toEqual([])
+    await expect(validate(falsePositiveWithoutReference)).resolves.toEqual([])
     await expect(validate(unknown)).resolves.not.toEqual([])
     await expect(validate(riskWithoutReference)).resolves.not.toEqual([])
   })

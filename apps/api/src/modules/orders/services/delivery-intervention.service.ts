@@ -418,7 +418,7 @@ export class DeliveryInterventionService {
             verificationFailureReason: null,
             verificationVersion: version.verificationVersion + 1,
             adminVerifiedById: userId,
-            adminOverrideReason: context?.overrideReason,
+            adminOverrideReason: context?.overrideReason ?? null,
             adminVerifiedNotes: context?.notes?.trim() || null,
           },
         })
