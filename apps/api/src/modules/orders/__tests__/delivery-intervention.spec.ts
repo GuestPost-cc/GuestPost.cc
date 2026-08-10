@@ -58,6 +58,9 @@ describe("DeliveryInterventionService", () => {
       deliveryFraudFlagResolution: {
         create: jest.fn().mockResolvedValue({ id: "fraud-resolution-1" }),
       },
+      deliveryFraudHold: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       notification: { create: jest.fn().mockResolvedValue({}) },
       staffMembership: {
         findUnique: jest.fn().mockResolvedValue({
@@ -85,7 +88,7 @@ describe("DeliveryInterventionService", () => {
         versionWith("FAILED"),
       )
       const r = await svc.manualApprove("v1", "u1", "OPERATIONS", reason)
-      expect(r.status).toBe("APPROVED")
+      expect(r.status).toBe("VERIFIED")
       expect(prisma.orderDeliveryVersion.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ interventionStatus: "APPROVED" }),
@@ -116,31 +119,29 @@ describe("DeliveryInterventionService", () => {
       ).rejects.toThrow(BadRequestException)
     })
 
-    it("clears only flags on the reviewed delivery with role-at-time evidence", async () => {
+    it("blocks approval until fraud holds are explicitly adjudicated", async () => {
       prisma.orderDeliveryVersion.findUnique.mockResolvedValue(
         versionWith("FAILED"),
       )
-      prisma.deliveryFraudFlag.findMany.mockResolvedValue([
-        { id: "flag-1", deliveryVersionId: "v1", type: "URL_REUSED" },
+      prisma.deliveryFraudHold.findMany.mockResolvedValue([
+        {
+          fraudFlagId: "flag-1",
+          deliveryVersionId: "v1",
+          type: "URL_REUSED",
+        },
       ])
 
-      await svc.manualApprove("v1", "u1", "OPERATIONS", reason)
-
-      expect(prisma.deliveryFraudFlag.findMany).toHaveBeenCalledWith({
-        where: {
-          orderId: "o1",
-          deliveryVersionId: "v1",
-          resolution: null,
-        },
-        select: { id: true, deliveryVersionId: true, type: true },
-      })
-      expect(prisma.deliveryFraudFlagResolution.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          fraudFlagId: "flag-1",
-          resolvedByUserId: "u1",
-          resolvedByRole: "OPERATIONS",
+      await expect(
+        svc.manualApprove("v1", "u1", "OPERATIONS", reason),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DELIVERY_FRAUD_REVIEW_REQUIRED",
         }),
       })
+
+      expect(prisma.orderDeliveryVersion.updateMany).not.toHaveBeenCalled()
+      expect(prisma.order.updateMany).not.toHaveBeenCalled()
+      expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
     })
   })
 
@@ -161,7 +162,13 @@ describe("DeliveryInterventionService", () => {
       prisma.order.findUnique.mockResolvedValue({ ...order, status })
 
       await expect(
-        svc.resolveFraudFlag("flag-1", "u1", "OPERATIONS", reason),
+        svc.resolveFraudFlag(
+          "flag-1",
+          "u1",
+          "OPERATIONS",
+          reason,
+          "FALSE_POSITIVE",
+        ),
       ).resolves.toEqual({
         status: "RESOLVED",
         fraudFlagId: "flag-1",
@@ -177,6 +184,9 @@ describe("DeliveryInterventionService", () => {
           deliveryVersionId: "v1",
           resolvedByUserId: "u1",
           resolvedByRole: "OPERATIONS",
+          evidence: expect.objectContaining({
+            disposition: "FALSE_POSITIVE",
+          }),
         }),
       })
     })
@@ -197,7 +207,13 @@ describe("DeliveryInterventionService", () => {
       })
 
       await expect(
-        svc.resolveFraudFlag("flag-1", "u1", "OPERATIONS", reason),
+        svc.resolveFraudFlag(
+          "flag-1",
+          "u1",
+          "OPERATIONS",
+          reason,
+          "FALSE_POSITIVE",
+        ),
       ).rejects.toBeInstanceOf(ForbiddenException)
       expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
     })
@@ -214,7 +230,13 @@ describe("DeliveryInterventionService", () => {
         })
 
       await expect(
-        svc.resolveFraudFlag("flag-1", "u1", "OPERATIONS", reason),
+        svc.resolveFraudFlag(
+          "flag-1",
+          "u1",
+          "OPERATIONS",
+          reason,
+          "FALSE_POSITIVE",
+        ),
       ).resolves.toEqual({
         status: "ALREADY_RESOLVED",
         fraudFlagId: "flag-1",
@@ -225,9 +247,75 @@ describe("DeliveryInterventionService", () => {
 
     it("rejects overlong resolution evidence before persistence", async () => {
       await expect(
-        svc.resolveFraudFlag("flag-1", "u1", "OPERATIONS", "x".repeat(1001)),
+        svc.resolveFraudFlag(
+          "flag-1",
+          "u1",
+          "OPERATIONS",
+          "x".repeat(1001),
+          "FALSE_POSITIVE",
+        ),
       ).rejects.toBeInstanceOf(BadRequestException)
       expect(prisma.deliveryFraudFlag.findUnique).not.toHaveBeenCalled()
+    })
+
+    it("requires Finance or Super Admin to accept a known risk", async () => {
+      prisma.deliveryFraudFlag.findUnique
+        .mockResolvedValueOnce({ orderId: "o1" })
+        .mockResolvedValueOnce({
+          id: "flag-1",
+          orderId: "o1",
+          deliveryVersionId: "v1",
+          type: "URL_REUSED",
+          resolution: null,
+        })
+
+      await expect(
+        svc.resolveFraudFlag(
+          "flag-1",
+          "u1",
+          "OPERATIONS",
+          reason,
+          "RISK_ACCEPTED",
+          "CASE-1024",
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException)
+      expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
+    })
+
+    it("records a Finance-authorized risk with its evidence reference", async () => {
+      prisma.deliveryFraudFlag.findUnique
+        .mockResolvedValueOnce({ orderId: "o1" })
+        .mockResolvedValueOnce({
+          id: "flag-1",
+          orderId: "o1",
+          deliveryVersionId: "v1",
+          type: "URL_REUSED",
+          resolution: null,
+        })
+      prisma.staffMembership.findUnique.mockResolvedValue({
+        role: "FINANCE",
+        user: { userType: "STAFF", banned: false },
+      })
+
+      await expect(
+        svc.resolveFraudFlag(
+          "flag-1",
+          "finance-1",
+          "FINANCE",
+          reason,
+          "AUTHORIZED_REUSE",
+          "CASE-1024",
+        ),
+      ).resolves.toEqual(expect.objectContaining({ status: "RESOLVED" }))
+      expect(prisma.deliveryFraudFlagResolution.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          resolvedByRole: "FINANCE",
+          evidence: expect.objectContaining({
+            disposition: "AUTHORIZED_REUSE",
+            evidenceReference: "CASE-1024",
+          }),
+        }),
+      })
     })
   })
 
@@ -339,6 +427,21 @@ describe("DeliveryInterventionService", () => {
       expect(prisma.notification.create).not.toHaveBeenCalled()
     })
 
+    it("requires the override path to retract an already verified delivery", async () => {
+      prisma.orderDeliveryVersion.findUnique.mockResolvedValue(
+        versionWith("VERIFIED"),
+      )
+      prisma.order.findUnique.mockResolvedValue({
+        ...order,
+        status: "VERIFIED",
+      })
+
+      await expect(
+        svc.manualReject("v1", "u1", "OPERATIONS", reason),
+      ).rejects.toThrow(/awaiting verification/i)
+      expect(prisma.orderDeliveryVersion.updateMany).not.toHaveBeenCalled()
+    })
+
     it.each([
       "DELIVERED",
       "SETTLED",
@@ -365,17 +468,36 @@ describe("DeliveryInterventionService", () => {
   })
 
   describe("reverify", () => {
+    it("revalidates current staff authority after taking the order lock", async () => {
+      prisma.orderDeliveryVersion.findUnique.mockResolvedValue(
+        versionWith("FAILED"),
+      )
+      prisma.staffMembership.findUnique.mockResolvedValue(null)
+
+      await expect(svc.reverify("v1", "u1", "OPERATIONS")).rejects.toThrow(
+        ForbiddenException,
+      )
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1)
+      expect(prisma.orderDeliveryVersion.updateMany).not.toHaveBeenCalled()
+      expect(queue.addJob).not.toHaveBeenCalled()
+    })
+
     it("resets to PENDING + enqueues a signed verify job", async () => {
       prisma.orderDeliveryVersion.findUnique.mockResolvedValue(
         versionWith("FAILED"),
       )
-      const r = await svc.reverify("v1", "u1")
+      const r = await svc.reverify("v1", "u1", "OPERATIONS")
       expect(r.status).toBe("PENDING")
       expect(prisma.orderDeliveryVersion.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             verificationStatus: "PENDING",
             interventionStatus: "NONE",
+            verificationFailureReason: null,
+            adminVerifiedById: null,
+            adminOverrideReason: null,
+            adminVerifiedNotes: null,
           }),
         }),
       )
@@ -402,7 +524,9 @@ describe("DeliveryInterventionService", () => {
         .spyOn(Logger.prototype, "error")
         .mockImplementation(() => undefined)
 
-      const error = await svc.reverify("v1", "u1").catch((value) => value)
+      const error = await svc
+        .reverify("v1", "u1", "OPERATIONS")
+        .catch((value) => value)
 
       expect(error.getStatus()).toBe(503)
       expect(error.getResponse()).toEqual(
@@ -429,9 +553,24 @@ describe("DeliveryInterventionService", () => {
         ...versionWith("FAILED"),
         supersededByVersion: 2,
       })
-      await expect(svc.reverify("v1", "u1")).rejects.toThrow(
+      await expect(svc.reverify("v1", "u1", "OPERATIONS")).rejects.toThrow(
         BadRequestException,
       )
+    })
+    it("does not create a pending delivery on an already verified order", async () => {
+      prisma.orderDeliveryVersion.findUnique.mockResolvedValue(
+        versionWith("VERIFIED"),
+      )
+      prisma.order.findUnique.mockResolvedValue({
+        ...order,
+        status: "VERIFIED",
+      })
+
+      await expect(svc.reverify("v1", "u1", "OPERATIONS")).rejects.toThrow(
+        /awaiting verification/i,
+      )
+      expect(prisma.orderDeliveryVersion.updateMany).not.toHaveBeenCalled()
+      expect(queue.addJob).not.toHaveBeenCalled()
     })
     it("does not enqueue when a concurrent intervention wins", async () => {
       prisma.orderDeliveryVersion.findUnique.mockResolvedValue(
@@ -439,7 +578,7 @@ describe("DeliveryInterventionService", () => {
       )
       prisma.orderDeliveryVersion.updateMany.mockResolvedValue({ count: 0 })
 
-      await expect(svc.reverify("v1", "u1")).rejects.toThrow(
+      await expect(svc.reverify("v1", "u1", "OPERATIONS")).rejects.toThrow(
         /modified by another request/i,
       )
       expect(queue.addJob).not.toHaveBeenCalled()
@@ -458,7 +597,7 @@ describe("DeliveryInterventionService", () => {
         return result
       })
 
-      await svc.reverify("v1", "u1")
+      await svc.reverify("v1", "u1", "OPERATIONS")
 
       expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
       expect(prisma.orderDeliveryVersion.updateMany).toHaveBeenCalledTimes(2)
@@ -479,7 +618,7 @@ describe("DeliveryInterventionService", () => {
         .mockResolvedValueOnce(order)
         .mockResolvedValueOnce({ ...order, status })
 
-      await expect(svc.reverify("v1", "u1")).rejects.toThrow(
+      await expect(svc.reverify("v1", "u1", "OPERATIONS")).rejects.toThrow(
         /financially final/i,
       )
 

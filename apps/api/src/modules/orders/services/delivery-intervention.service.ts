@@ -6,6 +6,7 @@ import {
   QUEUE_JOBS,
   QUEUES,
   runLockedOrderSerializableTransaction,
+  WorkflowDecisionService,
 } from "@guestpost/shared"
 import { presignGet } from "@guestpost/shared/dist/object-storage"
 import {
@@ -20,6 +21,11 @@ import {
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
+import {
+  DELIVERY_FRAUD_DISPOSITIONS,
+  type DeliveryFraudDisposition,
+} from "../dto/delivery-intervention.dto"
+import { assertNoUnresolvedDeliveryFraudHolds } from "./delivery-fraud-guard"
 import { assertCurrentStaffAuthority } from "./staff-authority"
 
 const MIN_REASON = 20
@@ -38,6 +44,7 @@ const FINANCIALLY_TERMINAL_ORDER_STATUSES = new Set([
 @Injectable()
 export class DeliveryInterventionService {
   private readonly logger = new Logger(DeliveryInterventionService.name)
+  private readonly decision = new WorkflowDecisionService()
 
   constructor(
     private readonly prisma: PrismaService,
@@ -72,6 +79,7 @@ export class DeliveryInterventionService {
         `Cannot ${action} delivery evidence after the order is financially final`,
       )
     }
+    return currentOrder
   }
 
   private async loadVersionWithOrder(deliveryVersionId: string) {
@@ -134,65 +142,6 @@ export class DeliveryInterventionService {
     return { currentOrder, currentVersion }
   }
 
-  private async resolveOpenFraudFlags(
-    tx: any,
-    order: any,
-    version: any,
-    userId: string,
-    role: string,
-    reason: string,
-  ) {
-    if (!FRAUD_RESOLVER_ROLES.has(role)) {
-      throw new ForbiddenException(
-        "Only authorized staff may resolve delivery fraud holds",
-      )
-    }
-    const unresolved = await tx.deliveryFraudFlag.findMany({
-      where: {
-        orderId: order.id,
-        deliveryVersionId: version.id,
-        resolution: null,
-      },
-      select: { id: true, deliveryVersionId: true, type: true },
-    })
-    for (const flag of unresolved) {
-      const resolution = await tx.deliveryFraudFlagResolution.create({
-        data: {
-          fraudFlagId: flag.id,
-          orderId: order.id,
-          deliveryVersionId: flag.deliveryVersionId,
-          kind: "STAFF_CLEARED",
-          reason,
-          resolvedByUserId: userId,
-          resolvedByRole: role,
-          evidence: {
-            approvedDeliveryVersionId: version.id,
-            roleAtTime: role,
-          },
-        },
-      })
-      await this.audit.log(
-        {
-          action: "ORDER_DELIVERY_FRAUD_RESOLVED",
-          entityType: "DeliveryFraudFlag",
-          entityId: flag.id,
-          metadata: this.deliveryAuditMeta(order, version, {
-            fraudFlagId: flag.id,
-            fraudDeliveryVersionId: flag.deliveryVersionId,
-            fraudType: flag.type,
-            resolutionId: resolution.id,
-            resolutionKind: "STAFF_CLEARED",
-            reason,
-            roleAtTime: role,
-          }),
-          userId,
-          organizationId: order.organizationId,
-        },
-        tx,
-      )
-    }
-  }
-
   /**
    * Adjudicate one immutable fraud flag without changing Order or delivery
    * lifecycle state. The database independently revalidates role-at-time and
@@ -203,8 +152,27 @@ export class DeliveryInterventionService {
     userId: string,
     role: string,
     reason: string,
+    disposition: DeliveryFraudDisposition,
+    evidenceReference?: string,
   ) {
     const r = this.requireReason(reason)
+    if (!DELIVERY_FRAUD_DISPOSITIONS.includes(disposition)) {
+      throw new BadRequestException("Invalid delivery fraud disposition")
+    }
+    const normalizedEvidenceReference = evidenceReference?.trim() || null
+    if (
+      normalizedEvidenceReference &&
+      normalizedEvidenceReference.length > 200
+    ) {
+      throw new BadRequestException(
+        "Evidence reference must be 200 characters or fewer",
+      )
+    }
+    if (disposition !== "FALSE_POSITIVE" && !normalizedEvidenceReference) {
+      throw new BadRequestException(
+        "An evidence or case reference is required when authorizing or accepting delivery risk",
+      )
+    }
     if (!FRAUD_RESOLVER_ROLES.has(role)) {
       throw new ForbiddenException(
         "Only authorized staff may resolve delivery fraud holds",
@@ -248,6 +216,15 @@ export class DeliveryInterventionService {
             resolutionId: flag.resolution.id,
           }
         }
+        if (
+          disposition !== "FALSE_POSITIVE" &&
+          currentRole !== "SUPER_ADMIN" &&
+          currentRole !== "FINANCE"
+        ) {
+          throw new ForbiddenException(
+            "Only Finance or Super Admin may accept or authorize a known delivery risk",
+          )
+        }
 
         const resolution = await tx.deliveryFraudFlagResolution.create({
           data: {
@@ -262,6 +239,8 @@ export class DeliveryInterventionService {
               activeDeliveryVersionId: order.activeDeliveryVersionId,
               adjudicatedDeliveryVersionId: flag.deliveryVersionId,
               fraudType: flag.type,
+              disposition,
+              evidenceReference: normalizedEvidenceReference,
               orderStatusAtResolution: order.status,
               roleAtTime: currentRole,
             },
@@ -279,6 +258,8 @@ export class DeliveryInterventionService {
               fraudType: flag.type,
               resolutionId: resolution.id,
               resolutionKind: "STAFF_CLEARED",
+              disposition,
+              evidenceReference: normalizedEvidenceReference,
               reason: r,
               roleAtTime: currentRole,
             },
@@ -368,8 +349,23 @@ export class DeliveryInterventionService {
     userId: string,
     role: string,
     reason: string,
+    context?: {
+      overrideReason?:
+        | "CRAWLER_BLOCKED"
+        | "ROBOTS_TXT"
+        | "LOGIN_REQUIRED"
+        | "JS_RENDERING"
+        | "TEMPORARY_FAILURE"
+        | "OTHER"
+      notes?: string
+    },
   ) {
     const r = this.requireReason(reason)
+    const now = new Date()
+    const autoAcceptAt = new Date(
+      now.getTime() +
+        this.decision.computeReviewWindowDays() * 24 * 60 * 60 * 1000,
+    )
     const { version, order } =
       await this.loadVersionWithOrder(deliveryVersionId)
     if (!["FAILED", "MANUAL_REVIEW"].includes(version.verificationStatus)) {
@@ -381,10 +377,12 @@ export class DeliveryInterventionService {
       this.prisma,
       order.id,
       async (tx: any) => {
-        await assertCurrentStaffAuthority(tx, userId, role, [
-          "SUPER_ADMIN",
-          "OPERATIONS",
-        ])
+        const currentRole = await assertCurrentStaffAuthority(
+          tx,
+          userId,
+          role,
+          ["SUPER_ADMIN", "OPERATIONS"],
+        )
         const { currentOrder, currentVersion } =
           await this.loadActiveVersionUnderLock(
             tx,
@@ -402,6 +400,7 @@ export class DeliveryInterventionService {
             "Delivery or order state changed. Refresh before approving.",
           )
         }
+        await assertNoUnresolvedDeliveryFraudHolds(tx, order.id)
         const upd = await tx.orderDeliveryVersion.updateMany({
           where: {
             id: version.id,
@@ -413,6 +412,9 @@ export class DeliveryInterventionService {
             interventionStatus: "APPROVED",
             verificationFailureReason: null,
             verificationVersion: version.verificationVersion + 1,
+            adminVerifiedById: userId,
+            adminOverrideReason: context?.overrideReason,
+            adminVerifiedNotes: context?.notes?.trim() || null,
           },
         })
         if (upd.count === 0) {
@@ -430,9 +432,10 @@ export class DeliveryInterventionService {
           },
           data: {
             status: "VERIFIED",
-            verifiedAt: new Date(),
+            verifiedAt: now,
             verifiedBy: userId,
             verifyMethod: "MANUAL_ADMIN",
+            autoAcceptAt,
             version: { increment: 1 },
           },
         })
@@ -442,15 +445,19 @@ export class DeliveryInterventionService {
           )
         }
 
-        await this.resolveOpenFraudFlags(tx, order, version, userId, role, r)
-
         await tx.orderEvent.create({
           data: {
             orderId: order.id,
             eventType: "VERIFIED_MANUAL",
             actorId: userId,
             message: "Delivery manually verified by staff",
-            metadata: { deliveryVersionId: version.id, reason: r },
+            metadata: {
+              deliveryVersionId: version.id,
+              reason: r,
+              overrideReason: context?.overrideReason ?? null,
+              notes: context?.notes?.trim() || null,
+              autoAcceptAt: autoAcceptAt.toISOString(),
+            },
           },
         })
         await this.audit.log(
@@ -460,7 +467,10 @@ export class DeliveryInterventionService {
             entityId: version.id,
             metadata: this.deliveryAuditMeta(order, version, {
               reason: r,
-              roleAtTime: role,
+              roleAtTime: currentRole,
+              overrideReason: context?.overrideReason ?? null,
+              notes: context?.notes?.trim() || null,
+              autoAcceptAt: autoAcceptAt.toISOString(),
             }),
             userId,
             organizationId: order.organizationId,
@@ -475,7 +485,12 @@ export class DeliveryInterventionService {
       "ORDER_DELIVERY_MANUAL_APPROVED",
       `Delivery for order ${order.id} was manually approved.`,
     )
-    return { status: "APPROVED" }
+    return {
+      status: "VERIFIED",
+      interventionStatus: "APPROVED",
+      verifyMethod: "MANUAL_ADMIN",
+      autoAcceptAt,
+    }
   }
 
   async manualReject(
@@ -491,17 +506,28 @@ export class DeliveryInterventionService {
       this.prisma,
       order.id,
       async (tx: any) => {
-        await assertCurrentStaffAuthority(tx, userId, role, [
-          "SUPER_ADMIN",
-          "OPERATIONS",
-        ])
+        const currentRole = await assertCurrentStaffAuthority(
+          tx,
+          userId,
+          role,
+          ["SUPER_ADMIN", "OPERATIONS"],
+        )
         await this.loadActiveVersionUnderLock(
           tx,
           order.id,
           version.id,
           version.verificationVersion,
         )
-        await this.assertDeliveryEvidenceMutable(tx, order.id, "reject")
+        const mutableOrder = await this.assertDeliveryEvidenceMutable(
+          tx,
+          order.id,
+          "reject",
+        )
+        if (mutableOrder.status !== "PUBLISHED") {
+          throw new ConflictException(
+            "Only a published delivery awaiting verification can be rejected.",
+          )
+        }
         const upd = await tx.orderDeliveryVersion.updateMany({
           where: {
             id: version.id,
@@ -536,7 +562,7 @@ export class DeliveryInterventionService {
             entityId: version.id,
             metadata: this.deliveryAuditMeta(order, version, {
               reason: r,
-              roleAtTime: role,
+              roleAtTime: currentRole,
             }),
             userId,
             organizationId: order.organizationId,
@@ -571,12 +597,22 @@ export class DeliveryInterventionService {
       )
     const { version, order } =
       await this.loadVersionWithOrder(deliveryVersionId)
+    const now = new Date()
+    const autoAcceptAt = new Date(
+      now.getTime() +
+        this.decision.computeReviewWindowDays() * 24 * 60 * 60 * 1000,
+    )
 
     await runLockedOrderSerializableTransaction(
       this.prisma,
       order.id,
       async (tx: any) => {
-        await assertCurrentStaffAuthority(tx, userId, role, ["SUPER_ADMIN"])
+        const currentRole = await assertCurrentStaffAuthority(
+          tx,
+          userId,
+          role,
+          ["SUPER_ADMIN"],
+        )
         if (targetStatus === "FAILED") {
           await this.assertDeliveryEvidenceMutable(tx, order.id, "override")
         }
@@ -594,6 +630,9 @@ export class DeliveryInterventionService {
           throw new ConflictException(
             "Order state changed. Refresh before overriding verification.",
           )
+        }
+        if (targetStatus === "VERIFIED") {
+          await assertNoUnresolvedDeliveryFraudHolds(tx, order.id)
         }
         const upd = await tx.orderDeliveryVersion.updateMany({
           where: {
@@ -625,9 +664,10 @@ export class DeliveryInterventionService {
             },
             data: {
               status: "VERIFIED",
-              verifiedAt: new Date(),
+              verifiedAt: now,
               verifiedBy: userId,
               verifyMethod: "MANUAL_ADMIN",
+              autoAcceptAt,
               version: { increment: 1 },
             },
           })
@@ -636,7 +676,6 @@ export class DeliveryInterventionService {
               "Order was modified by another request. Refresh and retry.",
             )
           }
-          await this.resolveOpenFraudFlags(tx, order, version, userId, role, r)
         } else if (currentOrder.status === "VERIFIED") {
           const orderUpdate = await tx.order.updateMany({
             where: {
@@ -650,6 +689,7 @@ export class DeliveryInterventionService {
               verifiedAt: null,
               verifiedBy: null,
               verifyMethod: null,
+              autoAcceptAt: null,
               version: { increment: 1 },
             },
           })
@@ -687,7 +727,7 @@ export class DeliveryInterventionService {
             metadata: this.deliveryAuditMeta(order, version, {
               reason: r,
               targetStatus,
-              roleAtTime: role,
+              roleAtTime: currentRole,
             }),
             userId,
             organizationId: order.organizationId,
@@ -706,7 +746,7 @@ export class DeliveryInterventionService {
   }
 
   // Re-run automated verification (staff). Resets to PENDING + re-enqueues.
-  async reverify(deliveryVersionId: string, userId: string) {
+  async reverify(deliveryVersionId: string, userId: string, role: string) {
     const { version, order } =
       await this.loadVersionWithOrder(deliveryVersionId)
     if (version.supersededByVersion != null)
@@ -715,7 +755,20 @@ export class DeliveryInterventionService {
       this.prisma,
       order.id,
       async (tx: any) => {
-        await this.assertDeliveryEvidenceMutable(tx, order.id, "re-verify")
+        await assertCurrentStaffAuthority(tx, userId, role, [
+          "SUPER_ADMIN",
+          "OPERATIONS",
+        ])
+        const mutableOrder = await this.assertDeliveryEvidenceMutable(
+          tx,
+          order.id,
+          "re-verify",
+        )
+        if (mutableOrder.status !== "PUBLISHED") {
+          throw new ConflictException(
+            "Only a published delivery awaiting verification can be re-verified.",
+          )
+        }
         const currentVersion = await tx.orderDeliveryVersion.findUnique({
           where: { id: version.id },
           select: { supersededByVersion: true },
@@ -737,7 +790,11 @@ export class DeliveryInterventionService {
           data: {
             verificationStatus: "PENDING",
             interventionStatus: "NONE",
+            verificationFailureReason: null,
             verificationVersion: version.verificationVersion + 1,
+            adminVerifiedById: null,
+            adminOverrideReason: null,
+            adminVerifiedNotes: null,
           },
         })
         if (updated.count === 0) {

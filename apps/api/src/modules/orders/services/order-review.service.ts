@@ -30,6 +30,10 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
+import {
+  deliveryFraudReviewRequiredForCustomer,
+  recordCustomerDeliveryFraudBlock,
+} from "./delivery-fraud-guard"
 import { OrderCancellationService } from "./order-cancellation.service"
 
 @Injectable()
@@ -580,7 +584,7 @@ export class OrderReviewService {
       // Authorization, cancellation state, delivery transition, and
       // settlement/revenue creation are all re-read after the canonical Order
       // lock. The helper retries only trusted serialization/deadlock errors.
-      return await runLockedOrderSerializableTransaction(
+      const result = await runLockedOrderSerializableTransaction(
         this.prisma,
         orderId,
         async (tx: any) => {
@@ -605,6 +609,24 @@ export class OrderReviewService {
               "Only organization owner or order creator can confirm delivery",
             )
           }
+          if (!order.activeDeliveryVersionId) {
+            throw new ConflictException(
+              "Verified order has no active delivery. Contact support.",
+            )
+          }
+          const fraudBlocked = await recordCustomerDeliveryFraudBlock(
+            tx,
+            this.audit,
+            {
+              action: "CONFIRM",
+              orderId,
+              deliveryVersionId: order.activeDeliveryVersionId,
+              organizationId,
+              userId,
+              now: new Date(),
+            },
+          )
+          if (fraudBlocked) return { fraudBlocked }
 
           const transitioned = await tx.order.updateMany({
             where: { id: orderId, version: order.version, status: "VERIFIED" },
@@ -703,6 +725,10 @@ export class OrderReviewService {
           return fresh
         },
       )
+      if ("fraudBlocked" in result) {
+        throw deliveryFraudReviewRequiredForCustomer()
+      }
+      return result
     } catch (error) {
       if (isRetryablePrismaTransactionError(error)) {
         throw new ConflictException({

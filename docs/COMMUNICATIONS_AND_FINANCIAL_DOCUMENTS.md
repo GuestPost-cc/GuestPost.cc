@@ -43,6 +43,14 @@ category. Required security, money-receipt, deadline, fraud, reconciliation,
 and staff-risk channels override opt-outs. This exception must not be expanded
 for marketing or product announcements.
 
+Delivery fraud detection records a required `STAFF_FRAUD_ALERT` in the same
+Order-locked transaction that appends the immutable fraud flag. The alert is
+preference-resistant for staff risk recipients and contains only the order,
+delivery, flag identity, and signal type. Investigation evidence and any
+cross-order customer details remain in staff-authorized delivery evidence
+surfaces. See `docs/DELIVERY_FRAUD_AND_MANUAL_VERIFICATION.md` for adjudication
+and customer-denial behavior.
+
 Recipient eligibility is evaluated twice: when the event commits and again
 immediately before SMTP delivery. A deleted, banned, unverified, opted-out, or
 suppressed recipient is not sent mail. Required messages still require an

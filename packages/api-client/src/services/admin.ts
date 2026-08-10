@@ -612,6 +612,11 @@ export interface AdminDeliveryVerificationQueueItem {
   }
 }
 
+export type DeliveryFraudDisposition =
+  | "FALSE_POSITIVE"
+  | "AUTHORIZED_REUSE"
+  | "RISK_ACCEPTED"
+
 export interface AdminOrderTimelineEvent {
   id: string
   eventType: string
@@ -1816,9 +1821,22 @@ export class AdminService {
       json: { targetStatus, reason },
     })
   }
-  resolveDeliveryFraudFlag(fraudFlagId: string, reason: string) {
+  resolveDeliveryFraudFlag(
+    fraudFlagId: string,
+    input:
+      | {
+          reason: string
+          disposition: "FALSE_POSITIVE"
+          evidenceReference?: string
+        }
+      | {
+          reason: string
+          disposition: Exclude<DeliveryFraudDisposition, "FALSE_POSITIVE">
+          evidenceReference: string
+        },
+  ) {
     return this.client.post(`/fraud-flags/${fraudFlagId}/resolve`, {
-      json: { reason },
+      json: input,
     })
   }
 

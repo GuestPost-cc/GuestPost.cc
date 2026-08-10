@@ -231,6 +231,48 @@ merged or deployed. GitHub `main` through dependency consolidation commit
   smoke check, a production-mode package load, and the exact Render API Turbo
   build (5 packages) pass. The hotfix still needs publication and redeployment.
 
+## Current Local Work: Delivery Fraud And Customer Acceptance
+
+- Durable communications and financial documents were squash-merged from PR
+  #91 as `85a7baa8`. Required `build-and-test` CI passed against the exact PR
+  head before the authorized repository-owner merge. The separate
+  `agent/delivery-fraud-hardening` branch remains local and independently
+  reviewable.
+- The Neon test database now has both merged migrations applied through the
+  direct owner endpoint. The earlier pooled runtime attempt applied zero steps;
+  its exact stale idle PgBouncer advisory-lock holder was terminated before the
+  owner retry. Prisma reports the schema current, every expected object and
+  immutable-document trigger exists, and the pooled `guestpost_runtime` can
+  read the new tables while retaining no schema `CREATE` authority.
+- A technically passing delivery with any fraud signal now remains
+  `MANUAL_REVIEW`. Flag insertion records the required `STAFF_FRAUD_ALERT` in
+  the same Order-locked transaction; the legacy best-effort fraud alert is not
+  the durability boundary.
+- Normal customer confirmation and the technical-failure manual fallback both
+  read the authoritative order-level `DeliveryFraudHold` projection under the
+  Order lock. A current hold commits only throttled internal audit evidence and
+  returns customer-safe `DELIVERY_FRAUD_REVIEW_REQUIRED`; it cannot commit a
+  delivery, settlement, or revenue transition.
+- Manual delivery approval and a positive Super Admin verification override no
+  longer resolve fraud as a side effect. Every hold requires the dedicated
+  append-only resolution command. Operations may classify a false positive;
+  only Finance or Super Admin may authorize reused evidence or accept known
+  risk, with a required bounded evidence reference. Current membership, role,
+  staff type, and ban state are revalidated in the locked transaction. Raw SQL
+  writers are held to the same classification and role policy by migration
+  `20260811120000_delivery_fraud_resolution_dispositions`.
+- The legacy Admin queue approval/rejection routes delegate to the canonical
+  intervention service. Manual verification records the customer review
+  deadline, and a negative override clears the old deadline. Finance can read
+  the delivery queue and adjudicate holds but cannot retry, approve, reject, or
+  request re-verification.
+- Operator and invariant documentation is in
+  `docs/DELIVERY_FRAUD_AND_MANUAL_VERIFICATION.md` and
+  `docs/FINANCIAL_INVARIANTS.md`. Focused fraud/intervention coverage passes;
+  the exact-tree API unit regression passes 129 suites / 1,510 tests. Prisma,
+  Biome, Admin lint/typecheck, and the API, Worker, shared, and API-client
+  builds also pass on the final tree.
+
 ## Current Local Work: Staff Marketplace And Canonical Order Integrity
 
 - Rebuilt the Admin marketplace list and detail workflows for Super Admin,

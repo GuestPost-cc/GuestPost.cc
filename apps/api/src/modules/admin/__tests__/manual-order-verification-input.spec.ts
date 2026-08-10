@@ -13,9 +13,13 @@ describe("manual order verification input", () => {
     const unknownReason = Object.assign(new MarkVerifiedDto(), {
       reason: "UNREVIEWED_OVERRIDE",
     })
+    const unexplainedOther = Object.assign(new MarkVerifiedDto(), {
+      reason: "OTHER",
+    })
 
     await expect(validate(canonical)).resolves.toEqual([])
     await expect(validate(legacyStatusOnly)).resolves.not.toEqual([])
     await expect(validate(unknownReason)).resolves.not.toEqual([])
+    await expect(validate(unexplainedOther)).resolves.not.toEqual([])
   })
 })

@@ -538,6 +538,19 @@ signed optimistic generation under that lock before changing state or
 appending evidence. Stale jobs may leave an unreferenced content-addressed
 object, but no database evidence, state, flag, or hold.
 
+Delivery approval never clears fraud as a side effect. A technically passing
+delivery that generates a fraud signal remains in `MANUAL_REVIEW`; customer
+confirmation, customer fallback acceptance, staff manual approval, and a
+positive verification override all reject current `DeliveryFraudHold` rows
+before changing lifecycle state. Customer denials expose only the stable
+`DELIVERY_FRAUD_REVIEW_REQUIRED` code while committing throttled internal audit
+evidence. Staff-cleared resolutions snapshot an allowlisted disposition;
+Operations may clear a false positive, while only Finance or Super Admin may
+authorize URL reuse or accept known risk with a bounded evidence reference.
+PostgreSQL independently enforces the new-row disposition allowlist, role
+boundary, and reference requirement. See
+`docs/DELIVERY_FRAUD_AND_MANUAL_VERIFICATION.md`.
+
 Automated policy may choose when an eligible row is reviewed, but it never
 bypasses this predicate. Its additional freshness boundary is defined below;
 human and system decisions remain distinct immutable evidence.

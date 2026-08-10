@@ -11,6 +11,7 @@
 
 import { createHash } from "node:crypto"
 import * as cheerio from "cheerio"
+import { recordCommunicationOutbox } from "./communication-outbox-core"
 import { runLockedOrderSerializableTransaction } from "./order-aggregate-lock"
 import { normalizeUrl, sameDomain, urlsMatch } from "./url-normalize"
 import { defaultWorkflowConfig } from "./workflow/workflow-config"
@@ -547,27 +548,6 @@ export async function runDeliveryVerification(
     analysis.linkFound && analysis.targetUrlMatched && analysis.anchorFound
   // Permanent raw evidence is required before automation may advance an Order
   // toward settlement. Exhausted storage retries fail closed to manual review.
-  const newStatus = snapshotStored
-    ? checksPass
-      ? "VERIFIED"
-      : "FAILED"
-    : "MANUAL_REVIEW"
-  const pass = newStatus === "VERIFIED"
-  const failureReason = snapshotStorageError
-    ? `Permanent delivery snapshot unavailable: ${snapshotStorageError}`
-    : checksPass
-      ? null
-      : [
-          !analysis.targetUrlMatched && order.targetUrl
-            ? "target URL not found on page"
-            : null,
-          !analysis.anchorFound && order.anchorText
-            ? "anchor text mismatch"
-            : null,
-        ]
-          .filter(Boolean)
-          .join("; ") || "link verification failed"
-
   // Detection can perform slow reads before the lock; no hold is persisted
   // until the active delivery is revalidated inside the transition below.
   const fraudCandidates = await detectFraudCandidates(
@@ -577,6 +557,38 @@ export async function runDeliveryVerification(
     analysis,
   )
   const fraudTypes = fraudCandidates.map((flag) => flag.type)
+  // A technically passing page is not an automatically verified delivery when
+  // it also generated a fraud signal. Keep it in manual review until every
+  // immutable hold has an explicit, separately audited adjudication.
+  const requiresFraudReview =
+    snapshotStored && checksPass && fraudTypes.length > 0
+  const newStatus = snapshotStored
+    ? checksPass && !requiresFraudReview
+      ? "VERIFIED"
+      : requiresFraudReview
+        ? "MANUAL_REVIEW"
+        : "FAILED"
+    : "MANUAL_REVIEW"
+  const failureReason = snapshotStorageError
+    ? `Permanent delivery snapshot unavailable: ${snapshotStorageError}`
+    : requiresFraudReview
+      ? "Delivery requires staff fraud review"
+      : checksPass
+        ? null
+        : [
+            !analysis.targetUrlMatched && order.targetUrl
+              ? "target URL not found on page"
+              : null,
+            !analysis.anchorFound && order.anchorText
+              ? "anchor text mismatch"
+              : null,
+          ]
+            .filter(Boolean)
+            .join("; ") || "link verification failed"
+
+  let committedStatus = newStatus
+  let committedFailureReason = failureReason
+  let committedRequiresFraudReview = requiresFraudReview
 
   try {
     const transition = await runLockedOrderSerializableTransaction(
@@ -598,6 +610,25 @@ export async function runDeliveryVerification(
           throw conflict
         }
         if (current.order.status !== "PUBLISHED") return "stale" as const
+
+        const currentFraudHold =
+          newStatus === "VERIFIED"
+            ? await tx.deliveryFraudHold.findFirst({
+                where: { orderId: order.id },
+                select: { fraudFlagId: true },
+              })
+            : null
+        const effectiveRequiresFraudReview =
+          requiresFraudReview || currentFraudHold != null
+        const effectiveStatus =
+          newStatus === "VERIFIED" && effectiveRequiresFraudReview
+            ? "MANUAL_REVIEW"
+            : newStatus
+        const effectiveFailureReason =
+          effectiveStatus === "MANUAL_REVIEW" && effectiveRequiresFraudReview
+            ? "Delivery requires staff fraud review"
+            : failureReason
+        const effectivePass = effectiveStatus === "VERIFIED"
 
         if (snapshotStored && snapshotObjectKey) {
           await tx.deliverySnapshot.create({
@@ -645,8 +676,8 @@ export async function runDeliveryVerification(
             verificationVersion: expectedVersion,
           },
           data: {
-            verificationStatus: newStatus,
-            verificationFailureReason: failureReason,
+            verificationStatus: effectiveStatus,
+            verificationFailureReason: effectiveFailureReason,
             verificationVersion: expectedVersion + 1,
           },
         })
@@ -657,7 +688,7 @@ export async function runDeliveryVerification(
         }
 
         let autoAcceptAt: Date | null = null
-        if (pass) {
+        if (effectivePass) {
           const reviewWindowMs =
             defaultWorkflowConfig.reviewWindowDays * 24 * 60 * 60 * 1000
           autoAcceptAt = new Date(now.getTime() + reviewWindowMs)
@@ -683,6 +714,7 @@ export async function runDeliveryVerification(
           }
         }
 
+        const createdFraudFlags: Array<{ id: string; type: string }> = []
         for (const flag of fraudCandidates) {
           // The Order lock serializes this check+insert. The database unique
           // constraint remains the final guard for non-cooperating clients.
@@ -695,7 +727,7 @@ export async function runDeliveryVerification(
             select: { id: true },
           })
           if (exists) continue
-          await tx.deliveryFraudFlag.create({
+          const createdFlag = await tx.deliveryFraudFlag.create({
             data: {
               orderId: order.id,
               deliveryVersionId: version.id,
@@ -703,6 +735,7 @@ export async function runDeliveryVerification(
               details: flag.details,
             },
           })
+          createdFraudFlags.push({ id: createdFlag.id, type: flag.type })
           await audit(
             tx,
             "ORDER_DELIVERY_FRAUD_FLAGGED",
@@ -712,15 +745,43 @@ export async function runDeliveryVerification(
             { fraudType: flag.type, details: flag.details },
           )
         }
+        if (createdFraudFlags.length > 0) {
+          const staff = await tx.staffMembership.findMany({
+            where: {
+              role: { in: ["SUPER_ADMIN", "OPERATIONS", "FINANCE"] },
+              user: { banned: false },
+            },
+            select: { userId: true },
+          })
+          await recordCommunicationOutbox(tx, {
+            type: "STAFF_FRAUD_ALERT",
+            aggregateType: "Order",
+            aggregateId: order.id,
+            organizationId: null,
+            title: "Delivery fraud review required",
+            message: `Order ${order.id} generated delivery fraud signals: ${createdFraudFlags.map((flag) => flag.type).join(", ")}.`,
+            actionPath: "/dashboard/verification/delivery",
+            payload: {
+              deliveryVersionId: version.id,
+              fraudFlags: createdFraudFlags,
+            },
+            dedupKey: `order:${order.id}:delivery:${version.id}:fraud-generation:${expectedVersion}`,
+            recipientUserIds: staff.map(
+              (membership: { userId: string }) => membership.userId,
+            ),
+          })
+        }
 
         await tx.orderEvent.create({
           data: {
             orderId: order.id,
-            eventType: pass ? "VERIFIED_AUTO" : "VERIFICATION_ESCALATED",
+            eventType: effectivePass
+              ? "VERIFIED_AUTO"
+              : "VERIFICATION_ESCALATED",
             actorId: null,
-            message: pass
+            message: effectivePass
               ? `Delivery auto-verified; review window expires ${autoAcceptAt?.toISOString()}`
-              : newStatus === "MANUAL_REVIEW"
+              : effectiveStatus === "MANUAL_REVIEW"
                 ? "Delivery verification requires manual evidence review"
                 : "Delivery verification failed and requires attention",
             metadata: {
@@ -731,15 +792,15 @@ export async function runDeliveryVerification(
               htmlHash,
               snapshotStored,
               fraudTypes,
-              reason: failureReason,
+              reason: effectiveFailureReason,
             },
           },
         })
         await audit(
           tx,
-          pass
+          effectivePass
             ? "ORDER_DELIVERY_AUTO_VERIFIED"
-            : newStatus === "MANUAL_REVIEW"
+            : effectiveStatus === "MANUAL_REVIEW"
               ? "ORDER_DELIVERY_ESCALATED"
               : "ORDER_DELIVERY_AUTO_FAILED",
           order,
@@ -753,13 +814,21 @@ export async function runDeliveryVerification(
             htmlHash,
             snapshotStored,
             fraudTypes,
-            reason: failureReason,
+            reason: effectiveFailureReason,
           },
         )
-        return "committed" as const
+        return {
+          state: "committed" as const,
+          status: effectiveStatus,
+          failureReason: effectiveFailureReason,
+          requiresFraudReview: effectiveRequiresFraudReview,
+        }
       },
     )
-    if (transition !== "committed") return { skipped: transition }
+    if (typeof transition === "string") return { skipped: transition }
+    committedStatus = transition.status
+    committedFailureReason = transition.failureReason
+    committedRequiresFraudReview = transition.requiresFraudReview
   } catch (error) {
     if (
       error instanceof Error &&
@@ -776,17 +845,8 @@ export async function runDeliveryVerification(
 
   // Notifications are intentionally after commit. They are retryable side
   // effects and must never make an order/event transaction roll back.
-  if (fraudTypes.length > 0) {
-    await notifyUsers(
-      prisma,
-      await staffIds(prisma),
-      null,
-      "ORDER_DELIVERY_FRAUD_FLAGGED",
-      `Fraud flags on order ${order.id}: ${fraudTypes.join(", ")}. Review before settlement.`,
-    )
-  }
   const ownerIds = await publisherOwnerIds(prisma, order.website?.publisherId)
-  if (pass) {
+  if (committedStatus === "VERIFIED") {
     await notifyUsers(
       prisma,
       ownerIds,
@@ -801,14 +861,16 @@ export async function runDeliveryVerification(
       "ORDER_VERIFICATION_PASSED",
       `Your order ${order.id} delivery was verified.`,
     )
-  } else if (newStatus === "MANUAL_REVIEW") {
-    await notifyUsers(
-      prisma,
-      await staffIds(prisma),
-      null,
-      "ORDER_DELIVERY_MANUAL_REVIEW",
-      `Delivery for order ${order.id} needs manual evidence review: ${failureReason}.`,
-    )
+  } else if (committedStatus === "MANUAL_REVIEW") {
+    if (!committedRequiresFraudReview) {
+      await notifyUsers(
+        prisma,
+        await staffIds(prisma),
+        null,
+        "ORDER_DELIVERY_MANUAL_REVIEW",
+        `Delivery for order ${order.id} needs manual evidence review: ${committedFailureReason}.`,
+      )
+    }
     await notifyUsers(
       prisma,
       ownerIds,
@@ -822,7 +884,7 @@ export async function runDeliveryVerification(
       ownerIds,
       order.organizationId,
       "ORDER_DELIVERY_FAILED",
-      `Delivery verification failed for order ${order.id}: ${failureReason}.`,
+      `Delivery verification failed for order ${order.id}: ${committedFailureReason}.`,
     )
     await notifyUsers(
       prisma,
@@ -833,7 +895,10 @@ export async function runDeliveryVerification(
     )
   }
 
-  return { status: newStatus, reason: failureReason ?? undefined }
+  return {
+    status: committedStatus,
+    reason: committedFailureReason ?? undefined,
+  }
 }
 
 // ── Settlement-hold link monitoring ─────────────────────────────────────────

@@ -1,7 +1,7 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-08-03
+updated: 2026-08-11
 ---
 
 # Risks
@@ -16,6 +16,13 @@ follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
 The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
 
 ## Current local-work risk
+
+- **PR #91 and its Neon test-schema rollout are complete.** The durable
+  communications and financial-document migrations are current, runtime DML
+  access is verified, and the restricted runtime role still lacks schema
+  creation authority. Rebase the local fraud branch on `main` and deploy its
+  subsequent fraud-disposition migration only with the matching writer; do not
+  cherry-pick only the delivery core change.
 
 - **Legacy platform inventory can have incomplete domain metrics.** Platform
   websites created before the staff-manual metric migration may legitimately

@@ -1,0 +1,48 @@
+import { validate } from "class-validator"
+import {
+  DeliveryInterventionReasonDto,
+  OverrideDeliveryVerificationDto,
+  ResolveDeliveryFraudFlagDto,
+} from "../dto/delivery-intervention.dto"
+
+describe("delivery intervention input", () => {
+  it("requires a bounded substantive reason for manual decisions", async () => {
+    const valid = Object.assign(new DeliveryInterventionReasonDto(), {
+      reason: "Evidence was reviewed directly by Operations.",
+    })
+    const short = Object.assign(new DeliveryInterventionReasonDto(), {
+      reason: "looks okay",
+    })
+
+    await expect(validate(valid)).resolves.toEqual([])
+    await expect(validate(short)).resolves.not.toEqual([])
+  })
+
+  it("allowlists override targets and classified fraud dispositions", async () => {
+    const override = Object.assign(new OverrideDeliveryVerificationDto(), {
+      targetStatus: "VERIFIED",
+      reason: "Evidence was reviewed directly by a Super Admin.",
+    })
+    const fraud = Object.assign(new ResolveDeliveryFraudFlagDto(), {
+      disposition: "AUTHORIZED_REUSE",
+      reason: "Finance confirmed the reuse against approved case evidence.",
+      evidenceReference: "CASE-1024",
+    })
+    const unknown = Object.assign(new ResolveDeliveryFraudFlagDto(), {
+      disposition: "CLEARED",
+      reason: "This is intentionally long enough but remains unclassified.",
+    })
+    const riskWithoutReference = Object.assign(
+      new ResolveDeliveryFraudFlagDto(),
+      {
+        disposition: "RISK_ACCEPTED",
+        reason: "Finance accepted the risk without attaching case evidence.",
+      },
+    )
+
+    await expect(validate(override)).resolves.toEqual([])
+    await expect(validate(fraud)).resolves.toEqual([])
+    await expect(validate(unknown)).resolves.not.toEqual([])
+    await expect(validate(riskWithoutReference)).resolves.not.toEqual([])
+  })
+})

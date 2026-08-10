@@ -1,6 +1,9 @@
 "use client"
 
-import type { AdminDeliveryVerificationQueueItem } from "@guestpost/api-client"
+import type {
+  AdminDeliveryVerificationQueueItem,
+  DeliveryFraudDisposition,
+} from "@guestpost/api-client"
 import {
   Badge,
   Button,
@@ -12,6 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
   ErrorState,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
   Table,
   TableBody,
@@ -48,14 +57,43 @@ const priorityBadge: Record<string, { variant: any; label: string }> = {
   LOW: { variant: "default", label: "Low" },
 }
 
-export default function DeliveryVerificationQueuePage() {
-  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
-  if (loading) return null
-  if (!allowed) return <ForbiddenPage requires="Operations or Super Admin" />
-  return <DeliveryVerificationQueuePageInner />
+const verificationReasons = {
+  CRAWLER_BLOCKED: "Crawler blocked",
+  ROBOTS_TXT: "Blocked by robots.txt",
+  LOGIN_REQUIRED: "Login required",
+  JS_RENDERING: "JavaScript rendering",
+  TEMPORARY_FAILURE: "Temporary verification failure",
+  OTHER: "Other",
+} as const
+
+type VerificationReason = keyof typeof verificationReasons
+
+const fraudDispositions: Record<DeliveryFraudDisposition, string> = {
+  FALSE_POSITIVE: "False positive",
+  AUTHORIZED_REUSE: "Authorized URL reuse (Finance/Super Admin)",
+  RISK_ACCEPTED: "Risk accepted (Finance/Super Admin)",
 }
 
-function DeliveryVerificationQueuePageInner() {
+export default function DeliveryVerificationQueuePage() {
+  const { allowed, loading, user } = useRequireRole(
+    "SUPER_ADMIN",
+    "OPERATIONS",
+    "FINANCE",
+  )
+  if (loading) return null
+  if (!allowed)
+    return <ForbiddenPage requires="Operations, Finance, or Super Admin" />
+  return (
+    <DeliveryVerificationQueuePageInner staffRole={user?.staffRole ?? null} />
+  )
+}
+
+function DeliveryVerificationQueuePageInner({
+  staffRole,
+}: {
+  staffRole: string | null
+}) {
+  const canOperate = staffRole === "SUPER_ADMIN" || staffRole === "OPERATIONS"
   const qc = useQueryClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [actionDialog, setActionDialog] = useState<{
@@ -65,6 +103,11 @@ function DeliveryVerificationQueuePageInner() {
   } | null>(null)
   const [reason, setReason] = useState("")
   const [notes, setNotes] = useState("")
+  const [verificationReason, setVerificationReason] =
+    useState<VerificationReason>("CRAWLER_BLOCKED")
+  const [fraudDisposition, setFraudDisposition] =
+    useState<DeliveryFraudDisposition>("FALSE_POSITIVE")
+  const [evidenceReference, setEvidenceReference] = useState("")
   const [ticketId, setTicketId] = useState("")
   const [reverifyId, setReverifyId] = useState<string | null>(null)
 
@@ -88,7 +131,11 @@ function DeliveryVerificationQueuePageInner() {
   })
 
   const markVerified = useMutation({
-    mutationFn: (args: { id: string; reason: string; notes?: string }) =>
+    mutationFn: (args: {
+      id: string
+      reason: VerificationReason
+      notes?: string
+    }) =>
       api.admin.markVerified(args.id, {
         reason: args.reason,
         notes: args.notes,
@@ -98,6 +145,7 @@ function DeliveryVerificationQueuePageInner() {
       setActionDialog(null)
       setReason("")
       setNotes("")
+      setVerificationReason("CRAWLER_BLOCKED")
       qc.invalidateQueries({ queryKey: ["delivery-verification-queue"] })
     },
     onError: () => toast.error("Failed to mark as verified"),
@@ -128,18 +176,53 @@ function DeliveryVerificationQueuePageInner() {
   })
 
   const resolveFraud = useMutation({
-    mutationFn: (args: { id: string; reason: string }) =>
-      api.admin.resolveDeliveryFraudFlag(args.id, args.reason),
+    mutationFn: (args: {
+      id: string
+      reason: string
+      disposition: DeliveryFraudDisposition
+      evidenceReference?: string
+    }) => {
+      if (args.disposition === "FALSE_POSITIVE") {
+        return api.admin.resolveDeliveryFraudFlag(args.id, {
+          reason: args.reason,
+          disposition: args.disposition,
+          evidenceReference: args.evidenceReference,
+        })
+      }
+      if (!args.evidenceReference) {
+        throw new Error(
+          "An evidence or case reference is required for known delivery risk",
+        )
+      }
+      return api.admin.resolveDeliveryFraudFlag(args.id, {
+        reason: args.reason,
+        disposition: args.disposition,
+        evidenceReference: args.evidenceReference,
+      })
+    },
     onSuccess: () => {
       toast.success("Fraud hold resolved with staff evidence")
       setActionDialog(null)
       setReason("")
+      setFraudDisposition("FALSE_POSITIVE")
+      setEvidenceReference("")
       qc.invalidateQueries({ queryKey: ["delivery-verification-queue"] })
     },
     onError: () => toast.error("Failed to resolve fraud hold"),
   })
 
   const items = queue ?? []
+  const actionPending =
+    markVerified.isPending || reject.isPending || resolveFraud.isPending
+  const actionInvalid =
+    actionDialog?.mode === "verify"
+      ? notes.length > 800 ||
+        (verificationReason === "OTHER" && notes.trim().length < 20)
+      : reason.length > 1000 ||
+        reason.trim().length < 20 ||
+        (actionDialog?.mode === "resolve-fraud" &&
+          fraudDisposition !== "FALSE_POSITIVE" &&
+          evidenceReference.trim().length === 0)
 
   return (
     <AdminPage>
@@ -197,6 +280,8 @@ function DeliveryVerificationQueuePageInner() {
                   const delivery = item.deliveryVersion
                   const verificationStatus =
                     delivery?.verificationStatus ?? "UNKNOWN"
+                  const hasUnresolvedFraud =
+                    (delivery?.fraudFlags.length ?? 0) > 0
                   const fulfilledBy =
                     item.website?.ownershipType === "PLATFORM"
                       ? "Platform"
@@ -283,7 +368,8 @@ function DeliveryVerificationQueuePageInner() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            {item.status === "PUBLISHED" &&
+                            {canOperate &&
+                              item.status === "PUBLISHED" &&
                               ["FAILED", "MANUAL_REVIEW"].includes(
                                 verificationStatus,
                               ) && (
@@ -304,6 +390,12 @@ function DeliveryVerificationQueuePageInner() {
                                     size="sm"
                                     variant="outline"
                                     className="text-green-600"
+                                    disabled={hasUnresolvedFraud}
+                                    title={
+                                      hasUnresolvedFraud
+                                        ? "Resolve every fraud hold before approving"
+                                        : undefined
+                                    }
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setActionDialog({
@@ -311,6 +403,8 @@ function DeliveryVerificationQueuePageInner() {
                                         id: item.orderId,
                                         orderId: item.orderId,
                                       })
+                                      setVerificationReason("CRAWLER_BLOCKED")
+                                      setNotes("")
                                     }}
                                   >
                                     <ShieldCheck className="h-3.5 w-3.5 mr-1" />
@@ -503,6 +597,8 @@ function DeliveryVerificationQueuePageInner() {
                                             orderId: item.orderId,
                                           })
                                           setReason("")
+                                          setFraudDisposition("FALSE_POSITIVE")
+                                          setEvidenceReference("")
                                         }}
                                       >
                                         Resolve hold
@@ -512,19 +608,21 @@ function DeliveryVerificationQueuePageInner() {
                                 </div>
                               )}
 
-                              <div className="flex items-center gap-2 pt-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setReverifyId(item.orderId)
-                                    setTicketId("")
-                                  }}
-                                >
-                                  <Ticket className="h-3.5 w-3.5 mr-1" />
-                                  Request Re-verify
-                                </Button>
-                              </div>
+                              {canOperate && (
+                                <div className="flex items-center gap-2 pt-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setReverifyId(item.orderId)
+                                      setTicketId("")
+                                    }}
+                                  >
+                                    <Ticket className="h-3.5 w-3.5 mr-1" />
+                                    Request Re-verify
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -544,6 +642,9 @@ function DeliveryVerificationQueuePageInner() {
           setActionDialog(null)
           setReason("")
           setNotes("")
+          setVerificationReason("CRAWLER_BLOCKED")
+          setFraudDisposition("FALSE_POSITIVE")
+          setEvidenceReference("")
         }}
       >
         <DialogContent>
@@ -564,17 +665,89 @@ function DeliveryVerificationQueuePageInner() {
                   ? "Document why this specific immutable fraud signal is safe to clear. This does not advance the order or release funds by itself."
                   : "Reject the delivery verification. This will require the publisher to resubmit."}
             </p>
-            <Textarea
-              placeholder="Reason (required, min 10 characters)"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-            {actionDialog?.mode === "verify" && (
-              <Textarea
-                placeholder="Notes (optional)"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
+            {actionDialog?.mode === "verify" ? (
+              <>
+                <Select
+                  value={verificationReason}
+                  onValueChange={(value) =>
+                    setVerificationReason(value as VerificationReason)
+                  }
+                >
+                  <SelectTrigger aria-label="Manual verification reason">
+                    <SelectValue placeholder="Select a reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(verificationReasons).map(
+                      ([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+                <Textarea
+                  placeholder={
+                    verificationReason === "OTHER"
+                      ? "Reviewer notes (required, min 20 characters)"
+                      : "Reviewer notes (optional)"
+                  }
+                  value={notes}
+                  maxLength={800}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </>
+            ) : (
+              <>
+                {actionDialog?.mode === "resolve-fraud" && (
+                  <>
+                    <Select
+                      value={fraudDisposition}
+                      onValueChange={(value) =>
+                        setFraudDisposition(value as DeliveryFraudDisposition)
+                      }
+                    >
+                      <SelectTrigger aria-label="Fraud disposition">
+                        <SelectValue placeholder="Select a disposition" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(fraudDispositions).map(
+                          ([value, label]) => (
+                            <SelectItem
+                              key={value}
+                              value={value}
+                              disabled={
+                                staffRole === "OPERATIONS" &&
+                                value !== "FALSE_POSITIVE"
+                              }
+                            >
+                              {label}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      placeholder={
+                        fraudDisposition === "FALSE_POSITIVE"
+                          ? "Evidence or case reference (optional)"
+                          : "Evidence or case reference (required)"
+                      }
+                      value={evidenceReference}
+                      maxLength={200}
+                      onChange={(event) =>
+                        setEvidenceReference(event.target.value)
+                      }
+                    />
+                  </>
+                )}
+                <Textarea
+                  placeholder="Reason (required, min 20 characters)"
+                  value={reason}
+                  maxLength={1000}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </>
             )}
           </div>
           <DialogFooter>
@@ -584,6 +757,9 @@ function DeliveryVerificationQueuePageInner() {
                 setActionDialog(null)
                 setReason("")
                 setNotes("")
+                setVerificationReason("CRAWLER_BLOCKED")
+                setFraudDisposition("FALSE_POSITIVE")
+                setEvidenceReference("")
               }}
             >
               Cancel
@@ -592,24 +768,21 @@ function DeliveryVerificationQueuePageInner() {
               variant={
                 actionDialog?.mode === "verify" ? "default" : "destructive"
               }
-              disabled={
-                reason.length > 1000 ||
-                resolveFraud.isPending ||
-                reason.trim().length <
-                  (actionDialog?.mode === "resolve-fraud" ? 20 : 10)
-              }
+              disabled={actionPending || actionInvalid}
               onClick={() => {
                 if (!actionDialog) return
                 if (actionDialog.mode === "verify") {
                   markVerified.mutate({
                     id: actionDialog.id,
-                    reason,
+                    reason: verificationReason,
                     notes: notes || undefined,
                   })
                 } else if (actionDialog.mode === "resolve-fraud") {
                   resolveFraud.mutate({
                     id: actionDialog.id,
                     reason,
+                    disposition: fraudDisposition,
+                    evidenceReference: evidenceReference.trim() || undefined,
                   })
                 } else {
                   reject.mutate({

@@ -152,18 +152,24 @@ export class MarkVerifiedDto {
   @IsIn(VERIFICATION_OVERRIDE_REASONS as unknown as string[])
   reason!: (typeof VERIFICATION_OVERRIDE_REASONS)[number]
 
-  @IsOptional()
+  @ValidateIf(
+    (input: MarkVerifiedDto) =>
+      input.reason === "OTHER" || input.notes !== undefined,
+  )
   @IsString()
-  @MaxLength(2_000)
+  @MinLength(20, {
+    message: "Notes must explain an OTHER verification reason",
+  })
+  @MaxLength(800)
   notes?: string
 }
 
 export class RejectVerificationDto {
   @IsString()
-  @MinLength(10, {
-    message: "Reason must be at least 10 characters for audit clarity",
+  @MinLength(20, {
+    message: "Reason must be at least 20 characters for audit clarity",
   })
-  @MaxLength(2_000)
+  @MaxLength(1_000)
   reason!: string
 }
 
