@@ -219,6 +219,18 @@ merged or deployed. GitHub `main` through dependency consolidation commit
   outbox sweep, retry, suppression, one representative event from each audience,
   and a rendered/received example of each financial attachment kind in staging.
 
+## Current Local Work: Render Auth Runtime Hotfix
+
+- Render built merged commit `85a7baa` successfully but the API exited before
+  binding its port because Node could not resolve the extensionless
+  `./layout` import emitted by the new auth email templates.
+- Branch `fix/auth-email-template-runtime` uses Node-compatible `.js` relative
+  specifiers in both templates and makes the auth build import their emitted
+  JavaScript, moving this class of failure into build/CI.
+- Local verification is green: all 8 auth suites / 38 tests, the auth runtime
+  smoke check, a production-mode package load, and the exact Render API Turbo
+  build (5 packages) pass. The hotfix still needs publication and redeployment.
+
 ## Current Local Work: Staff Marketplace And Canonical Order Integrity
 
 - Rebuilt the Admin marketplace list and detail workflows for Super Admin,
