@@ -1,4 +1,4 @@
-import { renderAuthActionEmail } from "./layout"
+import { renderAuthActionEmail } from "./layout.js"
 
 export interface PasswordResetEmailContext {
   name: string | null

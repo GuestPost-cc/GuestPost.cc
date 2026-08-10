@@ -84,7 +84,7 @@ const navGroups: NavGroup[] = [
         href: "/dashboard/verification/delivery",
         label: "Delivery Verification",
         icon: ClipboardCheck,
-        roles: ["SUPER_ADMIN", "OPERATIONS"],
+        roles: ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
       },
       {
         href: "/dashboard/verification",

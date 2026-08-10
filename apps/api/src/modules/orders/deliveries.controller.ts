@@ -12,6 +12,11 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
 import { PrismaService } from "../../common/prisma.service"
+import {
+  DeliveryInterventionReasonDto,
+  OverrideDeliveryVerificationDto,
+  ResolveDeliveryFraudFlagDto,
+} from "./dto/delivery-intervention.dto"
 import { DeliveryInterventionService } from "./services/delivery-intervention.service"
 import { OrderDeliveryService } from "./services/order-delivery.service"
 import { OrderFulfillmentAssignmentService } from "./services/order-fulfillment-assignment.service"
@@ -176,34 +181,44 @@ export class DeliveriesController {
   @Post("deliveries/:id/reverify")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   reverify(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.intervention.reverify(id, user.id)
+    return this.intervention.reverify(id, user.id, this.role(user))
   }
 
   @Post("deliveries/:id/manual-approve")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   manualApprove(
     @Param("id") id: string,
-    @Body("reason") reason: string,
+    @Body() body: DeliveryInterventionReasonDto,
     @CurrentUser() user: any,
   ) {
-    return this.intervention.manualApprove(id, user.id, this.role(user), reason)
+    return this.intervention.manualApprove(
+      id,
+      user.id,
+      this.role(user),
+      body.reason,
+    )
   }
 
   @Post("deliveries/:id/manual-reject")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   manualReject(
     @Param("id") id: string,
-    @Body("reason") reason: string,
+    @Body() body: DeliveryInterventionReasonDto,
     @CurrentUser() user: any,
   ) {
-    return this.intervention.manualReject(id, user.id, this.role(user), reason)
+    return this.intervention.manualReject(
+      id,
+      user.id,
+      this.role(user),
+      body.reason,
+    )
   }
 
   @Post("deliveries/:id/override")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   override(
     @Param("id") id: string,
-    @Body() body: { targetStatus: "VERIFIED" | "FAILED"; reason: string },
+    @Body() body: OverrideDeliveryVerificationDto,
     @CurrentUser() user: any,
   ) {
     return this.intervention.override(
@@ -219,14 +234,16 @@ export class DeliveriesController {
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   resolveFraudFlag(
     @Param("id") id: string,
-    @Body("reason") reason: string,
+    @Body() body: ResolveDeliveryFraudFlagDto,
     @CurrentUser() user: any,
   ) {
     return this.intervention.resolveFraudFlag(
       id,
       user.id,
       this.role(user),
-      reason,
+      body.reason,
+      body.disposition,
+      body.evidenceReference,
     )
   }
 }

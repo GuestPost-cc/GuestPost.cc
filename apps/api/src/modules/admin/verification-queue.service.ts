@@ -1,16 +1,8 @@
-import {
-  runLockedOrderSerializableTransaction,
-  WorkflowDecisionService,
-} from "@guestpost/shared"
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common"
+import { WorkflowDecisionService } from "@guestpost/shared"
+import { Injectable, NotFoundException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { DeliveryInterventionService } from "../orders/services/delivery-intervention.service"
-import { assertCurrentStaffAuthority } from "../orders/services/staff-authority"
 
 @Injectable()
 export class AdminVerificationQueueService {
@@ -173,7 +165,7 @@ export class AdminVerificationQueueService {
     return items
   }
 
-  async retry(orderId: string, userId: string) {
+  async retry(orderId: string, userId: string, role: string) {
     const order: any = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: { id: true, activeDeliveryVersionId: true, status: true },
@@ -184,7 +176,11 @@ export class AdminVerificationQueueService {
     if (!order.activeDeliveryVersionId)
       throw new NotFoundException("Order has no active delivery version")
 
-    return this.intervention.reverify(order.activeDeliveryVersionId, userId)
+    return this.intervention.reverify(
+      order.activeDeliveryVersionId,
+      userId,
+      role,
+    )
   }
 
   async markVerified(
@@ -196,188 +192,52 @@ export class AdminVerificationQueueService {
   ) {
     const order: any = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: {
-        website: { select: { publisherId: true } },
-        activeDeliveryVersion: true,
-      },
+      select: { status: true, activeDeliveryVersionId: true },
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "PUBLISHED")
       throw new NotFoundException("Order is not in PUBLISHED status")
-    if (!order.activeDeliveryVersion)
+    if (!order.activeDeliveryVersionId)
       throw new NotFoundException("Order has no active delivery version")
 
-    const version: any = order.activeDeliveryVersion
-    const now = new Date()
-    const reviewWindowMs =
-      this.decision.computeReviewWindowDays() * 24 * 60 * 60 * 1000
-    const autoAcceptAt = new Date(now.getTime() + reviewWindowMs)
-
-    await runLockedOrderSerializableTransaction(
-      this.prisma,
-      order.id,
-      async (tx: any) => {
-        await assertCurrentStaffAuthority(tx, userId, role, [
-          "SUPER_ADMIN",
-          "OPERATIONS",
-        ])
-        const upd = await tx.orderDeliveryVersion.updateMany({
-          where: {
-            id: version.id,
-            verificationVersion: version.verificationVersion,
-          },
-          data: {
-            interventionStatus: "APPROVED",
-            verificationFailureReason: null,
-            verificationVersion: version.verificationVersion + 1,
-            adminVerifiedById: userId,
-            adminOverrideReason: reason as any,
-            adminVerifiedNotes: notes ?? null,
-          },
-        })
-        if (upd.count === 0)
-          throw new ConflictException(
-            "Delivery was modified by another request. Retry.",
-          )
-
-        const orderUpd = await tx.order.updateMany({
-          where: {
-            id: order.id,
-            status: "PUBLISHED",
-            version: order.version,
-          },
-          data: {
-            status: "VERIFIED",
-            verifiedAt: now,
-            verifiedBy: userId,
-            verifyMethod: "MANUAL_ADMIN",
-            autoAcceptAt,
-            version: { increment: 1 },
-          },
-        })
-        if (orderUpd.count === 0)
-          throw new ConflictException(
-            "Order was modified by another request. Retry.",
-          )
-
-        await tx.orderEvent.create({
-          data: {
-            orderId: order.id,
-            eventType: "VERIFIED_MANUAL",
-            actorId: userId,
-            message: `Admin manually verified delivery — reason: ${reason}${notes ? ` (${notes})` : ""}`,
-            metadata: {
-              deliveryVersionId: version.id,
-              verifyMethod: "MANUAL_ADMIN",
-              adminReason: reason,
-              adminNotes: notes ?? null,
-              autoAcceptAt: autoAcceptAt.toISOString(),
-            },
-          },
-        })
-
-        await this.audit.log(
-          {
-            action: "ORDER_DELIVERY_MANUAL_APPROVED",
-            entityType: "OrderDeliveryVersion",
-            entityId: version.id,
-            metadata: {
-              orderId: order.id,
-              deliveryVersionId: version.id,
-              publisherId: order.website?.publisherId ?? null,
-              reason,
-              roleAtTime: role,
-              notes: notes ?? null,
-            },
-            userId,
-            organizationId: order.organizationId,
-          },
-          tx,
-        )
+    const normalizedNotes = notes?.trim() || undefined
+    const auditedReason = normalizedNotes
+      ? `Manual verification classified as ${reason}. Reviewer notes: ${normalizedNotes}`
+      : `Manual verification classified as ${reason}. Authorized staff directly reviewed the delivery evidence.`
+    return this.intervention.manualApprove(
+      order.activeDeliveryVersionId,
+      userId,
+      role,
+      auditedReason,
+      {
+        overrideReason: reason as
+          | "CRAWLER_BLOCKED"
+          | "ROBOTS_TXT"
+          | "LOGIN_REQUIRED"
+          | "JS_RENDERING"
+          | "TEMPORARY_FAILURE"
+          | "OTHER",
+        notes: normalizedNotes,
       },
     )
-
-    return {
-      status: "VERIFIED",
-      verifyMethod: "MANUAL_ADMIN",
-      autoAcceptAt,
-    }
   }
 
   async reject(orderId: string, userId: string, role: string, reason: string) {
     const order: any = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: {
-        website: { select: { publisherId: true } },
-        activeDeliveryVersion: true,
-      },
+      select: { status: true, activeDeliveryVersionId: true },
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "PUBLISHED")
       throw new NotFoundException("Order is not in PUBLISHED status")
-    if (!order.activeDeliveryVersion)
+    if (!order.activeDeliveryVersionId)
       throw new NotFoundException("Order has no active delivery version")
-
-    const version: any = order.activeDeliveryVersion
-
-    await runLockedOrderSerializableTransaction(
-      this.prisma,
-      order.id,
-      async (tx: any) => {
-        await assertCurrentStaffAuthority(tx, userId, role, [
-          "SUPER_ADMIN",
-          "OPERATIONS",
-        ])
-        const upd = await tx.orderDeliveryVersion.updateMany({
-          where: {
-            id: version.id,
-            verificationVersion: version.verificationVersion,
-          },
-          data: {
-            interventionStatus: "REJECTED",
-            verificationFailureReason: reason,
-            verificationVersion: version.verificationVersion + 1,
-          },
-        })
-        if (upd.count === 0)
-          throw new ConflictException(
-            "Delivery was modified by another request. Retry.",
-          )
-
-        await tx.orderEvent.create({
-          data: {
-            orderId: order.id,
-            eventType: "ORDER_CANCELLED",
-            actorId: userId,
-            message: `Delivery rejected by admin: ${reason}`,
-            metadata: {
-              deliveryVersionId: version.id,
-              reason,
-            },
-          },
-        })
-
-        await this.audit.log(
-          {
-            action: "ORDER_DELIVERY_MANUAL_REJECTED",
-            entityType: "OrderDeliveryVersion",
-            entityId: version.id,
-            metadata: {
-              orderId: order.id,
-              deliveryVersionId: version.id,
-              publisherId: order.website?.publisherId ?? null,
-              reason,
-              roleAtTime: role,
-            },
-            userId,
-            organizationId: order.organizationId,
-          },
-          tx,
-        )
-      },
+    return this.intervention.manualReject(
+      order.activeDeliveryVersionId,
+      userId,
+      role,
+      reason,
     )
-
-    return { status: "REJECTED" }
   }
 
   async requestReverify(

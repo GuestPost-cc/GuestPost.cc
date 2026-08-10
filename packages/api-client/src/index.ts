@@ -56,6 +56,7 @@ export type {
   AdminUserDetailResponse,
   AdminUserResponse,
   AdminWithdrawalResponse,
+  DeliveryFraudDisposition,
   OperationsInboxOrder,
   OperationsInboxResponse,
   OperationsInboxView,

@@ -12,7 +12,7 @@
     "./server": "./dist/server/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node --no-warnings scripts/check-runtime-imports.mjs",
     "dev": "tsc --watch",
     "test": "jest"
   },
@@ -38,6 +38,9 @@
     "testMatch": [
       "<rootDir>/src/__tests__/**/*.spec.ts"
     ],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
     "moduleFileExtensions": [
       "ts",
       "js"

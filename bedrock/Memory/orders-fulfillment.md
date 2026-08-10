@@ -221,6 +221,34 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
   delivery evidence and `Order` with optimistic guards, and writes event/audit
   evidence atomically. A status-only manual verification is not a valid
   settlement predicate.
+- A technically passing delivery never advances automatically when it creates
+  a fraud signal. It remains `MANUAL_REVIEW`, the database projects the
+  immutable signal into `DeliveryFraudHold`, and the same transaction records a
+  required durable staff fraud alert.
+- Customer normal confirmation and manual technical fallback re-read current
+  fraud holds under the Order lock. A hold produces customer-safe
+  `DELIVERY_FRAUD_REVIEW_REQUIRED`, commits no lifecycle or money mutation, and
+  records throttled internal denial evidence. Signal types and cross-order
+  references remain staff-only.
+- Delivery approval and fraud adjudication are separate. Manual approval and a
+  positive verification override reject every unresolved order-level hold.
+  Operations can resolve a classified false positive; authorizing URL reuse or
+  accepting known risk requires Finance or Super Admin plus a bounded evidence
+  reference. `AUTHORIZED_REUSE` is accepted only for a `URL_REUSED` signal.
+  Every resolution keeps the immutable original flag and snapshots
+  the disposition, evidence reference, reason, resolver, and role-at-time. New
+  raw SQL inserts are held to the same classification/role policy by the
+  database disposition guard.
+- Re-verification reuses a classified staff disposition only for the same
+  delivery version, fraud type, and deeply equal signal details. The worker
+  revalidates the classification, role-at-time, and required reference under
+  the Order lock and audits the reuse. Changed evidence, including a larger URL
+  reuse count, creates a new flag and hold; legacy unclassified resolutions
+  fail closed.
+- The Admin verification compatibility routes delegate to the canonical
+  intervention service. Finance has read/adjudication access to the queue but
+  cannot perform Operations delivery actions. Successful manual verification
+  sets `autoAcceptAt`; reversing verification clears it.
 - Manual settlement approval requires a reason and is available to `FINANCE`
   and `SUPER_ADMIN` after customer approval. Super Admin retains the separate
   force-approval step for exceptional missing-customer-approval cases.

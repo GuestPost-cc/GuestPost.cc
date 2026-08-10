@@ -2266,6 +2266,7 @@ DECLARE
   cancelled_settled_at TIMESTAMP;
   settlement_guard_count INTEGER;
   fraud_resolution_guard_count INTEGER;
+  fraud_resolution_constraint_count INTEGER;
   order_contract_guard_count INTEGER;
   platform_settings_id TEXT;
   platform_fee_pct NUMERIC;
@@ -2300,14 +2301,29 @@ BEGIN
    WHERE tgname IN (
      'DeliveryFraudFlag_current_hold_projection',
      'DeliveryFraudFlagResolution_guard',
+     'DeliveryFraudFlagResolution_classification_guard',
      'DeliveryFraudHold_write_guard',
      'DeliveryFraudHold_delete_requires_resolution',
      'DeliveryVerificationEvidence_append_only_guard',
      'DeliverySnapshot_append_only_guard'
    )
      AND NOT tgisinternal;
-  IF fraud_resolution_guard_count <> 6 THEN
+  IF fraud_resolution_guard_count <> 7 THEN
     RAISE EXCEPTION 'Delivery fraud resolution/hold/evidence guards are missing';
+  END IF;
+
+  -- This constraint is intentionally NOT VALID: immutable historical rows
+  -- predate classified dispositions, while PostgreSQL still enforces the
+  -- check for every new insert. Do not require convalidated here unless a
+  -- separate evidence-preserving historical backfill is introduced first.
+  SELECT COUNT(*)
+    INTO fraud_resolution_constraint_count
+    FROM pg_constraint
+   WHERE conrelid = '"DeliveryFraudFlagResolution"'::regclass
+     AND conname = 'DeliveryFraudFlagResolution_staff_disposition_check'
+     AND contype = 'c';
+  IF fraud_resolution_constraint_count <> 1 THEN
+    RAISE EXCEPTION 'Delivery fraud disposition constraint is missing';
   END IF;
 
   SELECT COUNT(*)
@@ -2381,7 +2397,7 @@ BEGIN
     'Finance reconciled and cleared the historical pre-migration signal.',
     'migration-rehearsal-finance',
     'FINANCE',
-    '{"source":"historical-migration-review"}'::jsonb,
+    '{"source":"historical-migration-review","disposition":"AUTHORIZED_REUSE","evidenceReference":"migration-rehearsal-case-url-reuse-001"}'::jsonb,
     CURRENT_TIMESTAMP
   );
 
@@ -3537,7 +3553,7 @@ BEGIN
       'A non-staff identity must never clear a settlement fraud hold.',
       'migration-rehearsal-publisher-owner',
       'FINANCE',
-      '{"source":"unauthorized"}'::jsonb,
+      '{"source":"unauthorized","disposition":"FALSE_POSITIVE"}'::jsonb,
       CURRENT_TIMESTAMP
     );
     RAISE EXCEPTION 'Non-staff identity cleared delivery fraud evidence';
@@ -3562,7 +3578,7 @@ BEGIN
     'Finance reviewed the recurrent signal and cleared it with documented evidence.',
     'migration-rehearsal-finance',
     'FINANCE',
-    '{"source":"staff-review"}'::jsonb,
+    '{"source":"staff-review","disposition":"RISK_ACCEPTED","evidenceReference":"migration-rehearsal-case-link-review-002"}'::jsonb,
     CURRENT_TIMESTAMP
   );
 

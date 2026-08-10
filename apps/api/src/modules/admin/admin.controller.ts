@@ -478,7 +478,7 @@ export class AdminController {
 
   // ── Verification queue ────────────────────────────────────────────────────
   @Get("verification-queue")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listVerificationQueue() {
     return this.verificationQueue.listQueue()
   }
@@ -486,7 +486,7 @@ export class AdminController {
   @Post("verification-queue/:id/retry")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   retryVerification(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.verificationQueue.retry(id, user.id)
+    return this.verificationQueue.retry(id, user.id, user.staffRole)
   }
 
   @Post("verification-queue/:id/mark-verified")

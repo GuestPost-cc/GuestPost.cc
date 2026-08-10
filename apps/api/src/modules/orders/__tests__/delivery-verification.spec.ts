@@ -329,14 +329,47 @@ describe("runDeliveryVerification", () => {
       deliveryVerificationEvidence: { create: jest.fn().mockResolvedValue({}) },
       deliveryFraudFlag: {
         findFirst: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockImplementation(({ data }: any) =>
+          Promise.resolve({
+            id: `flag-${data.type.toLowerCase()}`,
+            ...data,
+          }),
+        ),
       },
       deliveryFraudFlagResolution: {
         create: jest.fn().mockResolvedValue({ id: "resolution-1" }),
       },
+      deliveryFraudHold: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       orderEvent: { create: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
-      notification: { create: jest.fn().mockResolvedValue({}) },
+      notification: {
+        create: jest.fn().mockResolvedValue({}),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      communicationEvent: {
+        upsert: jest.fn().mockResolvedValue({ id: "communication-1" }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      communicationDelivery: {
+        upsert: jest
+          .fn()
+          .mockResolvedValue({ id: "delivery-email-1", status: "PENDING" }),
+      },
+      user: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "staff1",
+            email: "staff@example.com",
+            emailVerified: true,
+            banned: false,
+            notificationPreferences: [],
+            emailSuppressions: [],
+          },
+        ]),
+      },
       publisherMembership: {
         findMany: jest.fn().mockResolvedValue([{ userId: "pub-user" }]),
       },
@@ -471,13 +504,194 @@ describe("runDeliveryVerification", () => {
       id: "vX",
       orderId: "OTHER",
     })
-    await runDeliveryVerification(
+    const result = await runDeliveryVerification(
       { prisma, fetchUrl: fetcher(goodHtml), putObject },
       "v1",
     )
+    expect(result.status).toBe("MANUAL_REVIEW")
     expect(prisma.deliveryFraudFlag.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ type: "URL_REUSED" }),
+      }),
+    )
+    expect(prisma.order.updateMany).not.toHaveBeenCalled()
+    expect(prisma.communicationEvent.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          type: "STAFF_FRAUD_ALERT",
+          aggregateId: "o1",
+        }),
+      }),
+    )
+  })
+
+  it("honors a classified disposition when the exact fraud evidence recurs", async () => {
+    prisma.orderDeliveryVersion.findFirst.mockResolvedValue({
+      id: "vX",
+      orderId: "OTHER",
+    })
+    prisma.deliveryFraudFlag.findMany.mockResolvedValue([
+      {
+        id: "flag-resolved",
+        type: "URL_REUSED",
+        details: {
+          otherOrderId: "OTHER",
+          otherVersionId: "vX",
+          reuseCount: 1,
+        },
+        resolution: {
+          id: "resolution-resolved",
+          kind: "STAFF_CLEARED",
+          resolvedByUserId: "finance-1",
+          resolvedByRole: "FINANCE",
+          evidence: {
+            adjudicatedDeliveryVersionId: "v1",
+            fraudType: "URL_REUSED",
+            disposition: "AUTHORIZED_REUSE",
+            evidenceReference: "CASE-1024",
+            roleAtTime: "FINANCE",
+          },
+        },
+      },
+    ])
+
+    const result = await runDeliveryVerification(
+      { prisma, fetchUrl: fetcher(goodHtml), putObject },
+      "v1",
+    )
+
+    expect(result.status).toBe("VERIFIED")
+    expect(prisma.deliveryFraudFlag.create).not.toHaveBeenCalled()
+    expect(prisma.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "VERIFIED" }),
+      }),
+    )
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "ORDER_DELIVERY_FRAUD_DISPOSITION_REUSED",
+          metadata: expect.objectContaining({
+            fraudFlagId: "flag-resolved",
+            resolutionId: "resolution-resolved",
+            disposition: "AUTHORIZED_REUSE",
+          }),
+        }),
+      }),
+    )
+  })
+
+  it("creates a new hold when reused-URL evidence changes after adjudication", async () => {
+    prisma.orderDeliveryVersion.findFirst.mockResolvedValue({
+      id: "vX",
+      orderId: "OTHER",
+    })
+    prisma.orderDeliveryVersion.count.mockImplementation(({ where }: any) =>
+      Promise.resolve(where?.normalizedUrl ? 2 : 0),
+    )
+    prisma.deliveryFraudFlag.findMany.mockResolvedValue([
+      {
+        id: "flag-resolved",
+        type: "URL_REUSED",
+        details: {
+          otherOrderId: "OTHER",
+          otherVersionId: "vX",
+          reuseCount: 1,
+        },
+        resolution: {
+          id: "resolution-resolved",
+          kind: "STAFF_CLEARED",
+          resolvedByUserId: "finance-1",
+          resolvedByRole: "FINANCE",
+          evidence: {
+            adjudicatedDeliveryVersionId: "v1",
+            fraudType: "URL_REUSED",
+            disposition: "AUTHORIZED_REUSE",
+            evidenceReference: "CASE-1024",
+            roleAtTime: "FINANCE",
+          },
+        },
+      },
+    ])
+
+    const result = await runDeliveryVerification(
+      { prisma, fetchUrl: fetcher(goodHtml), putObject },
+      "v1",
+    )
+
+    expect(result.status).toBe("MANUAL_REVIEW")
+    expect(prisma.deliveryFraudFlag.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: "URL_REUSED",
+          details: expect.objectContaining({ reuseCount: 2 }),
+        }),
+      }),
+    )
+    expect(prisma.order.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("does not trust legacy unclassified fraud resolutions on retry", async () => {
+    prisma.orderDeliveryVersion.findFirst.mockResolvedValue({
+      id: "vX",
+      orderId: "OTHER",
+    })
+    prisma.deliveryFraudFlag.findMany.mockResolvedValue([
+      {
+        id: "flag-legacy",
+        type: "URL_REUSED",
+        details: {
+          otherOrderId: "OTHER",
+          otherVersionId: "vX",
+          reuseCount: 1,
+        },
+        resolution: {
+          id: "resolution-legacy",
+          kind: "STAFF_CLEARED",
+          resolvedByUserId: "operations-1",
+          resolvedByRole: "OPERATIONS",
+          evidence: {
+            adjudicatedDeliveryVersionId: "v1",
+            fraudType: "URL_REUSED",
+            roleAtTime: "OPERATIONS",
+          },
+        },
+      },
+    ])
+
+    const result = await runDeliveryVerification(
+      { prisma, fetchUrl: fetcher(goodHtml), putObject },
+      "v1",
+    )
+
+    expect(result.status).toBe("MANUAL_REVIEW")
+    expect(prisma.deliveryFraudFlag.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: "URL_REUSED" }),
+      }),
+    )
+  })
+
+  it("cannot auto-verify while an earlier unresolved order-level hold remains", async () => {
+    prisma.deliveryFraudHold.findFirst.mockResolvedValue({
+      fraudFlagId: "flag-existing",
+    })
+
+    const result = await runDeliveryVerification(
+      { prisma, fetchUrl: fetcher(goodHtml), putObject },
+      "v1",
+    )
+
+    expect(result).toEqual({
+      status: "MANUAL_REVIEW",
+      reason: "Delivery requires staff fraud review",
+    })
+    expect(prisma.order.updateMany).not.toHaveBeenCalled()
+    expect(prisma.orderDeliveryVersion.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          verificationStatus: "MANUAL_REVIEW",
+        }),
       }),
     )
   })

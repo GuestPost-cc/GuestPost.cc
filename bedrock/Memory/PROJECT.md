@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-08-10
+updated: 2026-08-11
 ---
 
 # GuestPost.cc
@@ -93,6 +93,11 @@ Open/partial items require architectural design discussion.
   deterministic message IDs, bounded retry leases, and hard-bounce
   suppression. Logs must not contain recipient addresses or raw provider
   payloads.
+- `packages/auth` emits server-reachable email templates as ESM. Relative
+  imports in those sources must include their emitted `.js` extension so the
+  compiled files remain loadable by Node without bundler-only resolution. The
+  auth build imports the emitted password-reset and verification templates as a
+  runtime smoke check; Jest maps those `.js` specifiers back to TypeScript.
 - Financial email attachments are issued only for captured order payments,
   order refunds, and successful wallet deposits. Each event transaction creates
   one immutable `FinancialDocument` snapshot (paid invoice, credit note, or

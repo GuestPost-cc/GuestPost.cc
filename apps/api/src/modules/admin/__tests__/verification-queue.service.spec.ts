@@ -107,4 +107,75 @@ describe("AdminVerificationQueueService", () => {
       }),
     )
   })
+
+  it("delegates approval to the canonical fraud-aware intervention path", async () => {
+    const prisma = {
+      order: {
+        findUnique: jest.fn().mockResolvedValue({
+          status: "PUBLISHED",
+          activeDeliveryVersionId: "delivery-1",
+        }),
+      },
+    }
+    const intervention = {
+      manualApprove: jest.fn().mockResolvedValue({ status: "VERIFIED" }),
+    }
+    const service = new AdminVerificationQueueService(
+      prisma as any,
+      {} as any,
+      intervention as any,
+    )
+
+    await service.markVerified(
+      "order-1",
+      "staff-1",
+      "OPERATIONS",
+      "CRAWLER_BLOCKED",
+      "The live article was reviewed in a normal browser.",
+    )
+
+    expect(intervention.manualApprove).toHaveBeenCalledWith(
+      "delivery-1",
+      "staff-1",
+      "OPERATIONS",
+      expect.stringContaining("CRAWLER_BLOCKED"),
+      {
+        overrideReason: "CRAWLER_BLOCKED",
+        notes: "The live article was reviewed in a normal browser.",
+      },
+    )
+  })
+
+  it("delegates rejection to the canonical intervention path", async () => {
+    const prisma = {
+      order: {
+        findUnique: jest.fn().mockResolvedValue({
+          status: "PUBLISHED",
+          activeDeliveryVersionId: "delivery-1",
+        }),
+      },
+    }
+    const intervention = {
+      manualReject: jest.fn().mockResolvedValue({ status: "REJECTED" }),
+    }
+    const service = new AdminVerificationQueueService(
+      prisma as any,
+      {} as any,
+      intervention as any,
+    )
+
+    await service.reject(
+      "order-1",
+      "staff-1",
+      "OPERATIONS",
+      "Published page does not contain the purchased placement.",
+    )
+
+    expect(intervention.manualReject).toHaveBeenCalledWith(
+      "delivery-1",
+      "staff-1",
+      "OPERATIONS",
+      "Published page does not contain the purchased placement.",
+    )
+  })
 })

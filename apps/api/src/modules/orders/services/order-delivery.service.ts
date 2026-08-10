@@ -9,6 +9,7 @@ import {
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -19,6 +20,10 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
+import {
+  deliveryFraudReviewRequiredForCustomer,
+  recordCustomerDeliveryFraudBlock,
+} from "./delivery-fraud-guard"
 import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderReviewService } from "./order-review.service"
 import { assertOwnerOrCreator } from "./owner-or-creator"
@@ -346,50 +351,77 @@ export class OrderDeliveryService {
     userId: string,
     actorRole?: string | null,
   ) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, organizationId },
-      include: { website: { select: { publisherId: true } } },
-    })
-    if (!order) throw new NotFoundException("Order not found")
-    // Phase 6.9 — Audit finding R-3. Manual customer-accept-delivery commits
-    // a delivery as APPROVED, unblocking the settlement path. OWNER||creator
-    // only — non-creator MEMBER cannot accept someone else's order delivery.
-    assertOwnerOrCreator({
-      customerId: order.customerId,
-      actorUserId: userId,
-      actorRole,
-      action: "accept delivery",
-    })
-    if (!order.activeDeliveryVersionId)
-      throw new BadRequestException("There is no delivery to accept yet")
-
-    const v = await this.prisma.orderDeliveryVersion.findUnique({
-      where: { id: order.activeDeliveryVersionId },
-    })
-    if (!v) throw new BadRequestException("Active delivery not found")
-
-    // System-check priority: manual accept is the fallback path only.
-    if (v.verificationStatus === "VERIFIED") {
-      throw new BadRequestException(
-        "This delivery passed automated verification — use Confirm Delivery.",
-      )
-    }
-    if (!["FAILED", "MANUAL_REVIEW"].includes(v.verificationStatus)) {
-      throw new BadRequestException(
-        "Automated verification is still running — please wait for it to finish.",
-      )
-    }
-    if (order.status !== "PUBLISHED") {
-      throw new BadRequestException(
-        "Order is not awaiting delivery confirmation",
-      )
-    }
-    await this.cancellation.assertNoActiveCancellation(orderId)
-
-    return runLockedOrderSerializableTransaction(
+    const result = await runLockedOrderSerializableTransaction(
       this.prisma,
       orderId,
       async (tx: any) => {
+        const [order, membership] = await Promise.all([
+          tx.order.findFirst({
+            where: { id: orderId, organizationId },
+            include: { website: { select: { publisherId: true } } },
+          }),
+          tx.membership.findFirst({
+            where: { organizationId, userId, status: "ACTIVE" },
+            select: { role: true },
+          }),
+        ])
+        if (!order) throw new NotFoundException("Order not found")
+        if (!membership) {
+          throw new ForbiddenException(
+            "An active organization membership is required to accept delivery",
+          )
+        }
+        // A customer manual approval is money-adjacent. Revalidate creator or
+        // owner authority only after taking the canonical Order lock.
+        assertOwnerOrCreator({
+          customerId: order.customerId,
+          actorUserId: userId,
+          actorRole: membership.role ?? actorRole,
+          action: "accept delivery",
+        })
+        if (!order.activeDeliveryVersionId) {
+          throw new BadRequestException("There is no delivery to accept yet")
+        }
+        const v = await tx.orderDeliveryVersion.findUnique({
+          where: { id: order.activeDeliveryVersionId },
+        })
+        if (!v || v.orderId !== order.id || v.supersededByVersion != null) {
+          throw new ConflictException(
+            "Active delivery changed. Refresh before accepting.",
+          )
+        }
+        if (v.verificationStatus === "VERIFIED") {
+          throw new BadRequestException(
+            "This delivery passed automated verification — use Confirm Delivery.",
+          )
+        }
+        if (!["FAILED", "MANUAL_REVIEW"].includes(v.verificationStatus)) {
+          throw new BadRequestException(
+            "Automated verification is still running — please wait for it to finish.",
+          )
+        }
+        if (order.status !== "PUBLISHED") {
+          throw new BadRequestException(
+            "Order is not awaiting delivery confirmation",
+          )
+        }
+        await this.cancellation.assertNoActiveCancellation(orderId, tx)
+
+        const now = new Date()
+        const fraudBlocked = await recordCustomerDeliveryFraudBlock(
+          tx,
+          this.audit,
+          {
+            action: "MANUAL_ACCEPT",
+            orderId,
+            deliveryVersionId: v.id,
+            organizationId,
+            userId,
+            now,
+          },
+        )
+        if (fraudBlocked) return { fraudBlocked }
+
         const upd = await tx.orderDeliveryVersion.updateMany({
           where: { id: v.id, verificationVersion: v.verificationVersion },
           data: {
@@ -407,8 +439,8 @@ export class OrderDeliveryService {
           where: { id: order.id, version: order.version, status: "PUBLISHED" },
           data: {
             status: "DELIVERED",
-            deliveredAt: new Date(),
-            verifiedAt: new Date(),
+            deliveredAt: now,
+            verifiedAt: now,
             verifiedBy: userId,
             verifyMethod: "CUSTOMER_MANUAL",
             deliveryAcceptedMethod: "CUSTOMER",
@@ -510,6 +542,13 @@ export class OrderDeliveryService {
         return { status: completed.status, acceptedBy: "customer" }
       },
     )
+    if ("fraudBlocked" in result) {
+      this.logger.warn(
+        `Blocked customer delivery acceptance pending fraud review: order=${orderId} user=${userId}`,
+      )
+      throw deliveryFraudReviewRequiredForCustomer()
+    }
+    return result
   }
 
   async getDelivery(id: string) {
