@@ -29,6 +29,22 @@ export type Team = {
   createdAt: string
 }
 
+export type BillingProfile = {
+  organizationId: string
+  legalName: string
+  billingEmail: string | null
+  addressLine1: string
+  addressLine2: string | null
+  city: string
+  region: string | null
+  postalCode: string
+  countryCode: string
+  taxIdType: string | null
+  taxId: string | null
+}
+
+export type BillingProfileInput = Omit<BillingProfile, "organizationId">
+
 export class IdentityService {
   constructor(private client: HttpClient) {}
 
@@ -96,6 +112,19 @@ export class IdentityService {
   getOrganization(orgId: string) {
     return this.client.get<OrganizationDetail>(
       `/identity/organizations/${orgId}`,
+    )
+  }
+
+  getBillingProfile(orgId: string) {
+    return this.client.get<BillingProfile>(
+      `/identity/organizations/${orgId}/billing-profile`,
+    )
+  }
+
+  updateBillingProfile(orgId: string, data: BillingProfileInput) {
+    return this.client.patch<BillingProfile>(
+      `/identity/organizations/${orgId}/billing-profile`,
+      { json: data },
     )
   }
 

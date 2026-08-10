@@ -202,6 +202,15 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   approves the entity-specific disclosures. Product controls and contractual
   wording cannot eliminate non-excludable liability for the platform's own
   fraud, gross negligence, willful misconduct, or statutory obligations.
+- **Financial documents require entity- and jurisdiction-specific review before
+  production use.** The implementation preserves exact issued snapshots,
+  deterministic numbers, related credit notes, billing parties, currency, and
+  attachment integrity, but it deliberately does not invent tax registration,
+  tax rates, statutory invoice wording, retention periods, or sequence rules.
+  Configure the real `INVOICE_*` issuer identity and obtain qualified accounting
+  or legal approval for every launch jurisdiction before enabling live financial
+  email delivery. Keep USD as the only supported currency until another currency
+  is certified end to end.
 
 ### Pre-existing risks unchanged by this batch (still on the radar)
 

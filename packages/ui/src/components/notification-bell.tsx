@@ -12,7 +12,10 @@ import {
 export interface NotificationBellItem {
   id: string
   type: string
+  title?: string | null
   message: string
+  severity?: "INFO" | "SUCCESS" | "WARNING" | "CRITICAL"
+  actionPath?: string | null
   read: boolean
   createdAt: string
 }
@@ -23,6 +26,7 @@ export interface NotificationBellProps {
   loading?: boolean
   onOpenChange?: (open: boolean) => void
   onMarkRead: (id: string) => void
+  onOpenItem?: (item: NotificationBellItem) => void
   onMarkAllRead: () => void
   onLoadMore?: () => void
   hasMore?: boolean
@@ -47,6 +51,7 @@ export function NotificationBell({
   loading,
   onOpenChange,
   onMarkRead,
+  onOpenItem,
   onMarkAllRead,
   onLoadMore,
   hasMore,
@@ -97,7 +102,10 @@ export function NotificationBell({
               <button
                 key={n.id}
                 type="button"
-                onClick={() => !n.read && onMarkRead(n.id)}
+                onClick={() => {
+                  if (!n.read) onMarkRead(n.id)
+                  onOpenItem?.(n)
+                }}
                 className={cn(
                   "flex w-full flex-col gap-0.5 border-b px-4 py-3 text-left last:border-b-0 hover:bg-muted/50",
                   !n.read && "bg-primary/5",
@@ -110,8 +118,20 @@ export function NotificationBell({
                       aria-hidden
                     />
                   )}
-                  <span className={cn("text-sm", !n.read && "font-medium")}>
-                    {n.message}
+                  <span className="min-w-0">
+                    {n.title && (
+                      <span className="block text-sm font-semibold">
+                        {n.title}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        "block text-sm text-muted-foreground",
+                        !n.title && !n.read && "font-medium text-foreground",
+                      )}
+                    >
+                      {n.message}
+                    </span>
                   </span>
                 </span>
                 <span className="pl-4 text-xs text-muted-foreground">

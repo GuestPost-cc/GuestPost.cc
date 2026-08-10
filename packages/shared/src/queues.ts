@@ -27,6 +27,8 @@ export const QUEUE_JOBS = {
     SEND_NOTIFICATION: "send-notification",
     SEND_MAGIC_LINK: "send-magic-link",
     SEND_REMINDER_EMAIL: "send-reminder-email",
+    SEND_DELIVERY: "send-email-delivery",
+    SWEEP_OUTBOX: "send-email-outbox-sweep",
   },
   [QUEUES.REPORT]: {
     GENERATE_PDF: "generate-pdf",

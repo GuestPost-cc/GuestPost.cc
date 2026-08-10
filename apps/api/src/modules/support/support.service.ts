@@ -4,9 +4,11 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { CommunicationsService } from "../communications/communications.service"
 import { QueueService } from "../queues/queue.service"
 
 // Phase 6.6: tickets are channel-aware. The participant matrix below is the
@@ -111,6 +113,7 @@ export class SupportService {
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
     private readonly audit: AuditService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   // ── createTicket ────────────────────────────────────────────────────────
@@ -188,6 +191,7 @@ export class SupportService {
       `New ticket: ${ticket.subject}`,
       data.userId,
       "PUBLIC",
+      ticket.id,
     )
 
     return ticket
@@ -439,6 +443,7 @@ export class SupportService {
         : `New reply on ticket: ${ticket.subject}`,
       actor.userId,
       visibility,
+      message.id,
     )
 
     return message
@@ -487,13 +492,14 @@ export class SupportService {
       organizationId: ticket.organizationId,
     })
 
-    // Notify the customer who opened the ticket — public-visible state change.
-    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: ticket.userId,
-      organizationId: ticket.organizationId,
-      type: "SUPPORT_TICKET_UPDATED",
-      message: `Your support ticket "${ticket.subject}" is now ${status.replace(/_/g, " ").toLowerCase()}.`,
-    })
+    await this.fanOutTicketEvent(
+      ticketId,
+      "SUPPORT_STATUS_CHANGED",
+      `Support ticket "${ticket.subject}" is now ${status.replace(/_/g, " ").toLowerCase()}.`,
+      actor.userId,
+      "PUBLIC",
+      `${ticketId}:${status}`,
+    )
 
     return updated
   }
@@ -700,6 +706,7 @@ export class SupportService {
     message: string,
     excludeUserId: string,
     visibility: Visibility,
+    sourceId: string,
   ) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
@@ -761,6 +768,36 @@ export class SupportService {
         select: { userId: true },
       })
       for (const sm of finance) add(sm.userId, null)
+    }
+
+    if (this.communications) {
+      const eventType =
+        type === "SUPPORT_STATUS_CHANGED"
+          ? "SUPPORT_STATUS_CHANGED"
+          : isInternal
+            ? "SUPPORT_INTERNAL_NOTE"
+            : "SUPPORT_PUBLIC_REPLY"
+      const event = await this.communications.record({
+        type: eventType,
+        aggregateType: type === "TICKET_OPENED" ? "Ticket" : "TicketMessage",
+        aggregateId: sourceId,
+        organizationId: ticket.organizationId,
+        title:
+          type === "TICKET_OPENED"
+            ? "New support ticket"
+            : type === "SUPPORT_STATUS_CHANGED"
+              ? "Support ticket status updated"
+              : isInternal
+                ? "Internal support note"
+                : "New support reply",
+        message,
+        actionPath: `/dashboard/support/${ticketId}`,
+        dedupKey: `support:${ticketId}:${sourceId}:${type.toLowerCase()}`,
+        recipientUserIds: [...recipients.keys()],
+        actorUserId: excludeUserId,
+      })
+      this.communications.dispatchBestEffort(event.eventId)
+      return
     }
 
     for (const [userId, organizationId] of recipients) {

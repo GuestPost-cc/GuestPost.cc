@@ -13,11 +13,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import { notificationThreshold } from "../../../common/notification-config"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { BillingService } from "../../billing/billing.service"
+import { CommunicationsService } from "../../communications/communications.service"
 import { projectExternalOrder } from "../order-visibility"
 import { assertOwnerOrCreator } from "./owner-or-creator"
 
@@ -67,6 +70,7 @@ export class OrderPaymentService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly billing: BillingService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   private async runSerializable<T>(operation: (tx: any) => Promise<T>) {
@@ -106,6 +110,7 @@ export class OrderPaymentService {
   ) {
     const expectedAmount = validateSubmitPaymentCommand(command)
     const result = await this.runSerializable(async (tx: any) => {
+      const communicationEventIds: string[] = []
       // Every cart mutation and capture takes the parent Order first. This is
       // the aggregate serialization boundary shared with the database trigger.
       await lockOrderAggregate(tx, orderId)
@@ -443,9 +448,128 @@ export class OrderPaymentService {
         tx,
       )
 
+      if (this.communications) {
+        const customerRecipients =
+          await this.communications.customerOrderRecipients(orderId, tx)
+        const customerEvent = await this.communications.record(
+          {
+            type: "ORDER_PAYMENT_CAPTURED",
+            aggregateType: "Order",
+            aggregateId: orderId,
+            organizationId: userOrgId,
+            title: "Payment received and order submitted",
+            message: `Your payment of ${amount.toFixed(2)} USD was received. Order ${orderId} is now awaiting acceptance.`,
+            actionPath: `/dashboard/orders/${orderId}`,
+            dedupKey: `order:${orderId}:payment-captured`,
+            recipientUserIds: customerRecipients,
+            actorUserId: userId,
+          },
+          tx,
+        )
+        communicationEventIds.push(customerEvent.eventId)
+
+        const website = order.websiteId
+          ? await tx.website.findUnique({
+              where: { id: order.websiteId },
+              select: { publisherId: true },
+            })
+          : null
+        const publisherRecipients =
+          await this.communications.publisherRecipients(
+            website?.publisherId,
+            false,
+            tx,
+          )
+        const publisherEvent = await this.communications.record(
+          {
+            type: "ORDER_SUBMITTED",
+            aggregateType: "Order",
+            aggregateId: orderId,
+            organizationId: userOrgId,
+            title: "New order awaiting acceptance",
+            message: `Order ${orderId} has been paid and is ready for your review.`,
+            actionPath: `/dashboard/orders/${orderId}`,
+            dedupKey: `order:${orderId}:submitted:publisher`,
+            recipientUserIds: publisherRecipients,
+            actorUserId: userId,
+          },
+          tx,
+        )
+        communicationEventIds.push(publisherEvent.eventId)
+
+        if (
+          amount.greaterThan(
+            notificationThreshold("ADMIN_HIGH_VALUE_ORDER_THRESHOLD", 500),
+          )
+        ) {
+          const staffRecipients = await this.communications.staffRecipients(
+            ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
+            tx,
+          )
+          const staffEvent = await this.communications.record(
+            {
+              type: "STAFF_HIGH_VALUE_ORDER",
+              aggregateType: "Order",
+              aggregateId: orderId,
+              organizationId: userOrgId,
+              title: "High-value order paid",
+              message: `Order ${orderId} was paid for ${amount.toFixed(2)} ${order.currency}.`,
+              actionPath: `/dashboard/orders/${orderId}`,
+              payload: {
+                amount: amount.toNumber(),
+                currency: order.currency,
+              },
+              dedupKey: `staff:order:${orderId}:high-value`,
+              recipientUserIds: staffRecipients,
+              actorUserId: userId,
+            },
+            tx,
+          )
+          communicationEventIds.push(staffEvent.eventId)
+        }
+
+        const lowBalanceThreshold = new Decimal(
+          notificationThreshold("ADMIN_WALLET_LOW_BALANCE_THRESHOLD", 100),
+        )
+        const previousBalance = new Decimal(wallet.availableBalance)
+        const remainingBalance = previousBalance.minus(amount)
+        if (
+          previousBalance.greaterThanOrEqualTo(lowBalanceThreshold) &&
+          remainingBalance.lessThan(lowBalanceThreshold)
+        ) {
+          const staffRecipients = await this.communications.staffRecipients(
+            ["SUPER_ADMIN", "FINANCE"],
+            tx,
+          )
+          const staffEvent = await this.communications.record(
+            {
+              type: "STAFF_WALLET_LOW_BALANCE",
+              aggregateType: "Wallet",
+              aggregateId: wallet.id,
+              organizationId: userOrgId,
+              title: "Customer wallet balance is low",
+              message: `Wallet ${wallet.id} fell below the configured balance threshold after order ${orderId}.`,
+              actionPath: "/dashboard/finance",
+              payload: {
+                balance: remainingBalance.toNumber(),
+                threshold: lowBalanceThreshold.toNumber(),
+                currency: wallet.currency,
+                orderId,
+              },
+              dedupKey: `staff:wallet:${wallet.id}:low-balance:order:${orderId}`,
+              recipientUserIds: staffRecipients,
+              actorUserId: userId,
+            },
+            tx,
+          )
+          communicationEventIds.push(staffEvent.eventId)
+        }
+      }
+
       return {
         kind: "CAPTURED" as const,
         order: await tx.order.findUnique({ where: { id: orderId } }),
+        communicationEventIds,
       }
     })
 
@@ -456,6 +580,9 @@ export class OrderPaymentService {
           "Prices changed since the order was created. Review the updated total and submit payment again.",
         driftedItems: result.driftedItems,
       })
+    }
+    for (const eventId of result.communicationEventIds) {
+      this.communications?.dispatchBestEffort(eventId)
     }
     return projectExternalOrder(result.order, "CUSTOMER")
   }

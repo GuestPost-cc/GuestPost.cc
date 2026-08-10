@@ -73,7 +73,10 @@ export class QueueService {
     data: { to: string; subject: string; html?: string },
   ) {
     const job = await this.addJob(QUEUES.EMAIL, jobName, data)
-    this.logger.log(`Email queued: ${jobName} -> ${data.to} (job ${job.id})`)
+    const recipientDomain = data.to.split("@")[1]?.toLowerCase() ?? "invalid"
+    this.logger.log(
+      `Email queued: ${jobName} -> domain=${recipientDomain} (job ${job.id})`,
+    )
     return job
   }
 

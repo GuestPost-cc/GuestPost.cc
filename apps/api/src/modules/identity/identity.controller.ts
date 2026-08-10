@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from "@nestjs/common"
@@ -18,6 +19,7 @@ import { AuditService } from "../audit/audit.service"
 import { CreateOrganizationDto } from "./dto/create-organization.dto"
 import { CreateTeamDto } from "./dto/create-team.dto"
 import { InviteMemberDto } from "./dto/invite-member.dto"
+import { UpdateBillingProfileDto } from "./dto/update-billing-profile.dto"
 import { IdentityService } from "./identity.service"
 
 @Controller("identity")
@@ -197,6 +199,24 @@ export class IdentityController {
   @Get("organizations/:id")
   getOrganization(@Param("id") orgId: string, @CurrentUser() user: any) {
     return this.identity.getOrganization(orgId, user.id)
+  }
+
+  @Get("organizations/:id/billing-profile")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER")
+  getBillingProfile(@Param("id") orgId: string, @CurrentUser() user: any) {
+    return this.identity.getBillingProfile(orgId, user.id)
+  }
+
+  @Patch("organizations/:id/billing-profile")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER")
+  updateBillingProfile(
+    @Param("id") orgId: string,
+    @CurrentUser() user: any,
+    @Body() body: UpdateBillingProfileDto,
+  ) {
+    return this.identity.updateBillingProfile(orgId, user.id, body)
   }
 
   @Get("organizations/:id/members")

@@ -1,8 +1,6 @@
 import {
   deliveryVerificationJobId,
-  isUniqueViolation,
   normalizeUrl,
-  notificationDedupKey,
   orderEventMetadata,
   QUEUE_JOBS,
   QUEUES,
@@ -14,10 +12,12 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
 import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderReviewService } from "./order-review.service"
@@ -46,6 +46,7 @@ export class OrderDeliveryService {
     private readonly queue: QueueService,
     private readonly orderReview: OrderReviewService,
     private readonly cancellation: OrderCancellationService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   // Validate + normalize a published URL. Throws on empty/placeholder/invalid.
@@ -183,6 +184,41 @@ export class OrderDeliveryService {
           },
           tx,
         )
+
+        if (this.communications) {
+          const current = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { website: { select: { publisherId: true } } },
+          })
+          const recipients = [
+            ...new Set<string>([
+              ...(await this.communications.customerOrderRecipients(
+                order.id,
+                tx,
+              )),
+              ...(await this.communications.publisherRecipients(
+                current?.website?.publisherId,
+                false,
+                tx,
+              )),
+            ]),
+          ]
+          await this.communications.record(
+            {
+              type: "ORDER_PUBLISHED",
+              aggregateType: "Order",
+              aggregateId: order.id,
+              organizationId: order.organizationId,
+              title: "Order published",
+              message: `A published delivery is ready for order ${order.id}.`,
+              actionPath: `/dashboard/orders/${order.id}`,
+              dedupKey: `order:${order.id}:published:${version.id}`,
+              recipientUserIds: recipients,
+              actorUserId,
+            },
+            tx,
+          )
+        }
 
         return version
       },
@@ -415,41 +451,6 @@ export class OrderDeliveryService {
           tx,
         )
 
-        // Best-effort notify the publisher owners.
-        // Phase 7.4 (audit #12) — dedupKey per (delivery version, owner) means
-        // a worker retry of this customer-accept flow produces ONE notification
-        // per publisher owner, not three.
-        if (order.website?.publisherId) {
-          const owners = await tx.publisherMembership.findMany({
-            where: {
-              publisherId: order.website.publisherId,
-              role: "PUBLISHER_OWNER",
-            },
-            select: { userId: true },
-          })
-          for (const o of owners) {
-            const dedupKey = notificationDedupKey.deliveryAccepted(
-              v.id,
-              o.userId,
-            )
-            try {
-              await tx.notification.create({
-                data: {
-                  userId: o.userId,
-                  organizationId,
-                  type: "ORDER_DELIVERY_CUSTOMER_ACCEPTED",
-                  message: `Customer manually accepted delivery for order ${orderId}.`,
-                  dedupKey,
-                },
-              })
-            } catch (err) {
-              if (!isUniqueViolation(err)) {
-                // best-effort path: swallow other errors as before
-              }
-            }
-          }
-        }
-
         // Create settlement with computed release policy — same as the
         // confirmDelivery path uses via OrderReviewService.
         await this.orderReview.createSettlementForOrder(tx, orderId)
@@ -457,6 +458,54 @@ export class OrderDeliveryService {
           where: { id: orderId },
           select: { status: true },
         })
+
+        if (this.communications) {
+          const recipients = [
+            ...new Set<string>([
+              ...(await this.communications.customerOrderRecipients(
+                orderId,
+                tx,
+              )),
+              ...(await this.communications.publisherRecipients(
+                order.website?.publisherId,
+                false,
+                tx,
+              )),
+            ]),
+          ]
+          await this.communications.record(
+            {
+              type: "ORDER_DELIVERED",
+              aggregateType: "Order",
+              aggregateId: orderId,
+              organizationId,
+              title: "Order delivered",
+              message: `Delivery for order ${orderId} was accepted.`,
+              actionPath: `/dashboard/orders/${orderId}`,
+              dedupKey: `order:${orderId}:delivered`,
+              recipientUserIds: recipients,
+              actorUserId: userId,
+            },
+            tx,
+          )
+          if (completed.status === "COMPLETED") {
+            await this.communications.record(
+              {
+                type: "ORDER_COMPLETED",
+                aggregateType: "Order",
+                aggregateId: orderId,
+                organizationId,
+                title: "Order completed",
+                message: `Order ${orderId} is complete.`,
+                actionPath: `/dashboard/orders/${orderId}`,
+                dedupKey: `order:${orderId}:completed`,
+                recipientUserIds: recipients,
+                actorUserId: userId,
+              },
+              tx,
+            )
+          }
+        }
 
         return { status: completed.status, acceptedBy: "customer" }
       },

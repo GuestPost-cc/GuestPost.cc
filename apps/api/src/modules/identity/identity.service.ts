@@ -10,11 +10,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { CommunicationsService } from "../communications/communications.service"
 import { QueueService } from "../queues/queue.service"
+import type { UpdateBillingProfileDto } from "./dto/update-billing-profile.dto"
 
 @Injectable()
 export class IdentityService {
@@ -22,6 +25,7 @@ export class IdentityService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   async findUserById(id: string) {
@@ -201,32 +205,60 @@ export class IdentityService {
 
     // Invite is PENDING until the user accepts — they get no access and the
     // org doesn't appear in their list until then.
-    const invited = await this.prisma.membership.create({
-      data: {
-        userId: user.id,
-        organizationId,
-        role,
-        status: "PENDING",
-      },
-    })
-    // Notify the invited user
-    await this.queue
-      .addJob(QUEUES.NOTIFICATION, "push-in-app", {
-        userId: user.id,
-        organizationId,
-        type: "ORG_INVITE",
-        message: `You've been invited to join an organization as ${role}.`,
+    let eventId: string | null = null
+    const invited = await this.prisma.$transaction(async (tx: any) => {
+      const created = await tx.membership.create({
+        data: {
+          userId: user.id,
+          organizationId,
+          role,
+          status: "PENDING",
+        },
       })
-      .catch(() => {})
-
-    await this.audit.log({
-      action: "MEMBER_INVITED",
-      entityType: "Membership",
-      entityId: invited.id,
-      metadata: { invitedUserId: user.id, email, role },
-      userId: callerUserId,
-      organizationId,
+      if (this.communications) {
+        const event = await this.communications.record(
+          {
+            type: "ACCOUNT_ORGANIZATION_INVITED",
+            aggregateType: "Membership",
+            aggregateId: created.id,
+            organizationId,
+            title: "Organization invitation",
+            message: `You have been invited to join an organization as ${role.toLowerCase()}.`,
+            actionPath: "/dashboard/settings",
+            dedupKey: `membership:${created.id}:invited`,
+            recipientUserIds: [user.id],
+            actorUserId: callerUserId,
+          },
+          tx,
+        )
+        eventId = event.eventId
+      }
+      await this.audit.log(
+        {
+          action: "MEMBER_INVITED",
+          entityType: "Membership",
+          entityId: created.id,
+          metadata: { invitedUserId: user.id, role },
+          userId: callerUserId,
+          organizationId,
+        },
+        tx,
+      )
+      return created
     })
+
+    if (eventId && this.communications) {
+      this.communications.dispatchBestEffort(eventId)
+    } else {
+      await this.queue
+        .addJob(QUEUES.NOTIFICATION, "push-in-app", {
+          userId: user.id,
+          organizationId,
+          type: "ORG_INVITE",
+          message: `You've been invited to join an organization as ${role}.`,
+        })
+        .catch(() => {})
+    }
 
     return invited
   }
@@ -428,6 +460,114 @@ export class IdentityService {
       teamCount: org._count.teams,
       myRole: membership.role,
     }
+  }
+
+  private async assertOrganizationOwner(
+    organizationId: string,
+    userId: string,
+    tx: any = this.prisma,
+  ) {
+    const membership = await tx.membership.findFirst({
+      where: {
+        organizationId,
+        userId,
+        role: "OWNER",
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    })
+    if (!membership) {
+      throw new ForbiddenException(
+        "Only an active organization owner can manage billing details",
+      )
+    }
+  }
+
+  async getBillingProfile(organizationId: string, userId: string) {
+    await this.assertOrganizationOwner(organizationId, userId)
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { name: true, billingProfile: true },
+    })
+    if (!organization) throw new NotFoundException("Organization not found")
+    return (
+      organization.billingProfile ?? {
+        organizationId,
+        legalName: organization.name,
+        billingEmail: null,
+        addressLine1: "",
+        addressLine2: null,
+        city: "",
+        region: null,
+        postalCode: "",
+        countryCode: "",
+        taxIdType: null,
+        taxId: null,
+      }
+    )
+  }
+
+  async updateBillingProfile(
+    organizationId: string,
+    userId: string,
+    data: UpdateBillingProfileDto,
+  ) {
+    const taxIdType = data.taxIdType?.trim() || null
+    const taxId = data.taxId?.trim() || null
+    if (Boolean(taxIdType) !== Boolean(taxId)) {
+      throw new BadRequestException(
+        "Tax ID type and tax ID must be provided together",
+      )
+    }
+
+    return this.prisma.$transaction(async (tx: any) => {
+      await this.assertOrganizationOwner(organizationId, userId, tx)
+      const profile = await tx.billingProfile.upsert({
+        where: { organizationId },
+        create: {
+          organizationId,
+          legalName: data.legalName,
+          billingEmail: data.billingEmail?.trim().toLowerCase() || null,
+          addressLine1: data.addressLine1,
+          addressLine2: data.addressLine2 || null,
+          city: data.city,
+          region: data.region || null,
+          postalCode: data.postalCode,
+          countryCode: data.countryCode.toUpperCase(),
+          taxIdType,
+          taxId,
+        },
+        update: {
+          legalName: data.legalName,
+          billingEmail: data.billingEmail?.trim().toLowerCase() || null,
+          addressLine1: data.addressLine1,
+          addressLine2: data.addressLine2 || null,
+          city: data.city,
+          region: data.region || null,
+          postalCode: data.postalCode,
+          countryCode: data.countryCode.toUpperCase(),
+          taxIdType,
+          taxId,
+        },
+      })
+
+      await this.audit.log(
+        {
+          action: "ORGANIZATION_BILLING_PROFILE_UPDATED",
+          entityType: "BillingProfile",
+          entityId: profile.id,
+          metadata: {
+            countryCode: profile.countryCode,
+            hasBillingEmail: Boolean(profile.billingEmail),
+            hasTaxId: Boolean(profile.taxId),
+          },
+          userId,
+          organizationId,
+        },
+        tx,
+      )
+      return profile
+    })
   }
 
   async listMembers(organizationId: string, userId: string) {

@@ -17,15 +17,18 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
+import { notificationThreshold } from "../../../common/notification-config"
 import {
   resolvePlatformFeePolicy,
   splitPlatformFee,
 } from "../../../common/platform-fee"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
 import { OrderCancellationService } from "./order-cancellation.service"
 
@@ -38,6 +41,7 @@ export class OrderReviewService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
     private readonly cancellation: OrderCancellationService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   // Customer review for a completed order. One per order. Recomputes the
@@ -123,6 +127,55 @@ export class OrderReviewService {
     const r = await recomputePublisherTrustCore(this.prisma, publisherId, {
       sourceEvent,
     })
+    if (r?.changed && this.communications) {
+      const [publisher, audit, publisherRecipients, staffRecipients] =
+        await Promise.all([
+          this.prisma.publisher.findUnique({
+            where: { id: publisherId },
+            select: { name: true, organizationId: true },
+          }),
+          this.prisma.auditLog.findFirst({
+            where: {
+              action: "PUBLISHER_TIER_CHANGED",
+              entityType: "Publisher",
+              entityId: publisherId,
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: { id: true },
+          }),
+          this.communications.publisherRecipients(publisherId),
+          this.communications.staffRecipients(["SUPER_ADMIN", "OPERATIONS"]),
+        ])
+      if (publisher) {
+        const transitionId = audit?.id ?? `${r.oldTier}-${r.newTier}`
+        const publisherEvent = await this.communications.record({
+          type: "PUBLISHER_TIER_CHANGED",
+          aggregateType: "Publisher",
+          aggregateId: publisherId,
+          organizationId: publisher.organizationId,
+          title: "Publisher tier changed",
+          message: `Your publisher tier changed from ${r.oldTier ?? "NEW"} to ${r.newTier}.`,
+          actionPath: "/dashboard/settings",
+          payload: { from: r.oldTier, to: r.newTier, trustScore: r.newScore },
+          dedupKey: `publisher:${publisherId}:tier-change:${transitionId}`,
+          recipientUserIds: publisherRecipients,
+        })
+        this.communications.dispatchBestEffort(publisherEvent.eventId)
+        const staffEvent = await this.communications.record({
+          type: "STAFF_PUBLISHER_TIER_CHANGED",
+          aggregateType: "Publisher",
+          aggregateId: publisherId,
+          organizationId: publisher.organizationId,
+          title: "Publisher tier changed",
+          message: `Publisher ${publisher.name ?? publisherId} changed from ${r.oldTier ?? "NEW"} to ${r.newTier}.`,
+          actionPath: "/dashboard/publishers",
+          payload: { from: r.oldTier, to: r.newTier, trustScore: r.newScore },
+          dedupKey: `staff:publisher:${publisherId}:tier-change:${transitionId}`,
+          recipientUserIds: staffRecipients,
+        })
+        this.communications.dispatchBestEffort(staffEvent.eventId)
+      }
+    }
     return r
       ? {
           publisherId,
@@ -183,6 +236,7 @@ export class OrderReviewService {
     organizationId: string,
     userId: string,
   ) {
+    let communicationEventId: string | null = null
     const result = await runLockedOrderSerializableTransaction(
       this.prisma,
       orderId,
@@ -265,16 +319,66 @@ export class OrderReviewService {
             },
           },
         })
+        if (this.communications) {
+          const publisherIds = [
+            ...new Set<string>(
+              order.items.flatMap((item: any) =>
+                typeof item.website?.publisherId === "string"
+                  ? [item.website.publisherId]
+                  : [],
+              ),
+            ),
+          ]
+          const recipients = [
+            ...new Set<string>([
+              ...(await this.communications.customerOrderRecipients(
+                orderId,
+                tx,
+              )),
+              ...(
+                await Promise.all(
+                  publisherIds.map((publisherId) =>
+                    this.communications!.publisherRecipients(
+                      publisherId,
+                      false,
+                      tx,
+                    ),
+                  ),
+                )
+              ).flat(),
+            ]),
+          ]
+          const event = await this.communications.record(
+            {
+              type: "ORDER_CONTENT_APPROVED",
+              aggregateType: "Order",
+              aggregateId: orderId,
+              organizationId,
+              title: "Content approved",
+              message: `Content for order ${orderId} was approved and is ready to publish.`,
+              actionPath: `/dashboard/orders/${orderId}`,
+              dedupKey: `order:${orderId}:content-approved:${fresh.version}`,
+              recipientUserIds: recipients,
+              actorUserId: userId,
+            },
+            tx,
+          )
+          communicationEventId = event.eventId
+        }
         return { order: fresh, assigneeId: order.assigneeId }
       },
     )
 
-    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: result.assigneeId ?? "",
-      organizationId,
-      type: "CONTENT_APPROVED",
-      message: `Content for order ${orderId} was approved — proceed to publish`,
-    })
+    if (communicationEventId) {
+      this.communications?.dispatchBestEffort(communicationEventId)
+    } else if (result.assigneeId) {
+      await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+        userId: result.assigneeId,
+        organizationId,
+        type: "CONTENT_APPROVED",
+        message: `Content for order ${orderId} was approved — proceed to publish`,
+      })
+    }
 
     return result.order
   }
@@ -297,7 +401,8 @@ export class OrderReviewService {
       )
     }
 
-    return runLockedOrderSerializableTransaction(
+    let communicationEventId: string | null = null
+    const updated = await runLockedOrderSerializableTransaction(
       this.prisma,
       orderId,
       async (tx: any) => {
@@ -410,9 +515,59 @@ export class OrderReviewService {
           },
           tx,
         )
+        if (this.communications) {
+          const publisherIds = [
+            ...new Set<string>(
+              order.items.flatMap((item: any) =>
+                typeof item.website?.publisherId === "string"
+                  ? [item.website.publisherId]
+                  : [],
+              ),
+            ),
+          ]
+          const recipients = [
+            ...new Set<string>([
+              ...(await this.communications.customerOrderRecipients(
+                orderId,
+                tx,
+              )),
+              ...(
+                await Promise.all(
+                  publisherIds.map((publisherId) =>
+                    this.communications!.publisherRecipients(
+                      publisherId,
+                      false,
+                      tx,
+                    ),
+                  ),
+                )
+              ).flat(),
+            ]),
+          ]
+          const event = await this.communications.record(
+            {
+              type: "ORDER_REVISION_REQUESTED",
+              aggregateType: "Order",
+              aggregateId: orderId,
+              organizationId,
+              title: "Content revision requested",
+              message: `A revision was requested for order ${orderId}. Review the notes and submit an updated version.`,
+              actionPath: `/dashboard/orders/${orderId}`,
+              dedupKey: `order:${orderId}:revision:${order.revisionCount + 1}`,
+              recipientUserIds: recipients,
+              actorUserId: userId,
+            },
+            tx,
+          )
+          communicationEventId = event.eventId
+        }
         return fresh
       },
     )
+    if (communicationEventId) {
+      this.communications?.dispatchBestEffort(communicationEventId)
+    }
+    return updated
   }
 
   async confirmDelivery(
@@ -490,6 +645,60 @@ export class OrderReviewService {
             },
             tx,
           )
+
+          if (this.communications) {
+            const website = fresh.websiteId
+              ? await tx.website.findUnique({
+                  where: { id: fresh.websiteId },
+                  select: { publisherId: true },
+                })
+              : null
+            const recipients = [
+              ...new Set<string>([
+                ...(await this.communications.customerOrderRecipients(
+                  orderId,
+                  tx,
+                )),
+                ...(await this.communications.publisherRecipients(
+                  website?.publisherId,
+                  false,
+                  tx,
+                )),
+              ]),
+            ]
+            await this.communications.record(
+              {
+                type: "ORDER_DELIVERED",
+                aggregateType: "Order",
+                aggregateId: orderId,
+                organizationId,
+                title: "Order delivered",
+                message: `Delivery for order ${orderId} was confirmed.`,
+                actionPath: `/dashboard/orders/${orderId}`,
+                dedupKey: `order:${orderId}:delivered`,
+                recipientUserIds: recipients,
+                actorUserId: userId,
+              },
+              tx,
+            )
+            if (fresh.status === "COMPLETED") {
+              await this.communications.record(
+                {
+                  type: "ORDER_COMPLETED",
+                  aggregateType: "Order",
+                  aggregateId: orderId,
+                  organizationId,
+                  title: "Order completed",
+                  message: `Order ${orderId} is complete.`,
+                  actionPath: `/dashboard/orders/${orderId}`,
+                  dedupKey: `order:${orderId}:completed`,
+                  recipientUserIds: recipients,
+                  actorUserId: userId,
+                },
+                tx,
+              )
+            }
+          }
 
           return fresh
         },
@@ -660,6 +869,52 @@ export class OrderReviewService {
             "Order state changed while platform revenue was being recorded.",
         })
       }
+      if (this.communications) {
+        const customerRecipients =
+          await this.communications.customerOrderRecipients(orderId, tx)
+        await this.communications.record(
+          {
+            type: "ORDER_COMPLETED",
+            aggregateType: "Order",
+            aggregateId: orderId,
+            organizationId: order.organizationId,
+            title: "Order completed",
+            message: `Order ${orderId} is complete.`,
+            actionPath: `/dashboard/orders/${orderId}`,
+            dedupKey: `order:${orderId}:completed`,
+            recipientUserIds: customerRecipients,
+          },
+          tx,
+        )
+        if (
+          new Decimal(order.amount).greaterThan(
+            notificationThreshold("ADMIN_HIGH_VALUE_ORDER_THRESHOLD", 500),
+          )
+        ) {
+          const staffRecipients = await this.communications.staffRecipients(
+            ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
+            tx,
+          )
+          await this.communications.record(
+            {
+              type: "STAFF_HIGH_VALUE_ORDER_COMPLETED",
+              aggregateType: "Order",
+              aggregateId: orderId,
+              organizationId: order.organizationId,
+              title: "High-value order completed",
+              message: `Order ${orderId} completed at ${new Decimal(order.amount).toFixed(2)} ${order.currency}.`,
+              actionPath: `/dashboard/orders/${orderId}`,
+              payload: {
+                amount: new Decimal(order.amount).toNumber(),
+                currency: order.currency,
+              },
+              dedupKey: `staff:order:${orderId}:high-value-completed`,
+              recipientUserIds: staffRecipients,
+            },
+            tx,
+          )
+        }
+      }
       return
     }
 
@@ -713,7 +968,7 @@ export class OrderReviewService {
       null,
     )
 
-    await tx.settlement.create({
+    const settlement = await tx.settlement.create({
       data: {
         orderId,
         publisherId: publisher.id,
@@ -735,5 +990,31 @@ export class OrderReviewService {
         unitPrice: snapshotUnitPrice,
       },
     })
+    if (this.communications) {
+      const recipients = await this.communications.publisherRecipients(
+        publisher.id,
+        false,
+        tx,
+      )
+      await this.communications.record(
+        {
+          type: "SETTLEMENT_CREATED",
+          aggregateType: "Settlement",
+          aggregateId: settlement.id,
+          organizationId: order.organizationId,
+          title: "Settlement created",
+          message: `A ${publisherAmount.toFixed(2)} ${order.currency} settlement was created for order ${orderId}.`,
+          actionPath: "/dashboard/earnings",
+          payload: {
+            amount: publisherAmount.toString(),
+            currency: order.currency,
+            orderId,
+          },
+          dedupKey: `settlement:${settlement.id}:created`,
+          recipientUserIds: recipients,
+        },
+        tx,
+      )
+    }
   }
 }

@@ -3,6 +3,7 @@ import {
   assertFinanceOperationAllowed,
   QUEUE_JOBS,
   QUEUES,
+  recordCommunicationOutbox,
 } from "@guestpost/shared"
 // Node-only deep imports keep cheerio + aws-sdk + undici/dns out of the
 // shared package's public index — the Next.js apps' webpack chokes on
@@ -37,6 +38,57 @@ const logger = createLogger("worker.delivery-verification")
 // transitions the delivery version. Retries on transient failure with 5/15/60m
 // backoff; after exhaustion the core routes to MANUAL_REVIEW.
 
+async function recordVerifiedCommunication(deliveryVersionId: string) {
+  await prisma.$transaction(async (tx) => {
+    const version = await tx.orderDeliveryVersion.findUnique({
+      where: { id: deliveryVersionId },
+      select: {
+        order: {
+          select: {
+            id: true,
+            customerId: true,
+            organizationId: true,
+            website: { select: { publisherId: true } },
+          },
+        },
+      },
+    })
+    if (!version?.order) return
+    const [customerOwners, publisherMemberships] = await Promise.all([
+      tx.membership.findMany({
+        where: {
+          organizationId: version.order.organizationId,
+          status: "ACTIVE",
+          role: "OWNER",
+        },
+        select: { userId: true },
+      }),
+      version.order.website?.publisherId
+        ? tx.publisherMembership.findMany({
+            where: { publisherId: version.order.website.publisherId },
+            select: { userId: true },
+          })
+        : Promise.resolve([]),
+    ])
+    await recordCommunicationOutbox(tx, {
+      type: "ORDER_VERIFIED",
+      aggregateType: "OrderDeliveryVersion",
+      aggregateId: deliveryVersionId,
+      organizationId: version.order.organizationId,
+      title: "Delivery verified",
+      message: `Delivery for order ${version.order.id} passed verification and is ready for review.`,
+      actionPath: `/dashboard/orders/${version.order.id}`,
+      dedupKey: `delivery:${deliveryVersionId}:verified`,
+      recipientUserIds: [
+        ...new Set<string>([
+          version.order.customerId,
+          ...customerOwners.map((item) => item.userId),
+          ...publisherMemberships.map((item) => item.userId),
+        ]),
+      ],
+    })
+  })
+}
 export function createDeliveryVerificationWorker() {
   const deps = {
     prisma,
@@ -129,6 +181,9 @@ export function createDeliveryVerificationWorker() {
         actorUserId,
         isFinalAttempt,
       })
+      if (res.status === "VERIFIED" || res.skipped === "already_verified") {
+        await recordVerifiedCommunication(deliveryVersionId)
+      }
       logger.info("delivery verification complete", {
         deliveryVersionId,
         attempt: job.attemptsMade + 1,

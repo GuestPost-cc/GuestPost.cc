@@ -13,6 +13,7 @@ import { AuditModule } from "./modules/audit/audit.module"
 import { AuthModule } from "./modules/auth/auth.module"
 import { BillingModule } from "./modules/billing/billing.module"
 import { CampaignsModule } from "./modules/campaigns/campaigns.module"
+import { CommunicationsModule } from "./modules/communications/communications.module"
 import { IdentityModule } from "./modules/identity/identity.module"
 import { IntegrationsModule } from "./modules/integrations/integrations.module"
 import { MarketplaceModule } from "./modules/marketplace/marketplace.module"
@@ -32,6 +33,7 @@ import { WebsitesModule } from "./modules/websites/websites.module"
     ActiveContextModule,
     AuthModule,
     QueueModule,
+    CommunicationsModule,
     IdentityModule,
     MarketplaceModule,
     CampaignsModule,

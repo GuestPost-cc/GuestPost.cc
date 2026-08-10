@@ -29,16 +29,22 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
+import {
+  notificationFlag,
+  notificationThreshold,
+} from "../../common/notification-config"
 import { PrismaService } from "../../common/prisma.service"
 import {
   assertStripeObjectMode,
   isStripeFeatureEnabled,
 } from "../../common/stripe-client"
 import { AuditService } from "../audit/audit.service"
+import { CommunicationsService } from "../communications/communications.service"
 import {
   type DepositProviderAdapter,
   DepositProviderError,
@@ -167,12 +173,96 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    providerService?: DepositProviderService,
+    @Optional() providerService?: DepositProviderService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {
     // The fallback keeps isolated unit construction lightweight; Nest runtime
     // always supplies the registry from BillingModule.
     this.depositProvider =
       providerService?.getAdapter("stripe") ?? new StripeDepositAdapter()
+  }
+
+  private async recordDepositFailure(
+    attempt: any,
+    status: "FAILED" | "EXPIRED",
+  ) {
+    if (!this.communications || !attempt) return
+    const organizationRecipients =
+      await this.communications.organizationRecipients(
+        attempt.organizationId,
+        true,
+      )
+    const recipients = [
+      ...new Set<string>([attempt.createdByUserId, ...organizationRecipients]),
+    ]
+    const amount = new Decimal(attempt.amount).toFixed(2)
+    const event = await this.communications.record({
+      type:
+        status === "FAILED"
+          ? "BILLING_DEPOSIT_FAILED"
+          : "BILLING_DEPOSIT_EXPIRED",
+      aggregateType: "DepositAttempt",
+      aggregateId: attempt.id,
+      organizationId: attempt.organizationId,
+      title: status === "FAILED" ? "Wallet deposit failed" : "Deposit expired",
+      message:
+        status === "FAILED"
+          ? `The ${amount} ${attempt.currency} wallet deposit could not be completed. No wallet funds were added.`
+          : `The ${amount} ${attempt.currency} wallet deposit expired before payment completed. No wallet funds were added.`,
+      actionPath: "/dashboard/billing",
+      dedupKey: `deposit:${attempt.id}:${status.toLowerCase()}`,
+      recipientUserIds: recipients,
+    })
+    this.communications.dispatchBestEffort(event.eventId)
+
+    if (
+      status === "FAILED" &&
+      notificationFlag("ADMIN_DEPOSIT_FAILED_NOTIFICATION", true)
+    ) {
+      const staffRecipients = await this.communications.staffRecipients([
+        "SUPER_ADMIN",
+        "FINANCE",
+      ])
+      const staffEvent = await this.communications.record({
+        type: "STAFF_DEPOSIT_FAILED",
+        aggregateType: "DepositAttempt",
+        aggregateId: attempt.id,
+        organizationId: attempt.organizationId,
+        title: "Deposit failure requires monitoring",
+        message: `A ${amount} ${attempt.currency} wallet deposit failed.`,
+        actionPath: "/dashboard/finance",
+        payload: { amount, currency: attempt.currency },
+        dedupKey: `staff:deposit:${attempt.id}:failed`,
+        recipientUserIds: staffRecipients,
+      })
+      this.communications.dispatchBestEffort(staffEvent.eventId)
+    }
+  }
+
+  private async recordDepositDispute(attempt: any) {
+    if (!this.communications || !attempt) return
+    const recipients = [
+      ...new Set<string>([
+        attempt.createdByUserId,
+        ...(await this.communications.organizationRecipients(
+          attempt.organizationId,
+          true,
+        )),
+      ]),
+    ]
+    const amount = new Decimal(attempt.amount).toFixed(2)
+    const event = await this.communications.record({
+      type: "BILLING_DEPOSIT_DISPUTED",
+      aggregateType: "DepositAttempt",
+      aggregateId: attempt.id,
+      organizationId: attempt.organizationId,
+      title: "Wallet deposit disputed",
+      message: `The ${amount} ${attempt.currency} deposit is under payment dispute review. Available wallet funds may be restricted while it is investigated.`,
+      actionPath: "/dashboard/billing",
+      dedupKey: `deposit:${attempt.id}:disputed`,
+      recipientUserIds: recipients,
+    })
+    this.communications.dispatchBestEffort(event.eventId)
   }
 
   getDepositCapability() {
@@ -418,7 +508,7 @@ export class BillingService {
     attempt: any,
     expected: DepositCommandEvidence,
     failure: DepositProviderError,
-  ): Promise<void> {
+  ): Promise<boolean> {
     let recorded: { count: number }
     try {
       recorded = await (this.prisma as any).depositAttempt.updateMany({
@@ -443,7 +533,7 @@ export class BillingService {
       )
       throw this.depositStateUnavailable()
     }
-    if (recorded.count === 1) return
+    if (recorded.count === 1) return true
 
     try {
       const successor = await (this.prisma as any).depositAttempt.findUnique({
@@ -465,6 +555,7 @@ export class BillingService {
       depositAttemptId: attempt.id,
       failureCode: failure.code,
     })
+    return false
   }
 
   private paymentProviderEventDate(value: unknown): Date | null {
@@ -944,7 +1035,23 @@ export class BillingService {
       this.assertReturnableDepositSession(session)
     } catch (error) {
       const failure = this.depositProviderFailure(error)
-      await this.recordDepositProviderFailure(attempt, commandEvidence, failure)
+      const recorded = await this.recordDepositProviderFailure(
+        attempt,
+        commandEvidence,
+        failure,
+      )
+      if (recorded) {
+        await this.recordDepositFailure(attempt, "FAILED").catch(
+          (notificationError) =>
+            this.logger.error("Failed to record deposit failure notification", {
+              depositAttemptId: attempt.id,
+              errorType:
+                notificationError instanceof Error
+                  ? notificationError.name
+                  : "UnknownError",
+            }),
+        )
+      }
       this.logger.error("Stripe deposit session creation failed", {
         depositAttemptId: attempt.id,
         failureCode: failure.code,
@@ -1335,7 +1442,7 @@ export class BillingService {
       ) {
         await this.markDepositAttemptFromSession(
           object,
-          "EXPIRED",
+          eventType === "checkout.session.expired" ? "EXPIRED" : "FAILED",
           providerEvent.id,
           lease,
         )
@@ -1404,17 +1511,17 @@ export class BillingService {
 
   private async markDepositAttemptFromSession(
     session: any,
-    status: "EXPIRED",
+    status: "FAILED" | "EXPIRED",
     providerEventRowId: string,
     lease: PaymentProviderEventLease,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx: any) => {
+    const failedAttempt = await this.prisma.$transaction(async (tx: any) => {
       await this.lockAndAssertPaymentProviderEventAuthority(
         tx,
         providerEventRowId,
         lease,
       )
-      await tx.depositAttempt.updateMany({
+      const attempt = await tx.depositAttempt.findFirst({
         where: {
           OR: [
             { id: session.metadata?.depositAttemptId ?? "__missing__" },
@@ -1422,8 +1529,18 @@ export class BillingService {
           ],
           status: { in: ["CREATED", "PENDING_CUSTOMER_ACTION", "PROCESSING"] },
         },
-        data: { status, failedAt: new Date() },
       })
+      const updated = attempt
+        ? await tx.depositAttempt.updateMany({
+            where: {
+              id: attempt.id,
+              status: {
+                in: ["CREATED", "PENDING_CUSTOMER_ACTION", "PROCESSING"],
+              },
+            },
+            data: { status, failedAt: new Date() },
+          })
+        : { count: 0 }
       await this.completePaymentProviderEventLease(
         tx,
         providerEventRowId,
@@ -1435,7 +1552,11 @@ export class BillingService {
           lastError: null,
         },
       )
+      return updated.count === 1 ? attempt : null
     })
+    if (failedAttempt) {
+      await this.recordDepositFailure(failedAttempt, status)
+    }
   }
 
   private isPaymentDisputeEventType(
@@ -1749,7 +1870,7 @@ export class BillingService {
       throw new PaymentProviderEventOwnershipError()
     }
     const input = this.paymentDisputeInputFromProviderEvent(event)
-    return transitionPaymentDispute(
+    const outcome = await transitionPaymentDispute(
       this.prisma,
       {
         audit: async (tx, auditInput) => {
@@ -1766,6 +1887,22 @@ export class BillingService {
       },
       input,
     )
+    if (outcome.status === "OPEN" && event.depositAttemptId) {
+      const attempt = await (this.prisma as any).depositAttempt.findUnique({
+        where: { id: event.depositAttemptId },
+      })
+      await this.recordDepositDispute(attempt).catch((notificationError) =>
+        this.logger.error("Failed to record deposit dispute notification", {
+          depositAttemptId: event.depositAttemptId,
+          paymentDisputeId: outcome.paymentDisputeId,
+          errorType:
+            notificationError instanceof Error
+              ? notificationError.name
+              : "UnknownError",
+        }),
+      )
+    }
+    return outcome
   }
 
   private safeProviderEventError(error: unknown): string {
@@ -1836,6 +1973,38 @@ export class BillingService {
     message: string,
     dedupKeyPrefix: string,
   ): Promise<void> {
+    if (this.communications) {
+      const recipients = await this.communications.staffRecipients(
+        ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
+        tx,
+      )
+      const source =
+        dedupKeyPrefix ??
+        createHash("sha256")
+          .update(`${type}:${message}`)
+          .digest("hex")
+          .slice(0, 32)
+      await this.communications.record(
+        {
+          type: type.includes("CHARGEBACK")
+            ? "STAFF_CHARGEBACK_ALERT"
+            : "STAFF_FRAUD_ALERT",
+          aggregateType: type.includes("CHARGEBACK")
+            ? "StripeDispute"
+            : "RiskAlert",
+          aggregateId: source,
+          title: type.includes("CHARGEBACK")
+            ? "Chargeback requires review"
+            : "Fraud risk alert",
+          message,
+          actionPath: "/dashboard/finance",
+          dedupKey: `staff-alert:${source.replace(/[^A-Za-z0-9:._-]/g, "-")}`,
+          recipientUserIds: recipients,
+        },
+        tx,
+      )
+      return
+    }
     const staff = await tx.staffMembership.findMany({
       where: { role: { in: ["FINANCE", "SUPER_ADMIN"] } },
       select: { userId: true },
@@ -2383,6 +2552,7 @@ export class BillingService {
     }
 
     const orgId = attempt.organizationId
+    let communicationEventId: string | null = null
 
     try {
       await this.prisma.$transaction(async (tx: any) => {
@@ -2508,6 +2678,65 @@ export class BillingService {
           },
           tx,
         )
+        if (this.communications) {
+          const organizationRecipients =
+            await this.communications.organizationRecipients(
+              attempt.organizationId,
+              true,
+              tx,
+            )
+          const recipients = [
+            ...new Set<string>([
+              attempt.createdByUserId,
+              ...organizationRecipients,
+            ]),
+          ]
+          const event = await this.communications.record(
+            {
+              type: "BILLING_DEPOSIT_SUCCEEDED",
+              aggregateType: "DepositAttempt",
+              aggregateId: attempt.id,
+              organizationId: attempt.organizationId,
+              title: "Wallet deposit completed",
+              message: `${amount.toFixed(2)} ${currency} was added to your wallet.`,
+              actionPath: "/dashboard/billing",
+              dedupKey: `deposit:${attempt.id}:succeeded`,
+              recipientUserIds: recipients,
+            },
+            tx,
+          )
+          communicationEventId = event.eventId
+
+          if (
+            amount.greaterThan(
+              notificationThreshold("ADMIN_HIGH_VALUE_DEPOSIT_THRESHOLD", 1000),
+            )
+          ) {
+            const staffRecipients = await this.communications.staffRecipients(
+              ["SUPER_ADMIN", "FINANCE"],
+              tx,
+            )
+            await this.communications.record(
+              {
+                type: "STAFF_HIGH_VALUE_DEPOSIT",
+                aggregateType: "DepositAttempt",
+                aggregateId: attempt.id,
+                organizationId: orgId,
+                title: "High-value wallet deposit",
+                message: `${amount.toFixed(2)} ${currency} was deposited into a customer wallet.`,
+                actionPath: "/dashboard/finance",
+                payload: {
+                  amount: amount.toString(),
+                  currency,
+                  walletId,
+                },
+                dedupKey: `staff:deposit:${attempt.id}:high-value`,
+                recipientUserIds: staffRecipients,
+              },
+              tx,
+            )
+          }
+        }
       })
     } catch (err: any) {
       if (err instanceof DepositEvidenceError) {
@@ -2539,6 +2768,9 @@ export class BillingService {
         return
       }
       throw err
+    }
+    if (communicationEventId) {
+      this.communications?.dispatchBestEffort(communicationEventId)
     }
   }
 

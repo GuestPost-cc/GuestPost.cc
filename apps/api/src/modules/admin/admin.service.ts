@@ -30,6 +30,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { normalizeDomain } from "../../common/domain"
@@ -40,6 +41,7 @@ import {
   requireActiveMarketplaceCategories,
 } from "../../common/utils/marketplace-categories"
 import { AuditService } from "../audit/audit.service"
+import { CommunicationsService } from "../communications/communications.service"
 import { QueueService } from "../queues/queue.service"
 import {
   assertManualMetricValues,
@@ -426,6 +428,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   /**
@@ -2545,28 +2548,34 @@ export class AdminService {
       status === ListingStatus.APPROVED ||
       status === ListingStatus.REJECTED
     ) {
-      const notificationType =
-        status === ListingStatus.APPROVED
-          ? "LISTING_APPROVED"
-          : "LISTING_REJECTED"
       const message =
         status === ListingStatus.APPROVED
           ? `Your listing "${listing.title}" has been approved and is now live in the marketplace.`
           : `Your listing "${listing.title}" has been rejected.`
 
-      await this.queue.pushNotification("push-in-app", {
-        userId: listing.publisherId ?? "",
-        organizationId: listing.organizationId ?? "",
-        type: notificationType,
-        message,
-      })
-
-      if (listing.publisher?.email) {
-        await this.queue.sendEmail("listing-status", {
-          to: listing.publisher.email,
-          subject: `Listing ${status === ListingStatus.APPROVED ? "Approved" : "Rejected"}: ${listing.title}`,
-          html: `<p>${message}</p>`,
+      if (this.communications) {
+        const recipients = await this.communications.publisherRecipients(
+          listing.publisherId,
+        )
+        const event = await this.communications.record({
+          type:
+            status === ListingStatus.APPROVED
+              ? "MARKETPLACE_LISTING_APPROVED"
+              : "MARKETPLACE_LISTING_REJECTED",
+          aggregateType: "MarketplaceListing",
+          aggregateId: id,
+          organizationId: listing.organizationId,
+          title:
+            status === ListingStatus.APPROVED
+              ? "Marketplace listing approved"
+              : "Marketplace listing needs attention",
+          message,
+          actionPath: "/dashboard/listings",
+          dedupKey: `listing:${id}:status:${status}`,
+          recipientUserIds: recipients,
+          actorUserId: user.id,
         })
+        this.communications.dispatchBestEffort(event.eventId)
       }
     }
 
@@ -3447,22 +3456,67 @@ export class AdminService {
       where: { id: publisherId },
     })
     if (!publisher) throw new NotFoundException("Publisher not found")
+    if (publisher.tier === tier) return publisher
 
-    const updated = await this.prisma.publisher.update({
-      where: { id: publisherId },
-      data: { tier: tier as any },
+    return this.prisma.$transaction(async (tx: any) => {
+      const updated = await tx.publisher.update({
+        where: { id: publisherId },
+        data: { tier: tier as any },
+      })
+
+      await this.audit.log(
+        {
+          action: "PUBLISHER_TIER_CHANGED",
+          entityType: "Publisher",
+          entityId: publisherId,
+          metadata: { from: publisher.tier, to: tier },
+          userId: actor.id,
+          organizationId: publisher.organizationId,
+        },
+        tx,
+      )
+      if (this.communications) {
+        const publisherRecipients =
+          await this.communications.publisherRecipients(publisherId, false, tx)
+        await this.communications.record(
+          {
+            type: "PUBLISHER_TIER_CHANGED",
+            aggregateType: "Publisher",
+            aggregateId: publisherId,
+            organizationId: publisher.organizationId,
+            title: "Publisher tier changed",
+            message: `Your publisher tier changed from ${publisher.tier} to ${tier}.`,
+            actionPath: "/dashboard/settings",
+            payload: { from: publisher.tier, to: tier },
+            dedupKey: `publisher:${publisherId}:tier:${publisher.tier}:${tier}`,
+            recipientUserIds: publisherRecipients,
+          },
+          tx,
+        )
+        const staffRecipients = await this.communications.staffRecipients(
+          ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
+          tx,
+        )
+        await this.communications.record(
+          {
+            type: "STAFF_PUBLISHER_TIER_CHANGED",
+            aggregateType: "Publisher",
+            aggregateId: publisherId,
+            organizationId: publisher.organizationId,
+            title: "Publisher tier changed",
+            message: `Publisher ${publisher.name ?? publisherId} changed from ${publisher.tier} to ${tier}.`,
+            actionPath: "/dashboard/publishers",
+            payload: { from: publisher.tier, to: tier },
+            dedupKey: `staff:publisher:${publisherId}:tier:${publisher.tier}:${tier}`,
+            recipientUserIds: staffRecipients,
+            actorUserId: actor.id,
+          },
+          tx,
+        )
+      }
+
+      return updated
     })
-
-    await this.audit.log({
-      action: "PUBLISHER_TIER_CHANGED",
-      entityType: "Publisher",
-      entityId: publisherId,
-      metadata: { from: publisher.tier, to: tier },
-      userId: actor.id,
-      organizationId: publisher.organizationId,
-    })
-
-    return updated
   }
 
   // ── Support tickets ─────────────────────────────────────────────────

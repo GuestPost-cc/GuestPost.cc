@@ -15,10 +15,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { ZodError } from "zod"
 import { canCustomerViewWebsite } from "../../common/customer-website-access"
 import { PrismaService } from "../../common/prisma.service"
+import { CommunicationsService } from "../communications/communications.service"
 import { projectExternalOrder } from "./order-visibility"
 import { assertOwnerOrCreator } from "./services/owner-or-creator"
 
@@ -132,7 +134,10 @@ function throwIdempotencyPayloadConflict() {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly communications?: CommunicationsService,
+  ) {}
 
   private async runLockedCartTransaction<T>(
     orderId: string,
@@ -740,6 +745,37 @@ export class OrdersService {
             },
           },
         })
+
+        if (this.communications) {
+          const customerRecipients = [
+            ...new Set<string>([
+              data.customerId,
+              ...(await this.communications.organizationRecipients(
+                data.organizationId,
+                true,
+                tx,
+              )),
+            ]),
+          ]
+          await this.communications.record(
+            {
+              type: "ORDER_CREATED",
+              aggregateType: "Order",
+              aggregateId: order.id,
+              organizationId: data.organizationId,
+              title: "Order created",
+              message: `Order ${order.id} was created for ${total.toFixed(2)} ${order.currency}.`,
+              actionPath: `/dashboard/orders/${order.id}`,
+              payload: {
+                amount: total.toNumber(),
+                currency: order.currency,
+              },
+              dedupKey: `order:${order.id}:created`,
+              recipientUserIds: customerRecipients,
+            },
+            tx,
+          )
+        }
 
         if (articleVersion) {
           await tx.orderEvent.create({

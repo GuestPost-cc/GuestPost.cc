@@ -12,9 +12,11 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
 import { RefundService } from "./refund.service"
 
@@ -25,6 +27,7 @@ export class OrderDisputeService {
     private readonly audit: AuditService,
     private readonly refund: RefundService,
     private readonly queue: QueueService,
+    @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
   // Resolve the order's publisher for trust events.
@@ -183,7 +186,7 @@ export class OrderDisputeService {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
       include: {
-        website: { select: { ownershipType: true } },
+        website: { select: { ownershipType: true, publisherId: true } },
         cancellationRequests: {
           where: {
             status: { in: [...ACTIVE_CANCELLATION_REQUEST_STATUSES] },
@@ -262,6 +265,55 @@ export class OrderDisputeService {
             },
             tx,
           )
+          if (this.communications) {
+            const partyRecipients = [
+              ...new Set<string>([
+                ...(await this.communications.customerOrderRecipients(
+                  orderId,
+                  tx,
+                )),
+                ...(await this.communications.publisherRecipients(
+                  order.website?.publisherId,
+                  false,
+                  tx,
+                )),
+              ]),
+            ]
+            await this.communications.record(
+              {
+                type: "ORDER_DISPUTE_OPENED",
+                aggregateType: "OrderDispute",
+                aggregateId: created.id,
+                organizationId,
+                title: "Order dispute opened",
+                message: `A dispute was opened for order ${orderId}.`,
+                actionPath: `/dashboard/orders/${orderId}`,
+                dedupKey: `dispute:${created.id}:opened`,
+                recipientUserIds: partyRecipients,
+                actorUserId: userId,
+              },
+              tx,
+            )
+            const staffRecipients = await this.communications.staffRecipients(
+              ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
+              tx,
+            )
+            await this.communications.record(
+              {
+                type: "STAFF_DISPUTE_OPENED",
+                aggregateType: "OrderDispute",
+                aggregateId: created.id,
+                organizationId,
+                title: "Dispute requires review",
+                message: `A dispute was opened for order ${orderId}.`,
+                actionPath: `/dashboard/orders/${orderId}`,
+                dedupKey: `staff:dispute:${created.id}:opened`,
+                recipientUserIds: staffRecipients,
+                actorUserId: userId,
+              },
+              tx,
+            )
+          }
           return created
         },
       )
@@ -439,6 +491,37 @@ export class OrderDisputeService {
           },
           tx,
         )
+        if (this.communications) {
+          const recipients = [
+            ...new Set<string>([
+              ...(await this.communications.customerOrderRecipients(
+                order.id,
+                tx,
+              )),
+              ...(await this.communications.publisherRecipients(
+                order.website?.publisherId,
+                false,
+                tx,
+              )),
+            ]),
+          ]
+          await this.communications.record(
+            {
+              type: "ORDER_DISPUTE_RESOLVED",
+              aggregateType: "OrderDispute",
+              aggregateId: disputeId,
+              organizationId: order.organizationId,
+              title: "Order dispute resolved",
+              message: `The dispute for order ${order.id} was resolved: ${resolution}`,
+              actionPath: `/dashboard/orders/${order.id}`,
+              payload: { action, responsibility: responsibility ?? null },
+              dedupKey: `dispute:${disputeId}:resolved`,
+              recipientUserIds: recipients,
+              actorUserId: userId,
+            },
+            tx,
+          )
+        }
         return {
           dispute: await tx.orderDispute.findUniqueOrThrow({
             where: { id: disputeId },

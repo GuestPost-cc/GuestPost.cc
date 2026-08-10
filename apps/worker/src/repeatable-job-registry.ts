@@ -26,6 +26,7 @@
  */
 
 const JOB_NAMES = [
+  "send-email-outbox-sweep",
   "payout-check-status",
   "payment-dispute-inbox",
   "reconciliation-run",
