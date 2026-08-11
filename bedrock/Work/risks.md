@@ -24,6 +24,9 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   `20260811120000_delivery_fraud_resolution_dispositions` and its matching
   writer together on the same rebased fraud branch. Apply the migration before
   starting the new API image; do not cherry-pick only the delivery core change.
+  The Neon test target satisfied this order on 2026-08-11 and reports all 62
+  migrations current; every other target must prove the same ordering
+  independently.
 
 - **Legacy platform inventory can have incomplete domain metrics.** Platform
   websites created before the staff-manual metric migration may legitimately

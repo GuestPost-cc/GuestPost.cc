@@ -245,6 +245,15 @@ merged or deployed. GitHub `main` through dependency consolidation commit
   owner retry. Prisma reports the schema current, every expected object and
   immutable-document trigger exists, and the pooled `guestpost_runtime` can
   read the new tables while retaining no schema `CREATE` authority.
+- On 2026-08-11, the Neon test database also received
+  `20260811120000_delivery_fraud_resolution_dispositions` through the direct
+  owner endpoint. Prisma reports all 62 migrations current. The applied
+  checksum matches the repository file; the classification constraint,
+  trigger, and function are installed; zero legacy unclassified staff
+  resolutions were found; transaction-rolled-back probes rejected missing
+  dispositions, unauthorized reuse, and missing risk references; and the
+  runtime role still has no schema `CREATE` authority. No credential material
+  was written to the repository.
 - A technically passing delivery with any fraud signal now remains
   `MANUAL_REVIEW`. Flag insertion records the required `STAFF_FRAUD_ALERT` in
   the same Order-locked transaction; the legacy best-effort fraud alert is not
