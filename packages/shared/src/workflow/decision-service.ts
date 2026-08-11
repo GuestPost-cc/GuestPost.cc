@@ -1,3 +1,4 @@
+import type { SettlementCustomerHistory } from "./settlement-risk"
 import { defaultWorkflowConfig, WorkflowConfig } from "./workflow-config"
 
 export interface PriorityScore {
@@ -46,22 +47,31 @@ export class WorkflowDecisionService {
     order: { verifyMethod?: string | null; amount?: number | null },
     publisher: { tier?: string; riskScore?: number } | null,
     fraudFlags: { type: string }[],
-    customerHistory?: { chargebackCount: number; disputeCount: number } | null,
+    customerHistory?: SettlementCustomerHistory | null,
   ): "AUTO" | "MANUAL" {
     if (order.verifyMethod === "MANUAL_ADMIN") return "MANUAL"
     if (fraudFlags.length > 0) return "MANUAL"
-    if (publisher?.tier === "NEW" && !this.config.enableAutoRelease)
+
+    // Risk classification and the operational auto-release switch are
+    // deliberately orthogonal. The switch controls whether an AUTO policy can
+    // execute; it must never turn a high-risk policy into AUTO when enabled.
+    if (!publisher || !["TRUSTED", "VERIFIED"].includes(publisher.tier ?? ""))
       return "MANUAL"
+
+    const amount = Number(order.amount)
+    if (!Number.isFinite(amount) || amount <= 0) return "MANUAL"
+    if (amount > this.config.autoReleaseMaxAmount) return "MANUAL"
+
+    // Missing history is unknown evidence, not proof of a clean customer.
+    if (!customerHistory) return "MANUAL"
     if (
-      Number(order.amount ?? 0) > this.config.autoReleaseMaxAmount &&
-      !this.config.enableAutoRelease
+      !Number.isSafeInteger(customerHistory.chargebackCount) ||
+      customerHistory.chargebackCount < 0 ||
+      !Number.isSafeInteger(customerHistory.disputeCount) ||
+      customerHistory.disputeCount < 0
     )
       return "MANUAL"
-    if (
-      (customerHistory?.chargebackCount ?? 0) > 0 &&
-      !this.config.enableAutoRelease
-    )
-      return "MANUAL"
+    if (customerHistory.chargebackCount > 0) return "MANUAL"
 
     return "AUTO"
   }

@@ -80,6 +80,7 @@ export const ModelName = {
   SettlementApproval: 'SettlementApproval',
   FulfillmentAssignment: 'FulfillmentAssignment',
   OrderDeliveryVersion: 'OrderDeliveryVersion',
+  DeliveryUrlClaimFence: 'DeliveryUrlClaimFence',
   DeliveryVerificationEvidence: 'DeliveryVerificationEvidence',
   DeliverySnapshot: 'DeliverySnapshot',
   DeliveryFraudFlag: 'DeliveryFraudFlag',
@@ -702,6 +703,14 @@ export const OrderDeliveryVersionScalarFieldEnum = {
 } as const
 
 export type OrderDeliveryVersionScalarFieldEnum = (typeof OrderDeliveryVersionScalarFieldEnum)[keyof typeof OrderDeliveryVersionScalarFieldEnum]
+
+
+export const DeliveryUrlClaimFenceScalarFieldEnum = {
+  normalizedUrl: 'normalizedUrl',
+  version: 'version'
+} as const
+
+export type DeliveryUrlClaimFenceScalarFieldEnum = (typeof DeliveryUrlClaimFenceScalarFieldEnum)[keyof typeof DeliveryUrlClaimFenceScalarFieldEnum]
 
 
 export const DeliveryVerificationEvidenceScalarFieldEnum = {
@@ -1332,6 +1341,7 @@ export const CommunicationDeliveryScalarFieldEnum = {
   attempts: 'attempts',
   availableAt: 'availableAt',
   lockedAt: 'lockedAt',
+  dispatchStartedAt: 'dispatchStartedAt',
   provider: 'provider',
   providerMessageId: 'providerMessageId',
   lastError: 'lastError',

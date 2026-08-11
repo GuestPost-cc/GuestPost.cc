@@ -21,9 +21,18 @@ export interface ListingAttribution {
   label: string
 }
 
+export type PublicDomainMetricSource =
+  | "AHREFS_FREE_API"
+  | "AHREFS_PAID_API"
+  | "MOZ_PAID_API"
+  | "OPEN_PAGE_RANK_API"
+  | "PUBLISHER_MANUAL"
+  | "STAFF_MANUAL"
+  | "ADMIN_IMPORT"
+
 export interface PublicDomainMetricValue {
   value: number
-  source: string
+  source: PublicDomainMetricSource
   status: "CURRENT" | "STALE" | "UNAVAILABLE"
   measuredAt: string
   collectedAt: string
@@ -66,8 +75,6 @@ export interface MarketplaceListing {
   priceType: string
   minPrice?: number
   maxPrice?: number
-  domainRating?: number
-  domainAuthority?: number
   traffic?: number
   siteMetrics?: {
     periodDays: number
@@ -75,8 +82,6 @@ export interface MarketplaceListing {
     ga4?: { sessions: number; users: number; pageviews: number }
   }
   domainMetrics?: PublicDomainMetrics
-  referringDomains?: number
-  spamScore?: number
   country?: string
   language?: string
   sportsGamingAllowed?: boolean | null
@@ -585,7 +590,7 @@ export class MarketplaceService {
       websiteUrl: string
       price: number
       currency: string
-      domainRating: number
+      domainRating?: PublicDomainMetricValue
       traffic: number
       category?: string
       language?: string
@@ -604,7 +609,7 @@ export class MarketplaceService {
         websiteUrl: l.websiteUrl ?? "",
         price: l.price ?? 0,
         currency: l.currency ?? "USD",
-        domainRating: l.domainRating ?? 0,
+        domainRating: l.domainMetrics?.ahrefs.domainRating,
         traffic: l.traffic ?? 0,
         category: l.category?.name,
         language: l.language,
@@ -636,7 +641,7 @@ export class MarketplaceService {
       id: string
       name: string
       websiteUrl: string
-      domainRating: number
+      domainRating?: PublicDomainMetricValue
       category?: string
       language?: string
       country?: string
@@ -648,7 +653,7 @@ export class MarketplaceService {
         id: l.websiteId,
         name: l.title,
         websiteUrl: l.websiteUrl ?? "",
-        domainRating: l.domainRating ?? 0,
+        domainRating: l.domainMetrics?.ahrefs.domainRating,
         category: l.category?.name,
         language: l.language,
         country: l.country,

@@ -755,12 +755,26 @@ describe("AdminService.updateListingStatus verification gate", () => {
 
   beforeEach(() => {
     prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "l1" }]),
       marketplaceListing: {
         findUnique: jest.fn(),
-        update: jest.fn().mockResolvedValue({ id: "l1", status: "APPROVED" }),
+        findUniqueOrThrow: jest
+          .fn()
+          .mockResolvedValue({ id: "l1", status: "APPROVED" }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      $transaction: jest.fn(async (work: (tx: unknown) => unknown) =>
+        work(prisma),
+      ),
     }
-    audit = { log: jest.fn().mockResolvedValue(undefined) }
+    let auditSequence = 0
+    audit = {
+      log: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve({ id: `audit-${++auditSequence}` }),
+        ),
+    }
     queue = {
       pushNotification: jest.fn().mockResolvedValue({}),
       sendEmail: jest.fn().mockResolvedValue({}),
@@ -778,7 +792,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
         role: "OPERATIONS",
       }),
     ).rejects.toMatchObject({ response: { code: "WEBSITE_NOT_VERIFIED" } })
-    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
   })
 
   it("allows APPROVED when the website is VERIFIED", async () => {
@@ -790,7 +804,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
       role: "OPERATIONS",
     })
     expect(res.status).toBe("APPROVED")
-    expect(prisma.marketplaceListing.update).toHaveBeenCalled()
+    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalled()
   })
 
   it("allows APPROVED for a platform listing with no website", async () => {
@@ -813,7 +827,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
         staffRole: "OPERATIONS",
       }),
     ).rejects.toMatchObject({ response: { code: "NO_AVAILABLE_SERVICES" } })
-    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
   })
 
   it("refuses force override from a non-SUPER_ADMIN", async () => {
@@ -828,7 +842,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
         true,
       ),
     ).rejects.toMatchObject({ response: { code: "WEBSITE_NOT_VERIFIED" } })
-    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
   })
 
   it("allows SUPER_ADMIN emergency force override and audits it", async () => {
@@ -847,6 +861,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
         action: "WEBSITE_VERIFICATION_OVERRIDE",
         entityId: "l1",
       }),
+      prisma,
     )
   })
 })

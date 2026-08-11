@@ -48,6 +48,7 @@ import {
   formatMoney,
   fulfillmentBadgeClass,
   fulfillmentLabel,
+  metricSourceSummary,
   serviceDescription,
   serviceLabel,
 } from "../../../../components/marketplace/marketplace-ui"
@@ -338,7 +339,7 @@ export default function ListingDetailPage() {
                 Domain metrics
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Source-specific authority and organic traffic signals.
+                Source-specific authority and reported organic traffic signals.
               </p>
             </div>
             <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -351,10 +352,9 @@ export default function ListingDetailPage() {
                       )
                     : "—"
                 }
-                note={
-                  listing.domainMetrics?.ahrefs.domainRating?.status ??
-                  "Unavailable"
-                }
+                note={metricSourceSummary(
+                  listing.domainMetrics?.ahrefs.domainRating,
+                )}
               />
               <Metric
                 label="Ahrefs traffic"
@@ -365,10 +365,9 @@ export default function ListingDetailPage() {
                       )
                     : "—"
                 }
-                note={
-                  listing.domainMetrics?.ahrefs.organicTraffic?.status ??
-                  "Unavailable"
-                }
+                note={metricSourceSummary(
+                  listing.domainMetrics?.ahrefs.organicTraffic,
+                )}
               />
               <Metric
                 label="Moz DA"
@@ -379,10 +378,9 @@ export default function ListingDetailPage() {
                       )
                     : "—"
                 }
-                note={
-                  listing.domainMetrics?.moz.domainAuthority?.status ??
-                  "Unavailable"
-                }
+                note={metricSourceSummary(
+                  listing.domainMetrics?.moz.domainAuthority,
+                )}
               />
               <Metric
                 label="Open PageRank"
@@ -391,13 +389,16 @@ export default function ListingDetailPage() {
                     ? String(listing.domainMetrics.openPageRank.pageRank.value)
                     : "—"
                 }
-                note={
-                  listing.domainMetrics?.openPageRank.pageRank?.status ??
-                  "Unavailable"
-                }
+                note={metricSourceSummary(
+                  listing.domainMetrics?.openPageRank.pageRank,
+                )}
               />
             </dl>
             <p className="mt-4 text-xs text-muted-foreground">
+              Only eligible current metrics can affect marketplace filters and
+              ranking. Publisher Reported traffic is excluded from both;
+              staff-entered and imported values are not independently verified.
+              Review each source before purchasing. {" · "}
               <a
                 href="https://ahrefs.com/"
                 target="_blank"

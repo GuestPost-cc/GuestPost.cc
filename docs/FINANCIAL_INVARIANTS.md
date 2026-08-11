@@ -129,10 +129,12 @@ it. Current orders are:
 - customer payment dispute:
   `PaymentProviderEvent -> immutable deposit lookup -> Wallet -> PaymentDispute -> ledger`.
 - settlement creation/approval/release:
-  `Order aggregate lock -> relational eligibility snapshot -> Settlement ->
-  PublisherBalance -> ledger/audit`. Delivery, dispute, revision, fraud, and
-  cancellation writers acquire the same Order lock before becoming visible;
-  the release reader does not lock child rows in the reverse order.
+  `Order aggregate lock -> normalized delivery-URL advisory lock -> relational
+  eligibility snapshot -> Settlement -> PublisherBalance -> ledger/audit`.
+  Delivery, dispute, revision, fraud, and cancellation writers acquire the same
+  Order lock before becoming visible; a delivery-version claim writer takes the
+  URL lock after its Order lock. The release reader does not lock child rows in
+  the reverse order.
 
 For every `OrderDeliveryVersion`, `OrderDispute`, `Revision`,
 `DeliveryFraudFlag`, `DeliveryFraudFlagResolution`, or
@@ -232,6 +234,27 @@ amount, precision, catalog-attribution, live-availability, and capture checks.
 Once the
 Order is paid, has PURCHASE evidence, or has a Settlement, OrderItem insertion,
 mutation, reassignment, and deletion are forbidden.
+
+Every captured-payment refund uses the canonical refund service/shared core
+(including customer cancellation, dispute, force-cancel, and worker timeout
+paths) under the parent Order lock. One canonical `REFUND` row must equal the Order amount and currency,
+belong to that Order, reference the Organization's canonical wallet, and match
+the `REFUND_ISSUED` event's `refundTransactionId`. The Order's terminal status,
+payment status, and final responsibility must agree. An exact idempotent replay
+revalidates all of this evidence before repairing a missing `ORDER_REFUNDED`
+outbox event/credit note; a mismatched amount, currency, wallet, reference,
+tenant, or audit event is an integrity conflict, never permission to credit or
+send. First-use commands serialize on the Order row, so two concurrent requests
+with one idempotency key converge on the same ledger evidence rather than
+surfacing a unique-key race. Queue wake-up happens only after the authoritative
+transaction commits.
+
+Pre-hardening credit notes are never rewritten solely to change their
+historical `Order <id>` payment reference. A replay may grandfather only the
+exact origin/main event/document shape after validating the same refund ledger,
+OrderEvent, tenant, immutable accounting snapshot, and customer-only audience;
+it may then recreate missing required projections under the parent event lock.
+Any other mismatch remains an integrity conflict.
 
 ## 6. Customer wallet
 
@@ -525,6 +548,21 @@ status. A hold can disappear only in the same transaction that appends its
 one immutable `DeliveryFraudFlagResolution`; a deferred constraint rejects a
 standalone delete.
 
+Normalized published URLs are cross-Order claims. Runtime claim writers,
+verification, customer confirmation/fallback acceptance, auto-accept, and
+settlement approval/release all follow the same `Order -> normalized URL` lock
+order. Authorization recomputes a bounded deterministic fingerprint containing
+the exact append-only conflict count and claimant identities. An exact,
+classified historical disposition may be reused; an added claimant changes the
+fingerprint and appends a fresh `URL_REUSED` flag/hold before any delivery or
+money transition. A public denial is raised only after that evidence commits.
+The delivery-version mutation trigger takes the same advisory key after the
+existing parent-Order trigger, fencing old application pods during rolling
+deploys. Readers also lock a backfilled per-URL MVCC fence row and claim
+mutations advance it, forcing any waiter with a stale `SERIALIZABLE` snapshot
+to abort and retry. PostgreSQL predicate serialization or an advisory lock by
+itself does not reject every reader-first, cross-Order insert schedule.
+
 `STAFF_CLEARED` requires a current, non-banned STAFF user with an allowed
 `SUPER_ADMIN`, `OPERATIONS`, or `FINANCE` membership, the role snapshotted at
 decision time, and a substantive reason. `LINK_RESTORED` has no synthetic
@@ -554,6 +592,40 @@ boundary, and reference requirement. See
 Automated policy may choose when an eligible row is reviewed, but it never
 bypasses this predicate. Its additional freshness boundary is defined below;
 human and system decisions remain distinct immutable evidence.
+
+Automatic release policy is a fail-closed snapshot created inside the same
+serializable Order transaction as the Settlement. `AUTO` is available only
+when all classification evidence is present: the publisher is currently
+`TRUSTED` or `VERIFIED`, the exact positive order amount is at or below the
+configured USD ceiling, there is no delivery fraud signal, the delivery was
+not accepted through `MANUAL_ADMIN`, and the customer has no durable payment
+chargeback history. `NEW`, missing, or unknown publisher tiers; an absent or
+invalid amount/history count; any chargeback; and an amount above the ceiling
+all require `MANUAL` review.
+
+Customer history is tenant-scoped. Current evidence follows the organization
+through its deposit attempts and wallet; direct customer/deposit identities
+are included for legacy personal-wallet history. Order-dispute history is
+loaded at the same boundary for risk reporting, but only chargeback history is
+currently a release-policy blocker. A database/read failure aborts settlement
+creation and must never be converted to a zero count. API confirmation, direct
+settlement creation, and worker auto-accept use the same shared loader and
+decision function. The `SETTLEMENT_AUTO_RELEASE_DISABLED` operational switch
+controls execution separately; enabling it never weakens the classification
+rules, while disabling it does not rewrite immutable policy evidence.
+Because publisher tier and customer history can change during the review
+window, the auto-release transaction reloads both after locking the Order and
+before writing any approval, balance, or ledger row. A newly manual result
+leaves the settlement `CUSTOMER_APPROVED`, increments the sweep's observable
+`riskBlocked` counter, and requires an explicit Finance decision.
+
+The amount ceiling remains an operational workflow policy, not a hard-coded
+schema trigger. The shared decision/release core is the only automatic-release
+writer and always rechecks the policy immediately before the database-enforced
+money transition; alternate workers or scripts must not write system approvals
+directly. PostgreSQL continues to enforce the canonical delivery, approval,
+exact-money, and single-release invariants independently of this configurable
+risk threshold.
 
 Every customer revision surface uses the canonical Order-review transition:
 after locking Order it revalidates organization, an ACTIVE organization

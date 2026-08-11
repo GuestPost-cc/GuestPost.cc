@@ -1,8 +1,12 @@
 import {
+  financialDocumentSnapshotSchema,
+  formatFinancialDocumentNumber,
   isSupportedMoneyCurrency,
+  normalizeFinancialMoney,
   notificationDedupKey,
   orderEventMetadata,
   REFUNDABLE_ORDER_STATUSES,
+  runLockedOrderSerializableTransaction,
   USD_CURRENCY,
 } from "@guestpost/shared"
 import {
@@ -36,6 +40,14 @@ export interface RefundTransactionResult {
   order: any
   refundTransactionId: string
 }
+
+const FINAL_REFUND_RESPONSIBILITIES = new Set<FinalRefundResponsibility>([
+  "CUSTOMER",
+  "PUBLISHER",
+  "PLATFORM",
+  "SHARED",
+  "SYSTEM",
+])
 
 /**
  * Single refund path for captured payments. Every approved refund flow
@@ -77,6 +89,319 @@ export class RefundService {
     }
   }
 
+  private async assertExistingRefundEvidence(
+    tx: any,
+    order: any,
+    refund: any,
+    expectedReference: string,
+  ): Promise<FinalRefundResponsibility> {
+    const responsibility = order.refundResponsibility
+    const amount = new Decimal(order.amount ?? 0)
+    const wallet = await tx.wallet.findUnique({
+      where: { organizationId: order.organizationId },
+    })
+    const refundEvent = await tx.orderEvent.findFirst({
+      where: {
+        orderId: order.id,
+        eventType: "REFUND_ISSUED",
+        metadata: { path: ["refundTransactionId"], equals: refund.id },
+      },
+      select: { id: true },
+    })
+    let hasRefundEventEvidence = Boolean(refundEvent)
+    if (!hasRefundEventEvidence && tx.orderEvent.findMany) {
+      // The origin/main post-acceptance writer predates the ledger-ID field on
+      // OrderEvent. Grandfather only its exact historical shape: one event
+      // whose reason joins the immutable REFUND description and whose
+      // responsibility matches the terminal Order. New writers must always
+      // use the direct refundTransactionId binding above.
+      const candidates = await tx.orderEvent.findMany({
+        where: { orderId: order.id, eventType: "REFUND_ISSUED" },
+        select: { id: true, actorId: true, message: true, metadata: true },
+      })
+      const legacyMatches = candidates.filter((candidate: any) => {
+        const metadata =
+          candidate.metadata &&
+          typeof candidate.metadata === "object" &&
+          !Array.isArray(candidate.metadata)
+            ? (candidate.metadata as Record<string, unknown>)
+            : null
+        const reason =
+          typeof metadata?.reason === "string" ? metadata.reason : null
+        const settlementCancelled = metadata?.settlementCancelled
+        return (
+          Object.keys(metadata ?? {})
+            .sort()
+            .join(",") ===
+            "reason,refundedBy,responsibility,settlementCancelled" &&
+          reason !== null &&
+          metadata?.responsibility === responsibility &&
+          typeof metadata?.refundedBy === "string" &&
+          (candidate.actorId === null ||
+            candidate.actorId === metadata?.refundedBy) &&
+          (settlementCancelled === null ||
+            typeof settlementCancelled === "string") &&
+          candidate.message === `Order refunded: ${reason}` &&
+          refund.description === `Refund for order ${order.id}: ${reason}`
+        )
+      })
+      hasRefundEventEvidence = legacyMatches.length === 1
+    }
+    if (
+      order.status !== "REFUNDED" ||
+      order.paymentStatus !== "REFUNDED" ||
+      !FINAL_REFUND_RESPONSIBILITIES.has(responsibility) ||
+      refund.type !== "REFUND" ||
+      refund.orderId !== order.id ||
+      refund.reference !== expectedReference ||
+      refund.currency !== order.currency ||
+      !new Decimal(refund.amount ?? 0).equals(amount) ||
+      !wallet ||
+      refund.walletId !== wallet.id ||
+      wallet.currency !== order.currency ||
+      !hasRefundEventEvidence
+    ) {
+      throw new ConflictException(
+        "Refund transaction does not match completed order evidence",
+      )
+    }
+    this.assertCanonicalUsd(order.currency, "order")
+    this.assertCanonicalUsd(wallet.currency, "wallet")
+    return responsibility
+  }
+
+  private async assertLegacyRefundDocument(
+    tx: any,
+    order: any,
+    financialDocumentId: string,
+  ): Promise<void> {
+    const document = await tx.financialDocument.findUnique({
+      where: { id: financialDocumentId },
+      include: {
+        relatedDocument: {
+          select: {
+            id: true,
+            kind: true,
+            aggregateType: true,
+            aggregateId: true,
+            organizationId: true,
+            currency: true,
+            total: true,
+            numberPrefix: true,
+            sequenceNumber: true,
+            issuedAt: true,
+          },
+        },
+      },
+    })
+    const amount = normalizeFinancialMoney(order.amount)
+    if (
+      document?.kind !== "CREDIT_NOTE" ||
+      document.aggregateType !== "Order" ||
+      document.aggregateId !== order.id ||
+      document.organizationId !== order.organizationId ||
+      document.currency !== String(order.currency).toUpperCase() ||
+      normalizeFinancialMoney(document.subtotal) !== amount ||
+      normalizeFinancialMoney(document.taxAmount) !== "0.00" ||
+      normalizeFinancialMoney(document.total) !== amount ||
+      document.dedupKey !== `financial-document:order:${order.id}:refunded`
+    ) {
+      throw new ConflictException(
+        "Legacy refund credit note does not match completed order evidence",
+      )
+    }
+
+    const snapshot = financialDocumentSnapshotSchema.safeParse(
+      document.snapshot,
+    )
+    const related = document.relatedDocument
+    const relatedDocumentValid = related
+      ? related.id === document.relatedDocumentId &&
+        related.kind === "PAID_INVOICE" &&
+        related.aggregateType === "Order" &&
+        related.aggregateId === order.id &&
+        related.organizationId === order.organizationId &&
+        related.currency === String(order.currency).toUpperCase() &&
+        normalizeFinancialMoney(related.total) === amount &&
+        snapshot.success &&
+        snapshot.data.relatedDocumentNumber ===
+          formatFinancialDocumentNumber(related)
+      : document.relatedDocumentId === null &&
+        snapshot.success &&
+        snapshot.data.relatedDocumentNumber === null
+    const serviceName = String(order.type)
+      .toLowerCase()
+      .split("_")
+      .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
+      .join(" ")
+    if (
+      !snapshot.success ||
+      !relatedDocumentValid ||
+      snapshot.data.lineItems.length !== 1 ||
+      snapshot.data.lineItems[0]?.description !==
+        `Refund - ${serviceName} service` ||
+      snapshot.data.lineItems[0]?.quantity !== 1 ||
+      normalizeFinancialMoney(snapshot.data.lineItems[0]?.unitAmount) !==
+        amount ||
+      normalizeFinancialMoney(snapshot.data.lineItems[0]?.lineTotal) !==
+        amount ||
+      snapshot.data.payment.status !== "REFUNDED" ||
+      snapshot.data.payment.method !== "GuestPost.cc wallet" ||
+      snapshot.data.payment.reference !== `Order ${order.id}` ||
+      snapshot.data.tax.label !== "Tax" ||
+      snapshot.data.tax.treatment !== "NOT_SEPARATELY_CHARGED" ||
+      snapshot.data.tax.note !==
+        "No tax was separately charged on this document." ||
+      snapshot.data.notes.length !== 0
+    ) {
+      throw new ConflictException(
+        "Legacy refund credit-note snapshot does not match completed order evidence",
+      )
+    }
+  }
+
+  /**
+   * Origin/main credit notes used `Order <id>` as their immutable payment
+   * reference and omitted refundTransactionId from the event payload. They
+   * cannot be rewritten. An exact replay may repair missing projections only
+   * after every ledger, tenant, event, audience, and snapshot field proves the
+   * historical row is that known shape.
+   */
+  private async repairValidatedLegacyRefundCommunication(
+    tx: any,
+    input: {
+      order: any
+      actorUserId: string
+      responsibility: FinalRefundResponsibility
+      refundTransactionId: string
+      recipientUserIds: string[]
+    },
+  ): Promise<boolean> {
+    if (!this.communications || !tx.communicationEvent?.findUnique) return false
+    const dedupKey = `order:${input.order.id}:refunded`
+    const existing = await tx.communicationEvent.findUnique({
+      where: { dedupKey },
+    })
+    if (!existing) return false
+    const locked = await tx.$queryRaw`
+      SELECT "id"
+      FROM "CommunicationEvent"
+      WHERE "dedupKey" = ${dedupKey}
+      FOR UPDATE
+    `
+    if (
+      !Array.isArray(locked) ||
+      locked.length !== 1 ||
+      locked[0]?.id !== existing.id
+    ) {
+      throw new ConflictException(
+        "Legacy refund communication evidence is ambiguous",
+      )
+    }
+    const event = await tx.communicationEvent.findUnique({
+      where: { dedupKey },
+    })
+    const payload =
+      event?.payload &&
+      typeof event.payload === "object" &&
+      !Array.isArray(event.payload)
+        ? (event.payload as Record<string, unknown>)
+        : null
+    if (Object.hasOwn(payload ?? {}, "refundTransactionId")) return false
+    const sourceOrder = await tx.order.findUnique({
+      where: { id: input.order.id },
+      select: {
+        id: true,
+        customerId: true,
+        organizationId: true,
+        type: true,
+        amount: true,
+        currency: true,
+        organization: {
+          select: { id: true },
+        },
+      },
+    })
+    const financialDocumentId =
+      typeof payload?.financialDocumentId === "string"
+        ? payload.financialDocumentId
+        : null
+    const amount = new Decimal(input.order.amount ?? 0)
+    if (
+      !event ||
+      !sourceOrder ||
+      sourceOrder.id !== input.order.id ||
+      sourceOrder.organizationId !== input.order.organizationId ||
+      sourceOrder.organization?.id !== input.order.organizationId ||
+      typeof sourceOrder.customerId !== "string" ||
+      !input.recipientUserIds.includes(sourceOrder.customerId) ||
+      normalizeFinancialMoney(sourceOrder.amount) !==
+        normalizeFinancialMoney(input.order.amount) ||
+      String(sourceOrder.currency).toUpperCase() !==
+        String(input.order.currency).toUpperCase() ||
+      event.id !== existing.id ||
+      event.type !== "ORDER_REFUNDED" ||
+      event.category !== "BILLING" ||
+      event.severity !== "WARNING" ||
+      event.aggregateType !== "Order" ||
+      event.aggregateId !== input.order.id ||
+      event.organizationId !== input.order.organizationId ||
+      event.title !== "Order refund completed" ||
+      event.message !==
+        `${amount.toFixed(2)} ${input.order.currency} was returned to your wallet for order ${input.order.id}.` ||
+      event.actionPath !== `/dashboard/orders/${input.order.id}` ||
+      event.dedupKey !== dedupKey ||
+      Object.keys(payload ?? {})
+        .sort()
+        .join(",") !== "amount,currency,financialDocumentId,responsibility" ||
+      normalizeFinancialMoney(payload?.amount) !==
+        normalizeFinancialMoney(input.order.amount) ||
+      String(payload?.currency ?? "").toUpperCase() !==
+        String(input.order.currency).toUpperCase() ||
+      payload?.responsibility !== input.responsibility ||
+      !financialDocumentId
+    ) {
+      throw new ConflictException(
+        "Legacy refund communication does not match completed order evidence",
+      )
+    }
+
+    await this.assertLegacyRefundDocument(
+      tx,
+      { ...sourceOrder, organizationId: sourceOrder.organizationId },
+      financialDocumentId,
+    )
+    const authorized = new Set(input.recipientUserIds)
+    const [deliveries, notifications] = await Promise.all([
+      tx.communicationDelivery.findMany({
+        where: { eventId: event.id },
+        select: { userId: true },
+      }),
+      tx.notification.findMany({
+        where: { eventId: event.id },
+        select: { userId: true },
+      }),
+    ])
+    if (
+      [...deliveries, ...notifications].some(
+        (projection: { userId: string | null }) =>
+          !projection.userId || !authorized.has(projection.userId),
+      )
+    ) {
+      throw new ConflictException(
+        "Legacy refund communication audience does not match the customer account",
+      )
+    }
+
+    await this.communications.repairValidatedLegacyEvent(
+      event,
+      input.recipientUserIds,
+      input.actorUserId,
+      tx,
+    )
+    return true
+  }
+
   async refundOrder(
     orderId: string,
     reason: string,
@@ -96,8 +421,49 @@ export class RefundService {
       if (existing && existing.orderId !== orderId) {
         throw new ConflictException("Idempotency key belongs to another order")
       }
-      if (existing)
-        return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
+      if (existing && existing.type !== "REFUND") {
+        throw new ConflictException(
+          "Idempotency key belongs to a different transaction type",
+        )
+      }
+      if (existing) {
+        const replayedOrder = await runLockedOrderSerializableTransaction(
+          this.prisma,
+          orderId,
+          async (tx: any) => {
+            const lockedRefund = await tx.transaction.findFirst({
+              where: { reference: idempotencyKey },
+            })
+            if (
+              !lockedRefund ||
+              lockedRefund.orderId !== orderId ||
+              lockedRefund.type !== "REFUND"
+            ) {
+              throw new ConflictException(
+                "Idempotent refund evidence changed before replay",
+              )
+            }
+            const refundedOrder = await tx.order.findUniqueOrThrow({
+              where: { id: orderId },
+            })
+            const responsibility = await this.assertExistingRefundEvidence(
+              tx,
+              refundedOrder,
+              lockedRefund,
+              idempotencyKey,
+            )
+            await this.recordRefundCommunications(tx, {
+              order: refundedOrder,
+              actorUserId: userId,
+              responsibility,
+              refundTransactionId: lockedRefund.id,
+            })
+            return refundedOrder
+          },
+        )
+        this.dispatchOrderRefundCommunicationsBestEffort(orderId)
+        return replayedOrder
+      }
     }
     assertApiFinanceOperationAllowed("new_liability")
 
@@ -122,16 +488,32 @@ export class RefundService {
     }
 
     const responsibility = options.responsibility
-    const result = await this.prisma.$transaction((tx: any) =>
-      this.refundOrderInTransaction(
-        tx,
-        order,
-        reason,
-        userId,
-        idempotencyKey,
-        responsibility,
-      ),
+    const result = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        // Re-read after acquiring the parent row lock. A request that waited
+        // behind a concurrent refund must observe the committed REFUND row and
+        // take the exact-evidence replay path instead of attempting a second
+        // transaction with the same unique reference.
+        const lockedOrder = await tx.order.findUnique({
+          where: { id: orderId },
+          include: {
+            website: { select: { ownershipType: true, publisherId: true } },
+          },
+        })
+        if (!lockedOrder) throw new NotFoundException("Order not found")
+        return this.refundOrderInTransaction(
+          tx,
+          lockedOrder,
+          reason,
+          userId,
+          idempotencyKey,
+          responsibility,
+        )
+      },
     )
+    this.dispatchOrderRefundCommunicationsBestEffort(orderId)
 
     // Refunds only affect publisher trust when the case attributes the failure
     // to the publisher. Customer changes of mind and platform failures must not
@@ -145,6 +527,42 @@ export class RefundService {
     }
 
     return result.order
+  }
+
+  /**
+   * Resolves only committed refund-related event IDs after the authoritative
+   * domain transaction completes, then wakes their email deliveries. This is
+   * safe across serializable retries because no ID captured by a rolled-back
+   * attempt escapes the transaction; the database sweep remains the fallback.
+   */
+  dispatchOrderRefundCommunicationsBestEffort(orderId: string): void {
+    if (!this.communications) return
+    void this.prisma.communicationEvent
+      .findMany({
+        where: {
+          aggregateType: "Order",
+          aggregateId: orderId,
+          type: {
+            in: [
+              "ORDER_REFUNDED",
+              "STAFF_HIGH_VALUE_REFUND",
+              "PUBLISHER_DEBT_CREATED",
+              "STAFF_PUBLISHER_DEBT_CREATED",
+            ],
+          },
+        },
+        select: { id: true },
+      })
+      .then((events) => {
+        this.communications?.dispatchManyBestEffort(
+          events.map((event) => event.id),
+        )
+      })
+      .catch((error) => {
+        this.logger.warn(
+          `Refund communications for order ${orderId} remain pending for catch-up: ${error}`,
+        )
+      })
   }
 
   /**
@@ -172,10 +590,28 @@ export class RefundService {
             "Idempotency key belongs to another order",
           )
         }
+        if (existing.type !== "REFUND") {
+          throw new ConflictException(
+            "Idempotency key belongs to a different transaction type",
+          )
+        }
+        const refundedOrder = await tx.order.findUniqueOrThrow({
+          where: { id: order.id },
+        })
+        const persistedResponsibility = await this.assertExistingRefundEvidence(
+          tx,
+          refundedOrder,
+          existing,
+          idempotencyKey,
+        )
+        await this.recordRefundCommunications(tx, {
+          order: refundedOrder,
+          actorUserId: userId,
+          responsibility: persistedResponsibility,
+          refundTransactionId: existing.id,
+        })
         return {
-          order: await tx.order.findUniqueOrThrow({
-            where: { id: order.id },
-          }),
+          order: refundedOrder,
           refundTransactionId: existing.id,
         }
       }
@@ -201,7 +637,7 @@ export class RefundService {
 
     if (["PAID", "SUBMITTED"].includes(order.status)) {
       try {
-        return await refundUnacceptedPaidOrderInTransaction(
+        const result = await refundUnacceptedPaidOrderInTransaction(
           tx,
           order,
           {
@@ -217,6 +653,13 @@ export class RefundService {
           },
           (data, auditTx) => this.audit.log(data, auditTx),
         )
+        await this.recordRefundCommunications(tx, {
+          order: result.order,
+          actorUserId: userId,
+          responsibility,
+          refundTransactionId: result.refundTransactionId,
+        })
+        return result
       } catch (error) {
         if (error instanceof OrderRefundConflictError) {
           throw new ConflictException(error.message)
@@ -446,6 +889,7 @@ export class RefundService {
           refundedBy: userId,
           responsibility,
           settlementCancelled: cancelledSettlementId,
+          refundTransactionId: refundTransaction.id,
         },
       },
     })
@@ -462,6 +906,7 @@ export class RefundService {
           fromStatus: order.status,
           reason,
           responsibility,
+          refundTransactionId: refundTransaction.id,
           ...orderEventMetadata(order),
         },
         userId,
@@ -470,67 +915,101 @@ export class RefundService {
       tx,
     )
 
-    if (this.communications) {
-      const recipients = await this.communications.customerOrderRecipients(
-        order.id,
-        tx,
-      )
-      await this.communications.record(
-        {
-          type: "ORDER_REFUNDED",
-          aggregateType: "Order",
-          aggregateId: order.id,
-          organizationId: order.organizationId,
-          title: "Order refund completed",
-          message: `${amount.toFixed(2)} ${order.currency} was returned to your wallet for order ${order.id}.`,
-          actionPath: `/dashboard/orders/${order.id}`,
-          payload: {
-            amount: amount.toString(),
-            currency: order.currency,
-            responsibility,
-          },
-          dedupKey: `order:${order.id}:refunded`,
-          recipientUserIds: recipients,
-          actorUserId: userId,
-        },
-        tx,
-      )
-      if (
-        amount.greaterThan(
-          notificationThreshold("ADMIN_REFUND_NOTIFICATION_THRESHOLD", 100),
-        )
-      ) {
-        const staffRecipients = await this.communications.staffRecipients(
-          ["SUPER_ADMIN", "FINANCE"],
-          tx,
-        )
-        await this.communications.record(
-          {
-            type: "STAFF_HIGH_VALUE_REFUND",
-            aggregateType: "Order",
-            aggregateId: order.id,
-            organizationId: order.organizationId,
-            title: "High-value refund completed",
-            message: `${amount.toFixed(2)} ${order.currency} was refunded for order ${order.id}.`,
-            actionPath: `/dashboard/orders/${order.id}`,
-            payload: {
-              amount: amount.toString(),
-              currency: order.currency,
-              responsibility,
-            },
-            dedupKey: `staff:order:${order.id}:refund:${refundTransaction.id}`,
-            recipientUserIds: staffRecipients,
-            actorUserId: userId,
-          },
-          tx,
-        )
-      }
-    }
+    await this.recordRefundCommunications(tx, {
+      order: updated,
+      actorUserId: userId,
+      responsibility,
+      refundTransactionId: refundTransaction.id,
+    })
 
     return {
       order: updated,
       refundTransactionId: refundTransaction.id,
     }
+  }
+
+  /**
+   * Records the customer credit-note event and any high-value staff alert in
+   * the same transaction as the refund. The stable deduplication keys also let
+   * an exact idempotent replay repair communications omitted by older writers
+   * without issuing a second refund or financial document.
+   */
+  private async recordRefundCommunications(
+    tx: any,
+    input: {
+      order: any
+      actorUserId: string
+      responsibility: FinalRefundResponsibility
+      refundTransactionId: string
+    },
+  ): Promise<void> {
+    if (!this.communications) return
+    const amount = new Decimal(input.order.amount ?? 0)
+    const recipients = await this.communications.customerOrderRecipients(
+      input.order.id,
+      tx,
+    )
+    const repairedLegacy = await this.repairValidatedLegacyRefundCommunication(
+      tx,
+      {
+        ...input,
+        recipientUserIds: recipients,
+      },
+    )
+    if (!repairedLegacy) {
+      await this.communications.record(
+        {
+          type: "ORDER_REFUNDED",
+          aggregateType: "Order",
+          aggregateId: input.order.id,
+          organizationId: input.order.organizationId,
+          title: "Order refund completed",
+          message: `${amount.toFixed(2)} ${input.order.currency} was returned to your wallet for order ${input.order.id}.`,
+          actionPath: `/dashboard/orders/${input.order.id}`,
+          payload: {
+            amount: amount.toString(),
+            currency: input.order.currency,
+            responsibility: input.responsibility,
+            refundTransactionId: input.refundTransactionId,
+          },
+          dedupKey: `order:${input.order.id}:refunded`,
+          recipientUserIds: recipients,
+          actorUserId: input.actorUserId,
+        },
+        tx,
+      )
+    }
+    if (
+      !amount.greaterThan(
+        notificationThreshold("ADMIN_REFUND_NOTIFICATION_THRESHOLD", 100),
+      )
+    ) {
+      return
+    }
+    const staffRecipients = await this.communications.staffRecipients(
+      ["SUPER_ADMIN", "FINANCE"],
+      tx,
+    )
+    await this.communications.record(
+      {
+        type: "STAFF_HIGH_VALUE_REFUND",
+        aggregateType: "Order",
+        aggregateId: input.order.id,
+        organizationId: input.order.organizationId,
+        title: "High-value refund completed",
+        message: `${amount.toFixed(2)} ${input.order.currency} was refunded for order ${input.order.id}.`,
+        actionPath: `/dashboard/orders/${input.order.id}`,
+        payload: {
+          amount: amount.toString(),
+          currency: input.order.currency,
+          responsibility: input.responsibility,
+        },
+        dedupKey: `staff:order:${input.order.id}:refund:${input.refundTransactionId}`,
+        recipientUserIds: staffRecipients,
+        actorUserId: input.actorUserId,
+      },
+      tx,
+    )
   }
 
   private async createPublisherDebtNotifications(

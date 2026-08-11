@@ -282,6 +282,62 @@ describe("OrderOperationsService", () => {
       ).rejects.toThrow(ConflictException)
       expect(queueMock.addJob).not.toHaveBeenCalled()
     })
+
+    it("wakes only the stable event from the committed serializable attempt", async () => {
+      const contentOrder = {
+        ...mockPlatformOrder,
+        status: "CONTENT_CREATION",
+      }
+      prismaMock.order.findUnique.mockResolvedValue(contentOrder)
+      prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+      prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+        ...contentOrder,
+        status: "CUSTOMER_REVIEW",
+        version: 2,
+      })
+      let transactionAttempt = 0
+      prismaMock.$transaction.mockImplementation(async (callback: any) => {
+        transactionAttempt++
+        const value = await callback(prismaMock)
+        if (transactionAttempt === 1) throw { code: "P2034" }
+        return value
+      })
+      const communications = {
+        customerOrderRecipients: jest.fn().mockResolvedValue(["user-1"]),
+        record: jest
+          .fn()
+          .mockResolvedValueOnce({ eventId: "rolled-back-event" })
+          .mockResolvedValueOnce({ eventId: "committed-event" }),
+        dispatchBestEffort: jest.fn(),
+        dispatchByDedupKeyBestEffort: jest.fn(),
+      }
+      service = new OrderOperationsService(
+        prismaMock as any,
+        auditMock as any,
+        queueMock as any,
+        deliveryMock as any,
+        { assertNoActiveCancellation: jest.fn() } as any,
+        communications as any,
+      )
+
+      await service.submitContentForReview(
+        "order-1",
+        "ops-user",
+        "OPERATIONS",
+        "Final content",
+      )
+
+      expect(transactionAttempt).toBe(2)
+      expect(communications.record).toHaveBeenCalledTimes(2)
+      expect(communications.dispatchBestEffort).not.toHaveBeenCalled()
+      expect(communications.dispatchByDedupKeyBestEffort).toHaveBeenCalledTimes(
+        1,
+      )
+      expect(communications.dispatchByDedupKeyBestEffort).toHaveBeenCalledWith(
+        "order:order-1:content-ready:v2",
+      )
+      expect(queueMock.addJob).not.toHaveBeenCalled()
+    })
   })
 
   describe("markPublished", () => {

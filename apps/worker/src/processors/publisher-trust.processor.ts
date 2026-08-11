@@ -3,6 +3,7 @@ import { QUEUES } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
+import { dispatchCommunicationEventsBestEffort } from "../lib/communication-outbox-dispatch"
 import { recordPublisherTierCommunications } from "../lib/publisher-tier-communications"
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
@@ -33,12 +34,21 @@ export function createPublisherTrustWorker() {
         sourceEvent: string
         reason?: string
       }
-      const res = await recomputePublisherTrustCore(prisma, publisherId, {
-        sourceEvent,
-        reason,
-      })
-      await recordPublisherTierCommunications(res)
-      return res ?? { skipped: "publisher_not_found" }
+      const { result, communicationEventIds } = await prisma.$transaction(
+        async (tx) => {
+          const result = await recomputePublisherTrustCore(tx, publisherId, {
+            sourceEvent,
+            reason,
+          })
+          const communicationEventIds = await recordPublisherTierCommunications(
+            tx,
+            result,
+          )
+          return { result, communicationEventIds }
+        },
+      )
+      await dispatchCommunicationEventsBestEffort(communicationEventIds)
+      return result ?? { skipped: "publisher_not_found" }
     },
     { connection, concurrency: 4 },
   )

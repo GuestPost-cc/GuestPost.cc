@@ -93,6 +93,18 @@ Open/partial items require architectural design discussion.
   deterministic message IDs, bounded retry leases, and hard-bounce
   suppression. Logs must not contain recipient addresses or raw provider
   payloads.
+- Financial receipt events use an explicit actor policy: the payer/refund
+  principal remains eligible only when the authoritative resolver listed that
+  user. Activity broadcasts still exclude actors by default. Every outbox row
+  is committed with its domain mutation; signed BullMQ work is a post-commit
+  wake-up and never the durability boundary. Dedup-key winners are compared
+  against immutable tenant, aggregate, policy, content, action, and payload
+  identity before any recipient projection is created.
+- Email delivery ownership is fenced by the exact attempt and lock timestamp.
+  SMTP dispatch start is persisted before the external call. Expired
+  pre-dispatch work can retry, while an expired or ambiguous post-dispatch
+  outcome becomes `DELIVERY_UNCERTAIN` and requires provider/operator
+  reconciliation rather than risking a duplicate financial message.
 - `packages/auth` emits server-reachable email templates as ESM. Relative
   imports in those sources must include their emitted `.js` extension so the
   compiled files remain loadable by Node without bundler-only resolution. The
@@ -112,6 +124,11 @@ Open/partial items require architectural design discussion.
   filename, SHA-256 digest, and size are recorded on the delivery; malformed or
   mismatched claimed attachments fail closed. PDFs use no remote resources,
   JavaScript, forms, or embedded files and are capped at 5 MiB.
+- Document creation uses a targeted atomic conflict on the document dedup key;
+  aggregate/sequence conflicts are not swallowed. PDF money formatting and
+  line reconciliation stay in exact decimal/minor units, and the renderer uses
+  pinned local Unicode shaping/bidirectional assets with a searchable text
+  layer and auditable unsupported-code-point fallback.
 - Organization owners manage the reusable billing profile. Issued documents do
   not change when that profile is later edited. The configured issuer legal
   identity and tax treatment are production release gates; the product does not

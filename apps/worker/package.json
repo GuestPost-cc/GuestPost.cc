@@ -6,21 +6,32 @@
     "dev": "NODE_ENV=development tsx watch src/index.ts",
     "build": "tsc",
     "test": "tsx --test test/*.spec.ts",
+    "render:pdf-fixtures": "tsx scripts/render-financial-document-fixtures.ts",
     "start": "node dist/index.js",
     "start:realtime": "WORKER_MODE=realtime node dist/index.js",
     "start:on-demand": "WORKER_MODE=on-demand node dist/index.js",
     "start:scheduled": "WORKER_MODE=scheduled node dist/index.js"
   },
   "dependencies": {
+    "@expo-google-fonts/noto-sans": "0.4.2",
+    "@expo-google-fonts/noto-sans-arabic": "0.4.3",
+    "@expo-google-fonts/noto-sans-bengali": "0.4.4",
+    "@expo-google-fonts/noto-sans-devanagari": "0.4.1",
+    "@expo-google-fonts/noto-sans-jp": "0.4.3",
+    "@expo-google-fonts/noto-sans-kr": "0.4.3",
+    "@expo-google-fonts/noto-sans-sc": "0.4.3",
     "@guestpost/database": "workspace:*",
     "@guestpost/integrations": "workspace:*",
     "@guestpost/shared": "workspace:*",
+    "@pdf-lib/fontkit": "1.1.1",
     "@sentry/node": "10.67.0",
+    "bidi-js": "1.0.3",
     "bullmq": "^5.80.12",
     "dotenv": "^17.4.2",
     "ioredis": "^5.11.1",
     "nodemailer": "^9.0.3",
-    "pdf-lib": "1.17.1"
+    "pdf-lib": "1.17.1",
+    "regenerator-runtime": "0.14.1"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",

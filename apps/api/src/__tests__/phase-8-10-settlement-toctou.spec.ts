@@ -22,6 +22,7 @@ function makeOrderMock(over: Record<string, unknown> = {}) {
     paymentStatus: "PAID",
     amount: "100.00",
     organizationId: "org-1",
+    customerId: "customer-1",
     listingServiceId: null,
     listingId: null,
     type: "GUEST_POST",
@@ -36,6 +37,8 @@ function makeDeliveryVersionMock() {
   return {
     id: "v1",
     orderId: "o1",
+    normalizedUrl: "https://publisher.example/article",
+    supersededByVersion: null,
     verificationStatus: "VERIFIED",
     interventionStatus: "NONE",
   }
@@ -72,8 +75,14 @@ function makeTxMock(disputeFindFirst: jest.Mock) {
     order: { findUnique: jest.fn().mockResolvedValue(makeOrderMock()) },
     orderDeliveryVersion: {
       findUnique: jest.fn().mockResolvedValue(makeDeliveryVersionMock()),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
-    orderDispute: { findFirst: disputeFindFirst },
+    orderDispute: {
+      findFirst: disputeFindFirst,
+      count: jest.fn().mockResolvedValue(0),
+    },
+    paymentDispute: { count: jest.fn().mockResolvedValue(0) },
     revision: { findFirst: jest.fn().mockResolvedValue(null) },
     orderCancellationRequest: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -121,6 +130,8 @@ function makePrismaMock(tx: ReturnType<typeof makeTxMock>) {
     },
     orderDeliveryVersion: {
       findUnique: jest.fn().mockResolvedValue(makeDeliveryVersionMock()),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     orderDispute: { findFirst: jest.fn().mockResolvedValue(null) },
     revision: { findFirst: jest.fn().mockResolvedValue(null) },

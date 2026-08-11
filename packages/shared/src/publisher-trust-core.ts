@@ -30,7 +30,28 @@ export interface TrustRecomputeResult {
   oldTier: string | null
   newTier: string
   changed: boolean
+  // The durable audit row is the unique identity of this committed tier
+  // transition. from/to alone is not unique when a publisher cycles tiers.
+  transitionId: string | null
   durationMs: number
+}
+
+/**
+ * All manual and computed publisher-tier writers take this row lock before
+ * reading the current tier. Keeping one lock protocol prevents a delayed
+ * recompute from overwriting a newer manual decision with stale evidence.
+ */
+export async function lockPublisherTierMutation(
+  prisma: any,
+  publisherId: string,
+): Promise<boolean> {
+  const rows = (await prisma.$queryRaw`
+    SELECT "id"
+    FROM "Publisher"
+    WHERE "id" = ${publisherId}
+    FOR UPDATE
+  `) as Array<{ id: string }>
+  return rows.length === 1
 }
 
 async function notifyOps(prisma: any, type: string, message: string) {
@@ -56,6 +77,7 @@ export async function recomputePublisherTrustCore(
   } = { sourceEvent: "MANUAL" },
 ): Promise<TrustRecomputeResult | null> {
   const startedAt = Date.now()
+  if (!(await lockPublisherTierMutation(prisma, publisherId))) return null
   const publisher = await prisma.publisher.findUnique({
     where: { id: publisherId },
     include: { profile: { select: { trustScore: true } } },
@@ -138,10 +160,16 @@ export async function recomputePublisherTrustCore(
     },
   })
   const changed = tier !== oldTier
+  let transitionId: string | null = null
   if (changed) {
-    await prisma.publisher
-      .update({ where: { id: publisherId }, data: { tier } })
-      .catch(() => undefined)
+    // A tier-change communication must never commit when the authoritative
+    // tier mutation failed. Production callers wrap this core and their
+    // outbox records in one transaction, so propagate the write failure and
+    // let the transaction roll back every derived profile/audit/outbox write.
+    await prisma.publisher.update({
+      where: { id: publisherId },
+      data: { tier },
+    })
   }
 
   const durationMs = Date.now() - startedAt
@@ -171,7 +199,7 @@ export async function recomputePublisherTrustCore(
   if (changed) {
     const direction =
       scoreTierRank(tier) > scoreTierRank(oldTier) ? "upgraded" : "downgraded"
-    await prisma.auditLog.create({
+    const transitionAudit = await prisma.auditLog.create({
       data: {
         action: "PUBLISHER_TIER_CHANGED",
         entityType: "Publisher",
@@ -180,7 +208,9 @@ export async function recomputePublisherTrustCore(
         userId: opts.actorUserId ?? null,
         organizationId: null,
       },
+      select: { id: true },
     })
+    transitionId = transitionAudit.id
     // Compatibility for lightweight callers that do not expose the durable
     // communication outbox. Production API/worker paths record the typed
     // publisher + staff deliveries after this core returns.
@@ -199,6 +229,7 @@ export async function recomputePublisherTrustCore(
     score: { from: oldScore, to: score },
     tier: { from: oldTier, to: tier },
     changed,
+    transitionId,
     durationMs,
   })
 
@@ -209,6 +240,7 @@ export async function recomputePublisherTrustCore(
     oldTier,
     newTier: tier,
     changed,
+    transitionId,
     durationMs,
   }
 }

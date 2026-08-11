@@ -24,6 +24,7 @@ import {
   isPrismaUniqueConstraintError,
   isRetryablePrismaTransactionError,
 } from "@guestpost/shared/dist/prisma-transaction-retry"
+import { lockPublisherTierMutation } from "@guestpost/shared/dist/publisher-trust-core"
 import {
   BadRequestException,
   ConflictException,
@@ -2461,125 +2462,189 @@ export class AdminService {
         "Operations can approve, reject, or pause listings but cannot edit their lifecycle history",
       )
     }
-    const listing = await this.prisma.marketplaceListing.findUnique({
-      where: { id },
-      include: {
-        publisher: { select: { email: true } },
-        website: { select: { verificationStatus: true, domain: true } },
-        categories: { select: { categoryId: true } },
-        services: {
-          where: { availability: "AVAILABLE" },
-          take: 1,
-          select: { id: true },
+    const result = await this.prisma.$transaction(async (tx: any) => {
+      const observedListing = await tx.marketplaceListing.findUnique({
+        where: { id },
+        select: { status: true },
+      })
+      if (!observedListing) throw new NotFoundException("Listing not found")
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "MarketplaceListing"
+        WHERE "id" = ${id}
+        FOR UPDATE
+      `
+      const listing = await tx.marketplaceListing.findUnique({
+        where: { id },
+        include: {
+          publisher: { select: { email: true } },
+          website: { select: { verificationStatus: true, domain: true } },
+          categories: { select: { categoryId: true } },
+          services: {
+            where: { availability: "AVAILABLE" },
+            take: 1,
+            select: { id: true },
+          },
         },
-      },
-    })
-    if (!listing) throw new NotFoundException("Listing not found")
-
-    if (status === ListingStatus.APPROVED && listing.services.length === 0) {
-      throw new BadRequestException({
-        code: "NO_AVAILABLE_SERVICES",
-        message:
-          "Cannot approve: add at least one available service to the listing first.",
       })
-    }
-    if (
-      status === ListingStatus.APPROVED &&
-      (listing.categories.length < 1 ||
-        listing.categories.length > 7 ||
-        !isMarketplaceLanguage(listing.language) ||
-        !hasCompleteListingPolicy(listing))
-    ) {
-      throw new BadRequestException({
-        code: "LISTING_METADATA_INCOMPLETE",
-        message:
-          "Cannot approve: choose 1-7 categories, one primary language, and every listing policy value first.",
-      })
-    }
-
-    // Domain ownership gate: a publisher listing cannot be APPROVED until its
-    // website is VERIFIED. Platform listings have no website (or a VERIFIED one)
-    // and pass through. Only SUPER_ADMIN may emergency-override, and the bypass
-    // is audited.
-    if (
-      status === ListingStatus.APPROVED &&
-      listing.website &&
-      listing.website.verificationStatus !== "VERIFIED"
-    ) {
-      if (!(force && user.staffRole === "SUPER_ADMIN")) {
-        throw new BadRequestException({
-          code: "WEBSITE_NOT_VERIFIED",
-          message: `Cannot approve: website ${listing.website.domain ?? ""} is ${listing.website.verificationStatus}, not VERIFIED.`,
-        })
+      if (!listing) throw new NotFoundException("Listing not found")
+      if (listing.status === status) {
+        return { updatedListing: listing, communicationEventIds: [] }
       }
-      await this.audit.log({
-        action: "WEBSITE_VERIFICATION_OVERRIDE",
-        entityType: "MarketplaceListing",
-        entityId: id,
-        metadata: {
-          domain: listing.website.domain,
-          websiteStatus: listing.website.verificationStatus,
-          reason: "SUPER_ADMIN emergency approval",
-        },
-        userId: user.id,
-        organizationId: listing.organizationId ?? null,
-      })
-    }
-
-    const updated = await this.prisma.marketplaceListing.update({
-      where: { id },
-      data: { status: status as any },
-    })
-
-    await this.audit.log({
-      action: "LISTING_STATUS_UPDATED",
-      entityType: "MarketplaceListing",
-      entityId: id,
-      metadata: {
-        previousStatus: listing.status,
-        newStatus: status,
-        listingTitle: listing.title,
-      },
-      userId: user.id,
-      organizationId: listing.organizationId ?? null,
-    })
-
-    if (
-      status === ListingStatus.APPROVED ||
-      status === ListingStatus.REJECTED
-    ) {
-      const message =
-        status === ListingStatus.APPROVED
-          ? `Your listing "${listing.title}" has been approved and is now live in the marketplace.`
-          : `Your listing "${listing.title}" has been rejected.`
-
-      if (this.communications) {
-        const recipients = await this.communications.publisherRecipients(
-          listing.publisherId,
+      if (listing.status !== observedListing.status) {
+        throw new ConflictException(
+          "Listing status changed concurrently; refresh and retry",
         )
-        const event = await this.communications.record({
-          type:
-            status === ListingStatus.APPROVED
-              ? "MARKETPLACE_LISTING_APPROVED"
-              : "MARKETPLACE_LISTING_REJECTED",
-          aggregateType: "MarketplaceListing",
-          aggregateId: id,
-          organizationId: listing.organizationId,
-          title:
-            status === ListingStatus.APPROVED
-              ? "Marketplace listing approved"
-              : "Marketplace listing needs attention",
-          message,
-          actionPath: "/dashboard/listings",
-          dedupKey: `listing:${id}:status:${status}`,
-          recipientUserIds: recipients,
-          actorUserId: user.id,
-        })
-        this.communications.dispatchBestEffort(event.eventId)
       }
-    }
 
-    return updated
+      if (status === ListingStatus.APPROVED && listing.services.length === 0) {
+        throw new BadRequestException({
+          code: "NO_AVAILABLE_SERVICES",
+          message:
+            "Cannot approve: add at least one available service to the listing first.",
+        })
+      }
+      if (
+        status === ListingStatus.APPROVED &&
+        (listing.categories.length < 1 ||
+          listing.categories.length > 7 ||
+          !isMarketplaceLanguage(listing.language) ||
+          !hasCompleteListingPolicy(listing))
+      ) {
+        throw new BadRequestException({
+          code: "LISTING_METADATA_INCOMPLETE",
+          message:
+            "Cannot approve: choose 1-7 categories, one primary language, and every listing policy value first.",
+        })
+      }
+
+      // Domain ownership gate: a publisher listing cannot be APPROVED until its
+      // website is VERIFIED. Platform listings have no website (or a VERIFIED one)
+      // and pass through. Only SUPER_ADMIN may emergency-override, and the bypass
+      // is audited.
+      if (
+        status === ListingStatus.APPROVED &&
+        listing.website &&
+        listing.website.verificationStatus !== "VERIFIED"
+      ) {
+        if (!(force && user.staffRole === "SUPER_ADMIN")) {
+          throw new BadRequestException({
+            code: "WEBSITE_NOT_VERIFIED",
+            message: `Cannot approve: website ${listing.website.domain ?? ""} is ${listing.website.verificationStatus}, not VERIFIED.`,
+          })
+        }
+      }
+
+      // The status predicate is the concurrency fence. Under PostgreSQL READ
+      // COMMITTED, a concurrent loser re-checks it after the winner commits and
+      // observes count=0, so it cannot audit or announce a stale transition.
+      const transition = await tx.marketplaceListing.updateMany({
+        where: { id, status: listing.status },
+        data: { status: status as any },
+      })
+      if (transition.count !== 1) {
+        throw new ConflictException(
+          "Listing status changed concurrently; refresh and retry",
+        )
+      }
+
+      const updatedListing = await tx.marketplaceListing.findUniqueOrThrow({
+        where: { id },
+      })
+
+      if (
+        status === ListingStatus.APPROVED &&
+        listing.website &&
+        listing.website.verificationStatus !== "VERIFIED"
+      ) {
+        await this.audit.log(
+          {
+            action: "WEBSITE_VERIFICATION_OVERRIDE",
+            entityType: "MarketplaceListing",
+            entityId: id,
+            metadata: {
+              domain: listing.website.domain,
+              websiteStatus: listing.website.verificationStatus,
+              reason: "SUPER_ADMIN emergency approval",
+            },
+            userId: user.id,
+            organizationId: listing.organizationId ?? null,
+          },
+          tx,
+        )
+      }
+
+      const transitionAudit = await this.audit.log(
+        {
+          action: "LISTING_STATUS_UPDATED",
+          entityType: "MarketplaceListing",
+          entityId: id,
+          metadata: {
+            previousStatus: listing.status,
+            newStatus: status,
+            listingTitle: listing.title,
+          },
+          userId: user.id,
+          organizationId: listing.organizationId ?? null,
+        },
+        tx,
+      )
+      if (!transitionAudit?.id) {
+        throw new Error("Listing transition audit identity was not persisted")
+      }
+
+      if (
+        status === ListingStatus.APPROVED ||
+        status === ListingStatus.REJECTED
+      ) {
+        const communicationEventIds: string[] = []
+        const message =
+          status === ListingStatus.APPROVED
+            ? `Your listing "${listing.title}" has been approved and is now live in the marketplace.`
+            : `Your listing "${listing.title}" has been rejected.`
+
+        if (this.communications) {
+          const recipients = await this.communications.publisherRecipients(
+            listing.publisherId,
+            false,
+            tx,
+          )
+          const event = await this.communications.record(
+            {
+              type:
+                status === ListingStatus.APPROVED
+                  ? "MARKETPLACE_LISTING_APPROVED"
+                  : "MARKETPLACE_LISTING_REJECTED",
+              aggregateType: "MarketplaceListing",
+              aggregateId: id,
+              organizationId: listing.organizationId,
+              title:
+                status === ListingStatus.APPROVED
+                  ? "Marketplace listing approved"
+                  : "Marketplace listing needs attention",
+              message,
+              actionPath: "/dashboard/listings",
+              payload: {
+                from: listing.status,
+                to: status,
+                transitionId: transitionAudit.id,
+              },
+              dedupKey: `listing:${id}:status-transition:${transitionAudit.id}`,
+              recipientUserIds: recipients,
+              actorUserId: user.id,
+            },
+            tx,
+          )
+          communicationEventIds.push(event.eventId)
+        }
+        return { updatedListing, communicationEventIds }
+      }
+
+      return { updatedListing, communicationEventIds: [] }
+    })
+
+    this.communications?.dispatchManyBestEffort(result.communicationEventIds)
+    return result.updatedListing
   }
 
   async toggleListingFeatured(id: string, featured: boolean, user: any) {
@@ -3452,19 +3517,41 @@ export class AdminService {
         `Invalid tier — must be one of ${valid.join(", ")}`,
       )
     }
-    const publisher = await this.prisma.publisher.findUnique({
-      where: { id: publisherId },
-    })
-    if (!publisher) throw new NotFoundException("Publisher not found")
-    if (publisher.tier === tier) return publisher
-
-    return this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.publisher.update({
+    const result = await this.prisma.$transaction(async (tx: any) => {
+      const observedPublisher = await tx.publisher.findUnique({
         where: { id: publisherId },
+        select: { tier: true },
+      })
+      if (!observedPublisher) throw new NotFoundException("Publisher not found")
+      if (!(await lockPublisherTierMutation(tx, publisherId))) {
+        throw new NotFoundException("Publisher not found")
+      }
+      const publisher = await tx.publisher.findUnique({
+        where: { id: publisherId },
+      })
+      if (!publisher) throw new NotFoundException("Publisher not found")
+      if (publisher.tier === tier) {
+        return { updatedPublisher: publisher, communicationDedupKeys: [] }
+      }
+      if (publisher.tier !== observedPublisher.tier) {
+        throw new ConflictException(
+          "Publisher tier changed concurrently; refresh and retry",
+        )
+      }
+      const transition = await tx.publisher.updateMany({
+        where: { id: publisherId, tier: publisher.tier },
         data: { tier: tier as any },
       })
+      if (transition.count !== 1) {
+        throw new ConflictException(
+          "Publisher tier changed concurrently; refresh and retry",
+        )
+      }
+      const updatedPublisher = await tx.publisher.findUniqueOrThrow({
+        where: { id: publisherId },
+      })
 
-      await this.audit.log(
+      const transitionAudit = await this.audit.log(
         {
           action: "PUBLISHER_TIER_CHANGED",
           entityType: "Publisher",
@@ -3475,6 +3562,9 @@ export class AdminService {
         },
         tx,
       )
+      if (!transitionAudit?.id) {
+        throw new Error("Publisher tier audit identity was not persisted")
+      }
       if (this.communications) {
         const publisherRecipients =
           await this.communications.publisherRecipients(publisherId, false, tx)
@@ -3487,8 +3577,12 @@ export class AdminService {
             title: "Publisher tier changed",
             message: `Your publisher tier changed from ${publisher.tier} to ${tier}.`,
             actionPath: "/dashboard/settings",
-            payload: { from: publisher.tier, to: tier },
-            dedupKey: `publisher:${publisherId}:tier:${publisher.tier}:${tier}`,
+            payload: {
+              from: publisher.tier,
+              to: tier,
+              transitionId: transitionAudit.id,
+            },
+            dedupKey: `publisher:${publisherId}:tier-change:${transitionAudit.id}`,
             recipientUserIds: publisherRecipients,
           },
           tx,
@@ -3506,8 +3600,12 @@ export class AdminService {
             title: "Publisher tier changed",
             message: `Publisher ${publisher.name ?? publisherId} changed from ${publisher.tier} to ${tier}.`,
             actionPath: "/dashboard/publishers",
-            payload: { from: publisher.tier, to: tier },
-            dedupKey: `staff:publisher:${publisherId}:tier:${publisher.tier}:${tier}`,
+            payload: {
+              from: publisher.tier,
+              to: tier,
+              transitionId: transitionAudit.id,
+            },
+            dedupKey: `staff:publisher:${publisherId}:tier-change:${transitionAudit.id}`,
             recipientUserIds: staffRecipients,
             actorUserId: actor.id,
           },
@@ -3515,8 +3613,20 @@ export class AdminService {
         )
       }
 
-      return updated
+      return {
+        updatedPublisher,
+        communicationDedupKeys: this.communications
+          ? [
+              `publisher:${publisherId}:tier-change:${transitionAudit.id}`,
+              `staff:publisher:${publisherId}:tier-change:${transitionAudit.id}`,
+            ]
+          : [],
+      }
     })
+    this.communications?.dispatchManyByDedupKeyBestEffort(
+      result.communicationDedupKeys,
+    )
+    return result.updatedPublisher
   }
 
   // ── Support tickets ─────────────────────────────────────────────────

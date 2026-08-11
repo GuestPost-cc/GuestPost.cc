@@ -66,7 +66,10 @@ describe("OrderCancellationService", () => {
         .fn()
         .mockImplementation(async (callback: any) => callback(prisma)),
     }
-    refund = { refundOrderInTransaction: jest.fn() }
+    refund = {
+      refundOrderInTransaction: jest.fn(),
+      dispatchOrderRefundCommunicationsBestEffort: jest.fn(),
+    }
     audit = { log: jest.fn().mockResolvedValue(undefined) }
     queue = { enqueueTrustRecompute: jest.fn().mockResolvedValue(undefined) }
     service = new OrderCancellationService(prisma, refund, audit, queue)
@@ -332,6 +335,85 @@ describe("OrderCancellationService", () => {
         data: expect.objectContaining({ status: "CANCELLED" }),
       }),
     )
+  })
+
+  it("repairs a legacy customer-cancel refund on exact authorized replay", async () => {
+    const refundedOrder = {
+      ...order,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "CUSTOMER",
+      version: 5,
+    }
+    prisma.order.findUnique.mockResolvedValue(refundedOrder)
+    prisma.transaction.findFirst.mockResolvedValue({
+      id: "refund-legacy-1",
+      type: "REFUND",
+      orderId: "order-1",
+      reference: "customer-cancel:order-1:cancel-command-1",
+    })
+    refund.refundOrderInTransaction.mockResolvedValue({
+      order: refundedOrder,
+      refundTransactionId: "refund-legacy-1",
+    })
+
+    const replay = await service.cancelNow(
+      "order-1",
+      {
+        userId: "customer-1",
+        kind: "CUSTOMER",
+        organizationId: "org-1",
+        customerRole: "MEMBER",
+      },
+      {
+        reasonCode: CancellationReasonCode.CUSTOMER_CHANGED_MIND,
+        expectedVersion: 4,
+        idempotencyKey: "cancel-command-1",
+      },
+    )
+
+    expect(replay).toBe(refundedOrder)
+    expect(refund.refundOrderInTransaction).toHaveBeenCalledWith(
+      prisma,
+      refundedOrder,
+      CancellationReasonCode.CUSTOMER_CHANGED_MIND,
+      "customer-1",
+      "customer-cancel:order-1:cancel-command-1",
+      "SYSTEM",
+    )
+  })
+
+  it("denies a cross-tenant idempotent cancellation replay before lookup", async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      ...order,
+      organizationId: "org-other",
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+    })
+    prisma.transaction.findFirst.mockResolvedValue({
+      id: "refund-other-tenant",
+      type: "REFUND",
+      orderId: "order-1",
+    })
+
+    await expect(
+      service.cancelNow(
+        "order-1",
+        {
+          userId: "customer-1",
+          kind: "CUSTOMER",
+          organizationId: "org-1",
+          customerRole: "MEMBER",
+        },
+        {
+          reasonCode: CancellationReasonCode.CUSTOMER_CHANGED_MIND,
+          expectedVersion: 4,
+          idempotencyKey: "known-command",
+        },
+      ),
+    ).rejects.toThrow("Order not found")
+    expect(prisma.transaction.findFirst).not.toHaveBeenCalled()
+    expect(refund.refundOrderInTransaction).not.toHaveBeenCalled()
   })
 
   it("blocks reserved-wallet releases while finance is locked", async () => {

@@ -1,3 +1,4 @@
+import { isSafeFinancialDocumentText } from "@guestpost/shared"
 import { Transform } from "class-transformer"
 import {
   IsEmail,
@@ -6,23 +7,41 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  registerDecorator,
   ValidateIf,
+  type ValidationArguments,
+  type ValidationOptions,
 } from "class-validator"
 
 const trim = ({ value }: { value: unknown }) =>
-  typeof value === "string" ? value.trim() : value
+  typeof value === "string" ? value.trim().normalize("NFC") : value
 const optionalTrim = ({ value }: { value: unknown }) =>
   typeof value === "string" && value.trim() === "" ? null : trim({ value })
-// PDF invoices embed a deterministic built-in Latin font. Reject unsupported
-// glyphs at the settings boundary instead of corrupting a legal name later.
-const SAFE_TEXT = /^[\u0020-\u007e\u00a0-\u00ff]+$/
+function IsSafeBillingText(validationOptions?: ValidationOptions) {
+  return (object: object, propertyName: string): void => {
+    registerDecorator({
+      name: "isSafeBillingText",
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: unknown): boolean {
+          return typeof value === "string" && isSafeFinancialDocumentText(value)
+        },
+        defaultMessage(args: ValidationArguments): string {
+          return `${args.property} contains unsafe or invisible control characters`
+        },
+      },
+    })
+  }
+}
 
 export class UpdateBillingProfileDto {
   @Transform(trim)
   @IsString()
   @MinLength(1)
   @MaxLength(160)
-  @Matches(SAFE_TEXT)
+  @IsSafeBillingText()
   legalName: string
 
   @Transform(optionalTrim)
@@ -35,35 +54,35 @@ export class UpdateBillingProfileDto {
   @IsString()
   @MinLength(1)
   @MaxLength(160)
-  @Matches(SAFE_TEXT)
+  @IsSafeBillingText()
   addressLine1: string
 
   @Transform(optionalTrim)
   @IsOptional()
   @IsString()
   @MaxLength(160)
-  @Matches(SAFE_TEXT)
+  @IsSafeBillingText()
   addressLine2?: string | null
 
   @Transform(trim)
   @IsString()
   @MinLength(1)
   @MaxLength(100)
-  @Matches(SAFE_TEXT)
+  @IsSafeBillingText()
   city: string
 
   @Transform(optionalTrim)
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  @Matches(SAFE_TEXT)
+  @IsSafeBillingText()
   region?: string | null
 
   @Transform(trim)
   @IsString()
   @MinLength(1)
   @MaxLength(32)
-  @Matches(SAFE_TEXT)
+  @IsSafeBillingText()
   postalCode: string
 
   @Transform(({ value }) =>

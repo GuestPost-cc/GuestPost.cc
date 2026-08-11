@@ -2,10 +2,12 @@ import {
   assertCanonicalPlatformRevenueFundingCore,
   evaluateLockedSettlementEligibility,
   getSettlementReviewDays,
+  loadSettlementCustomerHistory,
   orderEventMetadata,
   PlatformRevenueEvidenceError,
   type PublisherTier,
   QUEUES,
+  refreshDeliveryUrlReuseEvidenceUnderLock,
   runLockedOrderSerializableTransaction,
   WorkflowDecisionService,
 } from "@guestpost/shared"
@@ -128,58 +130,83 @@ export class OrderReviewService {
   // Synchronous recompute (manual admin endpoint). The shared core is the single
   // implementation; the worker uses the same one for the event-driven path.
   async recomputePublisherTrust(publisherId: string, sourceEvent = "MANUAL") {
-    const r = await recomputePublisherTrustCore(this.prisma, publisherId, {
-      sourceEvent,
-    })
-    if (r?.changed && this.communications) {
-      const [publisher, audit, publisherRecipients, staffRecipients] =
-        await Promise.all([
-          this.prisma.publisher.findUnique({
-            where: { id: publisherId },
-            select: { name: true, organizationId: true },
-          }),
-          this.prisma.auditLog.findFirst({
-            where: {
-              action: "PUBLISHER_TIER_CHANGED",
-              entityType: "Publisher",
-              entityId: publisherId,
-            },
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            select: { id: true },
-          }),
-          this.communications.publisherRecipients(publisherId),
-          this.communications.staffRecipients(["SUPER_ADMIN", "OPERATIONS"]),
-        ])
-      if (publisher) {
-        const transitionId = audit?.id ?? `${r.oldTier}-${r.newTier}`
-        const publisherEvent = await this.communications.record({
-          type: "PUBLISHER_TIER_CHANGED",
-          aggregateType: "Publisher",
-          aggregateId: publisherId,
-          organizationId: publisher.organizationId,
-          title: "Publisher tier changed",
-          message: `Your publisher tier changed from ${r.oldTier ?? "NEW"} to ${r.newTier}.`,
-          actionPath: "/dashboard/settings",
-          payload: { from: r.oldTier, to: r.newTier, trustScore: r.newScore },
-          dedupKey: `publisher:${publisherId}:tier-change:${transitionId}`,
-          recipientUserIds: publisherRecipients,
+    const { result: r, communicationEventIds } = await this.prisma.$transaction(
+      async (tx: any) => {
+        const result = await recomputePublisherTrustCore(tx, publisherId, {
+          sourceEvent,
         })
-        this.communications.dispatchBestEffort(publisherEvent.eventId)
-        const staffEvent = await this.communications.record({
-          type: "STAFF_PUBLISHER_TIER_CHANGED",
-          aggregateType: "Publisher",
-          aggregateId: publisherId,
-          organizationId: publisher.organizationId,
-          title: "Publisher tier changed",
-          message: `Publisher ${publisher.name ?? publisherId} changed from ${r.oldTier ?? "NEW"} to ${r.newTier}.`,
-          actionPath: "/dashboard/publishers",
-          payload: { from: r.oldTier, to: r.newTier, trustScore: r.newScore },
-          dedupKey: `staff:publisher:${publisherId}:tier-change:${transitionId}`,
-          recipientUserIds: staffRecipients,
-        })
-        this.communications.dispatchBestEffort(staffEvent.eventId)
-      }
-    }
+        const communicationEventIds: string[] = []
+        if (result?.changed && this.communications) {
+          const [publisher, audit, publisherRecipients, staffRecipients] =
+            await Promise.all([
+              tx.publisher.findUnique({
+                where: { id: publisherId },
+                select: { name: true, organizationId: true },
+              }),
+              tx.auditLog.findFirst({
+                where: {
+                  action: "PUBLISHER_TIER_CHANGED",
+                  entityType: "Publisher",
+                  entityId: publisherId,
+                },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: { id: true },
+              }),
+              this.communications.publisherRecipients(publisherId, false, tx),
+              this.communications.staffRecipients(
+                ["SUPER_ADMIN", "OPERATIONS"],
+                tx,
+              ),
+            ])
+          if (publisher) {
+            const transitionId =
+              audit?.id ?? `${result.oldTier}-${result.newTier}`
+            const publisherEvent = await this.communications.record(
+              {
+                type: "PUBLISHER_TIER_CHANGED",
+                aggregateType: "Publisher",
+                aggregateId: publisherId,
+                organizationId: publisher.organizationId,
+                title: "Publisher tier changed",
+                message: `Your publisher tier changed from ${result.oldTier ?? "NEW"} to ${result.newTier}.`,
+                actionPath: "/dashboard/settings",
+                payload: {
+                  from: result.oldTier,
+                  to: result.newTier,
+                  trustScore: result.newScore,
+                },
+                dedupKey: `publisher:${publisherId}:tier-change:${transitionId}`,
+                recipientUserIds: publisherRecipients,
+              },
+              tx,
+            )
+            communicationEventIds.push(publisherEvent.eventId)
+            const staffEvent = await this.communications.record(
+              {
+                type: "STAFF_PUBLISHER_TIER_CHANGED",
+                aggregateType: "Publisher",
+                aggregateId: publisherId,
+                organizationId: publisher.organizationId,
+                title: "Publisher tier changed",
+                message: `Publisher ${publisher.name ?? publisherId} changed from ${result.oldTier ?? "NEW"} to ${result.newTier}.`,
+                actionPath: "/dashboard/publishers",
+                payload: {
+                  from: result.oldTier,
+                  to: result.newTier,
+                  trustScore: result.newScore,
+                },
+                dedupKey: `staff:publisher:${publisherId}:tier-change:${transitionId}`,
+                recipientUserIds: staffRecipients,
+              },
+              tx,
+            )
+            communicationEventIds.push(staffEvent.eventId)
+          }
+        }
+        return { result, communicationEventIds }
+      },
+    )
+    this.communications?.dispatchManyBestEffort(communicationEventIds)
     return r
       ? {
           publisherId,
@@ -240,7 +267,6 @@ export class OrderReviewService {
     organizationId: string,
     userId: string,
   ) {
-    let communicationEventId: string | null = null
     const result = await runLockedOrderSerializableTransaction(
       this.prisma,
       orderId,
@@ -352,7 +378,7 @@ export class OrderReviewService {
               ).flat(),
             ]),
           ]
-          const event = await this.communications.record(
+          await this.communications.record(
             {
               type: "ORDER_CONTENT_APPROVED",
               aggregateType: "Order",
@@ -367,14 +393,15 @@ export class OrderReviewService {
             },
             tx,
           )
-          communicationEventId = event.eventId
         }
         return { order: fresh, assigneeId: order.assigneeId }
       },
     )
 
-    if (communicationEventId) {
-      this.communications?.dispatchBestEffort(communicationEventId)
+    if (this.communications) {
+      this.communications.dispatchByDedupKeyBestEffort(
+        `order:${orderId}:content-approved:${result.order.version}`,
+      )
     } else if (result.assigneeId) {
       await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
         userId: result.assigneeId,
@@ -405,7 +432,6 @@ export class OrderReviewService {
       )
     }
 
-    let communicationEventId: string | null = null
     const updated = await runLockedOrderSerializableTransaction(
       this.prisma,
       orderId,
@@ -548,7 +574,7 @@ export class OrderReviewService {
               ).flat(),
             ]),
           ]
-          const event = await this.communications.record(
+          await this.communications.record(
             {
               type: "ORDER_REVISION_REQUESTED",
               aggregateType: "Order",
@@ -563,13 +589,14 @@ export class OrderReviewService {
             },
             tx,
           )
-          communicationEventId = event.eventId
         }
         return fresh
       },
     )
-    if (communicationEventId) {
-      this.communications?.dispatchBestEffort(communicationEventId)
+    if (this.communications) {
+      this.communications.dispatchByDedupKeyBestEffort(
+        `order:${orderId}:revision:${updated.revisionCount}`,
+      )
     }
     return updated
   }
@@ -588,6 +615,7 @@ export class OrderReviewService {
         this.prisma,
         orderId,
         async (tx: any) => {
+          const communicationDedupKeys = new Set<string>()
           const [order, membership] = await Promise.all([
             tx.order.findFirst({ where: { id: orderId, organizationId } }),
             tx.membership.findFirst({
@@ -614,6 +642,33 @@ export class OrderReviewService {
               "Verified order has no active delivery. Contact support.",
             )
           }
+          const activeDelivery = await tx.orderDeliveryVersion.findUnique({
+            where: { id: order.activeDeliveryVersionId },
+            select: {
+              id: true,
+              orderId: true,
+              normalizedUrl: true,
+              supersededByVersion: true,
+            },
+          })
+          if (
+            !activeDelivery ||
+            activeDelivery.orderId !== order.id ||
+            activeDelivery.supersededByVersion !== null
+          ) {
+            throw new ConflictException(
+              "Active delivery changed. Refresh before confirming.",
+            )
+          }
+          const urlReuseFreshness =
+            await refreshDeliveryUrlReuseEvidenceUnderLock(tx, {
+              orderId,
+              deliveryVersionId: activeDelivery.id,
+              normalizedUrl: activeDelivery.normalizedUrl,
+              organizationId,
+              actorUserId: userId,
+              source: "CUSTOMER_CONFIRM",
+            })
           const fraudBlocked = await recordCustomerDeliveryFraudBlock(
             tx,
             this.audit,
@@ -626,7 +681,17 @@ export class OrderReviewService {
               now: new Date(),
             },
           )
-          if (fraudBlocked) return { fraudBlocked }
+          if (fraudBlocked || urlReuseFreshness.requiresReview) {
+            return {
+              fraudBlocked: fraudBlocked ?? {
+                blocked: true as const,
+                count: 1,
+              },
+              communicationDedupKeys: urlReuseFreshness.communicationDedupKey
+                ? [urlReuseFreshness.communicationDedupKey]
+                : [],
+            }
+          }
 
           const transitioned = await tx.order.updateMany({
             where: { id: orderId, version: order.version, status: "VERIFIED" },
@@ -651,7 +716,12 @@ export class OrderReviewService {
             },
           })
 
-          await this.createSettlementForOrder(tx, orderId)
+          for (const dedupKey of await this.createSettlementForOrder(
+            tx,
+            orderId,
+          )) {
+            communicationDedupKeys.add(dedupKey)
+          }
           const fresh = await tx.order.findUniqueOrThrow({
             where: { id: orderId },
           })
@@ -703,6 +773,7 @@ export class OrderReviewService {
               },
               tx,
             )
+            communicationDedupKeys.add(`order:${orderId}:delivered`)
             if (fresh.status === "COMPLETED") {
               await this.communications.record(
                 {
@@ -719,16 +790,23 @@ export class OrderReviewService {
                 },
                 tx,
               )
+              communicationDedupKeys.add(`order:${orderId}:completed`)
             }
           }
 
-          return fresh
+          return {
+            value: fresh,
+            communicationDedupKeys: [...communicationDedupKeys],
+          }
         },
+      )
+      this.communications?.dispatchManyByDedupKeyBestEffort(
+        result.communicationDedupKeys,
       )
       if ("fraudBlocked" in result) {
         throw deliveryFraudReviewRequiredForCustomer()
       }
-      return result
+      return result.value
     } catch (error) {
       if (isRetryablePrismaTransactionError(error)) {
         throw new ConflictException({
@@ -741,7 +819,7 @@ export class OrderReviewService {
     }
   }
 
-  async createSettlementForOrder(tx: any, orderId: string) {
+  async createSettlementForOrder(tx: any, orderId: string): Promise<string[]> {
     // This method is also called from delivery verification. Keep the gate at
     // the shared write boundary so an internal caller cannot bypass the
     // finance-wide maintenance/incident freeze.
@@ -757,13 +835,13 @@ export class OrderReviewService {
     const existingSettlement = await tx.settlement.findFirst({
       where: { orderId, status: { not: "CANCELLED" } },
     })
-    if (existingSettlement) return
+    if (existingSettlement) return []
 
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { website: true },
     })
-    if (!order?.amount) return
+    if (!order?.amount) return []
 
     // Phase 6 snapshot resolver. Reads the order's per-service price from
     // the snapshotted ListingService (or NULL for legacy orders) so both
@@ -941,7 +1019,14 @@ export class OrderReviewService {
           )
         }
       }
-      return
+      return [
+        `order:${orderId}:completed`,
+        ...(new Decimal(order.amount).greaterThan(
+          notificationThreshold("ADMIN_HIGH_VALUE_ORDER_THRESHOLD", 500),
+        )
+          ? [`staff:order:${orderId}:high-value-completed`]
+          : []),
+      ]
     }
 
     // Publisher-owned websites: create settlement for publisher payout
@@ -967,7 +1052,7 @@ export class OrderReviewService {
     const publisher = await tx.publisher.findUnique({
       where: { id: website.publisherId },
     })
-    if (!publisher) return
+    if (!publisher) return []
 
     const feePolicy = await resolvePlatformFeePolicy(tx)
     const { fee: platformFee, net: publisherAmount } = splitPlatformFee(
@@ -983,15 +1068,21 @@ export class OrderReviewService {
     )
     const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
 
-    const fraudFlags = await tx.deliveryFraudFlag.findMany({
-      where: { orderId, resolution: null },
-      select: { type: true },
-    })
+    const [fraudFlags, customerHistory] = await Promise.all([
+      tx.deliveryFraudFlag.findMany({
+        where: { orderId, resolution: null },
+        select: { type: true },
+      }),
+      loadSettlementCustomerHistory(tx, {
+        organizationId: order.organizationId,
+        customerId: order.customerId,
+      }),
+    ])
     const releasePolicy = this.decision.computeSettlementReleasePolicy(
       { verifyMethod: order.verifyMethod, amount: Number(order.amount) },
       { tier: publisher.tier },
       fraudFlags,
-      null,
+      customerHistory,
     )
 
     const settlement = await tx.settlement.create({
@@ -1041,6 +1132,8 @@ export class OrderReviewService {
         },
         tx,
       )
+      return [`settlement:${settlement.id}:created`]
     }
+    return []
   }
 }

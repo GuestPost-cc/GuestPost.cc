@@ -245,6 +245,13 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
   the Order lock and audits the reuse. Changed evidence, including a larger URL
   reuse count, creates a new flag and hold; legacy unclassified resolutions
   fail closed.
+- A classified URL-reuse decision is also bound to the exact current claim-set
+  fingerprint, not only the delivery version. Delivery claim writers and every
+  acceptance/settlement authorization boundary lock the Order first and then
+  the normalized URL. A database advisory lock plus MVCC-visible
+  `DeliveryUrlClaimFence` row covers rolling old writers and forces stale
+  serializable snapshots to retry. Any later claimant appends a fresh flag and
+  hold before the attempted acceptance or money transition is denied.
 - The Admin verification compatibility routes delegate to the canonical
   intervention service. Finance has read/adjudication access to the queue but
   cannot perform Operations delivery actions. Successful manual verification

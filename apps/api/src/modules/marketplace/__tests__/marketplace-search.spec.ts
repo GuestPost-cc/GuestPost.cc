@@ -1,7 +1,13 @@
 import { Prisma } from "@guestpost/database"
+import { MARKETPLACE_ALGORITHMIC_METRIC_SOURCES } from "@guestpost/shared"
 import { MarketplaceService } from "../marketplace.service"
 
-function listingRow(id: string, price: number, organicTraffic = 10_000) {
+function listingRow(
+  id: string,
+  price: number,
+  organicTraffic = 10_000,
+  trafficSource = "AHREFS_PAID_API",
+) {
   return {
     id,
     title: `Listing ${id}`,
@@ -51,7 +57,7 @@ function listingRow(id: string, price: number, organicTraffic = 10_000) {
         {
           key: "AHREFS_ORGANIC_TRAFFIC",
           provider: "AHREFS",
-          source: "PUBLISHER_MANUAL",
+          source: trafficSource,
           status: "CURRENT",
           value: new Prisma.Decimal(organicTraffic),
           measuredAt: new Date("2026-07-18T00:00:00Z"),
@@ -80,6 +86,18 @@ function listingRow(id: string, price: number, organicTraffic = 10_000) {
       },
     ],
   }
+}
+
+function expectExplicitMetricSourceAllowlist(query: {
+  sql: string
+  values: unknown[]
+}) {
+  expect(query.sql).toContain('metric."source" IN (')
+  for (const source of MARKETPLACE_ALGORITHMIC_METRIC_SOURCES) {
+    expect(query.values).toContain(source)
+  }
+  expect(query.values).not.toContain("PUBLISHER_MANUAL")
+  expect(query.values).not.toContain("FUTURE_UNREVIEWED_SOURCE")
 }
 
 describe("MarketplaceService search", () => {
@@ -203,16 +221,44 @@ describe("MarketplaceService search", () => {
     const where = prisma.marketplaceListing.findMany.mock.calls[0][0].where
     expect(where.traffic).toBeUndefined()
     expect(where.website).toEqual({
-      metricsHistory: {
-        some: expect.objectContaining({
-          key: "AHREFS_ORGANIC_TRAFFIC",
-          provider: "AHREFS",
-          status: "CURRENT",
-          value: { gte: 500, lte: 2_147_483_647 },
-          OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }],
-        }),
-      },
+      AND: [
+        {
+          metricsHistory: {
+            some: expect.objectContaining({
+              key: "AHREFS_ORGANIC_TRAFFIC",
+              provider: "AHREFS",
+              source: { in: [...MARKETPLACE_ALGORITHMIC_METRIC_SOURCES] },
+              status: "CURRENT",
+              value: { gte: 500, lte: 2_147_483_647 },
+              OR: [
+                { expiresAt: null },
+                { expiresAt: { gt: expect.any(Date) } },
+              ],
+            }),
+          },
+        },
+      ],
     })
+  })
+
+  it("filters DR through current source-aware Ahrefs metrics", async () => {
+    await service.searchListings({ minDR: 30, maxDR: 70, sortBy: "newest" })
+
+    const where = prisma.marketplaceListing.findMany.mock.calls[0][0].where
+    expect(where.domainRating).toBeUndefined()
+    expect(where.website.AND).toEqual([
+      {
+        metricsHistory: {
+          some: expect.objectContaining({
+            key: "AHREFS_DOMAIN_RATING",
+            provider: "AHREFS",
+            source: { in: [...MARKETPLACE_ALGORITHMIC_METRIC_SOURCES] },
+            status: "CURRENT",
+            value: { gte: 30, lte: 70 },
+          }),
+        },
+      },
+    ])
   })
 
   it("uses canonical traffic SQL for filtering and preserves traffic-rank order", async () => {
@@ -242,6 +288,7 @@ describe("MarketplaceService search", () => {
     expect(query.sql).toContain(
       'metric."provider" = ?::"WebsiteMetricProvider"',
     )
+    expectExplicitMetricSourceAllowlist(query)
     expect(query.sql).toContain('metric."expiresAt" > ?')
     expect(query.sql).toContain("DESC NULLS LAST")
     expect(query.sql).toContain('listing."id" ASC')
@@ -256,10 +303,40 @@ describe("MarketplaceService search", () => {
     const query = prisma.$queryRaw.mock.calls[0][0] as any
     expect(query.sql).toContain('listing."featured" DESC')
     expect(query.sql).toContain('FROM "WebsiteMetric" metric')
+    expectExplicitMetricSourceAllowlist(query)
     expect(query.sql).toContain("DESC NULLS LAST")
     expect(query.sql).toContain('listing."createdAt" DESC')
     expect(query.sql).toContain('listing."id" ASC')
     expect(query.sql).not.toContain('listing."traffic"')
+  })
+
+  it("uses source-aware Ahrefs DR for filtering and DR sorting", async () => {
+    prisma.$queryRaw.mockResolvedValue([])
+
+    await service.searchListings({ minDR: 25, maxDR: 80, sortBy: "dr" })
+
+    const query = prisma.$queryRaw.mock.calls[0][0] as any
+    expect(query.values).toContain("AHREFS_DOMAIN_RATING")
+    expectExplicitMetricSourceAllowlist(query)
+    expect(query.sql).toContain('metric."status" = ?::"WebsiteMetricStatus"')
+    expect(query.sql).toContain("DESC NULLS LAST")
+    expect(query.sql).not.toContain('listing."domainRating"')
+  })
+
+  it("shows publisher-reported traffic but excludes it from algorithmic projection", async () => {
+    prisma.marketplaceListing.findMany.mockResolvedValue([
+      listingRow("publisher-reported", 100, 75_000, "PUBLISHER_MANUAL"),
+    ])
+
+    const result = await service.searchListings({ sortBy: "newest" })
+
+    expect(result.listings[0].domainMetrics.ahrefs.organicTraffic).toEqual(
+      expect.objectContaining({
+        value: 75_000,
+        source: "PUBLISHER_MANUAL",
+      }),
+    )
+    expect(result.listings[0].traffic).toBeNull()
   })
 })
 
@@ -294,6 +371,7 @@ describe("MarketplaceService traffic-ranked recommendations", () => {
     const query = prisma.$queryRaw.mock.calls[0][0] as any
     expect(query.sql).toContain('FROM "WebsiteMetric" metric')
     expect(query.sql).toContain('metric."websiteId" = candidate."websiteId"')
+    expectExplicitMetricSourceAllowlist(query)
     expect(query.sql).toContain("DESC NULLS LAST")
     expect(query.sql).toContain('candidate."createdAt" DESC')
     expect(query.sql).toContain('candidate."id" ASC')

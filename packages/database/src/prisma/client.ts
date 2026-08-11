@@ -185,6 +185,11 @@ export type FulfillmentAssignment = Prisma.FulfillmentAssignmentModel
  */
 export type OrderDeliveryVersion = Prisma.OrderDeliveryVersionModel
 /**
+ * Model DeliveryUrlClaimFence
+ *
+ */
+export type DeliveryUrlClaimFence = Prisma.DeliveryUrlClaimFenceModel
+/**
  * Model DeliveryVerificationEvidence
  *
  */

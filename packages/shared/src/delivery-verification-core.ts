@@ -13,6 +13,12 @@ import { createHash } from "node:crypto"
 import { isDeepStrictEqual } from "node:util"
 import * as cheerio from "cheerio"
 import { recordCommunicationOutbox } from "./communication-outbox-core"
+import {
+  buildDeliveryUrlReuseCandidate,
+  type DeliveryUrlReuseCandidate,
+  deliveryUrlReuseEvidenceMatches,
+  lockDeliveryUrlClaim,
+} from "./delivery-url-claim-core"
 import { runLockedOrderSerializableTransaction } from "./order-aggregate-lock"
 import { normalizeUrl, sameDomain, urlsMatch } from "./url-normalize"
 import { defaultWorkflowConfig } from "./workflow/workflow-config"
@@ -51,6 +57,7 @@ export interface DeliveryVerifyResult {
   status?: string
   retryable?: boolean
   reason?: string
+  communicationEventIds?: string[]
 }
 
 // HTTP statuses accepted after redirect resolution.
@@ -329,7 +336,14 @@ async function evaluateFraudCandidatesUnderLock(
     }
     let reused: ReusedFraudDisposition | null = null
     for (const flag of sameType) {
-      if (!isDeepStrictEqual(flag.details ?? null, candidate.details)) continue
+      const exactEvidence =
+        candidate.type === "URL_REUSED"
+          ? deliveryUrlReuseEvidenceMatches(
+              flag.details,
+              candidate as DeliveryUrlReuseCandidate,
+            )
+          : isDeepStrictEqual(flag.details ?? null, candidate.details)
+      if (!exactEvidence) continue
       const disposition = classifiedStaffDisposition(
         flag.resolution,
         deliveryVersionId,
@@ -368,33 +382,11 @@ async function detectFraudCandidates(
   const { prisma } = deps
   const flags: FraudCandidate[] = []
 
-  // 1. Published URL reused on a different order
-  const reuse = await prisma.orderDeliveryVersion.findFirst({
-    where: { normalizedUrl: version.normalizedUrl, orderId: { not: order.id } },
-    select: { id: true, orderId: true },
-    orderBy: { id: "asc" },
-  })
-  if (reuse) {
-    // Count is part of the adjudicated evidence fingerprint. A disposition for
-    // one known reuse remains valid on retry, while an additional conflicting
-    // delivery is new evidence and must create a fresh hold.
-    const reuseCount = await prisma.orderDeliveryVersion.count({
-      where: {
-        normalizedUrl: version.normalizedUrl,
-        orderId: { not: order.id },
-      },
-    })
-    flags.push({
-      type: "URL_REUSED",
-      details: {
-        otherOrderId: reuse.orderId,
-        otherVersionId: reuse.id,
-        reuseCount,
-      },
-    })
-  }
+  // URL reuse is intentionally recomputed only inside the final Order + URL
+  // locked transition. A slow preflight read here could otherwise authorize a
+  // stale staff disposition while another order commits the same URL.
 
-  // 2. Target URL mismatch (order expected a target but it wasn't matched)
+  // 1. Target URL mismatch (order expected a target but it wasn't matched)
   if (order.targetUrl && !analysis.targetUrlMatched) {
     flags.push({
       type: "TARGET_MISMATCH",
@@ -402,7 +394,7 @@ async function detectFraudCandidates(
     })
   }
 
-  // 3. Anchor mismatch
+  // 2. Anchor mismatch
   if (order.anchorText && !analysis.anchorFound) {
     flags.push({
       type: "ANCHOR_MISMATCH",
@@ -410,7 +402,7 @@ async function detectFraudCandidates(
     })
   }
 
-  // 4. Domain mismatch — published on a different domain than the order website
+  // 3. Domain mismatch — published on a different domain than the order website
   if (
     order.website?.url &&
     !sameDomain(version.publishedUrl, order.website.url)
@@ -424,7 +416,7 @@ async function detectFraudCandidates(
     })
   }
 
-  // 5. Suspicious rapid delivery — same submitter, many submissions in 60s
+  // 4. Suspicious rapid delivery — same submitter, many submissions in 60s
   const since = new Date((deps.now ?? (() => new Date()))().getTime() - 60_000)
   const rapid = await prisma.orderDeliveryVersion.count({
     where: {
@@ -725,7 +717,6 @@ export async function runDeliveryVerification(
     version,
     analysis,
   )
-  const fraudTypes = fraudCandidates.map((flag) => flag.type)
   const baseStatus = snapshotStored
     ? checksPass
       ? "VERIFIED"
@@ -749,6 +740,7 @@ export async function runDeliveryVerification(
   let committedStatus: string
   let committedFailureReason: string | null
   let committedRequiresFraudReview: boolean
+  let committedCommunicationEventIds: string[] = []
 
   try {
     const transition = await runLockedOrderSerializableTransaction(
@@ -771,6 +763,29 @@ export async function runDeliveryVerification(
         }
         if (current.order.status !== "PUBLISHED") return "stale" as const
 
+        // URL claims are a cross-Order aggregate. Lock the normalized URL only
+        // after the canonical Order lock, then rebuild the complete claim-set
+        // fingerprint in this transaction. submitDelivery follows the same lock
+        // order, so a new claimant either commits before this decision and is
+        // reviewed, or waits until after this transaction commits.
+        await lockDeliveryUrlClaim(tx, version.normalizedUrl)
+        const currentUrlReuseCandidate = await buildDeliveryUrlReuseCandidate(
+          tx,
+          {
+            orderId: order.id,
+            normalizedUrl: version.normalizedUrl,
+          },
+        )
+        const lockedFraudCandidates: FraudCandidate[] = [
+          ...fraudCandidates.filter(
+            (candidate) => candidate.type !== "URL_REUSED",
+          ),
+          ...(currentUrlReuseCandidate ? [currentUrlReuseCandidate] : []),
+        ]
+        const lockedFraudTypes = lockedFraudCandidates.map(
+          (candidate) => candidate.type,
+        )
+
         // Evaluate immutable history only after the active delivery and signed
         // generation are revalidated under the Order lock. A classified staff
         // disposition is reusable for the exact same signal details; changed
@@ -779,7 +794,7 @@ export async function runDeliveryVerification(
         const fraudEvaluation = await evaluateFraudCandidatesUnderLock(
           tx,
           version.id,
-          fraudCandidates,
+          lockedFraudCandidates,
         )
         const currentFraudHold =
           baseStatus === "VERIFIED"
@@ -903,6 +918,7 @@ export async function runDeliveryVerification(
           }
         }
 
+        const communicationEventIds: string[] = []
         const createdFraudFlags: Array<{ id: string; type: string }> = []
         for (const flag of fraudEvaluation.candidatesToCreate) {
           // The Order lock serializes the history evaluation and this insert.
@@ -934,7 +950,7 @@ export async function runDeliveryVerification(
             },
             select: { userId: true },
           })
-          await recordCommunicationOutbox(tx, {
+          const fraudEvent = await recordCommunicationOutbox(tx, {
             type: "STAFF_FRAUD_ALERT",
             aggregateType: "Order",
             aggregateId: order.id,
@@ -951,6 +967,48 @@ export async function runDeliveryVerification(
               (membership: { userId: string }) => membership.userId,
             ),
           })
+          communicationEventIds.push(fraudEvent.eventId)
+        }
+
+        if (effectivePass) {
+          const [customerOwners, publisherMemberships] = await Promise.all([
+            tx.membership.findMany({
+              where: {
+                organizationId: order.organizationId,
+                status: "ACTIVE",
+                role: "OWNER",
+              },
+              select: { userId: true },
+            }),
+            order.website?.publisherId
+              ? tx.publisherMembership.findMany({
+                  where: { publisherId: order.website.publisherId },
+                  select: { userId: true },
+                })
+              : Promise.resolve([]),
+          ])
+          const verifiedEvent = await recordCommunicationOutbox(tx, {
+            type: "ORDER_VERIFIED",
+            aggregateType: "OrderDeliveryVersion",
+            aggregateId: version.id,
+            organizationId: order.organizationId,
+            title: "Delivery verified",
+            message: `Delivery for order ${order.id} passed verification and is ready for review.`,
+            actionPath: `/dashboard/orders/${order.id}`,
+            dedupKey: `delivery:${version.id}:verified`,
+            recipientUserIds: [
+              ...new Set<string>([
+                order.customerId,
+                ...customerOwners.map(
+                  (membership: { userId: string }) => membership.userId,
+                ),
+                ...publisherMemberships.map(
+                  (membership: { userId: string }) => membership.userId,
+                ),
+              ]),
+            ],
+          })
+          communicationEventIds.push(verifiedEvent.eventId)
         }
 
         await tx.orderEvent.create({
@@ -972,7 +1030,7 @@ export async function runDeliveryVerification(
               anchorFound: analysis.anchorFound,
               htmlHash,
               snapshotStored,
-              fraudTypes,
+              fraudTypes: lockedFraudTypes,
               reusedFraudDispositions: fraudEvaluation.reusedDispositions.map(
                 (reused) => ({
                   fraudFlagId: reused.fraudFlagId,
@@ -1002,7 +1060,7 @@ export async function runDeliveryVerification(
             anchorFound: analysis.anchorFound,
             htmlHash,
             snapshotStored,
-            fraudTypes,
+            fraudTypes: lockedFraudTypes,
             reusedFraudDispositions: fraudEvaluation.reusedDispositions.map(
               (reused) => ({
                 fraudFlagId: reused.fraudFlagId,
@@ -1019,6 +1077,7 @@ export async function runDeliveryVerification(
           status: effectiveStatus,
           failureReason: effectiveFailureReason,
           requiresFraudReview: effectiveRequiresFraudReview,
+          communicationEventIds,
         }
       },
     )
@@ -1026,6 +1085,7 @@ export async function runDeliveryVerification(
     committedStatus = transition.status
     committedFailureReason = transition.failureReason
     committedRequiresFraudReview = transition.requiresFraudReview
+    committedCommunicationEventIds = transition.communicationEventIds
   } catch (error) {
     if (
       error instanceof Error &&
@@ -1095,6 +1155,9 @@ export async function runDeliveryVerification(
   return {
     status: committedStatus,
     reason: committedFailureReason ?? undefined,
+    ...(committedCommunicationEventIds.length > 0
+      ? { communicationEventIds: committedCommunicationEventIds }
+      : {}),
   }
 }
 

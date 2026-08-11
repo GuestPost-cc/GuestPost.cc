@@ -413,6 +413,7 @@ export const ModelName = {
   SettlementApproval: 'SettlementApproval',
   FulfillmentAssignment: 'FulfillmentAssignment',
   OrderDeliveryVersion: 'OrderDeliveryVersion',
+  DeliveryUrlClaimFence: 'DeliveryUrlClaimFence',
   DeliveryVerificationEvidence: 'DeliveryVerificationEvidence',
   DeliverySnapshot: 'DeliverySnapshot',
   DeliveryFraudFlag: 'DeliveryFraudFlag',
@@ -492,7 +493,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "billingProfile" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "communicationEvent" | "communicationDelivery" | "financialDocument" | "notificationPreference" | "emailSuppression" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "billingProfile" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryUrlClaimFence" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "communicationEvent" | "communicationDelivery" | "financialDocument" | "notificationPreference" | "emailSuppression" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2639,6 +2640,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.OrderDeliveryVersionCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.OrderDeliveryVersionCountAggregateOutputType> | number
+        }
+      }
+    }
+    DeliveryUrlClaimFence: {
+      payload: Prisma.$DeliveryUrlClaimFencePayload<ExtArgs>
+      fields: Prisma.DeliveryUrlClaimFenceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DeliveryUrlClaimFenceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DeliveryUrlClaimFenceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload>
+        }
+        findFirst: {
+          args: Prisma.DeliveryUrlClaimFenceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DeliveryUrlClaimFenceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload>
+        }
+        findMany: {
+          args: Prisma.DeliveryUrlClaimFenceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload>[]
+        }
+        create: {
+          args: Prisma.DeliveryUrlClaimFenceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload>
+        }
+        createMany: {
+          args: Prisma.DeliveryUrlClaimFenceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DeliveryUrlClaimFenceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload>[]
+        }
+        delete: {
+          args: Prisma.DeliveryUrlClaimFenceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload>
+        }
+        update: {
+          args: Prisma.DeliveryUrlClaimFenceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload>
+        }
+        deleteMany: {
+          args: Prisma.DeliveryUrlClaimFenceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DeliveryUrlClaimFenceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DeliveryUrlClaimFenceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload>[]
+        }
+        upsert: {
+          args: Prisma.DeliveryUrlClaimFenceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryUrlClaimFencePayload>
+        }
+        aggregate: {
+          args: Prisma.DeliveryUrlClaimFenceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDeliveryUrlClaimFence>
+        }
+        groupBy: {
+          args: Prisma.DeliveryUrlClaimFenceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryUrlClaimFenceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DeliveryUrlClaimFenceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryUrlClaimFenceCountAggregateOutputType> | number
         }
       }
     }
@@ -7959,6 +8034,14 @@ export const OrderDeliveryVersionScalarFieldEnum = {
 export type OrderDeliveryVersionScalarFieldEnum = (typeof OrderDeliveryVersionScalarFieldEnum)[keyof typeof OrderDeliveryVersionScalarFieldEnum]
 
 
+export const DeliveryUrlClaimFenceScalarFieldEnum = {
+  normalizedUrl: 'normalizedUrl',
+  version: 'version'
+} as const
+
+export type DeliveryUrlClaimFenceScalarFieldEnum = (typeof DeliveryUrlClaimFenceScalarFieldEnum)[keyof typeof DeliveryUrlClaimFenceScalarFieldEnum]
+
+
 export const DeliveryVerificationEvidenceScalarFieldEnum = {
   id: 'id',
   deliveryVersionId: 'deliveryVersionId',
@@ -8587,6 +8670,7 @@ export const CommunicationDeliveryScalarFieldEnum = {
   attempts: 'attempts',
   availableAt: 'availableAt',
   lockedAt: 'lockedAt',
+  dispatchStartedAt: 'dispatchStartedAt',
   provider: 'provider',
   providerMessageId: 'providerMessageId',
   lastError: 'lastError',
@@ -9795,6 +9879,20 @@ export type ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> = Fiel
 
 
 /**
+ * Reference to a field of type 'BigInt'
+ */
+export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
+
+
+
+/**
+ * Reference to a field of type 'BigInt[]'
+ */
+export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
+
+
+
+/**
  * Reference to a field of type 'DeliveryFraudResolutionKind'
  */
 export type EnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryFraudResolutionKind'>
@@ -9889,20 +9987,6 @@ export type EnumPayoutExecutionClaimKindFieldRefInput<$PrismaModel> = FieldRefIn
  * Reference to a field of type 'PayoutExecutionClaimKind[]'
  */
 export type ListEnumPayoutExecutionClaimKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PayoutExecutionClaimKind[]'>
-
-
-
-/**
- * Reference to a field of type 'BigInt'
- */
-export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
-
-
-
-/**
- * Reference to a field of type 'BigInt[]'
- */
-export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
 
 
 
@@ -10562,6 +10646,7 @@ export type GlobalOmitConfig = {
   settlementApproval?: Prisma.SettlementApprovalOmit
   fulfillmentAssignment?: Prisma.FulfillmentAssignmentOmit
   orderDeliveryVersion?: Prisma.OrderDeliveryVersionOmit
+  deliveryUrlClaimFence?: Prisma.DeliveryUrlClaimFenceOmit
   deliveryVerificationEvidence?: Prisma.DeliveryVerificationEvidenceOmit
   deliverySnapshot?: Prisma.DeliverySnapshotOmit
   deliveryFraudFlag?: Prisma.DeliveryFraudFlagOmit

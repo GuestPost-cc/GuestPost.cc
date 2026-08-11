@@ -17,11 +17,14 @@ import { orderEventMetadata } from "./audit/order-event-metadata"
 import { evaluateLockedSettlementEligibility } from "./settlement-gating"
 import { runSettlementSerializableTransaction } from "./settlement-transaction"
 import { WorkflowDecisionService } from "./workflow/decision-service"
+import { loadSettlementCustomerHistory } from "./workflow/settlement-risk"
 
 export interface RunSettlementAutoReleaseOptions {
   batchSize?: number
   now?: Date
   onError?: (err: unknown, settlementId: string) => void
+  /** Invoked after commit for durable communication rows created by gating. */
+  onCommunicationEvents?: (eventIds: string[]) => void | Promise<void>
   /**
    * Optional hook invoked after a successful per-row release transaction.
    * Used for fire-and-forget side effects (e.g. enqueuing a publisher
@@ -39,6 +42,7 @@ export interface SettlementAutoReleaseResult {
   released: number
   skipped: number
   freshnessBlocked: number
+  riskBlocked: number
   durationMs: number
 }
 
@@ -169,6 +173,7 @@ export async function runSettlementAutoRelease(
   let released = 0
   let skipped = 0
   let freshnessBlocked = 0
+  let riskBlocked = 0
 
   for (const settlement of eligible) {
     try {
@@ -181,7 +186,14 @@ export async function runSettlementAutoRelease(
             tx,
             settlement.orderId,
           )
-          if (!eligibility.eligible) return false
+          if (!eligibility.eligible) {
+            return {
+              kind: "eligibility_blocked" as const,
+              communicationEventIds: eligibility.urlReuseCommunicationEventId
+                ? [eligibility.urlReuseCommunicationEventId]
+                : [],
+            }
+          }
 
           await tx.$queryRaw`SELECT "id" FROM "Settlement" WHERE "id" = ${settlement.id} FOR UPDATE`
           const fresh = await tx.settlement.findUnique({
@@ -192,6 +204,42 @@ export async function runSettlementAutoRelease(
             fresh.releasePolicy !== "AUTO"
           )
             return false
+
+          // releasePolicy is an immutable creation-time snapshot. Re-run the
+          // dynamic risk evidence under the same locked transaction so a
+          // later chargeback or publisher-tier downgrade cannot ride an old
+          // AUTO classification into a money movement. The row stays
+          // CUSTOMER_APPROVED for explicit Finance review.
+          const currentOrder = await tx.order.findUnique({
+            where: { id: settlement.orderId },
+            select: {
+              organizationId: true,
+              customerId: true,
+              verifyMethod: true,
+              amount: true,
+            },
+          })
+          if (!currentOrder) return "risk_blocked" as const
+          const [publisher, customerHistory] = await Promise.all([
+            tx.publisher.findUnique({
+              where: { id: settlement.publisherId },
+              select: { tier: true },
+            }),
+            loadSettlementCustomerHistory(tx, {
+              organizationId: currentOrder.organizationId,
+              customerId: currentOrder.customerId,
+            }),
+          ])
+          const currentRiskPolicy = decision.computeSettlementReleasePolicy(
+            {
+              verifyMethod: currentOrder.verifyMethod,
+              amount: Number(currentOrder.amount),
+            },
+            publisher,
+            [],
+            customerHistory,
+          )
+          if (currentRiskPolicy !== "AUTO") return "risk_blocked" as const
 
           const releaseAt = opts.now ?? new Date()
           const latestEvidence =
@@ -405,7 +453,17 @@ export async function runSettlementAutoRelease(
         },
       )
 
-      if (committed === true) {
+      if (
+        typeof committed === "object" &&
+        committed?.kind === "eligibility_blocked"
+      ) {
+        try {
+          await opts.onCommunicationEvents?.(committed.communicationEventIds)
+        } catch {
+          // The durable outbox recovery sweep remains authoritative.
+        }
+        skipped++
+      } else if (committed === true) {
         released++
         try {
           opts.onRelease?.({
@@ -416,6 +474,7 @@ export async function runSettlementAutoRelease(
         } catch {}
       } else {
         if (committed === "freshness_blocked") freshnessBlocked++
+        if (committed === "risk_blocked") riskBlocked++
         skipped++
       }
     } catch (err) {
@@ -431,6 +490,7 @@ export async function runSettlementAutoRelease(
     released,
     skipped,
     freshnessBlocked,
+    riskBlocked,
     durationMs: Date.now() - startedAt,
   }
 }

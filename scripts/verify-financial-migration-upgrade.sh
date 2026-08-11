@@ -240,6 +240,12 @@ for migration_file in "${migration_root}"/*/migration.sql; do
         echo "Legacy withdrawal ${legacy_case} rejection passed"
       done
     fi
+    if [[ "${migration_name}" == "20260811132000_refund_financial_audience_repair" ]]; then
+      echo "Loading populated legacy refund-audience fixture"
+      run_rehearsal_file \
+        scripts/fixtures/pre-refund-audience-repair.sql \
+        >/dev/null
+    fi
     migration_started_at="$(date +%s)"
     run_rehearsal_file "${migration_file}" >/dev/null
     migration_finished_at="$(date +%s)"
@@ -253,6 +259,16 @@ for migration_file in "${migration_root}"/*/migration.sql; do
         scripts/fixtures/pre-aggregate-hardening-missing-wallet-history-cleanup.sql \
         >/dev/null
       echo "PENDING invitee personal-wallet non-attribution passed"
+    fi
+    if [[ "${migration_name}" == "20260811132000_refund_financial_audience_repair" ]]; then
+      run_rehearsal_file \
+        scripts/fixtures/post-refund-audience-repair-assertions.sql \
+        >/dev/null
+      run_rehearsal_file "${migration_file}" >/dev/null
+      run_rehearsal_file \
+        scripts/fixtures/post-refund-audience-repair-assertions.sql \
+        >/dev/null
+      echo "Refund financial-audience populated repair and idempotent rerun passed"
     fi
   fi
 done

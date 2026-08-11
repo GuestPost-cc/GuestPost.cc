@@ -27,6 +27,7 @@ import {
   fulfillmentBadgeClass,
   fulfillmentLabel,
   listingImage,
+  metricSourceSummary,
   serviceShortLabel,
   startingPrice,
 } from "./marketplace-ui"
@@ -57,6 +58,7 @@ export function MarketplaceListingCard({
   const price = matchingService?.price ?? startingPrice(listing)
   const categories =
     listing.categories ?? (listing.category ? [listing.category] : [])
+  const organicTraffic = listing.domainMetrics?.ahrefs.organicTraffic
 
   return (
     <Link
@@ -161,16 +163,22 @@ export function MarketplaceListingCard({
           </div>
           <div className="px-3">
             <dt className="text-[11px] text-muted-foreground">
-              Ahrefs traffic
+              Reported Ahrefs traffic
             </dt>
             <dd className="mt-0.5 inline-flex items-center gap-1 font-semibold">
               <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-              {listing.domainMetrics?.ahrefs.organicTraffic?.value != null
-                ? formatCompactNumber(
-                    listing.domainMetrics.ahrefs.organicTraffic.value,
-                  )
+              {organicTraffic?.value != null
+                ? formatCompactNumber(organicTraffic.value)
                 : "—"}
             </dd>
+            {organicTraffic && (
+              <p
+                className="mt-1 text-[10px] leading-4 text-muted-foreground"
+                title={metricSourceSummary(organicTraffic)}
+              >
+                {metricSourceSummary(organicTraffic)}
+              </p>
+            )}
           </div>
           <div className="px-3">
             <dt className="text-[11px] text-muted-foreground">Fastest</dt>

@@ -14,6 +14,10 @@ export const NOTIFICATION_CATEGORIES = [
 ] as const
 
 export const NOTIFICATION_CHANNELS = ["IN_APP", "EMAIL"] as const
+export const ACTOR_RECIPIENT_POLICIES = [
+  "EXCLUDE",
+  "INCLUDE_IF_LISTED",
+] as const
 export const NOTIFICATION_SEVERITIES = [
   "INFO",
   "SUCCESS",
@@ -23,6 +27,7 @@ export const NOTIFICATION_SEVERITIES = [
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number]
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number]
+export type ActorRecipientPolicy = (typeof ACTOR_RECIPIENT_POLICIES)[number]
 export type NotificationSeverity = (typeof NOTIFICATION_SEVERITIES)[number]
 
 export const COMMUNICATION_EVENT_TYPES = [
@@ -91,6 +96,10 @@ export interface CommunicationEventPolicy {
   // Required channels ignore a user's opt-out. Keep this list deliberately
   // narrow: security, money receipts, deadlines, and staff risk controls.
   requiredChannels?: readonly NotificationChannel[]
+  // Actors are excluded from activity broadcasts by default. A receipt can
+  // retain an actor only when an authorized resolver independently listed the
+  // same user in recipientUserIds; this never adds a recipient.
+  actorRecipientPolicy?: ActorRecipientPolicy
 }
 
 const both = ["IN_APP", "EMAIL"] as const
@@ -158,6 +167,7 @@ export const COMMUNICATION_EVENT_POLICIES: Record<
     severity: "SUCCESS",
     defaultChannels: both,
     requiredChannels: both,
+    actorRecipientPolicy: "INCLUDE_IF_LISTED",
   },
   ORDER_SUBMITTED: {
     category: "ORDERS",
@@ -220,6 +230,7 @@ export const COMMUNICATION_EVENT_POLICIES: Record<
     severity: "WARNING",
     defaultChannels: both,
     requiredChannels: both,
+    actorRecipientPolicy: "INCLUDE_IF_LISTED",
   },
   ORDER_CANCELLATION_REQUESTED: {
     category: "ORDERS",

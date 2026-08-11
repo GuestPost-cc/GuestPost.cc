@@ -58,6 +58,10 @@ export type PayoutCompletionInput =
   | WebhookPayoutCompletionInput
   | ManualPayoutCompletionInput
 
+export interface PayoutFinalizationHooks {
+  afterTransition(tx: any, result: PayoutFinalizationResult): Promise<void>
+}
+
 export type PayoutFinalizationConflictCode =
   | "EXECUTION_NOT_FOUND"
   | "WITHDRAWAL_NOT_FOUND"
@@ -1126,11 +1130,16 @@ async function auditUniqueCollision(
 export async function finalizePayoutExecution(
   prisma: AnyPrisma,
   input: PayoutCompletionInput,
+  hooks?: PayoutFinalizationHooks,
 ): Promise<PayoutFinalizationResult> {
   for (let attempt = 1; attempt <= SERIALIZABLE_ATTEMPTS; attempt += 1) {
     try {
       return await prisma.$transaction(
-        (tx: AnyTx) => finalizeInTransaction(tx, input),
+        async (tx: AnyTx) => {
+          const result = await finalizeInTransaction(tx, input)
+          await hooks?.afterTransition(tx, result)
+          return result
+        },
         { isolationLevel: "Serializable" },
       )
     } catch (error) {

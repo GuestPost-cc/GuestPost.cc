@@ -319,7 +319,12 @@ describe("runDeliveryVerification", () => {
         findUnique: jest.fn().mockResolvedValue({ ...version }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findFirst: jest.fn().mockResolvedValue(null),
-        count: jest.fn().mockResolvedValue(1),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest
+          .fn()
+          .mockImplementation(({ where }: any) =>
+            Promise.resolve(where?.normalizedUrl ? 0 : 1),
+          ),
       },
       order: {
         findUnique: jest.fn().mockResolvedValue({ ...order }),
@@ -350,10 +355,17 @@ describe("runDeliveryVerification", () => {
         upsert: jest.fn().mockResolvedValue({}),
       },
       communicationEvent: {
-        upsert: jest.fn().mockResolvedValue({ id: "communication-1" }),
+        upsert: jest.fn().mockImplementation(({ create }: any) =>
+          Promise.resolve({
+            id: "communication-1",
+            ...create,
+            payload: create.payload ?? null,
+          }),
+        ),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       communicationDelivery: {
+        count: jest.fn().mockResolvedValue(1),
         upsert: jest
           .fn()
           .mockResolvedValue({ id: "delivery-email-1", status: "PENDING" }),
@@ -372,6 +384,9 @@ describe("runDeliveryVerification", () => {
       },
       publisherMembership: {
         findMany: jest.fn().mockResolvedValue([{ userId: "pub-user" }]),
+      },
+      membership: {
+        findMany: jest.fn().mockResolvedValue([{ userId: "cust-owner" }]),
       },
       staffMembership: {
         findMany: jest.fn().mockResolvedValue([{ userId: "staff1" }]),
@@ -402,6 +417,15 @@ describe("runDeliveryVerification", () => {
       "v1",
     )
     expect(res.status).toBe("VERIFIED")
+    expect(res.communicationEventIds).toEqual(["communication-1"])
+    expect(prisma.communicationEvent.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          type: "ORDER_VERIFIED",
+          aggregateId: "v1",
+        }),
+      }),
+    )
     expect(putObject).toHaveBeenCalledWith(
       expect.stringMatching(
         /^deliveries\/v1\/verification-0-[a-f0-9]{64}\.html$/,
@@ -500,10 +524,12 @@ describe("runDeliveryVerification", () => {
   })
 
   it("flags URL_REUSED when normalized URL exists on another order", async () => {
-    prisma.orderDeliveryVersion.findFirst.mockResolvedValue({
-      id: "vX",
-      orderId: "OTHER",
-    })
+    prisma.orderDeliveryVersion.findMany.mockResolvedValue([
+      { id: "vX", orderId: "OTHER" },
+    ])
+    prisma.orderDeliveryVersion.count.mockImplementation(({ where }: any) =>
+      Promise.resolve(where?.normalizedUrl ? 1 : 1),
+    )
     const result = await runDeliveryVerification(
       { prisma, fetchUrl: fetcher(goodHtml), putObject },
       "v1",
@@ -526,10 +552,12 @@ describe("runDeliveryVerification", () => {
   })
 
   it("honors a classified disposition when the exact fraud evidence recurs", async () => {
-    prisma.orderDeliveryVersion.findFirst.mockResolvedValue({
-      id: "vX",
-      orderId: "OTHER",
-    })
+    prisma.orderDeliveryVersion.findMany.mockResolvedValue([
+      { id: "vX", orderId: "OTHER" },
+    ])
+    prisma.orderDeliveryVersion.count.mockImplementation(({ where }: any) =>
+      Promise.resolve(where?.normalizedUrl ? 1 : 1),
+    )
     prisma.deliveryFraudFlag.findMany.mockResolvedValue([
       {
         id: "flag-resolved",
@@ -582,10 +610,10 @@ describe("runDeliveryVerification", () => {
   })
 
   it("creates a new hold when reused-URL evidence changes after adjudication", async () => {
-    prisma.orderDeliveryVersion.findFirst.mockResolvedValue({
-      id: "vX",
-      orderId: "OTHER",
-    })
+    prisma.orderDeliveryVersion.findMany.mockResolvedValue([
+      { id: "vX", orderId: "OTHER" },
+      { id: "vY", orderId: "ANOTHER" },
+    ])
     prisma.orderDeliveryVersion.count.mockImplementation(({ where }: any) =>
       Promise.resolve(where?.normalizedUrl ? 2 : 0),
     )
@@ -632,10 +660,12 @@ describe("runDeliveryVerification", () => {
   })
 
   it("does not trust legacy unclassified fraud resolutions on retry", async () => {
-    prisma.orderDeliveryVersion.findFirst.mockResolvedValue({
-      id: "vX",
-      orderId: "OTHER",
-    })
+    prisma.orderDeliveryVersion.findMany.mockResolvedValue([
+      { id: "vX", orderId: "OTHER" },
+    ])
+    prisma.orderDeliveryVersion.count.mockImplementation(({ where }: any) =>
+      Promise.resolve(where?.normalizedUrl ? 1 : 1),
+    )
     prisma.deliveryFraudFlag.findMany.mockResolvedValue([
       {
         id: "flag-legacy",

@@ -4,8 +4,11 @@
 
 `.github/workflows/ci.yml` is the single required CI workflow. It runs for
 pull requests targeting `main`, pushes to `main`, and manual dispatches.
-Render services retain `autoDeployTrigger: checksPass`, so a push is deployed
-only after this workflow succeeds.
+Every Blueprint-managed Render service uses `autoDeployTrigger: off`. A green
+workflow proves the reviewed commit passed the repository gate; it does not
+authorize or start a deployment. Operators promote one exact commit manually
+only after its migration, runtime-role, configuration, drain, and staging
+canaries are complete.
 
 The `CI / build-and-test` check performs:
 
@@ -66,11 +69,12 @@ gate.
 ## Deployment boundary
 
 GitHub Actions validates code but does not hold staging or production
-credentials and does not deploy directly. Render watches `main` and deploys the
-commit after GitHub checks pass. While Render staging is on the free plan,
-schema-changing releases still require `prisma migrate deploy` against Neon
-before the API or worker starts using the new schema. Move that command to a
-Render pre-deploy step when the paid plan is enabled.
+credentials and does not deploy directly. Render auto-deploy is disabled for
+all Blueprint services. A schema-changing release requires an explicitly
+coordinated manual promotion after `prisma migrate deploy` has completed
+against the intended Neon database and every release-specific operational gate
+has passed. Move migration deployment into a reviewed Render pre-deploy step
+when the paid plan is enabled, but keep schema-before-code ordering explicit.
 
 ## Local verification
 

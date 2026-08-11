@@ -85,6 +85,7 @@ enum CommunicationDeliveryStatus {
   PROCESSING
   SENT
   FAILED
+  DELIVERY_UNCERTAIN
   SUPPRESSED
   BOUNCED
   COMPLAINED
@@ -1441,6 +1442,14 @@ model OrderDeliveryVersion {
   @@index([normalizedUrl])
 }
 
+// MVCC-visible companion to the normalized-URL advisory lock. Database
+// triggers increment it for every delivery-version claim mutation; acceptance
+// and settlement readers lock it so a stale SERIALIZABLE snapshot must retry.
+model DeliveryUrlClaimFence {
+  normalizedUrl String @id
+  version       BigInt @default(0)
+}
+
 // Immutable verification evidence — survives disputes + revisions forever.
 model DeliveryVerificationEvidence {
   id                 String   @id @default(cuid())
@@ -2458,6 +2467,7 @@ model CommunicationDelivery {
   attempts          Int                         @default(0)
   availableAt       DateTime                    @default(now())
   lockedAt          DateTime?
+  dispatchStartedAt DateTime?
   provider          String?                     @db.VarChar(32)
   providerMessageId String?                     @db.VarChar(191)
   lastError         String?                     @db.VarChar(100)

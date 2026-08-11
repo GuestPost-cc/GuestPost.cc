@@ -7,6 +7,7 @@ import {
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import * as Sentry from "@sentry/node"
+import { dispatchCommunicationEventsBestEffort } from "../lib/communication-outbox-dispatch"
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
@@ -71,6 +72,7 @@ export function createSettlementReleaseWorker() {
       const result = await runSettlementAutoRelease(prisma, {
         batchSize,
         onError,
+        onCommunicationEvents: dispatchCommunicationEventsBestEffort,
         onRelease: (s) => {
           enqueueTrustRecompute(
             s.publisherId,
@@ -86,6 +88,7 @@ export function createSettlementReleaseWorker() {
         released: result.released,
         skipped: result.skipped,
         freshness_blocked: result.freshnessBlocked,
+        risk_blocked: result.riskBlocked,
         duration_ms: result.durationMs,
       })
 
@@ -101,6 +104,26 @@ export function createSettlementReleaseWorker() {
             },
             extra: {
               freshness_blocked: result.freshnessBlocked,
+              scanned: result.scanned,
+              released: result.released,
+              batch_size: batchSize,
+            },
+          },
+        )
+      }
+
+      if (result.riskBlocked > 0) {
+        Sentry.captureMessage(
+          "Settlement auto-release blocked by current risk classification",
+          {
+            level: "warning",
+            tags: {
+              queue: "settlement",
+              job: job.name,
+              sweepRunId: job.id ?? "unknown",
+            },
+            extra: {
+              risk_blocked: result.riskBlocked,
               scanned: result.scanned,
               released: result.released,
               batch_size: batchSize,

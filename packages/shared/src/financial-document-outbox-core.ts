@@ -24,6 +24,7 @@ export function normalizeFinancialMoney(value: unknown): string {
 
 function recipientParty(
   organization: {
+    id: string
     name: string
     billingProfile?: {
       legalName: string
@@ -59,6 +60,28 @@ function recipientParty(
   )
 }
 
+function assertFinancialAudience(
+  recipientUserIds: readonly string[],
+  authorizedUserIds: Iterable<string>,
+  requiredPrincipalUserId: string,
+): void {
+  const recipients = new Set(recipientUserIds)
+  if (!recipients.has(requiredPrincipalUserId)) {
+    throw new Error("Financial document principal recipient is missing")
+  }
+  const authorized = new Set(authorizedUserIds)
+  const unauthorized = [...recipients].filter(
+    (userId) => !authorized.has(userId),
+  )
+  if (unauthorized.length > 0) {
+    // Do not include user IDs in the error: the transaction must fail closed
+    // without copying cross-tenant identifiers into logs or provider errors.
+    throw new Error(
+      "Financial document recipients are not authorized for source",
+    )
+  }
+}
+
 /**
  * Issues an immutable financial-document snapshot inside the caller's domain
  * transaction. Keeping this in shared outbox code ensures API and worker
@@ -81,25 +104,78 @@ export async function issueFinancialDocumentForCommunication(
   let relatedDocumentId: string | null = null
   let relatedDocumentNumber: string | null = null
   const notes: string[] = []
+  let canonicalOrganizationId: string | null
 
   if (input.type === "BILLING_DEPOSIT_SUCCEEDED") {
     const attempt = await db.depositAttempt.findUnique({
       where: { id: input.aggregateId },
       select: {
+        organizationId: true,
+        createdByUserId: true,
         amount: true,
         walletCredit: true,
         currency: true,
         publicReference: true,
         provider: true,
         organization: {
-          select: { name: true, billingProfile: true },
+          select: {
+            id: true,
+            name: true,
+            billingProfile: true,
+            memberships: {
+              where: { status: "ACTIVE", role: "OWNER" },
+              select: { userId: true },
+            },
+          },
         },
       },
     })
     if (!attempt) throw new Error("Deposit receipt source was not found")
+    if (input.aggregateType !== "DepositAttempt") {
+      throw new Error("Financial document aggregate type does not match source")
+    }
+    canonicalOrganizationId = attempt.organizationId
+    if (
+      canonicalOrganizationId !== null &&
+      attempt.organization?.id !== canonicalOrganizationId
+    ) {
+      throw new Error("Deposit receipt organization source is inconsistent")
+    }
+    assertFinancialAudience(
+      input.recipientUserIds,
+      [
+        attempt.createdByUserId,
+        ...(attempt.organization?.memberships ?? []).map(
+          (membership: { userId: string }) => membership.userId,
+        ),
+      ],
+      attempt.createdByUserId,
+    )
     currency = attempt.currency.toUpperCase()
     subtotal = normalizeFinancialMoney(attempt.amount)
-    recipient = recipientParty(attempt.organization, "GuestPost.cc customer")
+    if (attempt.organization) {
+      recipient = recipientParty(attempt.organization, "GuestPost.cc customer")
+    } else {
+      const creator = await db.user.findUnique({
+        where: { id: attempt.createdByUserId },
+        select: { name: true, email: true },
+      })
+      const parsedEmail =
+        financialDocumentPartySchema.shape.billingEmail.safeParse(
+          creator?.email ?? null,
+        )
+      const billingEmail = parsedEmail.success ? parsedEmail.data : null
+      const namedRecipient = financialDocumentPartySchema.safeParse({
+        legalName: creator?.name?.trim(),
+        billingEmail,
+      })
+      recipient = namedRecipient.success
+        ? namedRecipient.data
+        : financialDocumentPartySchema.parse({
+            legalName: "GuestPost.cc customer",
+            billingEmail,
+          })
+    }
     lineItems = [
       {
         description: "GuestPost.cc wallet funding",
@@ -121,17 +197,40 @@ export async function issueFinancialDocumentForCommunication(
       where: { id: input.aggregateId },
       select: {
         id: true,
+        customerId: true,
         type: true,
         amount: true,
         currency: true,
         organization: {
-          select: { name: true, billingProfile: true },
+          select: {
+            id: true,
+            name: true,
+            billingProfile: true,
+            memberships: {
+              where: { status: "ACTIVE", role: "OWNER" },
+              select: { userId: true },
+            },
+          },
         },
       },
     })
     if (!order?.amount) {
       throw new Error("Invoice source order or amount was not found")
     }
+    if (input.aggregateType !== "Order") {
+      throw new Error("Financial document aggregate type does not match source")
+    }
+    canonicalOrganizationId = order.organization.id
+    assertFinancialAudience(
+      input.recipientUserIds,
+      [
+        order.customerId,
+        ...order.organization.memberships.map(
+          (membership: { userId: string }) => membership.userId,
+        ),
+      ],
+      order.customerId,
+    )
     currency = order.currency.toUpperCase()
     subtotal = normalizeFinancialMoney(order.amount)
     recipient = recipientParty(order.organization, "GuestPost.cc customer")
@@ -158,6 +257,61 @@ export async function issueFinancialDocumentForCommunication(
     }
 
     if (refunded) {
+      const payload =
+        typeof input.payload === "object" &&
+        input.payload !== null &&
+        !Array.isArray(input.payload)
+          ? (input.payload as Record<string, unknown>)
+          : null
+      const refundTransactionId =
+        typeof payload?.refundTransactionId === "string" &&
+        payload.refundTransactionId.trim().length > 0 &&
+        payload.refundTransactionId.length <= 191
+          ? payload.refundTransactionId
+          : null
+      if (!refundTransactionId) {
+        throw new Error("Credit note is missing refund ledger evidence")
+      }
+      const refund = await db.transaction.findUnique({
+        where: { id: refundTransactionId },
+        select: {
+          id: true,
+          type: true,
+          orderId: true,
+          amount: true,
+          currency: true,
+          wallet: {
+            select: { organizationId: true, currency: true },
+          },
+        },
+      })
+      const refundEvent = await db.orderEvent.findFirst({
+        where: {
+          orderId: order.id,
+          eventType: "REFUND_ISSUED",
+          metadata: {
+            path: ["refundTransactionId"],
+            equals: refundTransactionId,
+          },
+        },
+        select: { id: true },
+      })
+      if (
+        refund?.type !== "REFUND" ||
+        refund.orderId !== order.id ||
+        normalizeFinancialMoney(refund.amount) !== subtotal ||
+        refund.currency.toUpperCase() !== currency ||
+        refund.wallet.organizationId !== canonicalOrganizationId ||
+        refund.wallet.currency.toUpperCase() !== currency ||
+        !refundEvent ||
+        normalizeFinancialMoney(payload?.amount) !== subtotal ||
+        String(payload?.currency ?? "").toUpperCase() !== currency
+      ) {
+        throw new Error(
+          "Credit note refund ledger evidence does not match order",
+        )
+      }
+      payment.reference = `Refund ${refund.id}`
       const original = await db.financialDocument.findFirst({
         where: {
           kind: "PAID_INVOICE",
@@ -179,6 +333,10 @@ export async function issueFinancialDocumentForCommunication(
     }
   }
 
+  if ((input.organizationId ?? null) !== canonicalOrganizationId) {
+    throw new Error("Financial document organization does not match source")
+  }
+
   const taxAmount = "0.00"
   const snapshot = financialDocumentSnapshotSchema.parse({
     schemaVersion: 1,
@@ -196,29 +354,69 @@ export async function issueFinancialDocumentForCommunication(
     notes,
   })
   const dedupKey = `financial-document:${input.dedupKey}`
-  const existing = await db.financialDocument.findUnique({
+  // A read-then-create sequence is not safe when two domain transactions
+  // record the same event concurrently. Target only dedupKey here: swallowing
+  // an unrelated unique violation (such as a second document for the same
+  // kind/aggregate) would hide an accounting invariant conflict.
+  const proposedDocumentId = `fd_${globalThis.crypto.randomUUID()}`
+  await db.$executeRaw`
+    INSERT INTO "FinancialDocument" (
+      "id", "kind", "numberPrefix", "aggregateType", "aggregateId",
+      "organizationId", "relatedDocumentId", "currency", "subtotal",
+      "taxAmount", "total", "issuedAt", "snapshot", "dedupKey"
+    ) VALUES (
+      ${proposedDocumentId}, ${kind}::"FinancialDocumentKind",
+      ${issuer.numberPrefix}, ${input.aggregateType}, ${input.aggregateId},
+      ${canonicalOrganizationId}, ${relatedDocumentId}, ${currency},
+      ${subtotal}, ${taxAmount}, ${subtotal}, ${issuedAt},
+      ${JSON.stringify(snapshot)}::jsonb, ${dedupKey}
+    )
+    ON CONFLICT ("dedupKey") DO NOTHING
+  `
+  const document = await db.financialDocument.findUnique({
     where: { dedupKey },
-    select: { id: true },
-  })
-  if (existing) return existing.id
-
-  const document = await db.financialDocument.create({
-    data: {
-      kind,
-      numberPrefix: issuer.numberPrefix,
-      aggregateType: input.aggregateType,
-      aggregateId: input.aggregateId,
-      organizationId: input.organizationId ?? null,
-      relatedDocumentId,
-      currency,
-      subtotal,
-      taxAmount,
-      total: subtotal,
-      issuedAt,
-      snapshot,
-      dedupKey,
+    select: {
+      id: true,
+      kind: true,
+      aggregateType: true,
+      aggregateId: true,
+      organizationId: true,
+      currency: true,
+      subtotal: true,
+      taxAmount: true,
+      total: true,
+      relatedDocumentId: true,
+      snapshot: true,
     },
-    select: { id: true },
   })
+  if (!document) {
+    throw new Error("Financial document deduplication did not return a winner")
+  }
+  if (
+    document.kind !== kind ||
+    document.aggregateType !== input.aggregateType ||
+    document.aggregateId !== input.aggregateId ||
+    document.organizationId !== canonicalOrganizationId ||
+    document.relatedDocumentId !== relatedDocumentId ||
+    document.currency !== currency ||
+    normalizeFinancialMoney(document.subtotal) !== subtotal ||
+    normalizeFinancialMoney(document.taxAmount) !== taxAmount ||
+    normalizeFinancialMoney(document.total) !== subtotal
+  ) {
+    throw new Error(
+      "Financial document deduplication key conflicts with immutable inputs",
+    )
+  }
+  const winningSnapshot = financialDocumentSnapshotSchema.safeParse(
+    document.snapshot,
+  )
+  if (
+    !winningSnapshot.success ||
+    winningSnapshot.data.payment.reference !== payment.reference
+  ) {
+    throw new Error(
+      "Financial document deduplication key conflicts with immutable inputs",
+    )
+  }
   return document.id
 }

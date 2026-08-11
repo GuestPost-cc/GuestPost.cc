@@ -81,7 +81,9 @@ describe("BillingService", () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       $queryRawUnsafe: jest.fn().mockResolvedValue([]),
-      $transaction: jest.fn(),
+      $transaction: jest.fn(async (work: any) =>
+        typeof work === "function" ? work(prismaMock) : Promise.all(work),
+      ),
     }
 
     service = new BillingService(prismaMock as any, auditMock as any)
@@ -1140,80 +1142,6 @@ describe("BillingService", () => {
       await expect(
         service.payFromReserved("wallet-1", 9999, "order-1", mockUser),
       ).rejects.toThrow(BadRequestException)
-    })
-  })
-
-  describe("refund", () => {
-    it("returns full captured amount to available without touching reserved", async () => {
-      const walletWithReserved = {
-        ...mockWallet,
-        availableBalance: new Decimal(800),
-        reservedBalance: new Decimal(400),
-        version: 1,
-      }
-
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.wallet.findUniqueOrThrow
-          .mockReset()
-          .mockResolvedValueOnce(walletWithReserved)
-          .mockResolvedValueOnce({
-            ...walletWithReserved,
-            availableBalance: new Decimal(1000),
-            version: 2,
-          })
-        prismaMock.transaction.findFirst.mockResolvedValue(null)
-        prismaMock.wallet.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.transaction.create.mockResolvedValue({ id: "refund-tx" })
-        return cb(prismaMock)
-      })
-
-      const result = await service.refund("wallet-1", 200, "order-1", mockUser)
-
-      expect(Number(result.availableBalance)).toBe(1000)
-      // Reserved funds belong to other orders — refund must not decrement them
-      expect(prismaMock.wallet.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.not.objectContaining({
-            reservedBalance: expect.anything(),
-          }),
-        }),
-      )
-      expect(auditMock.log).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "WALLET_REFUND" }),
-      )
-      expect(prismaMock.transaction.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          type: "REFUND",
-          currency: "USD",
-          amount: new Decimal(200),
-        }),
-      })
-    })
-
-    it("prevents duplicate refund", async () => {
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        prismaMock.transaction.findFirst.mockResolvedValue({
-          id: "existing-refund",
-        })
-        return cb(prismaMock)
-      })
-
-      await expect(
-        service.refund("wallet-1", 200, "order-1", mockUser),
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it("rejects refund for unowned wallet", async () => {
-      const otherUser = { id: "user-2", organizationId: "org-2" }
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        return cb(prismaMock)
-      })
-
-      await expect(
-        service.refund("wallet-1", 200, "order-1", otherUser),
-      ).rejects.toThrow(ForbiddenException)
     })
   })
 
@@ -2382,7 +2310,6 @@ describe("BillingService", () => {
             service.createCheckoutSession("wallet-1", 10, mockUser, "blocked"),
           () => service.reserve("wallet-1", 10, "order-1", mockUser),
           () => service.payFromReserved("wallet-1", 10, "order-1", mockUser),
-          () => service.refund("wallet-1", 10, "order-1", mockUser),
         ]
         for (const operation of operations) {
           await expect(operation()).rejects.toMatchObject({

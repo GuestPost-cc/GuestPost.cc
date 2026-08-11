@@ -3,7 +3,10 @@
 // Consolidates ad-hoc process.env reads that were scattered across processors.
 // Hard-required vars cause exit(1) on startup. Optional vars warn once.
 
-import { resolveFinanceRuntimeMode } from "@guestpost/shared"
+import {
+  financialDocumentIssuerFromEnv,
+  resolveFinanceRuntimeMode,
+} from "@guestpost/shared"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 
 const logger = createLogger("worker.env")
@@ -20,12 +23,6 @@ const EMAIL_REQUIRED = [
   "NEXT_PUBLIC_PORTAL_URL",
   "NEXT_PUBLIC_PUBLISHER_URL",
   "NEXT_PUBLIC_ADMIN_URL",
-  "INVOICE_ISSUER_LEGAL_NAME",
-  "INVOICE_ISSUER_ADDRESS_LINE_1",
-  "INVOICE_ISSUER_CITY",
-  "INVOICE_ISSUER_POSTAL_CODE",
-  "INVOICE_ISSUER_COUNTRY_CODE",
-  "INVOICE_SUPPORT_EMAIL",
 ] as const
 
 const OPTIONAL_WARN = [
@@ -73,6 +70,16 @@ export function validateEnv(): void {
     if (missingProd.length > 0) {
       logger.error("FATAL: missing production-required env vars", {
         missing: missingProd,
+      })
+      process.exit(1)
+    }
+
+    try {
+      financialDocumentIssuerFromEnv(process.env)
+      logger.info("financial document configuration validated")
+    } catch (error) {
+      logger.error("FATAL: financial document configuration is invalid", {
+        error: error instanceof Error ? error.message : String(error),
       })
       process.exit(1)
     }

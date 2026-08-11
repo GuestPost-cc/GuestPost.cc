@@ -5,6 +5,8 @@ import {
   QUEUE_JOBS,
   QUEUES,
   recordCommunicationOutbox,
+  repairCommunicationOutboxProjections,
+  type ValidatedCommunicationProjectionEvent,
 } from "@guestpost/shared"
 import { getRequestId } from "@guestpost/shared/dist/observability/request-context"
 import { BadRequestException, Injectable, Logger } from "@nestjs/common"
@@ -22,8 +24,40 @@ export class CommunicationsService {
     private readonly queue: QueueService,
   ) {}
 
-  async record(input: CommunicationEventInput, tx: DbClient = this.prisma) {
+  private assertDomainTransaction(tx: DbClient): void {
+    if (!tx || tx === this.prisma) {
+      throw new Error(
+        "Communication outbox writes require the authoritative domain transaction client",
+      )
+    }
+  }
+
+  // A communication event is part of its domain mutation, not a follow-up
+  // side effect. Requiring the caller's transaction client makes it
+  // impossible for API call sites to accidentally create a split commit.
+  async record(input: CommunicationEventInput, tx: DbClient) {
+    this.assertDomainTransaction(tx)
     return recordCommunicationOutbox(tx, input, getRequestId())
+  }
+
+  /**
+   * Rebuild projections only after a caller has exhaustively validated an
+   * immutable historical event and its source artifact. This intentionally
+   * cannot mutate or replace the event/document winner.
+   */
+  async repairValidatedLegacyEvent(
+    event: ValidatedCommunicationProjectionEvent,
+    recipientUserIds: readonly string[],
+    actorUserId: string | null | undefined,
+    tx: DbClient,
+  ) {
+    this.assertDomainTransaction(tx)
+    return repairCommunicationOutboxProjections(
+      tx,
+      event,
+      recipientUserIds,
+      actorUserId,
+    )
   }
 
   // Call only after the surrounding domain transaction commits. Queue failure
@@ -58,10 +92,42 @@ export class CommunicationsService {
     })
   }
 
+  // Invoke only after the transaction that returned these IDs has committed.
+  // Deduplication avoids redundant wake jobs when idempotent domain work
+  // returns the same event more than once; the DB sweep remains authoritative.
+  dispatchManyBestEffort(eventIds: Iterable<string>): void {
+    for (const eventId of new Set(eventIds)) {
+      this.dispatchBestEffort(eventId)
+    }
+  }
+
+  // Retried serializable transactions may allocate a different event ID on a
+  // successful attempt. Resolve the stable domain dedup key only after commit
+  // instead of leaking an ID from a rolled-back attempt into queue dispatch.
+  dispatchByDedupKeyBestEffort(dedupKey: string): void {
+    void this.prisma.communicationEvent
+      .findUnique({ where: { dedupKey }, select: { id: true } })
+      .then((event) => {
+        if (event) this.dispatchBestEffort(event.id)
+      })
+      .catch((error) => {
+        this.logger.warn(
+          `Communication event ${dedupKey} remains pending for catch-up: ${error}`,
+        )
+      })
+  }
+
+  dispatchManyByDedupKeyBestEffort(dedupKeys: Iterable<string>): void {
+    for (const dedupKey of new Set(dedupKeys)) {
+      this.dispatchByDedupKeyBestEffort(dedupKey)
+    }
+  }
+
   async customerOrderRecipients(
     orderId: string,
-    tx: DbClient = this.prisma,
+    tx: DbClient,
   ): Promise<string[]> {
+    this.assertDomainTransaction(tx)
     const order = await tx.order.findUnique({
       where: { id: orderId },
       select: {
@@ -89,9 +155,10 @@ export class CommunicationsService {
 
   async publisherRecipients(
     publisherId: string | null | undefined,
-    ownersOnly = false,
-    tx: DbClient = this.prisma,
+    ownersOnly: boolean,
+    tx: DbClient,
   ): Promise<string[]> {
+    this.assertDomainTransaction(tx)
     if (!publisherId) return []
     const memberships = await tx.publisherMembership.findMany({
       where: {
@@ -109,9 +176,10 @@ export class CommunicationsService {
 
   async organizationRecipients(
     organizationId: string | null | undefined,
-    ownersOnly = false,
-    tx: DbClient = this.prisma,
+    ownersOnly: boolean,
+    tx: DbClient,
   ): Promise<string[]> {
+    this.assertDomainTransaction(tx)
     if (!organizationId) return []
     const memberships = await tx.membership.findMany({
       where: {
@@ -130,8 +198,9 @@ export class CommunicationsService {
 
   async staffRecipients(
     roles: Array<"SUPER_ADMIN" | "OPERATIONS" | "FINANCE">,
-    tx: DbClient = this.prisma,
+    tx: DbClient,
   ): Promise<string[]> {
+    this.assertDomainTransaction(tx)
     const memberships = await tx.staffMembership.findMany({
       where: { role: { in: roles }, user: { banned: false } },
       select: { userId: true },

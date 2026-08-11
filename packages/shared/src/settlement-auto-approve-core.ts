@@ -44,6 +44,8 @@ export interface RunSettlementAutoApproveOptions {
    * invisible to ops — the parameterless `catch` shape we replaced.
    */
   onError?: (err: unknown, settlementId: string) => void
+  /** Invoked after commit for durable communication rows created by gating. */
+  onCommunicationEvents?: (eventIds: string[]) => void | Promise<void>
 }
 
 /**
@@ -157,7 +159,7 @@ export async function runSettlementAutoApprove(
 
   for (const settlement of due) {
     try {
-      const committed = await runSettlementSerializableTransaction(
+      const outcome = await runSettlementSerializableTransaction(
         prisma,
         async (tx: AutoApproveTx) => {
           // One canonical, locked decision protects every settlement transition.
@@ -167,7 +169,14 @@ export async function runSettlementAutoApprove(
             tx,
             settlement.orderId,
           )
-          if (!eligibility.eligible) return false
+          if (!eligibility.eligible) {
+            return {
+              committed: false,
+              communicationEventIds: eligibility.urlReuseCommunicationEventId
+                ? [eligibility.urlReuseCommunicationEventId]
+                : [],
+            }
+          }
           if (settlement.currency !== "USD") {
             throw new Error("Settlement currency must be exactly USD")
           }
@@ -186,7 +195,9 @@ export async function runSettlementAutoApprove(
               version: { increment: 1 },
             },
           })
-          if (updated.count === 0) return false
+          if (updated.count === 0) {
+            return { committed: false, communicationEventIds: [] }
+          }
 
           await tx.settlementApproval.upsert({
             where: {
@@ -229,11 +240,18 @@ export async function runSettlementAutoApprove(
             },
           })
 
-          return true
+          return { committed: true, communicationEventIds: [] }
         },
       )
 
-      if (committed) {
+      try {
+        await opts.onCommunicationEvents?.(outcome.communicationEventIds)
+      } catch {
+        // The durable outbox remains authoritative and its recovery sweep will
+        // dispatch if the best-effort post-commit wake is unavailable.
+      }
+
+      if (outcome.committed) {
         approved++
       } else {
         skipped++ // version-guard race lost
