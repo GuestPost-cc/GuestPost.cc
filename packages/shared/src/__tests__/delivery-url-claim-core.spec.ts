@@ -33,7 +33,7 @@ describe("delivery URL claim freshness", () => {
   it("binds the URL as a parameter to the database advisory-and-row fence", async () => {
     const query = jest
       .fn()
-      .mockResolvedValue([{ acquire_delivery_url_claim_fence: null }])
+      .mockResolvedValue([{ acquire_delivery_url_claim_fence: true }])
 
     await lockDeliveryUrlClaim(
       { $queryRaw: query },

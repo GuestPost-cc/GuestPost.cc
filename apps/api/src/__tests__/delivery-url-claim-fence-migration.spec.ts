@@ -15,8 +15,9 @@ describe("delivery URL claim fence migration contract", () => {
     expect(migrationSql).toContain("hashtextextended(claim_url, 6182047)")
     expect(migrationSql).toMatch(/pg_advisory_xact_lock\(claim_lock_key\)/)
     expect(migrationSql).toMatch(
-      /CREATE FUNCTION "acquire_delivery_url_claim_fence"\(claim_url TEXT\)/,
+      /CREATE FUNCTION "acquire_delivery_url_claim_fence"\(claim_url TEXT\)\s+RETURNS BOOLEAN/,
     )
+    expect(migrationSql).toMatch(/RETURN TRUE;/)
   })
 
   it("fences every mutation and preserves the existing Order-to-URL lock order", () => {

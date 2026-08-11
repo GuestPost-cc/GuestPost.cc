@@ -403,7 +403,7 @@ authorization.
    ```
 
    Connect as that exact runtime role and run this rollback-only canary; the
-   call must succeed and the disposable fence row must not remain:
+   call must return `true` and the disposable fence row must not remain:
 
    ```sql
    BEGIN;

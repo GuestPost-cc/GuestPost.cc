@@ -39,7 +39,7 @@ FROM "OrderDeliveryVersion";
 -- changed after that snapshot forces SQLSTATE 40001 and a fresh retry instead
 -- of allowing a stale claim-set decision to commit.
 CREATE FUNCTION "acquire_delivery_url_claim_fence"(claim_url TEXT)
-RETURNS VOID
+RETURNS BOOLEAN
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
 AS $$
@@ -63,6 +63,12 @@ BEGIN
   FROM "DeliveryUrlClaimFence"
   WHERE "normalizedUrl" = claim_url
   FOR UPDATE;
+
+  -- Prisma's query protocol cannot deserialize PostgreSQL's pseudo-type
+  -- void. Return an explicit scalar so application callers can execute this
+  -- lock through a parameterized query without unsafe SQL or driver-specific
+  -- behavior; trigger callers deliberately discard the value with PERFORM.
+  RETURN TRUE;
 END
 $$;
 
