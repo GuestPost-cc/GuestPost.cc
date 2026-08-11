@@ -183,6 +183,60 @@ describe("OrderPaymentService", () => {
       )
     })
 
+    it("retains the sole-owner payer as an authorized receipt recipient", async () => {
+      const communicationsMock = {
+        customerOrderRecipients: jest.fn().mockResolvedValue(["user-1"]),
+        publisherRecipients: jest.fn().mockResolvedValue(["publisher-user-1"]),
+        staffRecipients: jest.fn().mockResolvedValue([]),
+        record: jest
+          .fn()
+          .mockResolvedValueOnce({ eventId: "customer-payment-event" })
+          .mockResolvedValueOnce({ eventId: "publisher-order-event" }),
+        dispatchBestEffort: jest.fn(),
+      }
+      service = new OrderPaymentService(
+        prismaMock as any,
+        auditMock as any,
+        billingMock as any,
+        communicationsMock as any,
+      )
+      prismaMock.website = {
+        findUnique: jest.fn().mockResolvedValue({ publisherId: "publisher-1" }),
+      }
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.order.findFirst.mockResolvedValue(mockOrder)
+        prismaMock.wallet.findFirst.mockResolvedValue(mockWallet)
+        prismaMock.orderItem.findMany.mockResolvedValue(mockItems)
+        prismaMock.listingService.findUnique.mockResolvedValue(
+          mockCatalogService,
+        )
+        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
+        prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+        prismaMock.order.findUnique.mockResolvedValue({
+          ...mockOrder,
+          paymentStatus: "PAID",
+          status: "SUBMITTED",
+          version: 2,
+        })
+        return cb(prismaMock)
+      })
+
+      await submitReviewedPayment()
+
+      expect(communicationsMock.record).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          type: "ORDER_PAYMENT_CAPTURED",
+          recipientUserIds: ["user-1"],
+          actorUserId: "user-1",
+        }),
+        prismaMock,
+      )
+      expect(communicationsMock.dispatchBestEffort).toHaveBeenCalledWith(
+        "customer-payment-event",
+      )
+    })
+
     it("rejects non-DRAFT orders", async () => {
       prismaMock.$transaction.mockImplementation(async (cb: any) => {
         prismaMock.order.findFirst.mockResolvedValue({

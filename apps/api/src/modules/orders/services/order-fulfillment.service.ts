@@ -281,7 +281,6 @@ export class OrderFulfillmentService {
     }
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    let communicationEventId: string | null = null
     const updated = await runLockedOrderSerializableTransaction(
       this.prisma,
       orderId,
@@ -330,7 +329,7 @@ export class OrderFulfillmentService {
               )),
             ]),
           ]
-          const event = await this.communications.record(
+          await this.communications.record(
             {
               type: "ORDER_CONTENT_READY",
               aggregateType: "Order",
@@ -345,14 +344,15 @@ export class OrderFulfillmentService {
             },
             tx,
           )
-          communicationEventId = event.eventId
         }
         return fresh
       },
     )
 
-    if (communicationEventId) {
-      this.communications?.dispatchBestEffort(communicationEventId)
+    if (this.communications) {
+      this.communications.dispatchByDedupKeyBestEffort(
+        `order:${orderId}:content-review:${updated.version}`,
+      )
     } else {
       await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
         userId: order.customerId,
@@ -386,7 +386,6 @@ export class OrderFulfillmentService {
     }
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    let communicationEventId: string | null = null
     const updated = await runLockedOrderSerializableTransaction(
       this.prisma,
       orderId,
@@ -489,7 +488,7 @@ export class OrderFulfillmentService {
               )),
             ]),
           ]
-          const event = await this.communications.record(
+          await this.communications.record(
             {
               type: "ORDER_CONTENT_READY",
               aggregateType: "Order",
@@ -504,14 +503,15 @@ export class OrderFulfillmentService {
             },
             tx,
           )
-          communicationEventId = event.eventId
         }
         return fresh
       },
     )
 
-    if (communicationEventId) {
-      this.communications?.dispatchBestEffort(communicationEventId)
+    if (this.communications) {
+      this.communications.dispatchByDedupKeyBestEffort(
+        `order:${orderId}:content-review:${updated.version}`,
+      )
     } else {
       await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
         userId: order.customerId,

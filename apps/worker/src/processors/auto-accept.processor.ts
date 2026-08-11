@@ -6,9 +6,11 @@ import {
   defaultWorkflowConfig,
   evaluateLockedSettlementEligibility,
   getSettlementReviewDays,
+  loadSettlementCustomerHistory,
   QUEUE_JOBS,
   QUEUES,
   recordCommunicationOutbox,
+  refreshDeliveryUrlReuseEvidenceUnderLock,
   resolveOrderCancellationConfig,
   resolvePlatformFeePolicyCore,
   runLockedOrderSerializableTransaction,
@@ -16,9 +18,10 @@ import {
 } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
-import { refundUnacceptedPaidOrderInTransaction } from "@guestpost/shared/dist/order-refund-core"
 import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
 import * as Sentry from "@sentry/node"
+import { processAcceptanceTimeoutOrderInTransaction } from "../lib/acceptance-timeout-refund"
+import { dispatchCommunicationEventsBestEffort } from "../lib/communication-outbox-dispatch"
 import { recordPublisherTierCommunications } from "../lib/publisher-tier-communications"
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
@@ -188,89 +191,45 @@ async function runOrderAcceptanceTimeoutSweep() {
   let refunded = 0
   for (const order of due) {
     if (order.cancellationRequests.length > 0) continue
-    const responsibility =
-      (order.fulfillmentChannel ??
-        (order.website?.ownershipType === "PLATFORM"
-          ? "PLATFORM"
-          : "PUBLISHER")) === "PLATFORM"
-        ? "PLATFORM"
-        : "PUBLISHER"
-    const didRefund = await prisma.$transaction(async (tx: any) => {
-      const existing = await tx.transaction.findFirst({
-        where: { reference: `acceptance-timeout:${order.id}` },
-      })
-      if (existing) return false
-      await refundUnacceptedPaidOrderInTransaction(
-        tx,
-        order,
-        {
-          reference: `acceptance-timeout:${order.id}`,
-          reason: `Order not accepted within ${acceptanceHours} hours`,
-          responsibility,
-          actorUserId: null,
-          auditAction: "ORDER_ACCEPTANCE_TIMEOUT_REFUND",
-          auditMetadata: { automatic: true, acceptanceHours },
-        },
-        (data, auditTx) => auditTx.auditLog.create({ data }),
-      )
-      const recipients = [
-        ...new Set<string>([
-          ...(await customerOrderRecipients(tx, order)),
-          ...(await publisherRecipients(tx, order.website?.publisherId)),
-        ]),
-      ]
-      await recordCommunicationOutbox(tx, {
-        type: "ORDER_REFUNDED",
-        aggregateType: "Order",
-        aggregateId: order.id,
-        organizationId: order.organizationId,
-        title: "Order refund completed",
-        message: `${Number(order.amount).toFixed(2)} ${order.currency} was returned to the customer wallet because order ${order.id} was not accepted in time.`,
-        actionPath: `/dashboard/orders/${order.id}`,
-        payload: { amount: Number(order.amount), currency: order.currency },
-        dedupKey: `order:${order.id}:refunded`,
-        recipientUserIds: recipients,
-      })
-      if (
-        Number(order.amount) >
-        safeThreshold("ADMIN_REFUND_NOTIFICATION_THRESHOLD", 100)
-      ) {
-        const staff = await tx.staffMembership.findMany({
-          where: {
-            role: { in: ["SUPER_ADMIN", "FINANCE"] },
-            user: { banned: false },
-          },
-          select: { userId: true },
-        })
-        await recordCommunicationOutbox(tx, {
-          type: "STAFF_HIGH_VALUE_REFUND",
-          aggregateType: "Order",
-          aggregateId: order.id,
-          organizationId: order.organizationId,
-          title: "High-value automatic refund",
-          message: `${Number(order.amount).toFixed(2)} ${order.currency} was refunded for unaccepted order ${order.id}.`,
-          actionPath: `/dashboard/orders/${order.id}`,
-          payload: { amount: Number(order.amount), currency: order.currency },
-          dedupKey: `staff:order:${order.id}:high-value-refund`,
-          recipientUserIds: staff.map(
-            (item: { userId: string }) => item.userId,
+    const refundResult = await runLockedOrderSerializableTransaction(
+      prisma,
+      order.id,
+      (tx: any) =>
+        processAcceptanceTimeoutOrderInTransaction(tx, {
+          orderId: order.id,
+          acceptanceHours,
+          highValueThreshold: safeThreshold(
+            "ADMIN_REFUND_NOTIFICATION_THRESHOLD",
+            100,
           ),
-        })
-      }
-      return true
-    })
-    if (didRefund) {
+        }),
+    )
+    await dispatchCommunicationEventsBestEffort(
+      refundResult.communicationEventIds,
+    )
+    if (refundResult.legacyUnauthorizedTerminalDeliveryCount > 0) {
+      logger.error(
+        "legacy refund audience has terminal deliveries requiring incident review",
+        {
+          orderId: order.id,
+          refundTransactionId: refundResult.refundTransactionId,
+          terminalUnauthorizedDeliveryCount:
+            refundResult.legacyUnauthorizedTerminalDeliveryCount,
+        },
+      )
+    }
+    if (refundResult.didRefund) {
       refunded++
-      if (responsibility === "PUBLISHER" && order.website?.publisherId) {
-        const result = await recomputePublisherTrustCore(
-          prisma,
-          order.website.publisherId,
-          {
+      const publisherId = refundResult.publisherId
+      if (refundResult.responsibility === "PUBLISHER" && publisherId) {
+        const communicationEventIds = await prisma.$transaction(async (tx) => {
+          const result = await recomputePublisherTrustCore(tx, publisherId, {
             sourceEvent: "ORDER_ACCEPTANCE_TIMEOUT",
             reason: `order ${order.id} was not accepted`,
-          },
-        )
-        await recordPublisherTierCommunications(result)
+          })
+          return recordPublisherTierCommunications(tx, result)
+        })
+        await dispatchCommunicationEventsBestEffort(communicationEventIds)
       }
     }
   }
@@ -333,15 +292,65 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
     }
 
     try {
-      const didAccept = await runLockedOrderSerializableTransaction(
+      const result = await runLockedOrderSerializableTransaction(
         prisma,
         order.id,
         async (tx: any) => {
+          const communicationEventIds: string[] = []
+          const lockedAcceptanceOrder = await tx.order.findUnique({
+            where: { id: order.id },
+            select: {
+              id: true,
+              organizationId: true,
+              status: true,
+              version: true,
+              activeDeliveryVersionId: true,
+            },
+          })
+          if (
+            lockedAcceptanceOrder?.status !== "VERIFIED" ||
+            lockedAcceptanceOrder.version !== order.version ||
+            !lockedAcceptanceOrder.activeDeliveryVersionId
+          ) {
+            return { didAccept: false, communicationEventIds }
+          }
+          const lockedDelivery = await tx.orderDeliveryVersion.findUnique({
+            where: { id: lockedAcceptanceOrder.activeDeliveryVersionId },
+            select: {
+              id: true,
+              orderId: true,
+              normalizedUrl: true,
+              supersededByVersion: true,
+            },
+          })
+          if (
+            !lockedDelivery ||
+            lockedDelivery.orderId !== order.id ||
+            lockedDelivery.supersededByVersion !== null
+          ) {
+            return { didAccept: false, communicationEventIds }
+          }
+          const urlReuseFreshness =
+            await refreshDeliveryUrlReuseEvidenceUnderLock(tx, {
+              orderId: order.id,
+              deliveryVersionId: lockedDelivery.id,
+              normalizedUrl: lockedDelivery.normalizedUrl,
+              organizationId: lockedAcceptanceOrder.organizationId,
+              actorUserId: null,
+              source: "AUTO_ACCEPT",
+            })
+          if (urlReuseFreshness.communicationEventId) {
+            communicationEventIds.push(urlReuseFreshness.communicationEventId)
+          }
+          if (urlReuseFreshness.requiresReview) {
+            return { didAccept: false, communicationEventIds }
+          }
+
           const upd = await tx.order.updateMany({
             where: {
               id: order.id,
               status: "VERIFIED",
-              version: order.version,
+              version: lockedAcceptanceOrder.version,
             },
             data: {
               status: "DELIVERED",
@@ -350,7 +359,9 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
               version: { increment: 1 },
             },
           })
-          if (upd.count === 0) return false
+          if (upd.count === 0) {
+            return { didAccept: false, communicationEventIds }
+          }
 
           const eligibility = await evaluateLockedSettlementEligibility(
             tx,
@@ -372,7 +383,9 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
               },
             },
           })
-          if (!canonicalOrder) return false
+          if (!canonicalOrder) {
+            return { didAccept: false, communicationEventIds }
+          }
           const grossAmount = canonicalOrder.amount
             ? new Prisma.Decimal(canonicalOrder.amount)
             : null
@@ -523,11 +536,18 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
               )
             }
 
+            const customerHistory = await loadSettlementCustomerHistory(tx, {
+              organizationId: canonicalOrder.organizationId,
+              customerId: canonicalOrder.customerId,
+            })
             const releasePolicy = decision.computeSettlementReleasePolicy(
-              { verifyMethod: "AUTO", amount: grossAmount.toNumber() },
+              {
+                verifyMethod: canonicalOrder.verifyMethod,
+                amount: grossAmount.toNumber(),
+              },
               publisherTierRow ? { tier: publisherTierRow.tier } : null,
               [],
-              null,
+              customerHistory,
             )
 
             const reviewDays = getSettlementReviewDays(
@@ -575,7 +595,7 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
                 },
               },
             })
-            await recordCommunicationOutbox(tx, {
+            const settlementEvent = await recordCommunicationOutbox(tx, {
               type: "SETTLEMENT_CREATED",
               aggregateType: "Settlement",
               aggregateId: settlement.id,
@@ -591,6 +611,7 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
               dedupKey: `settlement:${settlement.id}:created`,
               recipientUserIds: await publisherRecipients(tx, publisherId),
             })
+            communicationEventIds.push(settlementEvent.eventId)
           } else {
             throw new Error(
               `Order ${canonicalOrder.id} has no canonical publisher for auto-accept settlement`,
@@ -603,7 +624,7 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
               ...(await publisherRecipients(tx, publisherId)),
             ]),
           ]
-          await recordCommunicationOutbox(tx, {
+          const deliveredEvent = await recordCommunicationOutbox(tx, {
             type: "ORDER_DELIVERED",
             aggregateType: "Order",
             aggregateId: canonicalOrder.id,
@@ -614,8 +635,9 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
             dedupKey: `order:${canonicalOrder.id}:delivered`,
             recipientUserIds: partyRecipients,
           })
+          communicationEventIds.push(deliveredEvent.eventId)
           if (channel === "PLATFORM") {
-            await recordCommunicationOutbox(tx, {
+            const completedEvent = await recordCommunicationOutbox(tx, {
               type: "ORDER_COMPLETED",
               aggregateType: "Order",
               aggregateId: canonicalOrder.id,
@@ -626,6 +648,7 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
               dedupKey: `order:${canonicalOrder.id}:completed`,
               recipientUserIds: partyRecipients,
             })
+            communicationEventIds.push(completedEvent.eventId)
             if (
               grossAmount.greaterThan(
                 safeThreshold("ADMIN_HIGH_VALUE_ORDER_THRESHOLD", 500),
@@ -638,7 +661,7 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
                 },
                 select: { userId: true },
               })
-              await recordCommunicationOutbox(tx, {
+              const staffEvent = await recordCommunicationOutbox(tx, {
                 type: "STAFF_HIGH_VALUE_ORDER_COMPLETED",
                 aggregateType: "Order",
                 aggregateId: canonicalOrder.id,
@@ -655,13 +678,15 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
                   (item: { userId: string }) => item.userId,
                 ),
               })
+              communicationEventIds.push(staffEvent.eventId)
             }
           }
 
-          return true
+          return { didAccept: true, communicationEventIds }
         },
       )
-      if (didAccept) accepted++
+      await dispatchCommunicationEventsBestEffort(result.communicationEventIds)
+      if (result.didAccept) accepted++
       else skipped++
     } catch (err) {
       if (
@@ -759,7 +784,7 @@ async function runReviewReminderSweep(): Promise<ReminderResult> {
     if (existing) continue
 
     try {
-      await prisma.$transaction(async (tx) => {
+      const communicationEventId = await prisma.$transaction(async (tx) => {
         await tx.orderEvent.create({
           data: {
             orderId: order.id,
@@ -773,7 +798,7 @@ async function runReviewReminderSweep(): Promise<ReminderResult> {
             },
           },
         })
-        await recordCommunicationOutbox(tx, {
+        const event = await recordCommunicationOutbox(tx, {
           type: "ORDER_REVIEW_REMINDER",
           aggregateType: "Order",
           aggregateId: order.id,
@@ -784,7 +809,9 @@ async function runReviewReminderSweep(): Promise<ReminderResult> {
           dedupKey: `order:${order.id}:review-reminder:${daysRemaining}`,
           recipientUserIds: [order.customerId],
         })
+        return event.eventId
       })
+      await dispatchCommunicationEventsBestEffort([communicationEventId])
 
       reminded++
     } catch (err) {

@@ -23,10 +23,14 @@ snapshot, and evaluates these signals:
 - `DOMAIN_MISMATCH`: the delivery is on a different registrable host;
 - `RAPID_DELIVERY`: one submitter crosses the bounded submission-rate signal.
 
-Signals are computed before the transaction, then revalidated and inserted
-only after the worker takes the canonical Order lock and confirms the signed
-delivery generation is still active. A stale or superseded job cannot attach a
-hold to the current order state.
+Page-local signals are computed before the transaction, then revalidated and
+inserted only after the worker takes the canonical Order lock and confirms the
+signed delivery generation is still active. `URL_REUSED` is different because
+it crosses Order aggregates: the worker takes a transaction-scoped advisory
+lock keyed by the normalized URL and recomputes that signal inside the final
+transaction. A stale or superseded job cannot attach a hold to the current
+order state, and a concurrent claim cannot land between the URL evidence read
+and the verification decision.
 
 A technically passing page with any fraud signal is `MANUAL_REVIEW`, never
 automatically `VERIFIED`. Each new immutable `DeliveryFraudFlag` is projected by
@@ -45,7 +49,11 @@ Both customer paths enforce the same policy:
 
 After taking the Order lock, the API revalidates tenant scope, active
 membership, creator-or-owner authority, active delivery identity, cancellation
-state, and the authoritative `DeliveryFraudHold` projection. If any hold exists:
+state, and the authoritative `DeliveryFraudHold` projection. Before trusting a
+previous `AUTHORIZED_REUSE`, it also takes the normalized-URL lock and rebuilds
+the current claim-set fingerprint. A new claimant creates a fresh immutable
+`URL_REUSED` flag/hold and the denial transaction commits that evidence without
+committing a delivery or money transition. If any hold exists:
 
 - the API returns HTTP `409` with code `DELIVERY_FRAUD_REVIEW_REQUIRED`;
 - the response does not expose the signal type, related order, investigator
@@ -85,8 +93,10 @@ append-only resolution and audit evidence.
 
 Re-verification honors a classified staff disposition only when the delivery
 version, signal type, and complete signal details exactly match the adjudicated
-flag. The worker validates the classification, role-at-time snapshot, and any
-required evidence reference again under the Order lock, then records
+flag. URL-reuse details include an exact conflict count plus a bounded,
+deterministic fingerprint of the append-only cross-order claim set. The worker
+validates the classification, role-at-time snapshot, and any required evidence
+reference again under the Order and normalized-URL locks, then records
 `ORDER_DELIVERY_FRAUD_DISPOSITION_REUSED`. Changed details—including an
 increased reused-URL conflict count—are new evidence and create a new immutable
 flag and hold. Historical resolutions without a classified disposition always
@@ -104,13 +114,47 @@ timer cannot later auto-accept a failed delivery.
 ## Concurrency and database authority
 
 Sensitive paths use `runLockedOrderSerializableTransaction`. The Order row is
-the first lock. Fraud flag/hold/resolution triggers take the same parent lock and
-advance the settlement fence, closing these races:
+the first lock. A delivery claim writer then takes the normalized-URL advisory
+lock before inserting `OrderDeliveryVersion`; verification, both customer
+acceptance paths, auto-accept, and every settlement eligibility boundary take
+the locks in the same `Order -> normalized URL` order. Fraud
+flag/hold/resolution triggers take the same parent lock and advance the
+settlement fence, closing these races:
 
 - customer acceptance versus fraud flag insertion;
 - staff approval versus fraud adjudication;
 - fraud resolution versus settlement creation or release;
 - delivery re-verification versus supersession or another intervention.
+
+The database also takes the identical advisory lock for every delivery-version
+insert, update, and delete. Its URL trigger sorts after the existing
+`OrderDeliveryVersion_settlement_order_lock` trigger, so even an older pod in a
+rolling deploy is forced through the same `Order -> URL` sequence. A backfilled
+`DeliveryUrlClaimFence` row is locked by readers and advanced by every claim
+mutation. This MVCC-visible fence forces a stale `SERIALIZABLE` waiter to retry;
+an advisory lock alone would retain the waiter's old snapshot. Application
+predicate serialization by itself is also insufficient because an unrelated
+cross-order insert can legally serialize reader-first without a cycle. Deploy
+the `20260811133000_delivery_url_claim_fence` migration before rolling
+application instances that rely on URL-claim freshness.
+
+The restricted API/worker database role must receive only `SELECT`, `INSERT`,
+and `UPDATE` on `DeliveryUrlClaimFence` plus `EXECUTE` on
+`acquire_delivery_url_claim_fence(text)` before the new image starts. The
+trigger function is not an application call surface and does not need a
+runtime `EXECUTE` grant. In hardened clusters, revoke the default `PUBLIC`
+function grants and grant only this application function to the runtime role.
+Both functions are security-invoker functions, so missing table DML fails
+closed and cannot be bypassed through function execution; do not work around
+that failure by granting schema creation, ownership, superuser, `BYPASSRLS`,
+or deploy-role membership. Prove the exact runtime connection can acquire one
+transaction-scoped fence on a disposable URL and that the transaction rolls
+back before reopening acceptance or settlement.
+
+If a final API money-release decision discovers a new claim fingerprint, it
+returns a tagged block from the database callback so the new flag/hold commits,
+then raises the public `SETTLEMENT_BLOCKED` error after commit. Throwing inside
+that callback would erase the very evidence that prevented release.
 
 `DeliveryFraudFlag` and `DeliveryFraudFlagResolution` are append-only evidence.
 `DeliveryFraudHold` is the database-maintained current projection. A hold can be
@@ -141,6 +185,7 @@ Operations and Super Admin.
 ## Relevant code
 
 - `packages/shared/src/delivery-verification-core.ts`
+- `packages/shared/src/delivery-url-claim-core.ts`
 - `packages/shared/src/settlement-gating.ts`
 - `apps/api/src/modules/orders/services/delivery-fraud-guard.ts`
 - `apps/api/src/modules/orders/services/order-delivery.service.ts`
@@ -149,3 +194,4 @@ Operations and Super Admin.
 - `apps/api/src/modules/admin/verification-queue.service.ts`
 - `packages/database/prisma/migrations/20260802094000_delivery_fraud_resolutions/migration.sql`
 - `packages/database/prisma/migrations/20260811120000_delivery_fraud_resolution_dispositions/migration.sql`
+- `packages/database/prisma/migrations/20260811133000_delivery_url_claim_fence/migration.sql`

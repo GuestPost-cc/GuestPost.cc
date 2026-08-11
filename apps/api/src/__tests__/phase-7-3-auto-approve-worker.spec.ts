@@ -87,9 +87,13 @@ function makeTxMock() {
       findUnique: jest.fn().mockImplementation(() => ({
         id: "v1",
         orderId: currentOrderId,
+        normalizedUrl: "https://publisher.example/article",
+        supersededByVersion: null,
         verificationStatus: "VERIFIED",
         interventionStatus: "NONE",
       })),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     settlement: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     settlementApproval: { upsert: jest.fn().mockResolvedValue({}) },
@@ -100,7 +104,10 @@ function makeTxMock() {
     orderCancellationRequest: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
-    deliveryFraudFlag: { count: jest.fn().mockResolvedValue(0) },
+    deliveryFraudFlag: {
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   }
 }
 
@@ -194,6 +201,8 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
         tx.orderDeliveryVersion.findUnique.mockResolvedValue({
           id: "v1",
           orderId: "order-s1",
+          normalizedUrl: "https://publisher.example/article",
+          supersededByVersion: null,
           verificationStatus: "FAILED",
           interventionStatus: "NONE",
         }),

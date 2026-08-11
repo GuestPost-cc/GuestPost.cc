@@ -279,10 +279,11 @@ evidence. Do not deploy it while an old API or worker can still write payout
 state.
 
 1. Build and validate the release image before the maintenance window.
-2. Before merging or promoting this release, pause Render API auto-deploy and
-   every Northflank worker/service auto-rollout. A merge-triggered rolling
-   deploy is unsafe because the old and evidence-aware writers are not
-   schema-compatible. Record the paused state and intended release image.
+2. Before merging or promoting this release, pause auto-deploy for every
+   Blueprint-managed Render service and every Northflank worker/service
+   auto-rollout. A merge-triggered rolling deploy is unsafe because the old and
+   evidence-aware writers are not schema-compatible. Record the paused state
+   and intended release image.
 3. Set `FINANCE_RUNTIME_MODE=recovery_only` and
    `PAYOUT_EXECUTION_ENABLED=false` on the new release. Because the
    previously deployed code does not know this switch, also remove Finance

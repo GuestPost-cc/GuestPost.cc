@@ -40,17 +40,24 @@ function makeTxMock() {
       findUnique: jest.fn().mockResolvedValue({
         id: "dv-1",
         orderId: "ord-1",
+        normalizedUrl: "https://publisher.example/article",
+        supersededByVersion: null,
         verificationStatus: "VERIFIED",
         interventionStatus: "NONE",
         submittedByUserId: "publisher-user",
       }),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     orderDispute: { findFirst: jest.fn().mockResolvedValue(null) },
     revision: { findFirst: jest.fn().mockResolvedValue(null) },
     orderCancellationRequest: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
-    deliveryFraudFlag: { count: jest.fn().mockResolvedValue(0) },
+    deliveryFraudFlag: {
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     // releaseFundsInternal touches publisherBalance for tier accounting; mocked
     // null + happy-path create so the method reaches the order.updateMany line.
     publisherBalance: {

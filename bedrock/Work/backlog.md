@@ -1,10 +1,42 @@
 ---
 note_type: backlog
 project: guestpost-platform
-updated: 2026-07-29
+updated: 2026-08-11
 ---
 
 # Backlog
+
+## Deferred launch-readiness findings (2026-08-11)
+
+The 2026-08-11 launch-blocker hardening change set is limited to the nine
+approved communication, settlement-risk, financial-document, concurrency, and
+marketplace-provenance fixes. The following audit findings remain open and must
+not be represented as solved by that change set:
+
+- [ ] Design and certify a return-to-original-payment refund state machine.
+  Internal wallet restoration is not an external cash refund; the future flow
+  needs durable Stripe request/evidence states, immutable idempotency binding,
+  ambiguous-outcome recovery, reconciliation, and customer-visible status.
+- [ ] Require phishing-resistant staff MFA and recent step-up authorization for
+  finance decryption, payout execution/checking, role changes, and emergency
+  controls. Add a database-enforced append-only boundary for security audit
+  evidence and rehearse break-glass recovery.
+- [ ] Replace staging-grade deployment assumptions with schema-before-code
+  release orchestration, an explicit worker service, dependency readiness
+  checks, external paging, and a tested Neon/object-storage backup and restore
+  runbook. A successful application build is not deployment-safety evidence.
+- [ ] Finalize the operating entity, address, governing law, forum, privacy and
+  tax review, and approve one exact payout country/currency corridor before any
+  paid public launch. Provider availability must be verified for that precise
+  business, account, recipient, and corridor combination.
+- [ ] Obtain written payment-provider underwriting and enforce a documented SEO
+  link-qualification/content policy. Marketing and product behavior must not
+  imply provider approval or allow paid placements to pass ranking credit in
+  conflict with applicable search-engine policies.
+
+Until those controls are implemented and evidenced, the public paid-production
+and broad multicountry launch decisions remain **NO-GO** even if the nine code
+fixes in the current hardening set pass CI.
 
 Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 (the 2026-06-15 batch's §11 closed at 31/31 on 2026-06-21).
 

@@ -336,7 +336,6 @@ export class OrderOperationsService {
     }
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    let communicationEventId: string | null = null
     const updated = await runLockedOrderSerializableTransaction(
       this.prisma,
       orderId,
@@ -409,7 +408,7 @@ export class OrderOperationsService {
           tx,
         )
         if (this.communications) {
-          const event = await this.communications.record(
+          await this.communications.record(
             {
               type: "ORDER_CONTENT_READY",
               aggregateType: "Order",
@@ -425,14 +424,15 @@ export class OrderOperationsService {
             },
             tx,
           )
-          communicationEventId = event.eventId
         }
         return tx.order.findUniqueOrThrow({ where: { id: orderId } })
       },
     )
 
-    if (communicationEventId) {
-      this.communications?.dispatchBestEffort(communicationEventId)
+    if (this.communications) {
+      this.communications.dispatchByDedupKeyBestEffort(
+        `order:${orderId}:content-ready:v${updated.version}`,
+      )
     } else {
       await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
         userId: order.customerId,

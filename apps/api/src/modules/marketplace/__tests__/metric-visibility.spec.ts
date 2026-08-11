@@ -13,6 +13,10 @@ const listing = (website: any) => ({
   website,
   metricsData: { source: "GSC", clicks: 12, impressions: 345 },
   trafficData: { source: "GA4", sessions: 67, users: 45, pageviews: 89 },
+  domainRating: 91,
+  domainAuthority: 92,
+  referringDomains: 93,
+  spamScore: 94,
 })
 
 const metric = {
@@ -48,10 +52,40 @@ describe("public marketplace metric visibility", () => {
       }),
     )
     expect(JSON.stringify(result)).not.toContain("must-not-leak")
+    expect(result.domainRating).toBeUndefined()
+    expect(result.domainAuthority).toBeUndefined()
+    expect(result.referringDomains).toBeUndefined()
+    expect(result.spamScore).toBeUndefined()
   })
 
-  it("projects only current, unexpired Ahrefs organic traffic", () => {
-    const current = project(
+  it("keeps publisher-reported Moz DA source-visible without a legacy scalar", () => {
+    const result = project(
+      listing({
+        verificationStatus: "VERIFIED",
+        metricsHistory: [
+          {
+            key: "MOZ_DOMAIN_AUTHORITY",
+            provider: "MOZ",
+            source: "PUBLISHER_MANUAL",
+            status: "CURRENT",
+            value: "64",
+            measuredAt: new Date("2026-07-20T00:00:00Z"),
+            collectedAt: new Date("2026-07-20T01:00:00Z"),
+            expiresAt: null,
+          },
+        ],
+        websiteIntegrations: [],
+      }),
+    )
+
+    expect(result.domainAuthority).toBeUndefined()
+    expect(result.domainMetrics.moz.domainAuthority).toEqual(
+      expect.objectContaining({ value: 64, source: "PUBLISHER_MANUAL" }),
+    )
+  })
+
+  it("projects only current, unexpired, provider-sourced Ahrefs traffic", () => {
+    const publisherReported = project(
       listing({
         verificationStatus: "VERIFIED",
         metricsHistory: [
@@ -69,6 +103,24 @@ describe("public marketplace metric visibility", () => {
         websiteIntegrations: [],
       }),
     )
+    const current = project(
+      listing({
+        verificationStatus: "VERIFIED",
+        metricsHistory: [
+          {
+            key: "AHREFS_ORGANIC_TRAFFIC",
+            provider: "AHREFS",
+            source: "AHREFS_PAID_API",
+            status: "CURRENT",
+            value: "12345",
+            measuredAt: new Date("2026-07-20T00:00:00Z"),
+            collectedAt: new Date("2026-07-20T01:00:00Z"),
+            expiresAt: new Date("2099-01-01T00:00:00Z"),
+          },
+        ],
+        websiteIntegrations: [],
+      }),
+    )
     const expired = project(
       listing({
         verificationStatus: "VERIFIED",
@@ -76,7 +128,7 @@ describe("public marketplace metric visibility", () => {
           {
             key: "AHREFS_ORGANIC_TRAFFIC",
             provider: "AHREFS",
-            source: "PUBLISHER_MANUAL",
+            source: "AHREFS_PAID_API",
             status: "CURRENT",
             value: "999999",
             measuredAt: new Date("1999-10-01T00:00:00Z"),
@@ -87,9 +139,41 @@ describe("public marketplace metric visibility", () => {
         websiteIntegrations: [],
       }),
     )
+    const futureUnreviewed = project(
+      listing({
+        verificationStatus: "VERIFIED",
+        metricsHistory: [
+          {
+            key: "AHREFS_ORGANIC_TRAFFIC",
+            provider: "AHREFS",
+            source: "FUTURE_UNREVIEWED_SOURCE",
+            status: "CURRENT",
+            value: "54321",
+            measuredAt: new Date("2026-07-20T00:00:00Z"),
+            collectedAt: new Date("2026-07-20T01:00:00Z"),
+            expiresAt: new Date("2099-01-01T00:00:00Z"),
+          },
+        ],
+        websiteIntegrations: [],
+      }),
+    )
 
+    expect(publisherReported.traffic).toBeNull()
+    expect(publisherReported.domainMetrics.ahrefs.organicTraffic).toEqual(
+      expect.objectContaining({
+        value: 12_345,
+        source: "PUBLISHER_MANUAL",
+      }),
+    )
     expect(current.traffic).toBe(12_345)
     expect(expired.traffic).toBeNull()
+    expect(futureUnreviewed.traffic).toBeNull()
+    expect(futureUnreviewed.domainMetrics.ahrefs.organicTraffic).toEqual(
+      expect.objectContaining({
+        value: 54_321,
+        source: "FUTURE_UNREVIEWED_SOURCE",
+      }),
+    )
   })
 
   it("hides legacy Google values when there is no linked synced property", () => {
@@ -169,6 +253,10 @@ describe("Google metric quarantine across lightweight listing endpoints", () => 
     metricsData: { source: "GSC", clicks: 999 },
     trafficData: { source: "GA4", sessions: 888 },
     traffic: 777,
+    domainRating: 91,
+    domainAuthority: 92,
+    referringDomains: 93,
+    spamScore: 94,
   }
 
   function expectQuarantined(value: any) {
@@ -176,6 +264,10 @@ describe("Google metric quarantine across lightweight listing endpoints", () => 
     expect(value.trafficData).toBeUndefined()
     expect(value.siteMetrics).toBeUndefined()
     expect(value.traffic).toBeNull()
+    expect(value.domainRating).toBeUndefined()
+    expect(value.domainAuthority).toBeUndefined()
+    expect(value.referringDomains).toBeUndefined()
+    expect(value.spamScore).toBeUndefined()
     expect(JSON.stringify(value)).not.toContain("999")
     expect(JSON.stringify(value)).not.toContain("888")
   }
@@ -211,7 +303,7 @@ describe("Google metric quarantine across lightweight listing endpoints", () => 
     expectQuarantined(result[0].items[0].listing)
   })
 
-  it("quarantines stored recommendation listing projections", async () => {
+  it("ignores opaque stored recommendation scores and uses auditable trending facts", async () => {
     const prisma = {
       marketplaceRecommendation: {
         findMany: jest.fn().mockResolvedValue([
@@ -222,6 +314,9 @@ describe("Google metric quarantine across lightweight listing endpoints", () => 
           },
         ]),
       },
+      marketplaceListingView: {
+        groupBy: jest.fn().mockResolvedValue([{ listingId: unsafeListing.id }]),
+      },
       marketplaceListing: {
         findMany: jest.fn().mockResolvedValue([unsafeListing]),
       },
@@ -231,5 +326,6 @@ describe("Google metric quarantine across lightweight listing endpoints", () => 
     const result = await service.getRecommendations("user-1", {} as any)
 
     expectQuarantined(result[0])
+    expect(prisma.marketplaceRecommendation.findMany).not.toHaveBeenCalled()
   })
 })

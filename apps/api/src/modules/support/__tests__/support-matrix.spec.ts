@@ -62,7 +62,7 @@ function mockPrisma(opts: {
   messages?: any[]
 }) {
   const created: any[] = []
-  return {
+  const prisma: any = {
     _created: created,
     ticket: {
       findUnique: jest
@@ -117,6 +117,10 @@ function mockPrisma(opts: {
     },
     publisher: { findUnique: jest.fn() },
   }
+  prisma.$transaction = jest.fn(async (work: (tx: any) => unknown) =>
+    work(prisma),
+  )
+  return prisma
 }
 
 function mockQueue() {
@@ -587,6 +591,67 @@ describe("SupportService.addMessage — notification fan-out", () => {
     const recipients = queue._jobs.map((j) => j[2].userId)
     const admin1Count = recipients.filter((r) => r === "admin1").length
     expect(admin1Count).toBe(1)
+  })
+
+  it("wakes the legacy queue only after the domain transaction commits", async () => {
+    const ticket = makeTicket()
+    const prisma = mockPrisma({ ticket })
+    const queue = mockQueue()
+    let committed = false
+    prisma.$transaction.mockImplementation(async (work: (tx: any) => any) => {
+      const result = await work(prisma)
+      expect(queue.addJob).not.toHaveBeenCalled()
+      committed = true
+      return result
+    })
+    queue.addJob.mockImplementation(async (...args: any[]) => {
+      expect(committed).toBe(true)
+      queue._jobs.push(args)
+    })
+    const service = new SupportService(
+      prisma as any,
+      queue as any,
+      mockAudit() as any,
+    )
+
+    await service.addMessage(ticket.id, customerActor(), { content: "hello" })
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(queue.addJob).toHaveBeenCalled()
+  })
+
+  it("propagates an outbox failure so the domain transaction cannot commit", async () => {
+    const ticket = makeTicket()
+    const prisma = mockPrisma({ ticket })
+    const queue = mockQueue()
+    const communications = {
+      record: jest.fn().mockRejectedValue(new Error("outbox unavailable")),
+      dispatchBestEffort: jest.fn(),
+    }
+    let committed = false
+    prisma.$transaction.mockImplementation(async (work: (tx: any) => any) => {
+      const result = await work(prisma)
+      committed = true
+      return result
+    })
+    const service = new SupportService(
+      prisma as any,
+      queue as any,
+      mockAudit() as any,
+      communications as any,
+    )
+
+    await expect(
+      service.addMessage(ticket.id, customerActor(), { content: "hello" }),
+    ).rejects.toThrow("outbox unavailable")
+
+    expect(committed).toBe(false)
+    expect(communications.record).toHaveBeenCalledWith(
+      expect.objectContaining({ aggregateId: expect.any(String) }),
+      prisma,
+    )
+    expect(communications.dispatchBestEffort).not.toHaveBeenCalled()
+    expect(queue.addJob).not.toHaveBeenCalled()
   })
 })
 

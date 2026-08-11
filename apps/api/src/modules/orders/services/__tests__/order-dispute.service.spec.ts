@@ -54,6 +54,7 @@ describe("OrderDisputeService refund authorization", () => {
         order,
         refundTransactionId: "refund-transaction-1",
       }),
+      dispatchOrderRefundCommunicationsBestEffort: jest.fn(),
     }
     const queue = { enqueueTrustRecompute: jest.fn().mockResolvedValue({}) }
     return {
@@ -148,6 +149,9 @@ describe("OrderDisputeService refund authorization", () => {
       "dispute-refund:dispute-1",
       CancellationResponsibility.CUSTOMER,
     )
+    expect(
+      refund.dispatchOrderRefundCommunicationsBestEffort,
+    ).toHaveBeenCalledWith("order-1")
   })
 
   it("maps a concurrent duplicate dispute to a domain conflict", async () => {
@@ -168,7 +172,10 @@ describe("OrderDisputeService refund authorization", () => {
     const service = new OrderDisputeService(
       prisma,
       { log: jest.fn() } as any,
-      { refundOrderInTransaction: jest.fn() } as any,
+      {
+        refundOrderInTransaction: jest.fn(),
+        dispatchOrderRefundCommunicationsBestEffort: jest.fn(),
+      } as any,
       { enqueueTrustRecompute: jest.fn() } as any,
     )
 

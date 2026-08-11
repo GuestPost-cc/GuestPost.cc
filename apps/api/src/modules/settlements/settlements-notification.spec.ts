@@ -32,12 +32,16 @@ describe("SettlementsService release notifications", () => {
   it("explains how a debt-netted settlement affected withdrawable balance", async () => {
     const { queue, service } = setup()
 
-    await (service as any).notifySettlementReleased(settlement, {
-      publisherAmount: "100.00",
-      debtApplied: "80.00",
-      credited: "20.00",
-      currency: "USD",
-    })
+    await (service as any).notifySettlementReleasedAfterCommit(
+      settlement,
+      {
+        publisherAmount: "100.00",
+        debtApplied: "80.00",
+        credited: "20.00",
+        currency: "USD",
+      },
+      [],
+    )
 
     expect(queue.pushNotification).toHaveBeenCalledWith(
       "push-in-app",
@@ -60,12 +64,16 @@ describe("SettlementsService release notifications", () => {
     )
 
     await expect(
-      (service as any).notifySettlementReleased(settlement, {
-        publisherAmount: "100.00",
-        debtApplied: "0.00",
-        credited: "100.00",
-        currency: "USD",
-      }),
+      (service as any).notifySettlementReleasedAfterCommit(
+        settlement,
+        {
+          publisherAmount: "100.00",
+          debtApplied: "0.00",
+          credited: "100.00",
+          currency: "USD",
+        },
+        [],
+      ),
     ).resolves.toBeUndefined()
     expect(queue.pushNotification).toHaveBeenCalledTimes(1)
     expect(queue.pushNotification).toHaveBeenCalledWith(

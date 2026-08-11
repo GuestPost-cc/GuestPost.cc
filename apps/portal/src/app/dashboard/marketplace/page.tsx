@@ -31,6 +31,7 @@ import {
   ArrowRight,
   Bookmark,
   Heart,
+  Info,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -217,7 +218,7 @@ export default function MarketplacePage() {
     if (filters.minTraffic) {
       active.push({
         key: "traffic",
-        label: `${Number(filters.minTraffic).toLocaleString()}+ Ahrefs traffic`,
+        label: `${Number(filters.minTraffic).toLocaleString()}+ reported Ahrefs traffic`,
         clear: () => updateFilter("minTraffic", ""),
       })
     }
@@ -357,8 +358,8 @@ export default function MarketplacePage() {
                 Find the right placement for every campaign
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                Compare verified sites by service, authority, traffic, delivery
-                time, and price before you place an order.
+                Compare eligible listings by service, authority, source-labeled
+                traffic, delivery time, and price before you place an order.
               </p>
             </div>
             <div className="hidden gap-2 sm:flex">
@@ -408,6 +409,15 @@ export default function MarketplacePage() {
                 <X className="h-4 w-4" />
               </button>
             )}
+          </div>
+          <div className="relative mt-4 flex max-w-3xl items-start gap-2 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2.5 text-xs leading-5 text-amber-50">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              Eligible current Ahrefs metrics can affect filters and ranking.
+              Publisher Reported traffic and authority values are excluded from
+              all algorithmic discovery. Staff-entered and imported values
+              remain source-labeled and are not independently verified.
+            </p>
           </div>
         </div>
       </section>
@@ -666,7 +676,7 @@ function SortOptions() {
   return (
     <>
       <SelectItem value="recommended">Best match</SelectItem>
-      <SelectItem value="traffic">Highest Ahrefs traffic</SelectItem>
+      <SelectItem value="traffic">Highest reported Ahrefs traffic</SelectItem>
       <SelectItem value="price_asc">Lowest starting price</SelectItem>
       <SelectItem value="price_desc">Highest starting price</SelectItem>
       <SelectItem value="best_rated">Most reviewed</SelectItem>
@@ -790,7 +800,9 @@ function FilterPanel({
       </fieldset>
 
       <div className="space-y-3 px-1">
-        <Label htmlFor="minimum-traffic">Minimum Ahrefs organic traffic</Label>
+        <Label htmlFor="minimum-traffic">
+          Minimum reported Ahrefs organic traffic
+        </Label>
         <Input
           id="minimum-traffic"
           type="number"
@@ -799,6 +811,10 @@ function FilterPanel({
           value={filters.minTraffic}
           onChange={(event) => onFilterChange("minTraffic", event.target.value)}
         />
+        <p className="text-xs leading-5 text-muted-foreground">
+          Publisher Reported values never qualify for this filter. Other current
+          values remain source-labeled on each listing.
+        </p>
       </div>
 
       <div className="space-y-3 px-1">

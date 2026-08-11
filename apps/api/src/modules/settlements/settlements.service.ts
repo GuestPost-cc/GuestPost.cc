@@ -4,6 +4,7 @@ import {
   checkSeparationOfDuties,
   evaluateSettlementEligibility,
   getSettlementReviewDays,
+  loadSettlementCustomerHistory,
   notificationDedupKey,
   orderEventMetadata,
   type PublisherTier,
@@ -114,7 +115,7 @@ export class SettlementsService {
     // per Phase 7.2 Key decision #6 — cheaper than cascading nested includes
     // into the existing include chain).
 
-    return runSettlementSerializableTransaction(
+    const transactionOutcome = await runSettlementSerializableTransaction(
       this.prisma,
       async (tx: any) => {
         // Re-check gating inside the transaction to close the TOCTOU window
@@ -126,6 +127,13 @@ export class SettlementsService {
           orderId,
         )
         if (!txnEligibility.eligible) {
+          if (txnEligibility.urlReuseEvidenceCreated) {
+            return {
+              settlementEligibilityBlock: txnEligibility.reasons,
+              urlReuseCommunicationDedupKey:
+                txnEligibility.urlReuseCommunicationDedupKey,
+            } as const
+          }
           throw new BadRequestException({
             code: "SETTLEMENT_BLOCKED",
             message: `Settlement blocked: ${txnEligibility.reasons.join("; ")}`,
@@ -147,6 +155,7 @@ export class SettlementsService {
           select: {
             id: true,
             organizationId: true,
+            customerId: true,
             version: true,
             amount: true,
             currency: true,
@@ -258,10 +267,16 @@ export class SettlementsService {
           Date.now() + reviewDays * 24 * 60 * 60 * 1000,
         )
 
-        const fraudFlags = await tx.deliveryFraudFlag.findMany({
-          where: { orderId, resolution: null },
-          select: { type: true },
-        })
+        const [fraudFlags, customerHistory] = await Promise.all([
+          tx.deliveryFraudFlag.findMany({
+            where: { orderId, resolution: null },
+            select: { type: true },
+          }),
+          loadSettlementCustomerHistory(tx, {
+            organizationId: lockedOrder.organizationId,
+            customerId: lockedOrder.customerId,
+          }),
+        ])
         const releasePolicy = this.decision.computeSettlementReleasePolicy(
           {
             verifyMethod: lockedOrder.verifyMethod,
@@ -269,7 +284,7 @@ export class SettlementsService {
           },
           publisherTierRow ? { tier: publisherTierRow.tier } : null,
           fraudFlags,
-          null,
+          customerHistory,
         )
 
         let settlement: any
@@ -342,9 +357,26 @@ export class SettlementsService {
           tx,
         )
 
-        return settlement
+        return { result: settlement }
       },
     )
+    if (
+      "settlementEligibilityBlock" in transactionOutcome &&
+      transactionOutcome.settlementEligibilityBlock
+    ) {
+      if (transactionOutcome.urlReuseCommunicationDedupKey) {
+        this.communications?.dispatchByDedupKeyBestEffort(
+          transactionOutcome.urlReuseCommunicationDedupKey,
+        )
+      }
+      const reasons = transactionOutcome.settlementEligibilityBlock
+      throw new BadRequestException({
+        code: "SETTLEMENT_BLOCKED",
+        message: `Settlement blocked: ${reasons.join("; ")}`,
+        reasons,
+      })
+    }
+    return transactionOutcome.result
   }
 
   // organizationId is null for staff callers — customers may only see their own org's settlements
@@ -443,7 +475,7 @@ export class SettlementsService {
         "Cannot approve settlement while dispute is active",
       )
 
-    return runSettlementSerializableTransaction(
+    const transactionOutcome = await runSettlementSerializableTransaction(
       this.prisma,
       async (tx: any) => {
         const eligibility = await evaluateSettlementEligibilityTx(
@@ -451,6 +483,13 @@ export class SettlementsService {
           settlement.orderId,
         )
         if (!eligibility.eligible) {
+          if (eligibility.urlReuseEvidenceCreated) {
+            return {
+              settlementEligibilityBlock: eligibility.reasons,
+              urlReuseCommunicationDedupKey:
+                eligibility.urlReuseCommunicationDedupKey,
+            } as const
+          }
           throw new BadRequestException({
             code: "SETTLEMENT_BLOCKED",
             message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
@@ -525,13 +564,30 @@ export class SettlementsService {
           tx,
         )
 
-        return updated
+        return { result: updated }
       },
     )
+    if (
+      "settlementEligibilityBlock" in transactionOutcome &&
+      transactionOutcome.settlementEligibilityBlock
+    ) {
+      if (transactionOutcome.urlReuseCommunicationDedupKey) {
+        this.communications?.dispatchByDedupKeyBestEffort(
+          transactionOutcome.urlReuseCommunicationDedupKey,
+        )
+      }
+      const reasons = transactionOutcome.settlementEligibilityBlock
+      throw new BadRequestException({
+        code: "SETTLEMENT_BLOCKED",
+        message: `Settlement blocked: ${reasons.join("; ")}`,
+        reasons,
+      })
+    }
+    return transactionOutcome.result
   }
 
-  // Fired after the release transaction commits — queue writes are not transactional
-  private async notifySettlementReleased(
+  private async recordSettlementReleased(
+    tx: any,
     settlement: {
       id: string
       orderId: string
@@ -540,94 +596,119 @@ export class SettlementsService {
       order: { organizationId: string; customerId: string }
     },
     summary: SettlementReleaseSummary,
+  ): Promise<string[]> {
+    if (!this.communications) return []
+    const communicationEventIds: string[] = []
+    const publisherRecipients = await this.communications.publisherRecipients(
+      settlement.publisherId,
+      false,
+      tx,
+    )
+    const debtApplied = new Decimal(summary.debtApplied)
+    const publisherMessage = debtApplied.greaterThan(0)
+      ? `Settlement of ${summary.publisherAmount} ${summary.currency} was released: ${summary.debtApplied} ${summary.currency} repaid outstanding debt and ${summary.credited} ${summary.currency} was credited to your withdrawable balance.`
+      : `Settlement of ${summary.publisherAmount} ${summary.currency} has been credited to your withdrawable balance.`
+    const publisherEvent = await this.communications.record(
+      {
+        type: "SETTLEMENT_RELEASED",
+        aggregateType: "Settlement",
+        aggregateId: settlement.id,
+        organizationId: settlement.order.organizationId,
+        title: "Settlement released",
+        message: publisherMessage,
+        actionPath: "/dashboard/earnings",
+        dedupKey: `settlement:${settlement.id}:released:publisher`,
+        recipientUserIds: publisherRecipients,
+      },
+      tx,
+    )
+    communicationEventIds.push(publisherEvent.eventId)
+
+    const customerRecipients =
+      await this.communications.customerOrderRecipients(settlement.orderId, tx)
+    const customerEvent = await this.communications.record(
+      {
+        type: "SETTLEMENT_RELEASED",
+        aggregateType: "Settlement",
+        aggregateId: settlement.id,
+        organizationId: settlement.order.organizationId,
+        title: "Order settlement released",
+        message: `Settlement for order ${settlement.orderId} has been released.`,
+        actionPath: `/dashboard/orders/${settlement.orderId}`,
+        dedupKey: `settlement:${settlement.id}:released:customer`,
+        recipientUserIds: customerRecipients,
+      },
+      tx,
+    )
+    communicationEventIds.push(customerEvent.eventId)
+
+    const completedEvent = await this.communications.record(
+      {
+        type: "ORDER_COMPLETED",
+        aggregateType: "Order",
+        aggregateId: settlement.orderId,
+        organizationId: settlement.order.organizationId,
+        title: "Order completed",
+        message: `Order ${settlement.orderId} is complete and its settlement has been released.`,
+        actionPath: `/dashboard/orders/${settlement.orderId}`,
+        dedupKey: `order:${settlement.orderId}:completed`,
+        recipientUserIds: [
+          ...new Set([...customerRecipients, ...publisherRecipients]),
+        ],
+      },
+      tx,
+    )
+    communicationEventIds.push(completedEvent.eventId)
+
+    if (
+      new Decimal(summary.publisherAmount).greaterThan(
+        notificationThreshold("ADMIN_SETTLEMENT_NOTIFICATION_THRESHOLD", 500),
+      )
+    ) {
+      const staffRecipients = await this.communications.staffRecipients(
+        ["SUPER_ADMIN", "FINANCE"],
+        tx,
+      )
+      const staffEvent = await this.communications.record(
+        {
+          type: "STAFF_HIGH_VALUE_SETTLEMENT",
+          aggregateType: "Settlement",
+          aggregateId: settlement.id,
+          organizationId: settlement.order.organizationId,
+          title: "High-value settlement released",
+          message: `${summary.publisherAmount} ${summary.currency} was released for order ${settlement.orderId}.`,
+          actionPath: "/dashboard/finance",
+          payload: {
+            amount: summary.publisherAmount,
+            currency: summary.currency,
+            orderId: settlement.orderId,
+          },
+          dedupKey: `staff:settlement:${settlement.id}:high-value`,
+          recipientUserIds: staffRecipients,
+        },
+        tx,
+      )
+      communicationEventIds.push(staffEvent.eventId)
+    }
+    return communicationEventIds
+  }
+
+  // Fired after the release transaction commits — queue writes are not
+  // transactional. Durable rows already exist at this point.
+  private async notifySettlementReleasedAfterCommit(
+    settlement: {
+      id: string
+      orderId: string
+      publisherId: string
+      publisherAmount: any
+      order: { organizationId: string; customerId: string }
+    },
+    summary: SettlementReleaseSummary,
+    communicationEventIds: string[],
   ) {
     if (this.communications) {
-      try {
-        const publisherRecipients =
-          await this.communications.publisherRecipients(settlement.publisherId)
-        const debtApplied = new Decimal(summary.debtApplied)
-        const publisherMessage = debtApplied.greaterThan(0)
-          ? `Settlement of ${summary.publisherAmount} ${summary.currency} was released: ${summary.debtApplied} ${summary.currency} repaid outstanding debt and ${summary.credited} ${summary.currency} was credited to your withdrawable balance.`
-          : `Settlement of ${summary.publisherAmount} ${summary.currency} has been credited to your withdrawable balance.`
-        const publisherEvent = await this.communications.record({
-          type: "SETTLEMENT_RELEASED",
-          aggregateType: "Settlement",
-          aggregateId: settlement.id,
-          organizationId: settlement.order.organizationId,
-          title: "Settlement released",
-          message: publisherMessage,
-          actionPath: "/dashboard/earnings",
-          dedupKey: `settlement:${settlement.id}:released:publisher`,
-          recipientUserIds: publisherRecipients,
-        })
-        this.communications.dispatchBestEffort(publisherEvent.eventId)
-
-        const customerRecipients =
-          await this.communications.customerOrderRecipients(settlement.orderId)
-        const customerEvent = await this.communications.record({
-          type: "SETTLEMENT_RELEASED",
-          aggregateType: "Settlement",
-          aggregateId: settlement.id,
-          organizationId: settlement.order.organizationId,
-          title: "Order settlement released",
-          message: `Settlement for order ${settlement.orderId} has been released.`,
-          actionPath: `/dashboard/orders/${settlement.orderId}`,
-          dedupKey: `settlement:${settlement.id}:released:customer`,
-          recipientUserIds: customerRecipients,
-        })
-        this.communications.dispatchBestEffort(customerEvent.eventId)
-
-        const completedEvent = await this.communications.record({
-          type: "ORDER_COMPLETED",
-          aggregateType: "Order",
-          aggregateId: settlement.orderId,
-          organizationId: settlement.order.organizationId,
-          title: "Order completed",
-          message: `Order ${settlement.orderId} is complete and its settlement has been released.`,
-          actionPath: `/dashboard/orders/${settlement.orderId}`,
-          dedupKey: `order:${settlement.orderId}:completed`,
-          recipientUserIds: [
-            ...new Set([...customerRecipients, ...publisherRecipients]),
-          ],
-        })
-        this.communications.dispatchBestEffort(completedEvent.eventId)
-
-        if (
-          new Decimal(summary.publisherAmount).greaterThan(
-            notificationThreshold(
-              "ADMIN_SETTLEMENT_NOTIFICATION_THRESHOLD",
-              500,
-            ),
-          )
-        ) {
-          const staffRecipients = await this.communications.staffRecipients([
-            "SUPER_ADMIN",
-            "FINANCE",
-          ])
-          const staffEvent = await this.communications.record({
-            type: "STAFF_HIGH_VALUE_SETTLEMENT",
-            aggregateType: "Settlement",
-            aggregateId: settlement.id,
-            organizationId: settlement.order.organizationId,
-            title: "High-value settlement released",
-            message: `${summary.publisherAmount} ${summary.currency} was released for order ${settlement.orderId}.`,
-            actionPath: "/dashboard/finance",
-            payload: {
-              amount: summary.publisherAmount,
-              currency: summary.currency,
-              orderId: settlement.orderId,
-            },
-            dedupKey: `staff:settlement:${settlement.id}:high-value`,
-            recipientUserIds: staffRecipients,
-          })
-          this.communications.dispatchBestEffort(staffEvent.eventId)
-        }
-        return
-      } catch (error) {
-        this.logger.warn(
-          `Failed to record durable settlement communications for ${settlement.id}: ${error}`,
-        )
-      }
+      this.communications.dispatchManyBestEffort(communicationEventIds)
+      return
     }
 
     let memberships: Array<{ userId: string }> = []
@@ -736,91 +817,126 @@ export class SettlementsService {
 
     const previousStatus = settlement.status
 
-    const { result, releaseSummary } =
-      await runSettlementSerializableTransaction(
-        this.prisma,
-        async (tx: any) => {
-          // Re-check with fresh transactional snapshot — closes TOCTOU window
-          const eligibility = await evaluateSettlementEligibilityTx(
-            tx,
-            settlement.orderId,
-          )
-          if (!eligibility.eligible) {
-            throw new BadRequestException({
-              code: "SETTLEMENT_BLOCKED",
-              message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
-              reasons: eligibility.reasons,
-            })
+    const transactionOutcome = await runSettlementSerializableTransaction(
+      this.prisma,
+      async (tx: any) => {
+        // Re-check with fresh transactional snapshot — closes TOCTOU window
+        const eligibility = await evaluateSettlementEligibilityTx(
+          tx,
+          settlement.orderId,
+        )
+        if (!eligibility.eligible) {
+          if (eligibility.urlReuseEvidenceCreated) {
+            // Commit the newly-created immutable flag/hold, then surface the
+            // public denial outside this transaction. Throwing here would
+            // roll back the exact evidence that blocked the money release.
+            return {
+              settlementEligibilityBlock: eligibility.reasons,
+              urlReuseCommunicationDedupKey:
+                eligibility.urlReuseCommunicationDedupKey,
+            } as const
           }
-
-          const adminUpdated = await tx.settlement.updateMany({
-            where: {
-              id,
-              status: "CUSTOMER_APPROVED",
-              version: settlement.version,
-            },
-            data: {
-              status: "ADMIN_APPROVED",
-              version: { increment: 1 },
-            },
+          throw new BadRequestException({
+            code: "SETTLEMENT_BLOCKED",
+            message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+            reasons: eligibility.reasons,
           })
-          if (adminUpdated.count === 0) {
-            throw new ConflictException(
-              "Settlement status changed by another request",
-            )
-          }
+        }
 
-          const fresh = await tx.settlement.findUniqueOrThrow({ where: { id } })
-
-          await tx.settlementApproval.create({
-            data: {
-              settlementId: id,
-              type: "ADMIN",
-              approvedBy: userId,
-              roleAtTime: staffRole,
-            },
-          })
-
-          // Auto-release if admin approved
-          const releaseSummary = await this.releaseFundsInternal(
-            tx,
+        const adminUpdated = await tx.settlement.updateMany({
+          where: {
             id,
-            { ...settlement, version: fresh.version },
-            userId,
+            status: "CUSTOMER_APPROVED",
+            version: settlement.version,
+          },
+          data: {
+            status: "ADMIN_APPROVED",
+            version: { increment: 1 },
+          },
+        })
+        if (adminUpdated.count === 0) {
+          throw new ConflictException(
+            "Settlement status changed by another request",
           )
+        }
 
-          await this.audit.log(
-            {
-              action: "SETTLEMENT_ADMIN_APPROVED",
-              entityType: "Settlement",
-              entityId: id,
-              metadata: {
-                orderId: settlement.orderId,
-                ...orderEventMetadata(settlement.order),
-                reason,
-                actorRole: staffRole,
-                previousStatus,
-                newStatus: "ADMIN_APPROVED",
-                publisherAmount:
-                  settlement.publisherAmount?.toNumber?.() ??
-                  Number(settlement.publisherAmount),
-              },
-              userId,
-              organizationId: settlement.order.organizationId,
+        const fresh = await tx.settlement.findUniqueOrThrow({ where: { id } })
+
+        await tx.settlementApproval.create({
+          data: {
+            settlementId: id,
+            type: "ADMIN",
+            approvedBy: userId,
+            roleAtTime: staffRole,
+          },
+        })
+
+        // Auto-release if admin approved
+        const releaseSummary = await this.releaseFundsInternal(
+          tx,
+          id,
+          { ...settlement, version: fresh.version },
+          userId,
+        )
+
+        await this.audit.log(
+          {
+            action: "SETTLEMENT_ADMIN_APPROVED",
+            entityType: "Settlement",
+            entityId: id,
+            metadata: {
+              orderId: settlement.orderId,
+              ...orderEventMetadata(settlement.order),
+              reason,
+              actorRole: staffRole,
+              previousStatus,
+              newStatus: "ADMIN_APPROVED",
+              publisherAmount:
+                settlement.publisherAmount?.toNumber?.() ??
+                Number(settlement.publisherAmount),
             },
-            tx,
-          )
+            userId,
+            organizationId: settlement.order.organizationId,
+          },
+          tx,
+        )
 
-          // Row is now RELEASED — return the final state, not the snapshot
-          const result = await tx.settlement.findUniqueOrThrow({
-            where: { id },
-          })
-          return { result, releaseSummary }
-        },
-      )
+        // Row is now RELEASED — return the final state, not the snapshot
+        const result = await tx.settlement.findUniqueOrThrow({
+          where: { id },
+        })
+        const communicationEventIds = await this.recordSettlementReleased(
+          tx,
+          settlement,
+          releaseSummary,
+        )
+        return { result, releaseSummary, communicationEventIds }
+      },
+    )
+    if (
+      "settlementEligibilityBlock" in transactionOutcome &&
+      transactionOutcome.settlementEligibilityBlock
+    ) {
+      if (transactionOutcome.urlReuseCommunicationDedupKey) {
+        this.communications?.dispatchByDedupKeyBestEffort(
+          transactionOutcome.urlReuseCommunicationDedupKey,
+        )
+      }
+      const reasons = transactionOutcome.settlementEligibilityBlock
+      throw new BadRequestException({
+        code: "SETTLEMENT_BLOCKED",
+        message: `Settlement blocked: ${reasons.join("; ")}`,
+        reasons,
+      })
+    }
+    const { result, releaseSummary, communicationEventIds } = transactionOutcome
 
     await this.enqueueSettlementTrustRecompute(id, settlement.publisherId)
-    await this.notifySettlementReleased(settlement, releaseSummary)
+    await this.notifySettlementReleasedAfterCommit(
+      settlement,
+      releaseSummary,
+      communicationEventIds,
+    )
 
     return result
   }
@@ -848,92 +964,122 @@ export class SettlementsService {
         ? "ADMIN_APPROVED"
         : "CUSTOMER_APPROVED"
 
-    const { result, releaseSummary } =
-      await runSettlementSerializableTransaction(
-        this.prisma,
-        async (tx: any) => {
-          // Fresh eligibility check with locked snapshot — closes TOCTOU window
-          const eligibility = await evaluateSettlementEligibilityTx(
-            tx,
-            settlement.orderId,
-          )
-          if (!eligibility.eligible) {
-            throw new BadRequestException({
-              code: "SETTLEMENT_BLOCKED",
-              message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
-              reasons: eligibility.reasons,
-            })
+    const transactionOutcome = await runSettlementSerializableTransaction(
+      this.prisma,
+      async (tx: any) => {
+        // Fresh eligibility check with locked snapshot — closes TOCTOU window
+        const eligibility = await evaluateSettlementEligibilityTx(
+          tx,
+          settlement.orderId,
+        )
+        if (!eligibility.eligible) {
+          if (eligibility.urlReuseEvidenceCreated) {
+            return {
+              settlementEligibilityBlock: eligibility.reasons,
+              urlReuseCommunicationDedupKey:
+                eligibility.urlReuseCommunicationDedupKey,
+            } as const
           }
-
-          const updated = await tx.settlement.updateMany({
-            where: { id, version: settlement.version },
-            data: {
-              status: targetStatus,
-              version: { increment: 1 },
-            },
+          throw new BadRequestException({
+            code: "SETTLEMENT_BLOCKED",
+            message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+            reasons: eligibility.reasons,
           })
-          if (updated.count === 0) {
-            throw new ConflictException(
-              "Settlement was modified by another request",
-            )
-          }
+        }
 
-          const fresh = await tx.settlement.findUniqueOrThrow({ where: { id } })
-
-          await tx.settlementApproval.create({
-            data: {
-              settlementId: id,
-              type: targetStatus === "ADMIN_APPROVED" ? "ADMIN" : "CUSTOMER",
-              approvedBy: userId,
-              roleAtTime: staffRole,
-            },
-          })
-
-          const releaseSummary =
-            targetStatus === "ADMIN_APPROVED"
-              ? await this.releaseFundsInternal(
-                  tx,
-                  id,
-                  { ...settlement, version: fresh.version },
-                  userId,
-                )
-              : null
-
-          await this.audit.log(
-            {
-              action: "SETTLEMENT_FORCE_APPROVED",
-              entityType: "Settlement",
-              entityId: id,
-              metadata: {
-                orderId: settlement.orderId,
-                ...orderEventMetadata(settlement.order),
-                reason,
-                actorRole: staffRole,
-                previousStatus,
-                newStatus: targetStatus,
-                publisherAmount:
-                  settlement.publisherAmount?.toNumber?.() ??
-                  Number(settlement.publisherAmount),
-              },
-              userId,
-              organizationId: settlement.order.organizationId,
-            },
-            tx,
+        const updated = await tx.settlement.updateMany({
+          where: { id, version: settlement.version },
+          data: {
+            status: targetStatus,
+            version: { increment: 1 },
+          },
+        })
+        if (updated.count === 0) {
+          throw new ConflictException(
+            "Settlement was modified by another request",
           )
+        }
 
-          // releaseFundsInternal moved the row to RELEASED — return the final
-          // state, not the pre-release snapshot
-          const result =
-            targetStatus === "ADMIN_APPROVED"
-              ? await tx.settlement.findUnique({ where: { id } })
-              : fresh
-          return { result, releaseSummary }
-        },
-      )
+        const fresh = await tx.settlement.findUniqueOrThrow({ where: { id } })
+
+        await tx.settlementApproval.create({
+          data: {
+            settlementId: id,
+            type: targetStatus === "ADMIN_APPROVED" ? "ADMIN" : "CUSTOMER",
+            approvedBy: userId,
+            roleAtTime: staffRole,
+          },
+        })
+
+        const releaseSummary =
+          targetStatus === "ADMIN_APPROVED"
+            ? await this.releaseFundsInternal(
+                tx,
+                id,
+                { ...settlement, version: fresh.version },
+                userId,
+              )
+            : null
+
+        await this.audit.log(
+          {
+            action: "SETTLEMENT_FORCE_APPROVED",
+            entityType: "Settlement",
+            entityId: id,
+            metadata: {
+              orderId: settlement.orderId,
+              ...orderEventMetadata(settlement.order),
+              reason,
+              actorRole: staffRole,
+              previousStatus,
+              newStatus: targetStatus,
+              publisherAmount:
+                settlement.publisherAmount?.toNumber?.() ??
+                Number(settlement.publisherAmount),
+            },
+            userId,
+            organizationId: settlement.order.organizationId,
+          },
+          tx,
+        )
+
+        // releaseFundsInternal moved the row to RELEASED — return the final
+        // state, not the pre-release snapshot
+        const result =
+          targetStatus === "ADMIN_APPROVED"
+            ? await tx.settlement.findUnique({ where: { id } })
+            : fresh
+        const communicationEventIds = releaseSummary
+          ? await this.recordSettlementReleased(tx, settlement, releaseSummary)
+          : []
+        return { result, releaseSummary, communicationEventIds }
+      },
+    )
+    if (
+      "settlementEligibilityBlock" in transactionOutcome &&
+      transactionOutcome.settlementEligibilityBlock
+    ) {
+      if (transactionOutcome.urlReuseCommunicationDedupKey) {
+        this.communications?.dispatchByDedupKeyBestEffort(
+          transactionOutcome.urlReuseCommunicationDedupKey,
+        )
+      }
+      const reasons = transactionOutcome.settlementEligibilityBlock
+      throw new BadRequestException({
+        code: "SETTLEMENT_BLOCKED",
+        message: `Settlement blocked: ${reasons.join("; ")}`,
+        reasons,
+      })
+    }
+    const { result, releaseSummary, communicationEventIds } = transactionOutcome
 
     if (targetStatus === "ADMIN_APPROVED") {
       await this.enqueueSettlementTrustRecompute(id, settlement.publisherId)
-      await this.notifySettlementReleased(settlement, releaseSummary!)
+      await this.notifySettlementReleasedAfterCommit(
+        settlement,
+        releaseSummary!,
+        communicationEventIds,
+      )
     }
 
     return result

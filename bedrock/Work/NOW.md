@@ -219,6 +219,62 @@ merged or deployed. GitHub `main` through dependency consolidation commit
   outbox sweep, retry, suppression, one representative event from each audience,
   and a rendered/received example of each financial attachment kind in staging.
 
+## Current Local Work: Launch-Blocker Communication And Delivery Hardening
+
+- Mandatory payment and refund receipts may retain the actor only when the
+  authoritative recipient resolver independently listed that same user. The
+  policy never adds an actor or bypasses tenant, ownership, account, or
+  channel eligibility; sole-owner payers now receive their invoice.
+- Every paid-order refund path, including early cancellation and exact legacy
+  replay repair, records the customer-only `ORDER_REFUNDED` event and a
+  ledger-bound credit note inside the canonical locked serializable domain
+  transaction. Acceptance-timeout publisher notices are a separate
+  non-financial event and cannot receive customer billing identity or PDFs.
+- API and worker production startup now validate the complete reviewed
+  `INVOICE_*` issuer identity, including the document prefix. Partial or
+  missing production configuration fails before a writer starts; local
+  prefix-only configuration continues to use the unmistakable sample identity.
+- Settlement policy and release-time rechecks now fail closed to manual review
+  for missing/new publisher evidence, large or invalid amounts, missing or
+  invalid customer history, and durable chargeback history regardless of the
+  global auto-release switch. All current writers load tenant/customer-scoped
+  history instead of passing `null`.
+- Email claims are fenced by exact `(attempts, lockedAt)` evidence. A lease
+  that expires before SMTP is retryable; one that crossed the SMTP boundary is
+  quarantined as `DELIVERY_UNCERTAIN`, alerted, and never automatically sent
+  again. Parent-event finalization locks the event before counting terminal
+  deliveries, closing the concurrent-last-delivery race.
+- Communication events are recorded only through the shared outbox inside the
+  authoritative domain transaction. Immutable dedup winners are validated
+  before projections; signed queue jobs are post-commit wake-ups only, and the
+  database sweep remains the recovery boundary. Financial documents use a
+  targeted `ON CONFLICT ("dedupKey") DO NOTHING`; unrelated unique conflicts
+  remain visible.
+- Financial PDFs use pinned local Unicode fonts, exact shaped glyph placement,
+  bidirectional ordering, exact `BigInt` currency formatting, bounded dynamic
+  pagination, unsupported-code-point markers, searchable text, and a 5 MiB
+  limit. Deterministic fixtures cover Latin, Cyrillic, Arabic, Bengali,
+  Japanese, Chinese, Korean, mixed-direction identifiers, and schema-boundary
+  multipage content with Poppler raster/text checks.
+- Marketplace projections label publisher-entered Ahrefs/Moz values as
+  `Publisher Reported` and unverified. Public legacy metric scalars are removed,
+  and filtering, sorting, traffic/DR ranking, and recommendations use an
+  explicit source allowlist that excludes publisher-manual and unknown future
+  sources.
+- Delivery acceptance, manual fallback, auto-accept, verification, settlement
+  creation, approval, and release now re-fingerprint the current normalized-URL
+  claim set under the shared `Order -> URL` fence. A link reused after an older
+  adjudication creates fresh immutable fraud evidence, commits its hold/audit/
+  staff event, and blocks the transition before money can move.
+- Ordered rollout requires migrations `20260811130000` through
+  `20260811133000`, including the separately committed enum and low-lock check
+  validation steps, a drained email worker for the legacy refund-audience
+  repair, reviewed issuer values on both API and worker, and narrow runtime
+  DML/function privileges for `DeliveryUrlClaimFence`. Production promotion
+  remains gated on the populated PostgreSQL rehearsal and exact CI head.
+  Blueprint auto-deploy is disabled across the API and four frontends so a
+  merge cannot outrun those schema-before-code gates; promotion is manual.
+
 ## Current Local Work: Render Auth Runtime Hotfix
 
 - Render built merged commit `85a7baa` successfully but the API exited before

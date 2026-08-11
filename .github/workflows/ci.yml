@@ -90,11 +90,18 @@ jobs:
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level=moderate
 
-      - name: Install PostgreSQL client if missing
+      - name: Install PostgreSQL client and PDF renderer if missing
         run: |
+          packages=()
           if ! command -v psql >/dev/null 2>&1; then
+            packages+=(postgresql-client)
+          fi
+          if ! command -v pdftoppm >/dev/null 2>&1; then
+            packages+=(poppler-utils)
+          fi
+          if (( ${#packages[@]} > 0 )); then
             sudo apt-get update
-            sudo apt-get install -y --no-install-recommends postgresql-client
+            sudo apt-get install -y --no-install-recommends "${packages[@]}"
           fi
 
       - name: Apply migrations to CI database

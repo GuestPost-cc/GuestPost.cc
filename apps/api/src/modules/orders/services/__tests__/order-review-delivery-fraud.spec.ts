@@ -25,6 +25,20 @@ describe("OrderReviewService delivery confirmation fraud controls", () => {
       membership: {
         findFirst: jest.fn().mockResolvedValue({ role: "OWNER" }),
       },
+      orderDeliveryVersion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "delivery-1",
+          orderId: order.id,
+          normalizedUrl: "https://publisher.example/reused",
+          supersededByVersion: null,
+        }),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      deliveryFraudFlag: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({ id: "fresh-flag" }),
+      },
       deliveryFraudHold: {
         findMany: jest.fn().mockResolvedValue([
           {
@@ -34,7 +48,10 @@ describe("OrderReviewService delivery confirmation fraud controls", () => {
           },
         ]),
       },
-      auditLog: { findFirst: jest.fn().mockResolvedValue(null) },
+      auditLog: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+      },
     }
     const audit = { log: jest.fn().mockResolvedValue(undefined) }
     const cancellation = {
@@ -66,5 +83,90 @@ describe("OrderReviewService delivery confirmation fraud controls", () => {
       }),
       prisma,
     )
+  })
+
+  it("dispatches only the confirmation keys from the committed retry", async () => {
+    const order = {
+      id: "order-1",
+      organizationId: "organization-1",
+      customerId: "customer-1",
+      status: "VERIFIED",
+      version: 7,
+      activeDeliveryVersionId: "delivery-1",
+    }
+    const fresh = {
+      ...order,
+      status: "DELIVERED",
+      version: 8,
+      websiteId: null,
+    }
+    let transactionAttempt = 0
+    const prisma: any = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: order.id }]),
+      $transaction: jest.fn().mockImplementation(async (callback: any) => {
+        transactionAttempt++
+        const value = await callback(prisma)
+        if (transactionAttempt === 1) throw { code: "P2034" }
+        return value
+      }),
+      order: {
+        findFirst: jest.fn().mockResolvedValue(order),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(fresh),
+      },
+      membership: {
+        findFirst: jest.fn().mockResolvedValue({ role: "OWNER" }),
+      },
+      orderDeliveryVersion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "delivery-1",
+          orderId: order.id,
+          normalizedUrl: "https://publisher.example/article",
+          supersededByVersion: null,
+        }),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      deliveryFraudFlag: { findMany: jest.fn().mockResolvedValue([]) },
+      deliveryFraudHold: { findMany: jest.fn().mockResolvedValue([]) },
+      auditLog: { findFirst: jest.fn().mockResolvedValue(null) },
+      orderEvent: { create: jest.fn().mockResolvedValue({}) },
+    }
+    const audit = { log: jest.fn().mockResolvedValue(undefined) }
+    const cancellation = {
+      assertNoActiveCancellation: jest.fn().mockResolvedValue(undefined),
+    }
+    const communications = {
+      customerOrderRecipients: jest.fn().mockResolvedValue(["customer-1"]),
+      publisherRecipients: jest.fn().mockResolvedValue([]),
+      record: jest.fn().mockResolvedValue({ eventId: "event" }),
+      dispatchManyByDedupKeyBestEffort: jest.fn(),
+    }
+    const service = new OrderReviewService(
+      prisma,
+      audit as any,
+      {} as any,
+      cancellation as any,
+      communications as any,
+    )
+    jest
+      .spyOn(service, "createSettlementForOrder")
+      .mockImplementation(async () => [
+        `settlement-attempt-${transactionAttempt}`,
+      ])
+
+    await service.confirmDelivery(
+      order.id,
+      order.organizationId,
+      order.customerId,
+    )
+
+    expect(transactionAttempt).toBe(2)
+    expect(
+      communications.dispatchManyByDedupKeyBestEffort,
+    ).toHaveBeenCalledWith([
+      "settlement-attempt-2",
+      `order:${order.id}:delivered`,
+    ])
   })
 })

@@ -2,6 +2,7 @@ import type {
   ListingServiceOption,
   MarketplaceListing,
 } from "@guestpost/api-client"
+import { websiteMetricSourceDisclosure } from "@guestpost/shared"
 
 export const SERVICE_OPTIONS = [
   {
@@ -96,6 +97,23 @@ export function formatCompactNumber(value: number): string {
     notation: value >= 1_000 ? "compact" : "standard",
     maximumFractionDigits: 1,
   }).format(value)
+}
+
+export function metricSourceSummary(metric?: {
+  source?: string | null
+  status?: string | null
+}): string {
+  if (!metric) return "Unavailable"
+  const disclosure = websiteMetricSourceDisclosure(metric.source)
+  const status =
+    metric.status === "CURRENT"
+      ? "Current"
+      : metric.status === "STALE"
+        ? "Stale"
+        : "Unavailable"
+  return `${status} · ${disclosure.shortLabel}${
+    disclosure.independentlyVerified ? "" : " · not independently verified"
+  }`
 }
 
 export function availableServices(

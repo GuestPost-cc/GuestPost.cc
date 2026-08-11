@@ -939,6 +939,9 @@ export class PublisherPayoutsService {
         payoutMethodId,
         userId,
       )
+      this.communications?.dispatchByDedupKeyBestEffort(
+        `withdrawal:${committed.id}:withdrawal_requested`,
+      )
       return committed
     }
 
@@ -954,8 +957,9 @@ export class PublisherPayoutsService {
     assertApiFinanceOperationAllowed("new_liability")
 
     const publicReference = createFinancialReference("WD")
+    let result: any
     try {
-      return await this.runSerializable(async (tx) => {
+      result = await this.runSerializable(async (tx) => {
         // Idempotency: scoped per publisher via @@unique([publisherId, idempotencyKey]).
         // Never used as the row's PK — a colliding client key must not be able
         // to address another publisher's withdrawal.
@@ -1197,8 +1201,12 @@ export class PublisherPayoutsService {
         payoutMethodId,
         userId,
       )
-      return existing
+      result = existing
     }
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `withdrawal:${result.id}:withdrawal_requested`,
+    )
+    return result
   }
 
   async approveWithdrawal(id: string, approvedBy: string) {
@@ -1406,12 +1414,22 @@ export class PublisherPayoutsService {
         tx,
       )
 
+      const communicationEventId = await this.recordPublisherCommunication(
+        tx,
+        w.publisherId,
+        w.publisher.organizationId,
+        id,
+        "WITHDRAWAL_APPROVED",
+        `Withdrawal of ${w.amount} has been approved.`,
+      )
+
       return {
         kind: "approved" as const,
         updated,
         publisherId: w.publisherId,
         organizationId: w.publisher.organizationId,
         amount: w.amount,
+        communicationEventId,
       }
     })
 
@@ -1422,7 +1440,8 @@ export class PublisherPayoutsService {
       })
     }
 
-    await this.notifyPublisherMembers(
+    await this.dispatchPublisherCommunication(
+      result.communicationEventId,
       result.publisherId,
       result.organizationId,
       result.updated.id,
@@ -1433,13 +1452,14 @@ export class PublisherPayoutsService {
     return result.updated
   }
 
-  private async notifyPublisherMembers(
+  private async recordPublisherCommunication(
+    tx: any,
     publisherId: string,
     organizationId: string,
     withdrawalId: string,
     type: string,
     message: string,
-  ) {
+  ): Promise<string | null> {
     if (this.communications) {
       const eventTypes: Record<string, CommunicationEventType> = {
         WITHDRAWAL_REQUESTED: "PAYOUT_WITHDRAWAL_REQUESTED",
@@ -1453,26 +1473,46 @@ export class PublisherPayoutsService {
       const eventType = eventTypes[type]
       if (!eventType) {
         this.logger.warn(`Unsupported payout communication type: ${type}`)
-        return
+        return null
       }
-      const recipients =
-        await this.communications.publisherRecipients(publisherId)
-      const event = await this.communications.record({
-        type: eventType,
-        aggregateType: "Withdrawal",
-        aggregateId: withdrawalId,
-        organizationId,
-        title: type
-          .replace(/^WITHDRAWAL_/, "Withdrawal ")
-          .replace(/_/g, " ")
-          .toLowerCase()
-          .replace(/^./, (character) => character.toUpperCase()),
-        message,
-        actionPath: "/dashboard/withdrawals",
-        dedupKey: `withdrawal:${withdrawalId}:${type.toLowerCase()}`,
-        recipientUserIds: recipients,
-      })
-      this.communications.dispatchBestEffort(event.eventId)
+      const recipients = await this.communications.publisherRecipients(
+        publisherId,
+        false,
+        tx,
+      )
+      const event = await this.communications.record(
+        {
+          type: eventType,
+          aggregateType: "Withdrawal",
+          aggregateId: withdrawalId,
+          organizationId,
+          title: type
+            .replace(/^WITHDRAWAL_/, "Withdrawal ")
+            .replace(/_/g, " ")
+            .toLowerCase()
+            .replace(/^./, (character) => character.toUpperCase()),
+          message,
+          actionPath: "/dashboard/withdrawals",
+          dedupKey: `withdrawal:${withdrawalId}:${type.toLowerCase()}`,
+          recipientUserIds: recipients,
+        },
+        tx,
+      )
+      return event.eventId
+    }
+    return null
+  }
+
+  private async dispatchPublisherCommunication(
+    communicationEventId: string | null,
+    publisherId: string,
+    organizationId: string,
+    _withdrawalId: string,
+    type: string,
+    message: string,
+  ): Promise<void> {
+    if (communicationEventId && this.communications) {
+      this.communications.dispatchBestEffort(communicationEventId)
       return
     }
     const memberships = await this.prisma.publisherMembership.findMany({
@@ -1529,24 +1569,46 @@ export class PublisherPayoutsService {
       )
     }
 
-    const result = await finalizePayoutExecution(this.prisma, {
-      source: "MANUAL_BANK_CONFIRMATION",
-      withdrawalPublicReference,
-      executionId,
-      withdrawalId: id,
-      providerName: "manual",
-      providerReference: bankReference,
-      evidenceAt: paidAt,
-      actorUserId: completedBy,
-      reason,
-      metadata: {
-        manualCompletion: {
-          bankReference,
-          paidAt: paidAt.toISOString(),
-          reason,
+    const result = await finalizePayoutExecution(
+      this.prisma,
+      {
+        source: "MANUAL_BANK_CONFIRMATION",
+        withdrawalPublicReference,
+        executionId,
+        withdrawalId: id,
+        providerName: "manual",
+        providerReference: bankReference,
+        evidenceAt: paidAt,
+        actorUserId: completedBy,
+        reason,
+        metadata: {
+          manualCompletion: {
+            bankReference,
+            paidAt: paidAt.toISOString(),
+            reason,
+          },
         },
       },
-    })
+      {
+        afterTransition: async (tx, transition) => {
+          if (transition.kind !== "completed") return
+          const withdrawal = await tx.withdrawal.findUniqueOrThrow({
+            where: { id },
+            include: {
+              publisher: { select: { organizationId: true } },
+            },
+          })
+          await this.recordPublisherCommunication(
+            tx,
+            withdrawal.publisherId,
+            withdrawal.publisher.organizationId,
+            id,
+            "WITHDRAWAL_COMPLETED",
+            `Withdrawal of ${withdrawal.amount} has been paid.`,
+          )
+        },
+      },
+    )
     if (result.kind === "conflict") {
       const body = { code: result.code, message: result.message }
       if (result.code === "MAKER_CHECKER_VIOLATION") {
@@ -1559,17 +1621,24 @@ export class PublisherPayoutsService {
       where: { id },
     })
     if (result.kind === "completed") {
-      const publisher = await this.prisma.publisher.findUniqueOrThrow({
-        where: { id: updated.publisherId },
-        select: { organizationId: true },
-      })
-      await this.notifyPublisherMembers(
-        updated.publisherId,
-        publisher.organizationId,
-        id,
-        "WITHDRAWAL_COMPLETED",
-        `Withdrawal of ${updated.amount} has been paid.`,
-      )
+      if (this.communications) {
+        this.communications.dispatchByDedupKeyBestEffort(
+          `withdrawal:${id}:withdrawal_completed`,
+        )
+      } else {
+        const publisher = await this.prisma.publisher.findUniqueOrThrow({
+          where: { id: updated.publisherId },
+          select: { organizationId: true },
+        })
+        await this.dispatchPublisherCommunication(
+          null,
+          updated.publisherId,
+          publisher.organizationId,
+          id,
+          "WITHDRAWAL_COMPLETED",
+          `Withdrawal of ${updated.amount} has been paid.`,
+        )
+      }
     }
     return updated
   }
@@ -1795,10 +1864,19 @@ export class PublisherPayoutsService {
       const updated = await tx.withdrawal.findUniqueOrThrow({
         where: { id },
       })
-      return { updated, withdrawal }
+      const communicationEventId = await this.recordPublisherCommunication(
+        tx,
+        withdrawal.publisherId,
+        withdrawal.publisher.organizationId,
+        id,
+        "WITHDRAWAL_REJECTED",
+        `Withdrawal of ${withdrawal.amount} was rejected. Contact support if you need more information.`,
+      )
+      return { updated, withdrawal, communicationEventId }
     })
 
-    await this.notifyPublisherMembers(
+    await this.dispatchPublisherCommunication(
+      result.communicationEventId,
       result.withdrawal.publisherId,
       result.withdrawal.publisher.organizationId,
       id,

@@ -48,6 +48,8 @@ packages/ui/coverage/
 scripts/.wise-validation-key*
 repomix-output.xml
 test-results/
+# Deterministic PDF release fixtures and rendered QA pages.
+/tmp/
 
 
 Supporting_Reports_ENG_STATE/

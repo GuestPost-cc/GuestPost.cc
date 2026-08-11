@@ -1453,6 +1453,8 @@ describe("F-5: customerApprove cannot corrupt a RELEASED settlement", () => {
     prisma.orderDeliveryVersion.findUnique.mockResolvedValue({
       id: "delivery-1",
       orderId: "order-1",
+      normalizedUrl: "https://publisher.example/article",
+      supersededByVersion: null,
       verificationStatus: "VERIFIED",
       interventionStatus: "NONE",
     })

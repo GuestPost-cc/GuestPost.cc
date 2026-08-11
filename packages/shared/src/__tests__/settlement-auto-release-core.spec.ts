@@ -44,10 +44,14 @@ function makeTx() {
     order: {
       findUnique: jest.fn().mockResolvedValue({
         id: "o1",
+        organizationId: "org1",
+        customerId: "customer1",
         status: "DELIVERED",
         version: 7,
         currency: "USD",
         paymentStatus: "PAID",
+        verifyMethod: "AUTO",
+        amount: "100.00",
         activeDeliveryVersionId: "v1",
       }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -56,16 +60,26 @@ function makeTx() {
       findUnique: jest.fn().mockResolvedValue({
         id: "v1",
         orderId: "o1",
+        normalizedUrl: "https://publisher.example/article",
+        supersededByVersion: null,
         verificationStatus: "VERIFIED",
         interventionStatus: "NONE",
       }),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
-    orderDispute: { findFirst: jest.fn().mockResolvedValue(null) },
+    orderDispute: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      count: jest.fn().mockResolvedValue(0),
+    },
     revision: { findFirst: jest.fn().mockResolvedValue(null) },
     orderCancellationRequest: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
-    deliveryFraudFlag: { count: jest.fn().mockResolvedValue(0) },
+    deliveryFraudFlag: {
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     deliveryVerificationEvidence: {
       findFirst: jest.fn().mockResolvedValue(successfulEvidence()),
     },
@@ -73,6 +87,10 @@ function makeTx() {
       findUnique: jest.fn().mockResolvedValue(dueSettlement()),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
+    publisher: {
+      findUnique: jest.fn().mockResolvedValue({ tier: "VERIFIED" }),
+    },
+    paymentDispute: { count: jest.fn().mockResolvedValue(0) },
     settlementApproval: { upsert: jest.fn().mockResolvedValue({}) },
     publisherBalance: {
       create: jest.fn().mockResolvedValue({}),
@@ -212,6 +230,40 @@ describe("runSettlementAutoRelease canonical money boundary", () => {
     })
   })
 
+  it.each([
+    [
+      "a customer chargeback",
+      (tx: ReturnType<typeof makeTx>) =>
+        tx.paymentDispute.count.mockResolvedValue(1),
+    ],
+    [
+      "a publisher downgrade",
+      (tx: ReturnType<typeof makeTx>) =>
+        tx.publisher.findUnique.mockResolvedValue({ tier: "NEW" }),
+    ],
+  ])("re-checks %s and leaves the settlement for explicit Finance review", async (_label, arrange) => {
+    const tx = makeTx()
+    arrange(tx)
+    const prisma = makePrisma(tx)
+
+    const result = await runSettlementAutoRelease(prisma as any, {
+      now: RELEASE_AT,
+    })
+
+    expect(result).toMatchObject({
+      scanned: 1,
+      released: 0,
+      skipped: 1,
+      freshnessBlocked: 0,
+      riskBlocked: 1,
+    })
+    expect(tx.settlementApproval.upsert).not.toHaveBeenCalled()
+    expect(tx.settlement.updateMany).not.toHaveBeenCalled()
+    expect(tx.order.updateMany).not.toHaveBeenCalled()
+    expect(tx.publisherBalance.create).not.toHaveBeenCalled()
+    expect(tx.transaction.create).not.toHaveBeenCalled()
+  })
+
   it("retries a trusted serialization failure with a bounded fresh transaction", async () => {
     const tx = makeTx()
     const prisma = makePrisma(tx)
@@ -225,6 +277,31 @@ describe("runSettlementAutoRelease canonical money boundary", () => {
 
     expect(result).toMatchObject({ scanned: 1, released: 1, skipped: 0 })
     expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+  })
+
+  it("reloads customer risk on a serialization retry instead of reusing a clean result", async () => {
+    const tx = makeTx()
+    const prisma = makePrisma(tx)
+    prisma.$transaction
+      .mockRejectedValueOnce({ code: "P2034" })
+      .mockImplementationOnce(async (fn: any) => {
+        tx.paymentDispute.count.mockResolvedValue(1)
+        return fn(tx)
+      })
+
+    const result = await runSettlementAutoRelease(prisma as any, {
+      now: RELEASE_AT,
+    })
+
+    expect(result).toMatchObject({
+      scanned: 1,
+      released: 0,
+      skipped: 1,
+      riskBlocked: 1,
+    })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+    expect(tx.settlementApproval.upsert).not.toHaveBeenCalled()
+    expect(tx.transaction.create).not.toHaveBeenCalled()
   })
 
   it("nets debt in exact cents without binary floating-point arithmetic", async () => {

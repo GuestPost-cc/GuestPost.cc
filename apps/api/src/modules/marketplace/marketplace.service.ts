@@ -9,6 +9,8 @@ import {
 } from "@guestpost/database"
 import {
   computeListingPhase,
+  isMarketplaceAlgorithmicMetricSource,
+  MARKETPLACE_ALGORITHMIC_METRIC_SOURCES,
   normalizePositiveUsdMoney,
   QUEUES,
   USD_CURRENCY,
@@ -58,8 +60,19 @@ const publicWebsiteInclude = {
 } satisfies Prisma.WebsiteInclude
 
 const MAX_CANONICAL_ORGANIC_TRAFFIC = 2_147_483_647
+const MAX_CANONICAL_DOMAIN_RATING = 100
+const MARKETPLACE_ALGORITHMIC_METRIC_SOURCE_SQL = Prisma.join(
+  MARKETPLACE_ALGORITHMIC_METRIC_SOURCES.map(
+    (source) => Prisma.sql`${source}::"WebsiteMetricSource"`,
+  ),
+)
 
-type SqlSearchSort = "recommended" | "traffic" | "price_asc" | "price_desc"
+type SqlSearchSort =
+  | "recommended"
+  | "traffic"
+  | "dr"
+  | "price_asc"
+  | "price_desc"
 
 // Phase 7: the LISTING_TYPE_TO_SERVICE_TYPE bridge map was removed. Clients
 // now send `services[]` directly; the legacy single-service shape is gone.
@@ -106,11 +119,27 @@ export class MarketplaceService {
     return {
       key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
       provider: WebsiteMetricProvider.AHREFS,
+      source: { in: [...MARKETPLACE_ALGORITHMIC_METRIC_SOURCES] },
       status: WebsiteMetricStatus.CURRENT,
       value: {
         gte: minValue,
         lte: MAX_CANONICAL_ORGANIC_TRAFFIC,
       },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: asOf } }],
+    }
+  }
+
+  private canonicalDomainRatingFilter(
+    asOf: Date,
+    minValue = 0,
+    maxValue = MAX_CANONICAL_DOMAIN_RATING,
+  ) {
+    return {
+      key: WebsiteMetricKey.AHREFS_DOMAIN_RATING,
+      provider: WebsiteMetricProvider.AHREFS,
+      source: { in: [...MARKETPLACE_ALGORITHMIC_METRIC_SOURCES] },
+      status: WebsiteMetricStatus.CURRENT,
+      value: { gte: minValue, lte: maxValue },
       OR: [{ expiresAt: null }, { expiresAt: { gt: asOf } }],
     }
   }
@@ -129,10 +158,33 @@ export class MarketplaceService {
       WHERE metric."websiteId" = ${websiteId}
         AND metric."key" = ${WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC}::"WebsiteMetricKey"
         AND metric."provider" = ${WebsiteMetricProvider.AHREFS}::"WebsiteMetricProvider"
+        AND metric."source" IN (${MARKETPLACE_ALGORITHMIC_METRIC_SOURCE_SQL})
         AND metric."status" = ${WebsiteMetricStatus.CURRENT}::"WebsiteMetricStatus"
         AND (metric."expiresAt" IS NULL OR metric."expiresAt" > ${asOf})
         AND metric."value" BETWEEN 0 AND ${MAX_CANONICAL_ORGANIC_TRAFFIC}
         AND metric."value" = trunc(metric."value")
+      LIMIT 1
+    )`
+  }
+
+  private canonicalDomainRatingSql(
+    asOf: Date,
+    listingAlias: "listing" | "candidate" = "listing",
+  ) {
+    const websiteId =
+      listingAlias === "candidate"
+        ? Prisma.sql`candidate."websiteId"`
+        : Prisma.sql`listing."websiteId"`
+    return Prisma.sql`(
+      SELECT metric."value"
+      FROM "WebsiteMetric" metric
+      WHERE metric."websiteId" = ${websiteId}
+        AND metric."key" = ${WebsiteMetricKey.AHREFS_DOMAIN_RATING}::"WebsiteMetricKey"
+        AND metric."provider" = ${WebsiteMetricProvider.AHREFS}::"WebsiteMetricProvider"
+        AND metric."source" IN (${MARKETPLACE_ALGORITHMIC_METRIC_SOURCE_SQL})
+        AND metric."status" = ${WebsiteMetricStatus.CURRENT}::"WebsiteMetricStatus"
+        AND (metric."expiresAt" IS NULL OR metric."expiresAt" > ${asOf})
+        AND metric."value" BETWEEN 0 AND ${MAX_CANONICAL_DOMAIN_RATING}
       LIMIT 1
     )`
   }
@@ -146,6 +198,7 @@ export class MarketplaceService {
           (item: any) =>
             item.key === WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC &&
             item.provider === WebsiteMetricProvider.AHREFS &&
+            isMarketplaceAlgorithmicMetricSource(item.source) &&
             item.status === WebsiteMetricStatus.CURRENT &&
             (!item.expiresAt ||
               new Date(item.expiresAt).getTime() > asOf.getTime()),
@@ -178,6 +231,10 @@ export class MarketplaceService {
       semrushData,
       metricsData,
       trafficData,
+      domainRating: _legacyDomainRating,
+      domainAuthority: _legacyDomainAuthority,
+      referringDomains: _legacyReferringDomains,
+      spamScore: _legacySpamScore,
       publisher,
       ownerType,
       services,
@@ -290,6 +347,10 @@ export class MarketplaceService {
       metricsData: _quarantinedSearchConsoleData,
       trafficData: _quarantinedAnalyticsData,
       traffic: _quarantinedDenormalizedTraffic,
+      domainRating: _quarantinedLegacyDomainRating,
+      domainAuthority: _quarantinedLegacyDomainAuthority,
+      referringDomains: _quarantinedLegacyReferringDomains,
+      spamScore: _quarantinedLegacySpamScore,
       ...safeListing
     } = listing
     const categories = Array.isArray(listing?.categories)
@@ -390,6 +451,7 @@ export class MarketplaceService {
     }
 
     const websiteFilter: Record<string, unknown> = {}
+    const websiteMetricConditions: Record<string, unknown>[] = []
     if (ownershipType) websiteFilter.ownershipType = ownershipType as any
 
     if (country) {
@@ -433,19 +495,23 @@ export class MarketplaceService {
       serviceFilter.turnaroundDays = { lte: maxTurnaroundDays }
     where.services = { some: serviceFilter }
 
-    // DR remains a compatibility listing field. Traffic is a website fact and
-    // is filtered/ranked only through its source-aware canonical metric row.
     if (minDR !== undefined || maxDR !== undefined) {
-      where.domainRating = {}
-      if (minDR !== undefined) where.domainRating.gte = minDR
-      if (maxDR !== undefined) where.domainRating.lte = maxDR
+      websiteMetricConditions.push({
+        metricsHistory: {
+          some: this.canonicalDomainRatingFilter(metricsAsOf, minDR, maxDR),
+        },
+      })
     }
 
     if (minTraffic !== undefined) {
-      websiteFilter.metricsHistory = {
-        some: this.canonicalOrganicTrafficFilter(metricsAsOf, minTraffic),
-      }
+      websiteMetricConditions.push({
+        metricsHistory: {
+          some: this.canonicalOrganicTrafficFilter(metricsAsOf, minTraffic),
+        },
+      })
     }
+    if (websiteMetricConditions.length > 0)
+      websiteFilter.AND = websiteMetricConditions
     if (Object.keys(websiteFilter).length > 0) where.website = websiteFilter
 
     if (tags && tags.length > 0) {
@@ -479,7 +545,7 @@ export class MarketplaceService {
     let orderBy: any = [{ createdAt: "desc" }]
     switch (sortBy) {
       case "dr":
-        orderBy = [{ domainRating: "desc" }]
+        // Handled below with the canonical WebsiteMetric query.
         break
       case "traffic":
         // Handled below with the canonical WebsiteMetric query.
@@ -525,7 +591,10 @@ export class MarketplaceService {
     let listings: SearchListingRow[]
     let total: number
     const sqlSort: SqlSearchSort | null =
-      sortBy === "price_asc" || sortBy === "price_desc" || sortBy === "traffic"
+      sortBy === "price_asc" ||
+      sortBy === "price_desc" ||
+      sortBy === "traffic" ||
+      sortBy === "dr"
         ? sortBy
         : sortBy === undefined || sortBy === "recommended"
           ? "recommended"
@@ -606,6 +675,7 @@ export class MarketplaceService {
       Prisma.sql`service."availability" = ${ServiceAvailability.AVAILABLE}::"ServiceAvailability"`,
     ]
     const canonicalTraffic = this.canonicalOrganicTrafficSql(metricsAsOf)
+    const canonicalDomainRating = this.canonicalDomainRatingSql(metricsAsOf)
 
     const categorySlugs = dto.categories?.length
       ? dto.categories
@@ -694,10 +764,14 @@ export class MarketplaceService {
       )
     }
     if (dto.minDR !== undefined) {
-      listingConditions.push(Prisma.sql`listing."domainRating" >= ${dto.minDR}`)
+      listingConditions.push(
+        Prisma.sql`${canonicalDomainRating} >= ${dto.minDR}`,
+      )
     }
     if (dto.maxDR !== undefined) {
-      listingConditions.push(Prisma.sql`listing."domainRating" <= ${dto.maxDR}`)
+      listingConditions.push(
+        Prisma.sql`${canonicalDomainRating} <= ${dto.maxDR}`,
+      )
     }
     if (dto.minTraffic !== undefined) {
       listingConditions.push(
@@ -779,7 +853,9 @@ export class MarketplaceService {
           }, listing."createdAt" DESC, listing."id" ASC`
         : sortBy === "traffic"
           ? Prisma.sql`${canonicalTraffic} DESC NULLS LAST, listing."createdAt" DESC, listing."id" ASC`
-          : Prisma.sql`listing."featured" DESC, ${canonicalTraffic} DESC NULLS LAST, listing."createdAt" DESC, listing."id" ASC`
+          : sortBy === "dr"
+            ? Prisma.sql`${canonicalDomainRating} DESC NULLS LAST, listing."createdAt" DESC, listing."id" ASC`
+            : Prisma.sql`listing."featured" DESC, ${canonicalTraffic} DESC NULLS LAST, listing."createdAt" DESC, listing."id" ASC`
     const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       SELECT listing."id"
       FROM "MarketplaceListing" listing
@@ -1503,76 +1579,118 @@ export class MarketplaceService {
     serviceId: string,
     input: UpdateListingServiceInput,
   ) {
-    const service = await this.prisma.listingService.findUnique({
-      where: { id: serviceId },
-      include: {
-        listing: {
-          select: {
-            id: true,
-            publisherId: true,
-            organizationId: true,
-            ownerType: true,
-            websiteId: true,
-            currency: true,
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Approval and service availability mutations lock the parent first.
+      // This makes the approval invariant (at least one AVAILABLE service)
+      // stable until the status write commits and serializes two attempts to
+      // pause the final pair of available services.
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "MarketplaceListing"
+        WHERE "id" = ${listingId}
+        FOR UPDATE
+      `
+      const service = await tx.listingService.findUnique({
+        where: { id: serviceId },
+        include: {
+          listing: {
+            select: {
+              id: true,
+              publisherId: true,
+              organizationId: true,
+              ownerType: true,
+              websiteId: true,
+              currency: true,
+              status: true,
+            },
           },
         },
-      },
-    })
-    if (!service || service.listingId !== listingId) {
-      throw new NotFoundException("Service not found on this listing")
-    }
-    await this.assertListingWriteAccess(actor, service.listing)
-    this.requireUsd(service.listing.currency, "Persisted listing currency")
-    this.requireUsd(service.currency, "Persisted service currency")
-    this.requireUsd(input.currency, "Service currency")
-
-    // Version-guarded update — concurrent edits or a stale tab cannot silently
-    // overwrite each other. The optimistic lock matches the pattern used
-    // throughout orders/settlements.
-    const updateData: Prisma.ListingServiceUncheckedUpdateInput = {
-      version: { increment: 1 },
-    }
-    if (input.price !== undefined)
-      updateData.price = this.requirePositiveUsdPrice(input.price)
-    if (input.currency !== undefined) updateData.currency = USD_CURRENCY
-    if (input.turnaroundDays !== undefined)
-      updateData.turnaroundDays = input.turnaroundDays
-    if (input.revisionRounds !== undefined)
-      updateData.revisionRounds = input.revisionRounds
-    if (input.warrantyDays !== undefined)
-      updateData.warrantyDays = input.warrantyDays
-    if (input.requirements !== undefined)
-      updateData.requirements = input.requirements as Prisma.InputJsonValue
-    if (input.fulfillmentSettings !== undefined)
-      updateData.fulfillmentSettings =
-        input.fulfillmentSettings as Prisma.InputJsonValue
-    if (input.availability !== undefined)
-      updateData.availability = input.availability
-
-    const res = await this.prisma.listingService.updateMany({
-      where: { id: serviceId, version: input.version },
-      data: updateData,
-    })
-    if (res.count === 0) {
-      throw new BadRequestException({
-        code: "VERSION_CONFLICT",
-        message: "Service was modified by another request — reload and retry",
       })
-    }
+      if (!service || service.listingId !== listingId) {
+        throw new NotFoundException("Service not found on this listing")
+      }
+      await this.assertListingWriteAccess(actor, service.listing, tx)
+      this.requireUsd(service.listing.currency, "Persisted listing currency")
+      this.requireUsd(service.currency, "Persisted service currency")
+      this.requireUsd(input.currency, "Service currency")
 
-    const updated = await this.prisma.listingService.findUnique({
-      where: { id: serviceId },
+      if (
+        service.listing.status === ListingStatus.APPROVED &&
+        service.availability === ServiceAvailability.AVAILABLE &&
+        input.availability !== undefined &&
+        input.availability !== ServiceAvailability.AVAILABLE
+      ) {
+        const availableServices = await tx.listingService.count({
+          where: {
+            listingId,
+            availability: ServiceAvailability.AVAILABLE,
+          },
+        })
+        if (availableServices <= 1) {
+          throw new BadRequestException({
+            code: "LAST_AVAILABLE_SERVICE",
+            message:
+              "Pause the marketplace listing before disabling its last available service.",
+          })
+        }
+      }
+
+      // Version-guarded update — concurrent edits or a stale tab cannot
+      // silently overwrite each other after the parent-level invariant lock.
+      const updateData: Prisma.ListingServiceUncheckedUpdateInput = {
+        version: { increment: 1 },
+      }
+      if (input.price !== undefined)
+        updateData.price = this.requirePositiveUsdPrice(input.price)
+      if (input.currency !== undefined) updateData.currency = USD_CURRENCY
+      if (input.turnaroundDays !== undefined)
+        updateData.turnaroundDays = input.turnaroundDays
+      if (input.revisionRounds !== undefined)
+        updateData.revisionRounds = input.revisionRounds
+      if (input.warrantyDays !== undefined)
+        updateData.warrantyDays = input.warrantyDays
+      if (input.requirements !== undefined)
+        updateData.requirements = input.requirements as Prisma.InputJsonValue
+      if (input.fulfillmentSettings !== undefined)
+        updateData.fulfillmentSettings =
+          input.fulfillmentSettings as Prisma.InputJsonValue
+      if (input.availability !== undefined)
+        updateData.availability = input.availability
+
+      const res = await tx.listingService.updateMany({
+        where: { id: serviceId, version: input.version },
+        data: updateData,
+      })
+      if (res.count === 0) {
+        throw new BadRequestException({
+          code: "VERSION_CONFLICT",
+          message: "Service was modified by another request — reload and retry",
+        })
+      }
+
+      const updated = await tx.listingService.findUnique({
+        where: { id: serviceId },
+      })
+      await this.createAuditLog(
+        actor.userId,
+        service.listing.organizationId,
+        "LISTING_SERVICE_UPDATED",
+        serviceId,
+        {
+          listingId,
+          changes: Object.keys(input).filter((k) => k !== "version"),
+        },
+        tx,
+      )
+      return {
+        updated,
+        waitlistReleased:
+          service.availability === ServiceAvailability.WAITLIST &&
+          input.availability === ServiceAvailability.AVAILABLE,
+        serviceType: service.serviceType,
+        organizationId: service.listing.organizationId,
+      }
     })
-    await this.createAuditLog(
-      actor.userId,
-      service.listing.organizationId,
-      "LISTING_SERVICE_UPDATED",
-      serviceId,
-      {
-        listingId,
-        changes: Object.keys(input).filter((k) => k !== "version"),
-      },
-    )
 
     // ── Phase 6: waitlist → available fan-out ────────────────────────────
     // Notifies every user with a MarketplaceFavorite scoped to this
@@ -1581,14 +1699,11 @@ export class MarketplaceService {
     // queue — no new processor needed since the recipient set is small.
     // Sites toggling rapidly aren't a real concern (this is a publisher-
     // initiated edit, not a system-driven flap), so we don't rate-limit.
-    if (
-      service.availability === "WAITLIST" &&
-      input.availability === "AVAILABLE"
-    ) {
+    if (result.waitlistReleased) {
       const favorites = await this.prisma.marketplaceFavorite.findMany({
         where: {
           listingId,
-          OR: [{ serviceType: service.serviceType }, { serviceType: null }],
+          OR: [{ serviceType: result.serviceType }, { serviceType: null }],
         },
         select: { userId: true },
       })
@@ -1602,18 +1717,18 @@ export class MarketplaceService {
       }
       await this.createAuditLog(
         actor.userId,
-        service.listing.organizationId,
+        result.organizationId,
         "LISTING_SERVICE_WAITLIST_RELEASED",
         serviceId,
         {
           listingId,
-          serviceType: service.serviceType,
+          serviceType: result.serviceType,
           notifiedCount: favorites.length,
         },
       )
     }
 
-    return updated
+    return result.updated
   }
 
   // Soft-disable rather than hard-delete: a paused row stays linked to any
@@ -1646,6 +1761,7 @@ export class MarketplaceService {
       ownerType?: "PUBLISHER" | "PLATFORM" | null
       websiteId?: string | null
     },
+    db: any = this.prisma,
   ) {
     if (actor.isStaff) {
       if (actor.staffRole === "SUPER_ADMIN") return
@@ -1654,7 +1770,7 @@ export class MarketplaceService {
         listing.ownerType === "PLATFORM" &&
         listing.websiteId
       ) {
-        const assignedWebsite = await this.prisma.website.findFirst({
+        const assignedWebsite = await db.website.findFirst({
           where: {
             id: listing.websiteId,
             ownershipType: "PLATFORM",
@@ -1673,10 +1789,10 @@ export class MarketplaceService {
         "Only platform staff can edit this listing's services",
       )
     }
-    const hasAccess = await this.verifyPublisherAccess(
-      actor.userId,
-      listing.publisherId,
-    )
+    const hasAccess = await db.publisherMembership.findFirst({
+      where: { userId: actor.userId, publisherId: listing.publisherId },
+      select: { id: true },
+    })
     if (!hasAccess) {
       throw new ForbiddenException("You don't have access to this listing")
     }
@@ -2400,45 +2516,12 @@ export class MarketplaceService {
 
   async getRecommendations(userId: string, dto: GetRecommendationsDto) {
     const { listingId, type = "recommended", limit = 10 } = dto
-
-    // Try to get AI recommendations first
-    const recommendations =
-      await this.prisma.marketplaceRecommendation.findMany({
-        where: { userId, type },
-        orderBy: { score: "desc" },
-        take: limit,
-      })
-
-    if (recommendations.length > 0) {
-      // Fetch listings separately since relation isn't defined in schema
-      const listingIds = recommendations.map((r) => r.listingId)
-      const listings = await this.prisma.marketplaceListing.findMany({
-        where: { id: { in: listingIds } },
-        include: {
-          categories: { include: { category: true } },
-          images: { where: { isPrimary: true }, take: 1 },
-          tags: { include: { tag: true } },
-        },
-      })
-
-      const listingMap = new Map(listings.map((l) => [l.id, l]))
-
-      return recommendations
-        .map((r) => {
-          const listing = listingMap.get(r.listingId)
-          if (!listing) return null
-          return {
-            ...this.withCategoryProjection(listing),
-            tags: listing.tags.map((t: any) => t.tag),
-            image: listing.images[0]?.url || null,
-            recommendationScore: r.score,
-            recommendationReason: r.reason,
-          }
-        })
-        .filter(Boolean)
-    }
-
-    // Fallback to rule-based recommendations
+    // Legacy stored scores have no feature-provenance or policy-version
+    // evidence, and no in-repository writer can prove that an old/external
+    // score excluded publisher-entered metrics. Ignore them fail-closed until
+    // a separately reviewed recommendation contract records the exact feature
+    // policy. Current rule-based paths use auditable marketplace facts only.
+    void userId
     return this.getRuleBasedRecommendations(listingId, type, limit)
   }
 
@@ -2669,8 +2752,9 @@ export class MarketplaceService {
     action: string,
     entityId?: string,
     metadata?: any,
+    db: any = this.prisma,
   ) {
-    await this.prisma.auditLog.create({
+    await db.auditLog.create({
       data: {
         action,
         entityType: "MARKETPLACE_LISTING",

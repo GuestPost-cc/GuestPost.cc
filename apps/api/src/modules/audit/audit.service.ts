@@ -62,12 +62,11 @@ export class AuditService {
     if (tx) {
       // Inside a transaction the write must NOT be swallowed — a failed
       // audit insert aborts the financial operation with it.
-      await tx.auditLog.create({ data })
-      return
+      return tx.auditLog.create({ data })
     }
 
     try {
-      await this.prisma.auditLog.create({ data })
+      return await this.prisma.auditLog.create({ data })
     } catch (err) {
       this.logger.warn(`Audit log failed for ${params.action}: ${err}`)
     }

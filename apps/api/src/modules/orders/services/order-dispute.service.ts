@@ -325,6 +325,10 @@ export class OrderDisputeService {
       }
       throw error
     }
+    this.communications?.dispatchManyByDedupKeyBestEffort([
+      `dispute:${dispute.id}:opened`,
+      `staff:dispute:${dispute.id}:opened`,
+    ])
 
     // Snapshot the evidence inventory at dispute-open so reviewers see a
     // complete, immutable package (assembled live via GET /disputes/:id/evidence).
@@ -531,12 +535,17 @@ export class OrderDisputeService {
       },
     )
 
+    if (action === "REFUND") {
+      this.refund.dispatchOrderRefundCommunicationsBestEffort(resolved.orderId)
+    }
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `dispute:${disputeId}:resolved`,
+    )
     await this.queue.enqueueTrustRecompute(
       await this.publisherIdForOrder(resolved.orderId),
       "DISPUTE_RESOLVED",
       `dispute ${disputeId} resolved (${action})`,
     )
-
     return resolved.dispute
   }
 }

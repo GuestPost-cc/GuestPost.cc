@@ -134,9 +134,10 @@ runs type/lint/dependency checks plus API/package/UI tests, and builds all 12
 production targets.
 
 Render remains the deployment owner. Every Blueprint service uses
-`autoDeployTrigger: checksPass`, so pushes to `main` deploy only after the
-GitHub gate succeeds. GitHub Actions does not receive Neon, Upstash, Render, R2,
-Resend, Google, or Sentry deployment credentials.
+`autoDeployTrigger: off`; a green push does not deploy. Operators manually
+promote one reviewed commit only after its migration, runtime-role,
+configuration, drain, and staging gates pass. GitHub Actions does not receive
+Neon, Upstash, Render, R2, Resend, Google, or Sentry deployment credentials.
 
 ## Build System
 

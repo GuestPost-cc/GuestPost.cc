@@ -14,7 +14,11 @@ if (process.env.NODE_ENV === "development") {
 // later silently no-ops the wrappers.
 import "./instrument"
 import { createAuth, toNodeHandler } from "@guestpost/auth"
-import { QUEUES, resolveFinanceRuntimeMode } from "@guestpost/shared"
+import {
+  financialDocumentIssuerFromEnv,
+  QUEUES,
+  resolveFinanceRuntimeMode,
+} from "@guestpost/shared"
 import {
   assertDevelopmentSeedDatabaseSentinel,
   isDevelopmentSeedApiRequestAllowed,
@@ -97,6 +101,15 @@ function validateEnv(): void {
       console.error(
         "FATAL: QUEUE_SIGNING_SECRET is required in production (do not reuse JWT_SECRET)",
       )
+      process.exit(1)
+    }
+    try {
+      financialDocumentIssuerFromEnv(process.env)
+      bootstrapLogger.info("financial document configuration validated")
+    } catch (error) {
+      bootstrapLogger.error("Financial document configuration is invalid", {
+        error: error instanceof Error ? error.message : String(error),
+      })
       process.exit(1)
     }
   }

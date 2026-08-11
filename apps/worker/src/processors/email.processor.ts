@@ -13,7 +13,16 @@ import {
 } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import * as Sentry from "@sentry/node"
 import * as nodemailer from "nodemailer"
+import {
+  beginEmailDispatch,
+  type EmailDeliveryLease,
+  emailDeliveryLeaseWhere,
+  ownsEmailDeliveryLease,
+  recoverExpiredEmailDeliveryLeases,
+} from "../lib/email-delivery-lease"
+import { runEmailDeliveryTerminalTransaction } from "../lib/email-event-finalization"
 import {
   type RenderedFinancialDocumentAttachment,
   renderFinancialDocumentPdf,
@@ -23,7 +32,6 @@ import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.email")
-const DELIVERY_LEASE_MS = 15 * 60 * 1000
 const MAX_OUTBOX_BATCH = 100
 const MAX_SUBJECT_LENGTH = 500
 const MAX_HTML_LENGTH = 500_000
@@ -182,36 +190,47 @@ function permanentSmtpFailure(error: unknown): boolean {
   return responseCode === 550 || responseCode === 551 || responseCode === 553
 }
 
-async function finalizeEvent(eventId: string): Promise<void> {
-  const outstanding = await prisma.communicationDelivery.count({
-    where: {
-      eventId,
-      status: { in: ["PENDING", "PROCESSING", "FAILED"] },
-    },
-  })
-  if (outstanding === 0) {
-    await prisma.communicationEvent.updateMany({
-      where: { id: eventId, status: { not: "PROCESSED" } },
-      data: { status: "PROCESSED", processedAt: new Date(), lockedAt: null },
-    })
+function reportRecoveredUncertain(
+  uncertain: number,
+  deliveryId?: string,
+): void {
+  if (uncertain === 0) return
+  const context = {
+    uncertainCount: uncertain,
+    ...(deliveryId ? { deliveryId } : {}),
   }
+  logger.error("expired SMTP dispatch lease requires reconciliation", context)
+  Sentry.captureMessage("Email delivery outcome uncertain after lease expiry", {
+    level: "error",
+    tags: { subsystem: "email", reason: "dispatch_lease_expired" },
+    extra: context,
+  })
 }
 
 async function suppressDelivery(
   deliveryId: string,
   eventId: string,
   reason: string,
-): Promise<void> {
-  await prisma.communicationDelivery.update({
-    where: { id: deliveryId },
-    data: {
-      status: "SUPPRESSED",
-      lockedAt: null,
-      lastError: reason.slice(0, 100),
-      failedAt: new Date(),
+  lease: EmailDeliveryLease,
+): Promise<boolean> {
+  const suppressed = await runEmailDeliveryTerminalTransaction(
+    prisma,
+    eventId,
+    async (tx: any) => {
+      const changed = await tx.communicationDelivery.updateMany({
+        where: emailDeliveryLeaseWhere(deliveryId, lease),
+        data: {
+          status: "SUPPRESSED",
+          lockedAt: null,
+          lastError: reason.slice(0, 100),
+          failedAt: new Date(),
+        },
+      })
+      return { terminalized: changed.count === 1, result: changed }
     },
-  })
-  await finalizeEvent(eventId)
+  )
+  if (suppressed.count !== 1) return false
+  return true
 }
 
 async function buildFinancialAttachment(event: {
@@ -265,21 +284,11 @@ export async function processEmailDelivery(deliveryId: string) {
   }
 
   const now = new Date()
-  await prisma.communicationDelivery.updateMany({
-    where: {
-      id: deliveryId,
-      channel: "EMAIL",
-      status: "PROCESSING",
-      lockedAt: { lt: new Date(now.getTime() - DELIVERY_LEASE_MS) },
-    },
-    data: {
-      status: "FAILED",
-      lockedAt: null,
-      availableAt: now,
-      failedAt: now,
-      lastError: "Recovered an expired delivery lease",
-    },
+  const recovery = await recoverExpiredEmailDeliveryLeases(prisma, {
+    now,
+    deliveryId,
   })
+  reportRecoveredUncertain(recovery.uncertain, deliveryId)
 
   const claimed = await prisma.communicationDelivery.updateMany({
     where: {
@@ -316,16 +325,25 @@ export async function processEmailDelivery(deliveryId: string) {
     },
   })
   if (!delivery) throw new Error("Claimed email delivery no longer exists")
+  const lease: EmailDeliveryLease = {
+    attempts: delivery.attempts,
+    lockedAt: now,
+  }
+  if (!ownsEmailDeliveryLease(delivery, lease)) {
+    return { sent: false, skipped: "lease-lost" }
+  }
 
   const user = delivery.user
   if (!user || user.banned || !user.emailVerified) {
-    await suppressDelivery(
+    const suppressed = await suppressDelivery(
       delivery.id,
       delivery.eventId,
       !user
         ? "Recipient account was removed"
         : "Recipient is not eligible for email",
+      lease,
     )
+    if (!suppressed) return { sent: false, skipped: "lease-lost" }
     return { sent: false, suppressed: true }
   }
 
@@ -341,11 +359,13 @@ export async function processEmailDelivery(deliveryId: string) {
       currentEmailPreference?.enabled,
     )
   ) {
-    await suppressDelivery(
+    const suppressed = await suppressDelivery(
       delivery.id,
       delivery.eventId,
       "Disabled by current notification preference",
+      lease,
     )
+    if (!suppressed) return { sent: false, skipped: "lease-lost" }
     return { sent: false, suppressed: true }
   }
 
@@ -355,11 +375,13 @@ export async function processEmailDelivery(deliveryId: string) {
   )
   const recipientError = validateRecipient(email)
   if (suppressed || recipientError) {
-    await suppressDelivery(
+    const deliverySuppressed = await suppressDelivery(
       delivery.id,
       delivery.eventId,
       suppressed ? "Recipient address is suppressed" : recipientError!,
+      lease,
     )
+    if (!deliverySuppressed) return { sent: false, skipped: "lease-lost" }
     return { sent: false, suppressed: true }
   }
 
@@ -378,17 +400,41 @@ export async function processEmailDelivery(deliveryId: string) {
     reference: `${delivery.event.aggregateType}:${delivery.event.aggregateId}`,
   })
 
+  let financialAttachment: RenderedFinancialDocumentAttachment | null
   try {
-    const financialAttachment = await buildFinancialAttachment(delivery.event)
-    const headers: Record<string, string> = {
-      "X-GuestPost-Event-ID": delivery.eventId,
-      "X-GuestPost-Delivery-ID": delivery.id,
+    financialAttachment = await buildFinancialAttachment(delivery.event)
+  } catch (error) {
+    const diagnostic = safeError(error)
+    const failed = await prisma.communicationDelivery.updateMany({
+      where: emailDeliveryLeaseWhere(delivery.id, lease),
+      data: {
+        status: "FAILED",
+        lockedAt: null,
+        failedAt: new Date(),
+        availableAt: retryAt(lease.attempts),
+        lastError: diagnostic,
+      },
+    })
+    if (failed.count !== 1) {
+      return { sent: false, skipped: "lease-lost" }
     }
-    if (financialAttachment) {
-      headers["X-GuestPost-Document-Number"] =
-        financialAttachment.documentNumber
-      headers["X-GuestPost-Attachment-SHA256"] = financialAttachment.sha256
-    }
+    throw new Error(diagnostic, { cause: error })
+  }
+
+  const dispatchLease = await beginEmailDispatch(prisma, delivery.id, lease)
+  if (!dispatchLease) return { sent: false, skipped: "lease-lost" }
+
+  const headers: Record<string, string> = {
+    "X-GuestPost-Event-ID": delivery.eventId,
+    "X-GuestPost-Delivery-ID": delivery.id,
+  }
+  if (financialAttachment) {
+    headers["X-GuestPost-Document-Number"] = financialAttachment.documentNumber
+    headers["X-GuestPost-Attachment-SHA256"] = financialAttachment.sha256
+  }
+
+  let providerMessageId: string | null = null
+  try {
     const result = await transporter.sendMail({
       from: process.env.EMAIL_FROM || '"GuestPost.cc" <noreply@guestpost.cc>',
       to: email,
@@ -408,98 +454,128 @@ export async function processEmailDelivery(deliveryId: string) {
           ]
         : undefined,
     })
-    await prisma.communicationDelivery.update({
-      where: { id: delivery.id },
-      data: {
-        status: "SENT",
-        provider: "smtp",
-        providerMessageId: String(result.messageId ?? "").slice(0, 191) || null,
-        sentAt: new Date(),
-        failedAt: null,
-        lockedAt: null,
-        lastError: null,
-        attachmentName: financialAttachment?.filename ?? null,
-        attachmentSha256: financialAttachment?.sha256 ?? null,
-        attachmentSize: financialAttachment?.size ?? null,
-      },
-    })
-    await finalizeEvent(delivery.eventId)
-    logger.info("transactional email sent", {
-      deliveryId: delivery.id,
-      eventType: delivery.event.type,
-      recipientDomain: recipientDomain(email),
-      mode: deliveryMode(),
-      attachedFinancialDocument: Boolean(financialAttachment),
-    })
-    return { sent: true, deliveryId: delivery.id }
+    providerMessageId = String(result.messageId ?? "").slice(0, 191) || null
   } catch (error) {
     const diagnostic = safeError(error)
     if (permanentSmtpFailure(error)) {
-      await prisma.$transaction([
-        prisma.communicationDelivery.update({
-          where: { id: delivery.id },
-          data: {
-            status: "BOUNCED",
-            lockedAt: null,
-            failedAt: new Date(),
-            bouncedAt: new Date(),
-            lastError: diagnostic,
-          },
-        }),
-        prisma.emailSuppression.upsert({
-          where: { userId_email: { userId: user.id, email } },
-          create: {
-            userId: user.id,
-            email,
-            reason: "HARD_BOUNCE",
-            sourceRef: delivery.id,
-          },
-          update: {
-            active: true,
-            reason: "HARD_BOUNCE",
-            sourceRef: delivery.id,
-          },
-        }),
-      ])
-      await finalizeEvent(delivery.eventId)
+      const bounced = await runEmailDeliveryTerminalTransaction(
+        prisma,
+        delivery.eventId,
+        async (tx: any) => {
+          const changed = await tx.communicationDelivery.updateMany({
+            where: emailDeliveryLeaseWhere(delivery.id, dispatchLease),
+            data: {
+              status: "BOUNCED",
+              lockedAt: null,
+              failedAt: new Date(),
+              bouncedAt: new Date(),
+              lastError: diagnostic,
+            },
+          })
+          if (changed.count !== 1) {
+            return { terminalized: false, result: false }
+          }
+          await tx.emailSuppression.upsert({
+            where: { userId_email: { userId: user.id, email } },
+            create: {
+              userId: user.id,
+              email,
+              reason: "HARD_BOUNCE",
+              sourceRef: delivery.id,
+            },
+            update: {
+              active: true,
+              reason: "HARD_BOUNCE",
+              sourceRef: delivery.id,
+            },
+          })
+          return { terminalized: true, result: true }
+        },
+      )
+      if (!bounced) return { sent: false, skipped: "lease-lost" }
       logger.warn("email address suppressed after permanent SMTP failure", {
         deliveryId: delivery.id,
         recipientDomain: recipientDomain(email),
       })
       return { sent: false, bounced: true }
     }
-    await prisma.communicationDelivery.update({
-      where: { id: delivery.id },
-      data: {
-        status: "FAILED",
-        lockedAt: null,
-        failedAt: new Date(),
-        availableAt: retryAt(delivery.attempts),
-        lastError: diagnostic,
+    // Once SMTP dispatch starts, a transport error does not prove that the
+    // provider rejected the message. Quarantine the outcome instead of
+    // automatically sending a duplicate invoice or credit note.
+    const uncertain = await runEmailDeliveryTerminalTransaction(
+      prisma,
+      delivery.eventId,
+      async (tx: any) => {
+        const changed = await tx.communicationDelivery.updateMany({
+          where: emailDeliveryLeaseWhere(delivery.id, dispatchLease),
+          data: {
+            status: "DELIVERY_UNCERTAIN",
+            lockedAt: null,
+            failedAt: new Date(),
+            lastError: diagnostic,
+          },
+        })
+        // DELIVERY_UNCERTAIN deliberately remains in the outstanding count,
+        // so this atomically preserves a PENDING parent event for operators.
+        return { terminalized: changed.count === 1, result: changed }
       },
+    )
+    logger.error("SMTP delivery outcome requires manual reconciliation", {
+      deliveryId: delivery.id,
+      eventType: delivery.event.type,
+      recipientDomain: recipientDomain(email),
+      stateRecorded: uncertain.count === 1,
+      err: diagnostic,
     })
-    throw new Error(diagnostic, { cause: error })
+    return { sent: false, uncertain: true, deliveryId: delivery.id }
   }
+
+  const sent = await runEmailDeliveryTerminalTransaction(
+    prisma,
+    delivery.eventId,
+    async (tx: any) => {
+      const changed = await tx.communicationDelivery.updateMany({
+        where: emailDeliveryLeaseWhere(delivery.id, dispatchLease),
+        data: {
+          status: "SENT",
+          provider: "smtp",
+          providerMessageId,
+          sentAt: new Date(),
+          failedAt: null,
+          lockedAt: null,
+          lastError: null,
+          attachmentName: financialAttachment?.filename ?? null,
+          attachmentSha256: financialAttachment?.sha256 ?? null,
+          attachmentSize: financialAttachment?.size ?? null,
+        },
+      })
+      return { terminalized: changed.count === 1, result: changed }
+    },
+  )
+  if (sent.count !== 1) {
+    logger.error("SMTP accepted email after delivery lease was lost", {
+      deliveryId: delivery.id,
+      eventType: delivery.event.type,
+      recipientDomain: recipientDomain(email),
+    })
+    return { sent: true, uncertain: true, deliveryId: delivery.id }
+  }
+  logger.info("transactional email sent", {
+    deliveryId: delivery.id,
+    eventType: delivery.event.type,
+    recipientDomain: recipientDomain(email),
+    mode: deliveryMode(),
+    attachedFinancialDocument: Boolean(financialAttachment),
+  })
+  return { sent: true, deliveryId: delivery.id }
 }
 
 export async function processEmailOutboxBatch(limit = MAX_OUTBOX_BATCH) {
   if (deliveryMode() === "disabled") return { processed: 0, failed: 0 }
   const batchSize = Math.max(1, Math.min(limit, MAX_OUTBOX_BATCH))
   const now = new Date()
-  await prisma.communicationDelivery.updateMany({
-    where: {
-      channel: "EMAIL",
-      status: "PROCESSING",
-      lockedAt: { lt: new Date(now.getTime() - DELIVERY_LEASE_MS) },
-    },
-    data: {
-      status: "FAILED",
-      lockedAt: null,
-      availableAt: now,
-      failedAt: now,
-      lastError: "Recovered an expired delivery lease",
-    },
-  })
+  const recovery = await recoverExpiredEmailDeliveryLeases(prisma, { now })
+  reportRecoveredUncertain(recovery.uncertain)
   const deliveries = await prisma.communicationDelivery.findMany({
     where: {
       channel: "EMAIL",
@@ -515,7 +591,12 @@ export async function processEmailOutboxBatch(limit = MAX_OUTBOX_BATCH) {
   for (const delivery of deliveries) {
     try {
       const result = await processEmailDelivery(delivery.id)
-      if (result.sent || "suppressed" in result || "bounced" in result) {
+      if (
+        result.sent ||
+        "suppressed" in result ||
+        "bounced" in result ||
+        "uncertain" in result
+      ) {
         processed += 1
       }
     } catch (error) {

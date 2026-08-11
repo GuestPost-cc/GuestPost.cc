@@ -78,6 +78,7 @@ export interface PaymentDisputeHooks {
       dedupKeyPrefix: string
     },
   ): Promise<void>
+  notifyCustomer?(tx: any, input: { depositAttemptId: string }): Promise<void>
 }
 
 export type PaymentDisputeErrorCode =
@@ -617,6 +618,11 @@ export async function transitionPaymentDispute(
                   organizationId: null,
                 })
               }
+              if (currentStatus === "OPEN") {
+                await hooks.notifyCustomer?.(tx, {
+                  depositAttemptId: deposit.depositAttempt.id,
+                })
+              }
               await completeEvent(
                 tx,
                 deposit.depositAttempt.id,
@@ -921,6 +927,9 @@ export async function transitionPaymentDispute(
               type: "STRIPE_CHARGEBACK",
               message: `Chargeback ${input.providerDisputeId} for ${input.amount} ${input.currency} — ${moneyString(held)} held${currentExposure > 0n ? `, ${moneyString(currentExposure)} uncovered` : ""}. Respond in Stripe dashboard.`,
               dedupKeyPrefix: `chargeback:${input.providerDisputeId}:opened`,
+            })
+            await hooks.notifyCustomer?.(tx, {
+              depositAttemptId: deposit.depositAttempt.id,
             })
             await completeEvent(
               tx,

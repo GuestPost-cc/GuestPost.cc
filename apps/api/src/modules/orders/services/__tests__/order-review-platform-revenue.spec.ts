@@ -44,9 +44,13 @@ function setup() {
       findUnique: jest.fn().mockResolvedValue({
         id: "delivery-1",
         orderId: "order-1",
+        normalizedUrl: "https://publisher.example/article",
+        supersededByVersion: null,
         verificationStatus: "VERIFIED",
         interventionStatus: "NONE",
       }),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     orderDispute: { findFirst: jest.fn().mockResolvedValue(null) },
     revision: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -91,7 +95,7 @@ describe("OrderReviewService PlatformRevenue evidence", () => {
 
     await expect(
       service.createSettlementForOrder(tx, "order-1"),
-    ).resolves.toBeUndefined()
+    ).resolves.toEqual(["order:order-1:completed"])
 
     const data = tx.platformRevenue.create.mock.calls[0][0].data
     expect(data).toMatchObject({

@@ -21,7 +21,9 @@ services:
     region: singapore
     branch: main
     rootDir: .
-    autoDeployTrigger: checksPass
+    # Schema-before-code release: promote manually only after migrations,
+    # worker drain, runtime grants, issuer config, and cutover canaries pass.
+    autoDeployTrigger: off
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/api...
     startCommand: cd apps/api && node dist/main.js
     healthCheckPath: /api/v1/health
@@ -53,6 +55,24 @@ services:
         value: recovery_only
       - key: PAYOUT_EXECUTION_ENABLED
         value: "false"
+      # Server-only issuer identity. Render must receive the complete reviewed
+      # set before the production API can boot or issue immutable documents.
+      # The separately operated worker requires the exact same values; never
+      # expose these through NEXT_PUBLIC_* variables.
+      - key: INVOICE_DOCUMENT_PREFIX
+        value: GP
+      - key: INVOICE_ISSUER_LEGAL_NAME
+        sync: false
+      - key: INVOICE_ISSUER_ADDRESS_LINE_1
+        sync: false
+      - key: INVOICE_ISSUER_CITY
+        sync: false
+      - key: INVOICE_ISSUER_POSTAL_CODE
+        sync: false
+      - key: INVOICE_ISSUER_COUNTRY_CODE
+        sync: false
+      - key: INVOICE_SUPPORT_EMAIL
+        sync: false
       - key: TRUSTED_ORIGINS
         value: https://guestpost.pro.bd,https://app.guestpost.pro.bd,https://publisher.guestpost.pro.bd,https://admin.guestpost.pro.bd,https://api.guestpost.pro.bd
       - key: CORS_ORIGIN
@@ -147,7 +167,7 @@ services:
     region: singapore
     branch: main
     rootDir: .
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/portal...
     startCommand: cd apps/portal && npx next start --hostname 0.0.0.0 --port $PORT
     healthCheckPath: /
@@ -180,7 +200,7 @@ services:
     region: singapore
     branch: main
     rootDir: .
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/publisher...
     startCommand: cd apps/publisher && npx next start --hostname 0.0.0.0 --port $PORT
     healthCheckPath: /
@@ -213,7 +233,7 @@ services:
     region: singapore
     branch: main
     rootDir: .
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/admin...
     startCommand: cd apps/admin && npx next start --hostname 0.0.0.0 --port $PORT
     healthCheckPath: /
@@ -242,7 +262,7 @@ services:
     region: singapore
     branch: main
     rootDir: .
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: off
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/website...
     startCommand: cd apps/website && npx next start --hostname 0.0.0.0 --port $PORT
     healthCheckPath: /

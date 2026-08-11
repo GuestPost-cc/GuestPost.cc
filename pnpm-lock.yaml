@@ -516,6 +516,27 @@ importers:
 
   apps/worker:
     dependencies:
+      '@expo-google-fonts/noto-sans':
+        specifier: 0.4.2
+        version: 0.4.2
+      '@expo-google-fonts/noto-sans-arabic':
+        specifier: 0.4.3
+        version: 0.4.3
+      '@expo-google-fonts/noto-sans-bengali':
+        specifier: 0.4.4
+        version: 0.4.4
+      '@expo-google-fonts/noto-sans-devanagari':
+        specifier: 0.4.1
+        version: 0.4.1
+      '@expo-google-fonts/noto-sans-jp':
+        specifier: 0.4.3
+        version: 0.4.3
+      '@expo-google-fonts/noto-sans-kr':
+        specifier: 0.4.3
+        version: 0.4.3
+      '@expo-google-fonts/noto-sans-sc':
+        specifier: 0.4.3
+        version: 0.4.3
       '@guestpost/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -525,9 +546,15 @@ importers:
       '@guestpost/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@pdf-lib/fontkit':
+        specifier: 1.1.1
+        version: 1.1.1
       '@sentry/node':
         specifier: 10.67.0
         version: 10.67.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))
+      bidi-js:
+        specifier: 1.0.3
+        version: 1.0.3
       bullmq:
         specifier: ^5.80.12
         version: 5.81.3
@@ -543,6 +570,9 @@ importers:
       pdf-lib:
         specifier: 1.17.1
         version: 1.17.1
+      regenerator-runtime:
+        specifier: 0.14.1
+        version: 0.14.1
     devDependencies:
       '@types/node':
         specifier: ^26.1.0
@@ -1567,6 +1597,27 @@ packages:
       '@noble/hashes':
         optional: true
 
+  '@expo-google-fonts/noto-sans-arabic@0.4.3':
+    resolution: {integrity: sha512-YvtxyuegxPegu2g5urXJ+gQxRp8i798nQswTmEjwXOWR/fqy0Gvey6h5IoNRBrc43SxRxPezqCiR9ivpfPAXSg==}
+
+  '@expo-google-fonts/noto-sans-bengali@0.4.4':
+    resolution: {integrity: sha512-Ya58tLTEdP4P5EF3ZXTM829/g57mbfW8OrD16MMZr2sC3nIKItl/3J9tZlk1nrtqfFGzIgxb+zt/hLjAaTAQgQ==}
+
+  '@expo-google-fonts/noto-sans-devanagari@0.4.1':
+    resolution: {integrity: sha512-26boYPNKGP1r4R5MxsMAY/zCQOwiXLOJzX8sh1a2oEWyQurQsyniaCv4992c+9jjwshEEt2NNVv5GcnyzaL7QQ==}
+
+  '@expo-google-fonts/noto-sans-jp@0.4.3':
+    resolution: {integrity: sha512-Fl+Z6vtD24HFAYsvzB0S9Nery1ly16B9PesdY0wBd+wEHAvkNglnkTUspU0HqGOubkmoa8zusJrKv6vDx1o70A==}
+
+  '@expo-google-fonts/noto-sans-kr@0.4.3':
+    resolution: {integrity: sha512-EVS/uJPcf1TgJtjmQmrFr0oGdcl7ml09CSu0E/AyGzR0UfzdR2pBbzWWPsnuzZiGUl643ODYwYiXK5+B+fLjhQ==}
+
+  '@expo-google-fonts/noto-sans-sc@0.4.3':
+    resolution: {integrity: sha512-9rAwdFTFHbO/u6Cs0gj2jZbW74TGIiaFNQnXYH2s5wA1bzVkwbaviL4t8YUV642eGYjg86eH6DkAEQmfNHDncQ==}
+
+  '@expo-google-fonts/noto-sans@0.4.2':
+    resolution: {integrity: sha512-zYD8G2ijWLxqmquoQgghNh/x9p0yxWwArD0oxO1oXY1qx5vOd4t0Kbhnu/Cx8RTy08OgA8RtxuULZFaXwVPnPw==}
+
   '@floating-ui/core@1.7.5':
     resolution: {integrity: sha512-1Ih4WTWyw0+lKyFMcBHGbb5U5FtuHJuujoyyr5zTaWS5EYMeT6Jb2AuDeftsCsEuchO+mM2ij5+q9crhydzLhQ==}
 
@@ -2253,6 +2304,9 @@ packages:
 
   '@paralleldrive/cuid2@2.3.1':
     resolution: {integrity: sha512-XO7cAxhnTZl0Yggq6jOgjiOHhbgcO4NqFqwSmQpjK3b6TEE6Uj/jfSk6wzYyemh3+I0sHirKSetjQwn5cZktFw==}
+
+  '@pdf-lib/fontkit@1.1.1':
+    resolution: {integrity: sha512-KjMd7grNapIWS/Dm0gvfHEilSyAmeLvrEGVcqLGi0VYebuqqzTbgF29efCx7tvx+IEbG3zQciRSWl3GkUSvjZg==}
 
   '@pdf-lib/standard-fonts@1.0.0':
     resolution: {integrity: sha512-hU30BK9IUN/su0Mn9VdlVKsWBS6GyhVfqjwl1FjZN4TxP6cCw0jP2w7V3Hf5uX7M0AZJ16vey9yE0ny7Sa59ZA==}
@@ -6351,6 +6405,9 @@ packages:
   reflect-metadata@0.2.2:
     resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
 
+  regenerator-runtime@0.14.1:
+    resolution: {integrity: sha512-dYnhHh0nJoMfnkZs6GmmhFknAGRrLznOu5nc9ML+EJxGvrx6H7teuevqVqCuPcPK//3eDrrjQhehXVx9cnkGdw==}
+
   regexp-tree@0.1.27:
     resolution: {integrity: sha512-iETxpjK6YoRWJG5o6hXLwvjYAoW+FEZn9os0PD/b6AP6xQwsa/Y7lCVgIixBbUPMfhu+i2LtdeAqVTgGlQarfA==}
     hasBin: true
@@ -8042,6 +8099,20 @@ snapshots:
     optionalDependencies:
       '@noble/hashes': 2.2.0
 
+  '@expo-google-fonts/noto-sans-arabic@0.4.3': {}
+
+  '@expo-google-fonts/noto-sans-bengali@0.4.4': {}
+
+  '@expo-google-fonts/noto-sans-devanagari@0.4.1': {}
+
+  '@expo-google-fonts/noto-sans-jp@0.4.3': {}
+
+  '@expo-google-fonts/noto-sans-kr@0.4.3': {}
+
+  '@expo-google-fonts/noto-sans-sc@0.4.3': {}
+
+  '@expo-google-fonts/noto-sans@0.4.2': {}
+
   '@floating-ui/core@1.7.5':
     dependencies:
       '@floating-ui/utils': 0.2.11
@@ -8750,6 +8821,10 @@ snapshots:
   '@paralleldrive/cuid2@2.3.1':
     dependencies:
       '@noble/hashes': 1.8.0
+
+  '@pdf-lib/fontkit@1.1.1':
+    dependencies:
+      pako: 1.0.11
 
   '@pdf-lib/standard-fonts@1.0.0':
     dependencies:
@@ -13109,6 +13184,8 @@ snapshots:
   redux@5.0.1: {}
 
   reflect-metadata@0.2.2: {}
+
+  regenerator-runtime@0.14.1: {}
 
   regexp-tree@0.1.27: {}
 

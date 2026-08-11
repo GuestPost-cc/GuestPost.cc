@@ -73,6 +73,13 @@ export interface ActorSnapshot {
   publisherRole: PublisherRole | null
 }
 
+interface TicketFanOut {
+  communicationEventId: string | null
+  legacyRecipients: Array<{ userId: string; organizationId: string | null }>
+  legacyType: string
+  message: string
+}
+
 // Pure helper — exported so admin investigation views and tests can build
 // the same shape. Always returns concrete values (never `undefined`) so the
 // stored JSON has a stable schema.
@@ -155,44 +162,54 @@ export class SupportService {
       }
     }
 
-    const ticket = await this.prisma.ticket.create({
-      data: {
-        subject: data.subject,
-        description: data.description,
-        userId: data.userId,
-        organizationId: data.organizationId,
-        orderId: data.orderId,
-        fulfillmentChannel,
-        assignedToUserId,
-        assignedPublisherId,
-      },
-    })
+    const { ticket, fanOut } = await this.prisma.$transaction(
+      async (tx: any) => {
+        const ticket = await tx.ticket.create({
+          data: {
+            subject: data.subject,
+            description: data.description,
+            userId: data.userId,
+            organizationId: data.organizationId,
+            orderId: data.orderId,
+            fulfillmentChannel,
+            assignedToUserId,
+            assignedPublisherId,
+          },
+        })
 
-    await this.audit.log({
-      action: "TICKET_OPENED",
-      entityType: "Ticket",
-      entityId: ticket.id,
-      metadata: {
-        orderId: data.orderId ?? null,
-        fulfillmentChannel,
-        assignedToUserId,
-        assignedPublisherId,
-      },
-      userId: data.userId,
-      organizationId: data.organizationId,
-    })
+        await this.audit.log(
+          {
+            action: "TICKET_OPENED",
+            entityType: "Ticket",
+            entityId: ticket.id,
+            metadata: {
+              orderId: data.orderId ?? null,
+              fulfillmentChannel,
+              assignedToUserId,
+              assignedPublisherId,
+            },
+            userId: data.userId,
+            organizationId: data.organizationId,
+          },
+          tx,
+        )
 
-    // TICKET_OPENED uses the PUBLIC recipient set — the ticket subject + body
-    // ARE the customer's public message. Internal-only events use the
-    // INTERNAL set.
-    await this.fanOutTicketEvent(
-      ticket.id,
-      "TICKET_OPENED",
-      `New ticket: ${ticket.subject}`,
-      data.userId,
-      "PUBLIC",
-      ticket.id,
+        // TICKET_OPENED uses the PUBLIC recipient set — the ticket subject +
+        // body ARE the customer's public message. Internal-only events use
+        // the INTERNAL set.
+        const fanOut = await this.fanOutTicketEvent(
+          tx,
+          ticket.id,
+          "TICKET_OPENED",
+          `New ticket: ${ticket.subject}`,
+          data.userId,
+          "PUBLIC",
+          ticket.id,
+        )
+        return { ticket, fanOut }
+      },
     )
+    await this.dispatchTicketFanOut(fanOut)
 
     return ticket
   }
@@ -391,60 +408,65 @@ export class SupportService {
     // Phase 6.6.2: uncollapsed role snapshot for forensic queries.
     const actorSnapshot = buildActorSnapshot(actor)
 
-    const message = await this.prisma.ticketMessage.create({
-      data: {
-        content: data.content.trim(),
-        userId: actor.userId,
-        ticketId,
-        visibility,
-        participantRole,
-        messageType,
-        actorSnapshot: actorSnapshot as any,
+    const { message, fanOut } = await this.prisma.$transaction(
+      async (tx: any) => {
+        const message = await tx.ticketMessage.create({
+          data: {
+            content: data.content.trim(),
+            userId: actor.userId,
+            ticketId,
+            visibility,
+            participantRole,
+            messageType,
+            actorSnapshot: actorSnapshot as any,
+          },
+        })
+
+        // Touch updatedAt so the inbox sort surfaces this ticket.
+        await tx.ticket.update({
+          where: { id: ticketId },
+          data: { updatedAt: new Date() },
+        })
+
+        await this.audit.log(
+          {
+            action:
+              visibility === "INTERNAL"
+                ? "TICKET_INTERNAL_NOTE_ADDED"
+                : "TICKET_MESSAGE_ADDED",
+            entityType: "Ticket",
+            entityId: ticketId,
+            metadata: {
+              orderId: ticket.orderId,
+              fulfillmentChannel: ticket.fulfillmentChannel,
+              actorKind: actor.kind,
+              actorStaffRole: actor.staffRole ?? null,
+              participantRole,
+              messageType,
+              visibility,
+              actorSnapshot,
+            },
+            userId: actor.userId,
+            organizationId: ticket.organizationId,
+          },
+          tx,
+        )
+
+        const fanOut = await this.fanOutTicketEvent(
+          tx,
+          ticketId,
+          visibility === "INTERNAL" ? "SUPPORT_INTERNAL_NOTE" : "SUPPORT_REPLY",
+          visibility === "INTERNAL"
+            ? `Internal note added on: ${ticket.subject}`
+            : `New reply on ticket: ${ticket.subject}`,
+          actor.userId,
+          visibility,
+          message.id,
+        )
+        return { message, fanOut }
       },
-    })
-
-    // Touch updatedAt so the inbox sort surfaces this ticket.
-    await this.prisma.ticket.update({
-      where: { id: ticketId },
-      data: { updatedAt: new Date() },
-    })
-
-    await this.audit.log({
-      action:
-        visibility === "INTERNAL"
-          ? "TICKET_INTERNAL_NOTE_ADDED"
-          : "TICKET_MESSAGE_ADDED",
-      entityType: "Ticket",
-      entityId: ticketId,
-      metadata: {
-        orderId: ticket.orderId,
-        fulfillmentChannel: ticket.fulfillmentChannel,
-        actorKind: actor.kind,
-        actorStaffRole: actor.staffRole ?? null,
-        // Phase 6.6.1 — the value reports + dispute review will key off. Same
-        // string the row carries, so audit + row never drift.
-        participantRole,
-        messageType,
-        visibility,
-        // Phase 6.6.2 — uncollapsed role snapshot. Mirrors the column so
-        // audit-log readers don't have to join TicketMessage to answer
-        // "what authority did this person have?".
-        actorSnapshot,
-      },
-      userId: actor.userId,
-      organizationId: ticket.organizationId,
-    })
-
-    await this.fanOutTicketEvent(
-      ticketId,
-      visibility === "INTERNAL" ? "SUPPORT_INTERNAL_NOTE" : "SUPPORT_REPLY",
-      visibility === "INTERNAL"
-        ? `Internal note added on: ${ticket.subject}`
-        : `New reply on ticket: ${ticket.subject}`,
-      actor.userId,
-      visibility,
-      message.id,
     )
+    await this.dispatchTicketFanOut(fanOut)
 
     return message
   }
@@ -473,33 +495,43 @@ export class SupportService {
     if (!ticket) throw new NotFoundException("Ticket not found")
     await this.assertCanReply(actor, ticket, "PUBLIC")
 
-    const updated = await this.prisma.ticket.update({
-      where: { id: ticketId },
-      data: { status: status as any },
-    })
+    const { updated, fanOut } = await this.prisma.$transaction(
+      async (tx: any) => {
+        const updated = await tx.ticket.update({
+          where: { id: ticketId },
+          data: { status: status as any },
+        })
 
-    await this.audit.log({
-      action: "SUPPORT_TICKET_STATUS_CHANGED",
-      entityType: "Ticket",
-      entityId: ticketId,
-      metadata: {
-        from: ticket.status,
-        to: status,
-        actorKind: actor.kind,
-        actorStaffRole: actor.staffRole ?? null,
+        await this.audit.log(
+          {
+            action: "SUPPORT_TICKET_STATUS_CHANGED",
+            entityType: "Ticket",
+            entityId: ticketId,
+            metadata: {
+              from: ticket.status,
+              to: status,
+              actorKind: actor.kind,
+              actorStaffRole: actor.staffRole ?? null,
+            },
+            userId: actor.userId,
+            organizationId: ticket.organizationId,
+          },
+          tx,
+        )
+
+        const fanOut = await this.fanOutTicketEvent(
+          tx,
+          ticketId,
+          "SUPPORT_STATUS_CHANGED",
+          `Support ticket "${ticket.subject}" is now ${status.replace(/_/g, " ").toLowerCase()}.`,
+          actor.userId,
+          "PUBLIC",
+          `${ticketId}:${status}`,
+        )
+        return { updated, fanOut }
       },
-      userId: actor.userId,
-      organizationId: ticket.organizationId,
-    })
-
-    await this.fanOutTicketEvent(
-      ticketId,
-      "SUPPORT_STATUS_CHANGED",
-      `Support ticket "${ticket.subject}" is now ${status.replace(/_/g, " ").toLowerCase()}.`,
-      actor.userId,
-      "PUBLIC",
-      `${ticketId}:${status}`,
     )
+    await this.dispatchTicketFanOut(fanOut)
 
     return updated
   }
@@ -701,14 +733,15 @@ export class SupportService {
   // holding multiple roles still gets one notification per event — fixes the
   // Set<object>-identity duplicate bug from the audit.
   private async fanOutTicketEvent(
+    tx: any,
     ticketId: string,
     type: string,
     message: string,
     excludeUserId: string,
     visibility: Visibility,
     sourceId: string,
-  ) {
-    const ticket = await this.prisma.ticket.findUnique({
+  ): Promise<TicketFanOut> {
+    const ticket = await tx.ticket.findUnique({
       where: { id: ticketId },
       include: {
         organization: {
@@ -717,7 +750,14 @@ export class SupportService {
         assignedPublisher: { include: { publisherMemberships: true } },
       },
     })
-    if (!ticket) return
+    if (!ticket) {
+      return {
+        communicationEventId: null,
+        legacyRecipients: [],
+        legacyType: type,
+        message,
+      }
+    }
 
     // userId -> organizationId (for the notification's tenant scope).
     const recipients = new Map<string, string | null>()
@@ -752,7 +792,7 @@ export class SupportService {
     }
 
     // SUPER_ADMIN — universal participant. Notified on every event.
-    const superAdmins = await this.prisma.staffMembership.findMany({
+    const superAdmins = await tx.staffMembership.findMany({
       where: { role: "SUPER_ADMIN" },
       select: { userId: true },
     })
@@ -763,7 +803,7 @@ export class SupportService {
     //   PLATFORM  channel: read-only on customer thread (no PUBLIC ping);
     //                      INTERNAL pings to keep them in the loop.
     if (channel === "PUBLISHER" || isInternal) {
-      const finance = await this.prisma.staffMembership.findMany({
+      const finance = await tx.staffMembership.findMany({
         where: { role: "FINANCE" },
         select: { userId: true },
       })
@@ -777,35 +817,58 @@ export class SupportService {
           : isInternal
             ? "SUPPORT_INTERNAL_NOTE"
             : "SUPPORT_PUBLIC_REPLY"
-      const event = await this.communications.record({
-        type: eventType,
-        aggregateType: type === "TICKET_OPENED" ? "Ticket" : "TicketMessage",
-        aggregateId: sourceId,
-        organizationId: ticket.organizationId,
-        title:
-          type === "TICKET_OPENED"
-            ? "New support ticket"
-            : type === "SUPPORT_STATUS_CHANGED"
-              ? "Support ticket status updated"
-              : isInternal
-                ? "Internal support note"
-                : "New support reply",
+      const event = await this.communications.record(
+        {
+          type: eventType,
+          aggregateType: type === "TICKET_OPENED" ? "Ticket" : "TicketMessage",
+          aggregateId: sourceId,
+          organizationId: ticket.organizationId,
+          title:
+            type === "TICKET_OPENED"
+              ? "New support ticket"
+              : type === "SUPPORT_STATUS_CHANGED"
+                ? "Support ticket status updated"
+                : isInternal
+                  ? "Internal support note"
+                  : "New support reply",
+          message,
+          actionPath: `/dashboard/support/${ticketId}`,
+          dedupKey: `support:${ticketId}:${sourceId}:${type.toLowerCase()}`,
+          recipientUserIds: [...recipients.keys()],
+          actorUserId: excludeUserId,
+        },
+        tx,
+      )
+      return {
+        communicationEventId: event.eventId,
+        legacyRecipients: [],
+        legacyType: type,
         message,
-        actionPath: `/dashboard/support/${ticketId}`,
-        dedupKey: `support:${ticketId}:${sourceId}:${type.toLowerCase()}`,
-        recipientUserIds: [...recipients.keys()],
-        actorUserId: excludeUserId,
-      })
-      this.communications.dispatchBestEffort(event.eventId)
-      return
+      }
     }
 
-    for (const [userId, organizationId] of recipients) {
+    return {
+      communicationEventId: null,
+      legacyRecipients: [...recipients].map(([userId, organizationId]) => ({
+        userId,
+        organizationId,
+      })),
+      legacyType: type,
+      message,
+    }
+  }
+
+  private async dispatchTicketFanOut(fanOut: TicketFanOut): Promise<void> {
+    if (fanOut.communicationEventId) {
+      this.communications?.dispatchBestEffort(fanOut.communicationEventId)
+      return
+    }
+    for (const { userId, organizationId } of fanOut.legacyRecipients) {
       await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
         userId,
         organizationId,
-        type,
-        message,
+        type: fanOut.legacyType,
+        message: fanOut.message,
       })
     }
   }

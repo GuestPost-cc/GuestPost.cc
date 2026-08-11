@@ -1,9 +1,11 @@
 import {
   deliveryVerificationJobId,
+  lockDeliveryUrlClaim,
   normalizeUrl,
   orderEventMetadata,
   QUEUE_JOBS,
   QUEUES,
+  refreshDeliveryUrlReuseEvidenceUnderLock,
   runLockedOrderSerializableTransaction,
 } from "@guestpost/shared"
 import {
@@ -105,6 +107,11 @@ export class OrderDeliveryService {
       this.prisma,
       order.id,
       async (tx: any) => {
+        // Cross-order URL claims use Order -> normalized URL as the canonical
+        // lock order. Acceptance and settlement boundaries take the same lock,
+        // closing the gap between their freshness read and protected write.
+        await lockDeliveryUrlClaim(tx, normalizedUrl)
+
         // Next version number for this order (immutable history)
         const last = await tx.orderDeliveryVersion.findFirst({
           where: { orderId: order.id },
@@ -227,6 +234,9 @@ export class OrderDeliveryService {
 
         return version
       },
+    )
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `order:${order.id}:published:${version.id}`,
     )
 
     // Redis is an external durability boundary and must not run inside the
@@ -355,6 +365,9 @@ export class OrderDeliveryService {
       this.prisma,
       orderId,
       async (tx: any) => {
+        // Keep retry-attempt state inside the callback. Only keys returned by
+        // the committed SERIALIZABLE attempt may be dispatched after commit.
+        const communicationDedupKeys = new Set<string>()
         const [order, membership] = await Promise.all([
           tx.order.findFirst({
             where: { id: orderId, organizationId },
@@ -408,6 +421,15 @@ export class OrderDeliveryService {
         await this.cancellation.assertNoActiveCancellation(orderId, tx)
 
         const now = new Date()
+        const urlReuseFreshness =
+          await refreshDeliveryUrlReuseEvidenceUnderLock(tx, {
+            orderId,
+            deliveryVersionId: v.id,
+            normalizedUrl: v.normalizedUrl,
+            organizationId,
+            actorUserId: userId,
+            source: "CUSTOMER_MANUAL_ACCEPT",
+          })
         const fraudBlocked = await recordCustomerDeliveryFraudBlock(
           tx,
           this.audit,
@@ -420,7 +442,17 @@ export class OrderDeliveryService {
             now,
           },
         )
-        if (fraudBlocked) return { fraudBlocked }
+        if (fraudBlocked || urlReuseFreshness.requiresReview) {
+          return {
+            fraudBlocked: fraudBlocked ?? {
+              blocked: true as const,
+              count: 1,
+            },
+            communicationDedupKeys: urlReuseFreshness.communicationDedupKey
+              ? [urlReuseFreshness.communicationDedupKey]
+              : [],
+          }
+        }
 
         const upd = await tx.orderDeliveryVersion.updateMany({
           where: { id: v.id, verificationVersion: v.verificationVersion },
@@ -485,7 +517,11 @@ export class OrderDeliveryService {
 
         // Create settlement with computed release policy — same as the
         // confirmDelivery path uses via OrderReviewService.
-        await this.orderReview.createSettlementForOrder(tx, orderId)
+        const settlementCommunicationDedupKeys =
+          (await this.orderReview.createSettlementForOrder(tx, orderId)) ?? []
+        for (const dedupKey of settlementCommunicationDedupKeys) {
+          communicationDedupKeys.add(dedupKey)
+        }
         const completed = await tx.order.findUniqueOrThrow({
           where: { id: orderId },
           select: { status: true },
@@ -520,6 +556,7 @@ export class OrderDeliveryService {
             },
             tx,
           )
+          communicationDedupKeys.add(`order:${orderId}:delivered`)
           if (completed.status === "COMPLETED") {
             await this.communications.record(
               {
@@ -536,11 +573,18 @@ export class OrderDeliveryService {
               },
               tx,
             )
+            communicationDedupKeys.add(`order:${orderId}:completed`)
           }
         }
 
-        return { status: completed.status, acceptedBy: "customer" }
+        return {
+          value: { status: completed.status, acceptedBy: "customer" },
+          communicationDedupKeys: [...communicationDedupKeys],
+        }
       },
+    )
+    this.communications?.dispatchManyByDedupKeyBestEffort(
+      result.communicationDedupKeys,
     )
     if ("fraudBlocked" in result) {
       this.logger.warn(
@@ -548,7 +592,7 @@ export class OrderDeliveryService {
       )
       throw deliveryFraudReviewRequiredForCustomer()
     }
-    return result
+    return result.value
   }
 
   async getDelivery(id: string) {

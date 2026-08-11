@@ -223,8 +223,9 @@ export class OrdersService {
       )
     }
 
+    let result: any
     try {
-      return await this.prisma.$transaction(async (tx: any) => {
+      result = await this.prisma.$transaction(async (tx: any) => {
         if (data.idempotencyKey) {
           // Tenant-scoped replay — a key-only lookup let any organization replay
           // another tenant's key and read their order. The composite unique
@@ -823,11 +824,18 @@ export class OrdersService {
             throwIdempotencyPayloadConflict()
           }
           assertUsdOrderCurrency(winner.currency, "Existing order")
-          return projectExternalOrder(winner, "CUSTOMER")
+          result = projectExternalOrder(winner, "CUSTOMER")
+        } else {
+          throw error
         }
+      } else {
+        throw error
       }
-      throw error
     }
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `order:${result.id}:created`,
+    )
+    return result
   }
 
   async addOrderItem(

@@ -120,67 +120,89 @@ export class OrderCancellationService {
       throw new ForbiddenException("Only the customer can cancel this order")
     }
 
-    return this.prisma.$transaction(async (tx: any) => {
-      const replay = body.idempotencyKey
-        ? await tx.transaction.findFirst({
-            where: {
-              reference: `customer-cancel:${orderId}:${body.idempotencyKey}`,
-            },
-          })
-        : null
-      if (replay) {
-        return tx.order.findUniqueOrThrow({ where: { id: orderId } })
-      }
+    const result = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        const order = await this.loadOrder(tx, orderId)
+        // Authorization must precede the idempotency lookup and replay return;
+        // knowing another tenant's order ID and command key is not access.
+        this.assertActorCanAccess(order, actor)
+        assertOwnerOrCreator({
+          customerId: order.customerId,
+          actorUserId: actor.userId,
+          actorRole: actor.customerRole,
+          action: "cancel order",
+        })
+        const replay = body.idempotencyKey
+          ? await tx.transaction.findFirst({
+              where: {
+                reference: `customer-cancel:${orderId}:${body.idempotencyKey}`,
+              },
+            })
+          : null
+        if (replay) {
+          // Route exact replays through the canonical evidence assertion and
+          // communication repair path. This repairs pre-communications refunds
+          // without crediting the wallet or creating a second REFUND row.
+          const repaired = await this.refund.refundOrderInTransaction(
+            tx,
+            order,
+            this.reasonText(body.reasonCode, body.note),
+            actor.userId,
+            `customer-cancel:${orderId}:${body.idempotencyKey}`,
+            "SYSTEM",
+          )
+          return repaired.order
+        }
 
-      const order = await this.loadOrder(tx, orderId)
-      this.assertActorCanAccess(order, actor)
-      assertOwnerOrCreator({
-        customerId: order.customerId,
-        actorUserId: actor.userId,
-        actorRole: actor.customerRole,
-        action: "cancel order",
-      })
-      this.assertExpectedVersion(order.version, body.expectedVersion)
+        this.assertExpectedVersion(order.version, body.expectedVersion)
 
-      const decision = decideOrderCancellation({
-        status: order.status,
-        paymentStatus: order.paymentStatus,
-        fulfillmentChannel: this.channelFor(order),
-        actor: "CUSTOMER",
-        hasActiveRequest: order.cancellationRequests.length > 0,
-        hasActiveDispute: this.hasActiveDispute(order),
-        fulfillmentDueAt: order.fulfillmentDueAt,
-        warrantyEndsAt: order.warrantyEndsAt,
-      })
-      if (decision.action !== "CANCEL_NOW") {
-        throw new BadRequestException(decision.message)
-      }
+        const decision = decideOrderCancellation({
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          fulfillmentChannel: this.channelFor(order),
+          actor: "CUSTOMER",
+          hasActiveRequest: order.cancellationRequests.length > 0,
+          hasActiveDispute: this.hasActiveDispute(order),
+          fulfillmentDueAt: order.fulfillmentDueAt,
+          warrantyEndsAt: order.warrantyEndsAt,
+        })
+        if (decision.action !== "CANCEL_NOW") {
+          throw new BadRequestException(decision.message)
+        }
 
-      if (decision.refundRequired) {
-        const responsibility = this.immediateCustomerResponsibility(
-          order,
-          body.reasonCode,
-        )
-        const result = await this.refund.refundOrderInTransaction(
+        if (decision.refundRequired) {
+          const responsibility = this.immediateCustomerResponsibility(
+            order,
+            body.reasonCode,
+          )
+          const result = await this.refund.refundOrderInTransaction(
+            tx,
+            order,
+            this.reasonText(body.reasonCode, body.note),
+            actor.userId,
+            `customer-cancel:${orderId}:${body.idempotencyKey ?? order.version}`,
+            responsibility,
+          )
+          return result.order
+        }
+
+        return this.cancelUnpaidInTransaction(
           tx,
           order,
-          this.reasonText(body.reasonCode, body.note),
           actor.userId,
-          `customer-cancel:${orderId}:${body.idempotencyKey ?? order.version}`,
-          responsibility,
+          body.reasonCode,
+          body.note,
+          "CUSTOMER",
         )
-        return result.order
-      }
-
-      return this.cancelUnpaidInTransaction(
-        tx,
-        order,
-        actor.userId,
-        body.reasonCode,
-        body.note,
-        "CUSTOMER",
-      )
-    })
+      },
+    )
+    this.refund.dispatchOrderRefundCommunicationsBestEffort(orderId)
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `order:${orderId}:cancelled`,
+    )
+    return result
   }
 
   async decline(
@@ -241,6 +263,7 @@ export class OrderCancellationService {
       })
       return refunded.order
     })
+    this.refund.dispatchOrderRefundCommunicationsBestEffort(orderId)
 
     if (publisherId) {
       await this.queue.enqueueTrustRecompute(
@@ -257,8 +280,9 @@ export class OrderCancellationService {
     actor: CancellationActorContext,
     body: CreateCancellationRequestDto,
   ) {
+    let result: any
     try {
-      return await runLockedOrderSerializableTransaction(
+      result = await runLockedOrderSerializableTransaction(
         this.prisma,
         orderId,
         async (tx: any) => {
@@ -390,6 +414,10 @@ export class OrderCancellationService {
       }
       throw error
     }
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `cancel-request:${result.id}:counterparty`,
+    )
+    return result
   }
 
   async respond(
@@ -512,6 +540,10 @@ export class OrderCancellationService {
       },
     )
 
+    this.refund.dispatchOrderRefundCommunicationsBestEffort(orderId)
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `cancel-request:${requestId}:order_cancellation_responded`,
+    )
     if (responsibility === "PUBLISHER" && publisherId) {
       await this.queue.enqueueTrustRecompute(
         publisherId,
@@ -535,7 +567,7 @@ export class OrderCancellationService {
       throw new NotFoundException("Cancellation request not found")
     }
 
-    return runLockedOrderSerializableTransaction(
+    const result = await runLockedOrderSerializableTransaction(
       this.prisma,
       preflight.orderId,
       async (tx: any) => {
@@ -663,6 +695,10 @@ export class OrderCancellationService {
         })
       },
     )
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `cancel-request:${requestId}:order_cancellation_resolved`,
+    )
+    return result
   }
 
   async financeApprove(
@@ -769,6 +805,10 @@ export class OrderCancellationService {
       },
     )
 
+    this.refund.dispatchOrderRefundCommunicationsBestEffort(preflight.orderId)
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `cancel-request:${requestId}:order_cancellation_resolved`,
+    )
     if (responsibility === "PUBLISHER" && publisherId) {
       await this.queue.enqueueTrustRecompute(
         publisherId,
@@ -828,6 +868,10 @@ export class OrderCancellationService {
       )
     })
 
+    this.refund.dispatchOrderRefundCommunicationsBestEffort(orderId)
+    this.communications?.dispatchByDedupKeyBestEffort(
+      `order:${orderId}:cancelled`,
+    )
     if (body.responsibility === CancellationResponsibility.PUBLISHER) {
       const publisherId = await this.prisma.order
         .findUnique({

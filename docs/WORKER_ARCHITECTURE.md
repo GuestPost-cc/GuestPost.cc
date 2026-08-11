@@ -151,6 +151,12 @@ cannot duplicate them.
 `SETTLEMENT_AUTO_RELEASE_DISABLED` are honored by both the compatibility
 scheduler and the maintenance dispatcher.
 
+The settlement-release sweep reports `freshness_blocked` separately from
+`risk_blocked`. A risk block means the immutable creation-time `AUTO` snapshot
+no longer matches current publisher tier or tenant-scoped customer chargeback
+history; no approval, balance, or ledger write occurred, and Finance must
+review the `CUSTOMER_APPROVED` settlement explicitly.
+
 ## Northflank production layout
 
 Build one image from `apps/worker/Dockerfile` and reuse the identical immutable

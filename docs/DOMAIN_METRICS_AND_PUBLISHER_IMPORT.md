@@ -57,11 +57,34 @@ Legacy GSC/GA4 JSON is scrubbed. Listing traffic is rebuilt from the canonical
 `WebsiteMetric.AHREFS_ORGANIC_TRAFFIC` row, and the public projection ignores a
 stale `MarketplaceListing.traffic` value. The database rejects writes from an
 old provider worker, so a rolling old pod cannot repopulate quarantined data.
-Marketplace traffic filters, explicit traffic sorting, default ranking, and
-rule-based recommendations also use only a `CURRENT`, unexpired Ahrefs
-`WebsiteMetric` row. Missing or expired traffic projects as `null` and ranks
-last with stable creation-time and listing-ID tie-breakers; the denormalized
-listing column is never marketplace evidence.
+Marketplace traffic and DR filters, explicit traffic and DR sorting, default
+ranking, and rule-based recommendations use only a `CURRENT`, unexpired Ahrefs
+`WebsiteMetric` row whose source appears in the explicit, reviewed algorithmic
+source allowlist. The policy is never derived by merely excluding
+`PUBLISHER_MANUAL`: publisher-reported and unknown future sources both fail
+closed. Publisher-reported values remain visible with their provenance but
+never affect filtering, sorting, default ranking, or recommendations. Missing,
+expired, publisher-reported, or unreviewed-source traffic projects as `null`
+for algorithmic use and ranks last with stable creation-time and listing-ID
+tie-breakers; denormalized legacy listing metric columns are never marketplace
+evidence or part of buyer API projections.
+
+Legacy `MarketplaceRecommendation` scores are ignored. Those rows have no
+feature-provenance or metric-policy version and no in-repository producer can
+prove that publisher-entered inputs were excluded. Re-enabling stored/AI scores
+requires a separately reviewed versioned feature contract, fail-closed source
+allowlist, invalidation plan for older rows, and adversarial ranking tests.
+
+Current does not mean independently verified. Buyer marketplace cards, detail
+views, favorites, traffic filters, and traffic sorting disclose whether the
+value can influence discovery and show its source. `PUBLISHER_MANUAL` is
+rendered with the exact buyer-facing label **Publisher Reported**,
+`STAFF_MANUAL` as staff-entered, and `ADMIN_IMPORT` as
+imported; all three are explicitly labelled **not independently verified**.
+Direct provider sources are labelled by provider. Unknown future sources fail
+closed to an unverified/source-unavailable label until their semantics are
+reviewed. Listing/domain verification must never be used as a visual claim
+that a manually supplied traffic number was verified.
 
 Re-enabling Google metrics requires a separately reviewed release with an
 append-only binding that records provider, resource/property, canonical
@@ -101,7 +124,9 @@ with `AHREFS_PAID_API` or `MOZ_PAID_API`. The same upsert/revision path preserve
 history across the source transition.
 
 Public UI attribution is required for provider data. Keep the Ahrefs and Open
-PageRank attribution links whenever their metrics are displayed.
+PageRank attribution links whenever their metrics are displayed. Manual or
+imported data requires the same prominence for its unverified provenance; a
+generic provider label is insufficient.
 
 ## Super Admin CSV workflow
 

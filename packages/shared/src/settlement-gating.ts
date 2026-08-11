@@ -1,3 +1,7 @@
+import {
+  type DeliveryUrlReuseFreshnessResult,
+  refreshDeliveryUrlReuseEvidenceUnderLock,
+} from "./delivery-url-claim-core"
 import { lockOrderAggregate } from "./order-aggregate-lock"
 
 // Settlement gating — the platform never settles on a human "done" claim. A
@@ -150,6 +154,17 @@ export async function buildLockedSettlementEligibilitySnapshot(
   tx: any,
   orderId: string,
 ): Promise<SettlementEligibilitySnapshot> {
+  const state = await buildLockedSettlementEligibilityState(tx, orderId)
+  return state.snapshot
+}
+
+async function buildLockedSettlementEligibilityState(
+  tx: any,
+  orderId: string,
+): Promise<{
+  snapshot: SettlementEligibilitySnapshot
+  urlReuseFreshness: DeliveryUrlReuseFreshnessResult | null
+}> {
   // Fixed SQL plus bound interpolation only. Keep this lock order stable across
   // every create/approve/release caller.
   await lockOrderAggregate(tx, orderId)
@@ -162,20 +177,65 @@ export async function buildLockedSettlementEligibilitySnapshot(
       currency: true,
       paymentStatus: true,
       activeDeliveryVersionId: true,
+      organizationId: true,
     },
   })
 
-  return buildSnapshotForOrder(tx, orderId, order)
+  let urlReuseFreshness: DeliveryUrlReuseFreshnessResult | null = null
+  if (order?.activeDeliveryVersionId) {
+    const activeDelivery = await tx.orderDeliveryVersion.findUnique({
+      where: { id: order.activeDeliveryVersionId },
+      select: {
+        id: true,
+        orderId: true,
+        normalizedUrl: true,
+        supersededByVersion: true,
+      },
+    })
+    if (
+      activeDelivery?.orderId === orderId &&
+      activeDelivery.supersededByVersion === null
+    ) {
+      urlReuseFreshness = await refreshDeliveryUrlReuseEvidenceUnderLock(tx, {
+        orderId,
+        deliveryVersionId: activeDelivery.id,
+        normalizedUrl: activeDelivery.normalizedUrl,
+        organizationId: order.organizationId,
+        actorUserId: null,
+        source: "SETTLEMENT_ELIGIBILITY",
+      })
+    }
+  }
+
+  return {
+    snapshot: await buildSnapshotForOrder(tx, orderId, order),
+    urlReuseFreshness,
+  }
 }
 
 export async function evaluateLockedSettlementEligibility(
   tx: any,
   orderId: string,
 ): Promise<
-  SettlementEligibility & { snapshot: SettlementEligibilitySnapshot }
+  SettlementEligibility & {
+    snapshot: SettlementEligibilitySnapshot
+    urlReuseEvidenceCreated: boolean
+    urlReuseCommunicationEventId: string | null
+    urlReuseCommunicationDedupKey: string | null
+  }
 > {
-  const snapshot = await buildLockedSettlementEligibilitySnapshot(tx, orderId)
-  return { ...evaluateSettlementEligibility(snapshot), snapshot }
+  const state = await buildLockedSettlementEligibilityState(tx, orderId)
+  return {
+    ...evaluateSettlementEligibility(state.snapshot),
+    snapshot: state.snapshot,
+    urlReuseEvidenceCreated:
+      state.urlReuseFreshness?.createdFlagId !== null &&
+      state.urlReuseFreshness?.createdFlagId !== undefined,
+    urlReuseCommunicationEventId:
+      state.urlReuseFreshness?.communicationEventId ?? null,
+    urlReuseCommunicationDedupKey:
+      state.urlReuseFreshness?.communicationDedupKey ?? null,
+  }
 }
 
 async function buildSnapshotForOrder(

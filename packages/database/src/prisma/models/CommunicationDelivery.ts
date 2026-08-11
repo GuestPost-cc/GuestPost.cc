@@ -45,6 +45,7 @@ export type CommunicationDeliveryMinAggregateOutputType = {
   attempts: number | null
   availableAt: Date | null
   lockedAt: Date | null
+  dispatchStartedAt: Date | null
   provider: string | null
   providerMessageId: string | null
   lastError: string | null
@@ -68,6 +69,7 @@ export type CommunicationDeliveryMaxAggregateOutputType = {
   attempts: number | null
   availableAt: Date | null
   lockedAt: Date | null
+  dispatchStartedAt: Date | null
   provider: string | null
   providerMessageId: string | null
   lastError: string | null
@@ -91,6 +93,7 @@ export type CommunicationDeliveryCountAggregateOutputType = {
   attempts: number
   availableAt: number
   lockedAt: number
+  dispatchStartedAt: number
   provider: number
   providerMessageId: number
   lastError: number
@@ -126,6 +129,7 @@ export type CommunicationDeliveryMinAggregateInputType = {
   attempts?: true
   availableAt?: true
   lockedAt?: true
+  dispatchStartedAt?: true
   provider?: true
   providerMessageId?: true
   lastError?: true
@@ -149,6 +153,7 @@ export type CommunicationDeliveryMaxAggregateInputType = {
   attempts?: true
   availableAt?: true
   lockedAt?: true
+  dispatchStartedAt?: true
   provider?: true
   providerMessageId?: true
   lastError?: true
@@ -172,6 +177,7 @@ export type CommunicationDeliveryCountAggregateInputType = {
   attempts?: true
   availableAt?: true
   lockedAt?: true
+  dispatchStartedAt?: true
   provider?: true
   providerMessageId?: true
   lastError?: true
@@ -282,6 +288,7 @@ export type CommunicationDeliveryGroupByOutputType = {
   attempts: number
   availableAt: Date
   lockedAt: Date | null
+  dispatchStartedAt: Date | null
   provider: string | null
   providerMessageId: string | null
   lastError: string | null
@@ -328,6 +335,7 @@ export type CommunicationDeliveryWhereInput = {
   attempts?: Prisma.IntFilter<"CommunicationDelivery"> | number
   availableAt?: Prisma.DateTimeFilter<"CommunicationDelivery"> | Date | string
   lockedAt?: Prisma.DateTimeNullableFilter<"CommunicationDelivery"> | Date | string | null
+  dispatchStartedAt?: Prisma.DateTimeNullableFilter<"CommunicationDelivery"> | Date | string | null
   provider?: Prisma.StringNullableFilter<"CommunicationDelivery"> | string | null
   providerMessageId?: Prisma.StringNullableFilter<"CommunicationDelivery"> | string | null
   lastError?: Prisma.StringNullableFilter<"CommunicationDelivery"> | string | null
@@ -353,6 +361,7 @@ export type CommunicationDeliveryOrderByWithRelationInput = {
   attempts?: Prisma.SortOrder
   availableAt?: Prisma.SortOrder
   lockedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  dispatchStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   provider?: Prisma.SortOrderInput | Prisma.SortOrder
   providerMessageId?: Prisma.SortOrderInput | Prisma.SortOrder
   lastError?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -382,6 +391,7 @@ export type CommunicationDeliveryWhereUniqueInput = Prisma.AtLeast<{
   attempts?: Prisma.IntFilter<"CommunicationDelivery"> | number
   availableAt?: Prisma.DateTimeFilter<"CommunicationDelivery"> | Date | string
   lockedAt?: Prisma.DateTimeNullableFilter<"CommunicationDelivery"> | Date | string | null
+  dispatchStartedAt?: Prisma.DateTimeNullableFilter<"CommunicationDelivery"> | Date | string | null
   provider?: Prisma.StringNullableFilter<"CommunicationDelivery"> | string | null
   providerMessageId?: Prisma.StringNullableFilter<"CommunicationDelivery"> | string | null
   lastError?: Prisma.StringNullableFilter<"CommunicationDelivery"> | string | null
@@ -407,6 +417,7 @@ export type CommunicationDeliveryOrderByWithAggregationInput = {
   attempts?: Prisma.SortOrder
   availableAt?: Prisma.SortOrder
   lockedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  dispatchStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   provider?: Prisma.SortOrderInput | Prisma.SortOrder
   providerMessageId?: Prisma.SortOrderInput | Prisma.SortOrder
   lastError?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -438,6 +449,7 @@ export type CommunicationDeliveryScalarWhereWithAggregatesInput = {
   attempts?: Prisma.IntWithAggregatesFilter<"CommunicationDelivery"> | number
   availableAt?: Prisma.DateTimeWithAggregatesFilter<"CommunicationDelivery"> | Date | string
   lockedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"CommunicationDelivery"> | Date | string | null
+  dispatchStartedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"CommunicationDelivery"> | Date | string | null
   provider?: Prisma.StringNullableWithAggregatesFilter<"CommunicationDelivery"> | string | null
   providerMessageId?: Prisma.StringNullableWithAggregatesFilter<"CommunicationDelivery"> | string | null
   lastError?: Prisma.StringNullableWithAggregatesFilter<"CommunicationDelivery"> | string | null
@@ -459,6 +471,7 @@ export type CommunicationDeliveryCreateInput = {
   attempts?: number
   availableAt?: Date | string
   lockedAt?: Date | string | null
+  dispatchStartedAt?: Date | string | null
   provider?: string | null
   providerMessageId?: string | null
   lastError?: string | null
@@ -484,6 +497,7 @@ export type CommunicationDeliveryUncheckedCreateInput = {
   attempts?: number
   availableAt?: Date | string
   lockedAt?: Date | string | null
+  dispatchStartedAt?: Date | string | null
   provider?: string | null
   providerMessageId?: string | null
   lastError?: string | null
@@ -505,6 +519,7 @@ export type CommunicationDeliveryUpdateInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -530,6 +545,7 @@ export type CommunicationDeliveryUncheckedUpdateInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -553,6 +569,7 @@ export type CommunicationDeliveryCreateManyInput = {
   attempts?: number
   availableAt?: Date | string
   lockedAt?: Date | string | null
+  dispatchStartedAt?: Date | string | null
   provider?: string | null
   providerMessageId?: string | null
   lastError?: string | null
@@ -574,6 +591,7 @@ export type CommunicationDeliveryUpdateManyMutationInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -597,6 +615,7 @@ export type CommunicationDeliveryUncheckedUpdateManyInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -636,6 +655,7 @@ export type CommunicationDeliveryCountOrderByAggregateInput = {
   attempts?: Prisma.SortOrder
   availableAt?: Prisma.SortOrder
   lockedAt?: Prisma.SortOrder
+  dispatchStartedAt?: Prisma.SortOrder
   provider?: Prisma.SortOrder
   providerMessageId?: Prisma.SortOrder
   lastError?: Prisma.SortOrder
@@ -664,6 +684,7 @@ export type CommunicationDeliveryMaxOrderByAggregateInput = {
   attempts?: Prisma.SortOrder
   availableAt?: Prisma.SortOrder
   lockedAt?: Prisma.SortOrder
+  dispatchStartedAt?: Prisma.SortOrder
   provider?: Prisma.SortOrder
   providerMessageId?: Prisma.SortOrder
   lastError?: Prisma.SortOrder
@@ -687,6 +708,7 @@ export type CommunicationDeliveryMinOrderByAggregateInput = {
   attempts?: Prisma.SortOrder
   availableAt?: Prisma.SortOrder
   lockedAt?: Prisma.SortOrder
+  dispatchStartedAt?: Prisma.SortOrder
   provider?: Prisma.SortOrder
   providerMessageId?: Prisma.SortOrder
   lastError?: Prisma.SortOrder
@@ -805,6 +827,7 @@ export type CommunicationDeliveryCreateWithoutUserInput = {
   attempts?: number
   availableAt?: Date | string
   lockedAt?: Date | string | null
+  dispatchStartedAt?: Date | string | null
   provider?: string | null
   providerMessageId?: string | null
   lastError?: string | null
@@ -828,6 +851,7 @@ export type CommunicationDeliveryUncheckedCreateWithoutUserInput = {
   attempts?: number
   availableAt?: Date | string
   lockedAt?: Date | string | null
+  dispatchStartedAt?: Date | string | null
   provider?: string | null
   providerMessageId?: string | null
   lastError?: string | null
@@ -880,6 +904,7 @@ export type CommunicationDeliveryScalarWhereInput = {
   attempts?: Prisma.IntFilter<"CommunicationDelivery"> | number
   availableAt?: Prisma.DateTimeFilter<"CommunicationDelivery"> | Date | string
   lockedAt?: Prisma.DateTimeNullableFilter<"CommunicationDelivery"> | Date | string | null
+  dispatchStartedAt?: Prisma.DateTimeNullableFilter<"CommunicationDelivery"> | Date | string | null
   provider?: Prisma.StringNullableFilter<"CommunicationDelivery"> | string | null
   providerMessageId?: Prisma.StringNullableFilter<"CommunicationDelivery"> | string | null
   lastError?: Prisma.StringNullableFilter<"CommunicationDelivery"> | string | null
@@ -901,6 +926,7 @@ export type CommunicationDeliveryCreateWithoutEventInput = {
   attempts?: number
   availableAt?: Date | string
   lockedAt?: Date | string | null
+  dispatchStartedAt?: Date | string | null
   provider?: string | null
   providerMessageId?: string | null
   lastError?: string | null
@@ -924,6 +950,7 @@ export type CommunicationDeliveryUncheckedCreateWithoutEventInput = {
   attempts?: number
   availableAt?: Date | string
   lockedAt?: Date | string | null
+  dispatchStartedAt?: Date | string | null
   provider?: string | null
   providerMessageId?: string | null
   lastError?: string | null
@@ -972,6 +999,7 @@ export type CommunicationDeliveryCreateManyUserInput = {
   attempts?: number
   availableAt?: Date | string
   lockedAt?: Date | string | null
+  dispatchStartedAt?: Date | string | null
   provider?: string | null
   providerMessageId?: string | null
   lastError?: string | null
@@ -993,6 +1021,7 @@ export type CommunicationDeliveryUpdateWithoutUserInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1016,6 +1045,7 @@ export type CommunicationDeliveryUncheckedUpdateWithoutUserInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1038,6 +1068,7 @@ export type CommunicationDeliveryUncheckedUpdateManyWithoutUserInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1060,6 +1091,7 @@ export type CommunicationDeliveryCreateManyEventInput = {
   attempts?: number
   availableAt?: Date | string
   lockedAt?: Date | string | null
+  dispatchStartedAt?: Date | string | null
   provider?: string | null
   providerMessageId?: string | null
   lastError?: string | null
@@ -1081,6 +1113,7 @@ export type CommunicationDeliveryUpdateWithoutEventInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1104,6 +1137,7 @@ export type CommunicationDeliveryUncheckedUpdateWithoutEventInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1126,6 +1160,7 @@ export type CommunicationDeliveryUncheckedUpdateManyWithoutEventInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   availableAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   lockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dispatchStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerMessageId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1151,6 +1186,7 @@ export type CommunicationDeliverySelect<ExtArgs extends runtime.Types.Extensions
   attempts?: boolean
   availableAt?: boolean
   lockedAt?: boolean
+  dispatchStartedAt?: boolean
   provider?: boolean
   providerMessageId?: boolean
   lastError?: boolean
@@ -1176,6 +1212,7 @@ export type CommunicationDeliverySelectCreateManyAndReturn<ExtArgs extends runti
   attempts?: boolean
   availableAt?: boolean
   lockedAt?: boolean
+  dispatchStartedAt?: boolean
   provider?: boolean
   providerMessageId?: boolean
   lastError?: boolean
@@ -1201,6 +1238,7 @@ export type CommunicationDeliverySelectUpdateManyAndReturn<ExtArgs extends runti
   attempts?: boolean
   availableAt?: boolean
   lockedAt?: boolean
+  dispatchStartedAt?: boolean
   provider?: boolean
   providerMessageId?: boolean
   lastError?: boolean
@@ -1226,6 +1264,7 @@ export type CommunicationDeliverySelectScalar = {
   attempts?: boolean
   availableAt?: boolean
   lockedAt?: boolean
+  dispatchStartedAt?: boolean
   provider?: boolean
   providerMessageId?: boolean
   lastError?: boolean
@@ -1240,7 +1279,7 @@ export type CommunicationDeliverySelectScalar = {
   updatedAt?: boolean
 }
 
-export type CommunicationDeliveryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "eventId" | "userId" | "channel" | "status" | "attempts" | "availableAt" | "lockedAt" | "provider" | "providerMessageId" | "lastError" | "sentAt" | "failedAt" | "bouncedAt" | "complainedAt" | "attachmentName" | "attachmentSha256" | "attachmentSize" | "createdAt" | "updatedAt", ExtArgs["result"]["communicationDelivery"]>
+export type CommunicationDeliveryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "eventId" | "userId" | "channel" | "status" | "attempts" | "availableAt" | "lockedAt" | "dispatchStartedAt" | "provider" | "providerMessageId" | "lastError" | "sentAt" | "failedAt" | "bouncedAt" | "complainedAt" | "attachmentName" | "attachmentSha256" | "attachmentSize" | "createdAt" | "updatedAt", ExtArgs["result"]["communicationDelivery"]>
 export type CommunicationDeliveryInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   event?: boolean | Prisma.CommunicationEventDefaultArgs<ExtArgs>
   user?: boolean | Prisma.CommunicationDelivery$userArgs<ExtArgs>
@@ -1269,6 +1308,7 @@ export type $CommunicationDeliveryPayload<ExtArgs extends runtime.Types.Extensio
     attempts: number
     availableAt: Date
     lockedAt: Date | null
+    dispatchStartedAt: Date | null
     provider: string | null
     providerMessageId: string | null
     lastError: string | null
@@ -1714,6 +1754,7 @@ export interface CommunicationDeliveryFieldRefs {
   readonly attempts: Prisma.FieldRef<"CommunicationDelivery", 'Int'>
   readonly availableAt: Prisma.FieldRef<"CommunicationDelivery", 'DateTime'>
   readonly lockedAt: Prisma.FieldRef<"CommunicationDelivery", 'DateTime'>
+  readonly dispatchStartedAt: Prisma.FieldRef<"CommunicationDelivery", 'DateTime'>
   readonly provider: Prisma.FieldRef<"CommunicationDelivery", 'String'>
   readonly providerMessageId: Prisma.FieldRef<"CommunicationDelivery", 'String'>
   readonly lastError: Prisma.FieldRef<"CommunicationDelivery", 'String'>

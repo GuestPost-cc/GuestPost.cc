@@ -48,6 +48,14 @@ Both **customer** AND **admin** must approve before funds are released. Dispute 
 - `PlatformRevenue.reversedAt` for refund tracking instead of delete
 - Reconciliation endpoint verifies settlement integrity
 
+Settlement automation is fail-closed on current risk evidence. Missing or NEW
+publisher tier, large/invalid order amount, missing/invalid customer history,
+or any durable chargeback history forces manual review independently of the
+global auto-release switch. Settlement creation loads organization/customer
+history inside its locked transaction, and auto-release reloads the same
+evidence after locking the Order so a later risk fact cannot rely on the older
+snapshot.
+
 ## Key Models
 
 - `Settlement` — header with status, amounts, tier

@@ -38,6 +38,7 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
   let previousStripeLiveMode: string | undefined
   let prisma: any
   let billing: any
+  let refunds: any
 
   beforeAll(async () => {
     database = await createTestDatabase()
@@ -52,9 +53,15 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
       require("../../../modules/audit/audit.service") as any
     const { BillingService } =
       require("../../../modules/billing/billing.service") as any
+    const { RefundService } =
+      require("../../../modules/orders/services/refund.service") as any
     prisma = new PrismaService()
     await prisma.$connect()
-    billing = new BillingService(prisma, new AuditService(prisma))
+    const audit = new AuditService(prisma)
+    billing = new BillingService(prisma, audit)
+    refunds = new RefundService(prisma, audit, {
+      enqueueTrustRecompute: async () => undefined,
+    })
   })
 
   afterAll(async () => {
@@ -533,7 +540,13 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
       id: fixture.user.id,
       organizationId: fixture.organization.id,
     }
-    await billing.refund(fixture.wallet.id, 25, refundOrder.id, actor)
+    await refunds.refundOrder(
+      refundOrder.id,
+      "integration dispute exposure setup",
+      actor.id,
+      `refund-${refundOrder.id}`,
+      { responsibility: "SYSTEM" },
+    )
 
     let blocked: any
     try {
@@ -602,7 +615,13 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
       id: fixture.user.id,
       organizationId: fixture.organization.id,
     }
-    await billing.refund(fixture.wallet.id, 25, refundOrder.id, actor)
+    await refunds.refundOrder(
+      refundOrder.id,
+      "integration dispute exposure setup",
+      actor.id,
+      `refund-${refundOrder.id}`,
+      { responsibility: "SYSTEM" },
+    )
 
     const reserved = await billing.reserve(
       fixture.wallet.id,

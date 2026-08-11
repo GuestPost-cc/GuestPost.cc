@@ -33,6 +33,7 @@ function trustPrisma(
   return {
     _audits: audits,
     _notifs: notifs,
+    $queryRaw: jest.fn().mockResolvedValue([{ id: "pub1" }]),
     publisher: {
       findUnique: jest.fn().mockResolvedValue({
         id: "pub1",
@@ -74,7 +75,7 @@ function trustPrisma(
     auditLog: {
       create: jest.fn().mockImplementation((a: any) => {
         audits.push(a.data)
-        return Promise.resolve({})
+        return Promise.resolve({ id: `audit-${audits.length}` })
       }),
     },
   }
@@ -105,6 +106,10 @@ describe("recomputePublisherTrustCore", () => {
     })
     expect(r?.newTier).toBe("VERIFIED")
     expect(r?.changed).toBe(true)
+    expect(r?.transitionId).toBe("audit-2")
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.publisher.findUnique.mock.invocationCallOrder[0]!,
+    )
     expect(prisma.publisher.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { tier: "VERIFIED" } }),
     )

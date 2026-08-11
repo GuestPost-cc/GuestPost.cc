@@ -27,6 +27,7 @@ import {
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import * as Sentry from "@sentry/node"
+import { dispatchCommunicationEventsBestEffort } from "../lib/communication-outbox-dispatch"
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
@@ -91,6 +92,7 @@ export function createSettlementAutoApproveWorker() {
       const result = await runSettlementAutoApprove(prisma, {
         batchSize,
         onError,
+        onCommunicationEvents: dispatchCommunicationEventsBestEffort,
       })
       const stale = await countStaleReviewSettlements(prisma)
 

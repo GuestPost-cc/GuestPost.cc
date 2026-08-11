@@ -9,20 +9,63 @@ export const FINANCIAL_DOCUMENT_KINDS = [
 
 export type FinancialDocumentKind = (typeof FINANCIAL_DOCUMENT_KINDS)[number]
 
+const MARK = /\p{M}/u
+const JOINING_SCRIPTS = [
+  ["ARABIC", /\p{Script=Arabic}/u],
+  ["BENGALI", /\p{Script=Bengali}/u],
+  ["DEVANAGARI", /\p{Script=Devanagari}/u],
+] as const
+
+function joiningScriptAt(
+  characters: readonly string[],
+  start: number,
+  direction: -1 | 1,
+): string | null {
+  for (
+    let index = start;
+    index >= 0 && index < characters.length;
+    index += direction
+  ) {
+    const character = characters[index]!
+    if (MARK.test(character)) continue
+    return (
+      JOINING_SCRIPTS.find(([, pattern]) => pattern.test(character))?.[0] ??
+      null
+    )
+  }
+  return null
+}
+
+/**
+ * Allows printable, single-line Unicode while rejecting markup, controls,
+ * isolated surrogates, and bidi/invisible spoofing. ZWNJ/ZWJ are the only
+ * formatting controls retained, and only between characters from the same
+ * supported joining script so Persian and Indic legal names can shape safely.
+ */
+export function isSafeFinancialDocumentText(value: string): boolean {
+  if (/[<>\p{Cc}\p{Cs}\p{Zl}\p{Zp}]/u.test(value)) return false
+  const characters = Array.from(value)
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index]!
+    if (!/\p{Cf}/u.test(character)) continue
+    if (character !== "\u200C" && character !== "\u200D") return false
+    const left = joiningScriptAt(characters, index - 1, -1)
+    const right = joiningScriptAt(characters, index + 1, 1)
+    if (!left || left !== right) return false
+  }
+  return true
+}
+
 const safeSingleLine = (max: number) =>
   z
     .string()
     .trim()
     .min(1)
     .max(max)
-    .refine(
-      (value) => !/[<>\u0000-\u001f\u007f]/.test(value),
-      "Value contains unsafe characters",
-    )
-    .refine(
-      (value) => /^[\u0020-\u007e\u00a0-\u00ff]+$/.test(value),
-      "Value must use the supported Latin invoice character set",
-    )
+    .transform((value) => value.normalize("NFC"))
+    .refine(isSafeFinancialDocumentText, {
+      message: "Value contains unsafe or invisible control characters",
+    })
 
 export const financialMoneySchema = z
   .string()
@@ -94,6 +137,7 @@ export interface FinancialDocumentIssuerConfig {
 }
 
 const ISSUER_REQUIRED_KEYS = [
+  "INVOICE_DOCUMENT_PREFIX",
   "INVOICE_ISSUER_LEGAL_NAME",
   "INVOICE_ISSUER_ADDRESS_LINE_1",
   "INVOICE_ISSUER_CITY",
@@ -101,6 +145,9 @@ const ISSUER_REQUIRED_KEYS = [
   "INVOICE_ISSUER_COUNTRY_CODE",
   "INVOICE_SUPPORT_EMAIL",
 ] as const
+const ISSUER_IDENTITY_KEYS = ISSUER_REQUIRED_KEYS.filter(
+  (key) => key !== "INVOICE_DOCUMENT_PREFIX",
+)
 
 /**
  * Reads the invoicing identity once at issue time. Production is fail-closed;
@@ -111,7 +158,10 @@ export function financialDocumentIssuerFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): FinancialDocumentIssuerConfig {
   const production = env.NODE_ENV === "production"
-  const hasAnyIssuerValue = ISSUER_REQUIRED_KEYS.some((key) => env[key]?.trim())
+  // A prefix-only local configuration is not a partial legal identity: it is
+  // allowed to customize deterministic sample numbers. Any identity field,
+  // however, opts into the complete fail-closed issuer bundle.
+  const hasAnyIssuerValue = ISSUER_IDENTITY_KEYS.some((key) => env[key]?.trim())
   const missing = ISSUER_REQUIRED_KEYS.filter((key) => !env[key]?.trim())
 
   if ((production || hasAnyIssuerValue) && missing.length > 0) {

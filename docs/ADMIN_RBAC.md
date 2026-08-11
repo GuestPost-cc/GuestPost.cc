@@ -95,6 +95,17 @@ reconciliation issue.
   Super Admin or the assigned Operations owner of a platform site. Publisher
   contacts and Operations email addresses are withheld from Operations and
   Finance; Super Admin receives them only in explicit staff projections.
+- Listing moderation and service-availability writes take the listing parent
+  lock before reading AVAILABLE children. An approved listing can never lose
+  its final available service; pause the listing first. Concurrent moderation
+  commands compare their pre-lock observation with the locked predecessor: an
+  identical winning target is an idempotent no-op, while a distinct stale
+  transition returns a conflict. Audit-row IDs identify each real transition,
+  so a later reject/approve cycle never reuses an earlier notification.
+- Manual and computed publisher-tier writers share the Publisher row lock and
+  re-read tier only after acquiring it. Each committed tier transition uses its
+  durable audit-row ID in publisher/staff event dedup keys; from/to alone is not
+  unique when a publisher cycles tiers.
 - Staff listing responses are allowlisted projections. They exclude raw metric
   provider payloads, integration credentials, internal fulfillment settings,
   and unrestricted related records.
