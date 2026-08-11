@@ -92,7 +92,7 @@ describe("Order aggregate locking", () => {
 
     const [strings, value] = query.mock.calls[0]
     expect(strings.join("?")).toBe(
-      'SELECT "id" FROM "Order" WHERE "id" = ? FOR UPDATE',
+      'SELECT "id" FROM public."Order" WHERE "id" = ? FOR UPDATE',
     )
     expect(value).toBe("order-'unsafe")
   })

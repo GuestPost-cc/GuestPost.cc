@@ -1,8 +1,50 @@
 -- ORDER_REFUNDED carries a customer credit note. The original acceptance-
 -- timeout writer also resolved publisher members onto that financial event.
--- Drain communication workers before applying this migration: pre-dispatch
--- work is suppressible, but an SMTP call that already started is immutable
--- evidence and must be reviewed rather than rewritten or automatically sent.
+-- Drain communication workers before applying this migration. Retryable work
+-- without current dispatch evidence is suppressed from future delivery, but
+-- every pre-fence attempted row is still disclosure-review evidence because a
+-- newly added NULL column cannot prove an older SMTP attempt never occurred.
+-- Any known dispatch-started row is immutable evidence and is never rewritten
+-- or automatically resent.
+
+-- Prisma 7 executes migration statements without an implicit transaction.
+-- Keep incident evidence, projection cleanup, and parent-event reconciliation
+-- all-or-nothing. The writer barrier makes an incomplete worker drain fail on
+-- the bounded lock timeout instead of racing recipient or delivery changes.
+BEGIN;
+
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '15min';
+SET LOCAL search_path = pg_catalog, public, pg_temp;
+
+LOCK TABLE
+  "Order",
+  "Membership",
+  "CommunicationEvent",
+  "CommunicationDelivery",
+  "Notification",
+  "AuditLog"
+IN SHARE MODE;
+
+-- Financial events must resolve to the canonical Order aggregate. Fail closed
+-- instead of silently excluding a malformed event from the repair/audit set.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM "CommunicationEvent" event
+    LEFT JOIN "Order" order_row
+      ON event."aggregateType" = 'Order'
+      AND event."aggregateId" = order_row."id"
+    WHERE event."type" = 'ORDER_REFUNDED'
+      AND order_row."id" IS NULL
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'refund audience repair blocked: malformed or orphaned ORDER_REFUNDED event exists';
+  END IF;
+END
+$$;
 
 -- Persist an incident trail before changing projections. This intentionally
 -- records SENT/DELIVERY_UNCERTAIN/bounce/complaint outcomes and any delivery
@@ -29,12 +71,13 @@ SELECT
   jsonb_build_object(
     'communicationEventId', event."id",
     'orderId', order_row."id",
-    'terminalUnauthorizedEmailCount', count(delivery."id"),
+    'reviewRequiredEmailCount', count(delivery."id"),
     'deliveries', jsonb_agg(
       jsonb_build_object(
         'deliveryId', delivery."id",
         'userId', delivery."userId",
         'status', delivery."status",
+        'attempts', delivery."attempts",
         'dispatchStartedAt', delivery."dispatchStartedAt",
         'sentAt', delivery."sentAt"
       )
@@ -77,6 +120,11 @@ WHERE event."type" = 'ORDER_REFUNDED'
       'COMPLAINED'
     )
     OR delivery."dispatchStartedAt" IS NOT NULL
+    OR (
+      delivery."dispatchStartedAt" IS NULL
+      AND delivery."attempts" > 0
+      AND delivery."status" IN ('PENDING', 'FAILED', 'PROCESSING')
+    )
   )
 GROUP BY event."id", order_row."id", order_row."organizationId"
 ON CONFLICT ("id") DO NOTHING;
@@ -104,7 +152,7 @@ SELECT
   jsonb_build_object(
     'communicationEventId', event."id",
     'orderId', order_row."id",
-    'preDispatchEmailSuppressed', (
+    'unauthorizedEmailSuppressed', (
       SELECT count(*)
       FROM "CommunicationDelivery" delivery
       WHERE delivery."eventId" = event."id"
@@ -302,3 +350,5 @@ WHERE event."type" = 'ORDER_REFUNDED'
       AND delivery."status" = 'PROCESSING'
       AND delivery."dispatchStartedAt" IS NOT NULL
   );
+
+COMMIT;

@@ -17,18 +17,22 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 
 ## Current local-work risk
 
-- **The launch-blocker communication/fraud release has ordered operational
-  gates.** Apply `20260811130000` before the evidence column, commit
-  `20260811131000` before the lower-lock `20260811131100` validation scan,
-  drain email workers before `20260811132000`, review every legacy audience
-  incident audit, and apply `20260811133000` before code that relies on URL
-  claim freshness. The restricted runtime role needs only fence-table
-  `SELECT`/`INSERT`/`UPDATE` and `EXECUTE` on the application fence function;
-  missing privileges fail closed. Both API and worker must have the identical
-  reviewed server-only invoice issuer bundle before production startup. Do not
-  roll forward only the application or only these migrations. Render
-  auto-deploy stays off for all five Blueprint services until the coordinated
-  manual promotion is approved.
+- **The launch-blocker communication/fraud release has one hard-drain cutover.**
+  None of the edited `2026081113*` migrations was applied to the checked Neon
+  target as of 2026-08-11; every persistent target must independently prove the
+  same before these files may be promoted. Verify a provider-native recovery
+  point, stop API writers, API on-demand wakes, realtime/legacy workers, both
+  schedules, and every active scheduled/on-demand run, then apply all pending
+  migrations once from a direct schema-owner connection. Review every legacy
+  audience incident audit before restoring delivery. Provision only schema
+  `USAGE` (not `CREATE`), fence-table `SELECT`, column-scoped `INSERT`/`UPDATE`,
+  and application-fence `EXECUTE` to the restricted runtime role and pass its
+  rollback canary. Missing privileges
+  fail closed. Both API and every worker lane need the identical reviewed
+  server-only invoice issuer bundle; email mode is explicit per lane and starts
+  in capture/disabled. Render stays manual, and every frontend must prove that
+  no effective/inherited live database credential remains before redeploy. Do
+  not roll forward only the application, only the schema, or a mixed image.
 
 - **PR #91 and its Neon test-schema rollout are complete.** The durable
   communications and financial-document migrations are current, runtime DML

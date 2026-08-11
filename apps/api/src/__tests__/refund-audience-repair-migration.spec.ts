@@ -41,6 +41,12 @@ describe("refund financial-audience repair migration", () => {
     )
     expect(migrationSql).toMatch(/'DELIVERY_UNCERTAIN'/)
     expect(migrationSql).toMatch(/delivery\."dispatchStartedAt" IS NOT NULL/)
+    expect(migrationSql).toMatch(/delivery\."attempts" > 0/)
+    expect(migrationSql).toMatch(/'attempts', delivery\."attempts"/)
+    expect(migrationSql).toMatch(/'reviewRequiredEmailCount'/)
+    expect(migrationSql).toMatch(/'unauthorizedEmailSuppressed'/)
+    expect(migrationSql).not.toMatch(/terminalUnauthorizedEmailCount/)
+    expect(migrationSql).not.toMatch(/preDispatchEmailSuppressed/)
     expect(migrationSql).toMatch(/ON CONFLICT \("id"\) DO NOTHING/)
     expect(migrationSql).toMatch(/LEGACY_REFUND_AUDIENCE_PROJECTIONS_REPAIRED/)
   })
@@ -50,12 +56,29 @@ describe("refund financial-audience repair migration", () => {
     expect(migrationSql).not.toMatch(/event\."organizationId",/)
   })
 
+  it("repairs evidence and projections atomically behind a bounded writer barrier", () => {
+    expect(migrationSql.match(/\bBEGIN;/g)).toHaveLength(1)
+    expect(migrationSql.match(/\bCOMMIT;/g)).toHaveLength(1)
+    expect(migrationSql).toMatch(/SET LOCAL lock_timeout = '5s'/)
+    expect(migrationSql).toMatch(/SET LOCAL statement_timeout = '15min'/)
+    expect(migrationSql).toMatch(
+      /LOCK TABLE[\s\S]*"Order"[\s\S]*"Membership"[\s\S]*"CommunicationEvent"[\s\S]*"CommunicationDelivery"[\s\S]*"Notification"[\s\S]*"AuditLog"[\s\S]*IN SHARE MODE/,
+    )
+    expect(migrationSql).toMatch(/malformed or orphaned ORDER_REFUNDED event/)
+  })
+
   it("runs the populated PostgreSQL fixture and an idempotent migration replay", () => {
     expect(financeRehearsalScript).toContain(
       "scripts/fixtures/pre-refund-audience-repair.sql",
     )
     expect(financeRehearsalScript).toContain(
       "scripts/fixtures/post-refund-audience-repair-assertions.sql",
+    )
+    expect(financeRehearsalScript).toContain(
+      "scripts/fixtures/inject-refund-audience-repair-failure.sql",
+    )
+    expect(financeRehearsalScript).toContain(
+      "scripts/fixtures/post-refund-audience-repair-rollback-assertions.sql",
     )
     expect(financeRehearsalScript).toMatch(
       /post-refund-audience-repair-assertions\.sql[\s\S]+run_rehearsal_file "\$\{migration_file\}"[\s\S]+post-refund-audience-repair-assertions\.sql/,

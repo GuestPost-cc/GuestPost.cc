@@ -42,7 +42,7 @@ describe("delivery URL claim freshness", () => {
 
     const [strings, url, namespace] = query.mock.calls[0]
     expect(strings.join("?")).toContain(
-      'SELECT "acquire_delivery_url_claim_fence"(?)',
+      'SELECT public."acquire_delivery_url_claim_fence"(?)',
     )
     expect(url).toBe("https://example.test/'unsafe")
     expect(namespace).toBeUndefined()

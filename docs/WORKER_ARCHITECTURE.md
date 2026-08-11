@@ -246,18 +246,27 @@ Required on all worker lanes:
 - `DATABASE_URL`
 - `QUEUE_REDIS_URL` or the compatibility `REDIS_URL`
 - `QUEUE_SIGNING_SECRET` in production
+- the complete production `INVOICE_*` issuer bundle
+- an explicit production `EMAIL_DELIVERY_MODE`; validation runs before lane
+  selection, so a missing value fails every production lane closed
 
 Lane-specific:
 
 - Realtime: SMTP and verification/object-storage settings used by its queues;
+  use `EMAIL_DELIVERY_MODE=capture` with a non-empty exact-domain allowlist
+  during staging, and change deliberately to `live` only after approval;
   production requires `OBJECT_STORAGE_PROVIDER=r2|s3` and only the matching
   complete R2/S3 bundle. Startup must successfully read the fixed
   `.guestpost/evidence-storage-ready-v1` sentinel before consuming delivery
   evidence jobs.
 - On demand: integration encryption/provider settings, report settings, payout
-  provider settings for inbox recovery
+  provider settings for inbox recovery; set `EMAIL_DELIVERY_MODE=disabled`
+  because this lane has no email consumer
 - Scheduled dispatcher: the union of credentials needed by enabled maintenance
-  tasks; never include payout method decryption keys
+  tasks; the combined `maintenance-dispatch` catalog runs communication-outbox
+  recovery, so it uses the same reviewed capture/live SMTP and allowlist policy
+  as realtime. A dedicated non-email scheduled task may use `disabled`. Never
+  include payout method decryption keys.
 - API: `WORKER_ON_DEMAND_TRIGGER_URL` and
   `WORKER_ON_DEMAND_TRIGGER_TOKEN` for immediate burst processing
 

@@ -87,7 +87,7 @@ export async function lockDeliveryUrlClaim(
     throw new Error("Delivery URL claim lock requires a normalized URL")
   }
   await tx.$queryRaw`
-    SELECT "acquire_delivery_url_claim_fence"(${normalizedUrl})
+    SELECT public."acquire_delivery_url_claim_fence"(${normalizedUrl})
   `
 }
 

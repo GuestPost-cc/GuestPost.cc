@@ -1,11 +1,40 @@
 # Current Status
 
-**Phase**: Draft PR #84 (`agent/financial-integrity-hardening`) contains the
-completed financial hardening plus local schema/login recovery work. It is not
-merged or deployed. GitHub `main` through dependency consolidation commit
-`c55c4d9` is merged into the branch and remains its ancestor.
+**Phase**: PR #98 is merged into `main` at `6abd81c`; its five communication,
+financial-document, and delivery-URL migrations are not applied to the current
+Neon target and its application image is not promoted. Branch
+`agent/pr98-rollout-safety` contains the follow-up migration/release hardening
+and awaits an immutable PR/CI attestation before any rollout.
 
-## Current Local Work: Financial Evidence And Release Integrity
+## Current Release: PR #98 Rollout Safety
+
+- The target Neon database was checked read-only: 62 migrations are applied
+  through `20260811120000_delivery_fraud_resolution_dispositions`; none of the
+  five `2026081113*` migrations is present, there are no open transactions,
+  and the refund/URL preflight anomalies are zero. Re-prove this immediately
+  before the maintenance window and in every other persistent database.
+- The follow-up wraps the five migrations in bounded transactions, proves the
+  legacy-audience repair rolls back on a forced late failure, schema-qualifies
+  and least-privileges the delivery URL fence, rehearses the restricted runtime
+  role plus the SERIALIZABLE `40001` schedule, and documents safe Prisma P3009
+  recovery. Migrations run from one isolated direct schema-owner connection;
+  runtime services retain only their restricted pooled role.
+- Production worker email behavior now requires an explicit per-lane mode.
+  Realtime and the combined maintenance dispatcher stage in `capture` with a
+  non-empty exact-domain allowlist; the non-email on-demand lane is `disabled`.
+  Missing, malformed, or delimiter-only configuration fails closed.
+- Render and Northflank remain manual. The rollout requires a full writer
+  quiescence window, including disabling API on-demand wakes and proving zero
+  active scheduled/on-demand runs, then migrations, legacy-audience audit,
+  narrow runtime grants/canaries, and one immutable API/worker image. The four
+  Render frontends must be Blueprint-synced, stripped of any inherited real
+  database credential, and redeployed with only the loopback build placeholder.
+- Actual migration/promotion is blocked until a provider-native Neon recovery
+  point is verified and the operator supplies the approved legal invoice issuer
+  identity plus the capture recipient-domain allowlist. These values are legal
+  and security decisions and must not be inferred from branding.
+
+## Prior Local Work: Financial Evidence And Release Integrity
 
 - The original money defects are fixed: publisher approval uses the already
   reserved balance instead of charging it twice; chargeback holds have an

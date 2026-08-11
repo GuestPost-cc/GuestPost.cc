@@ -24,6 +24,10 @@ import {
 } from "../lib/email-delivery-lease"
 import { runEmailDeliveryTerminalTransaction } from "../lib/email-event-finalization"
 import {
+  emailAllowedRecipientDomainsFromEnv,
+  emailDeliveryModeFromEnv,
+} from "../lib/env"
+import {
   type RenderedFinancialDocumentAttachment,
   renderFinancialDocumentPdf,
 } from "../lib/financial-document-pdf"
@@ -45,20 +49,6 @@ const LEGACY_JOB_NAMES = new Set([
   "send-password-reset-email",
   "send-reminder-email",
 ])
-
-type DeliveryMode = "disabled" | "capture" | "live"
-
-function deliveryMode(): DeliveryMode {
-  const configured = process.env.EMAIL_DELIVERY_MODE?.trim().toLowerCase()
-  if (
-    configured === "disabled" ||
-    configured === "capture" ||
-    configured === "live"
-  ) {
-    return configured
-  }
-  return process.env.NODE_ENV === "production" ? "live" : "capture"
-}
 
 function smtpPort(): number {
   const parsed = Number(process.env.SMTP_PORT ?? 1025)
@@ -88,10 +78,7 @@ const transporter = nodemailer.createTransport({
 
 // Optional comma-separated recipient-domain allowlist. This is useful in
 // staging/capture environments and is rechecked immediately before delivery.
-const allowedDomains = (process.env.EMAIL_ALLOWED_RECIPIENT_DOMAINS ?? "")
-  .split(",")
-  .map((domain) => domain.trim().toLowerCase())
-  .filter(Boolean)
+const allowedDomains = emailAllowedRecipientDomainsFromEnv().domains
 
 function recipientDomain(address: string): string | null {
   return address.split("@")[1]?.trim().toLowerCase() ?? null
@@ -279,7 +266,7 @@ async function buildFinancialAttachment(event: {
 }
 
 export async function processEmailDelivery(deliveryId: string) {
-  if (deliveryMode() === "disabled") {
+  if (emailDeliveryModeFromEnv() === "disabled") {
     return { sent: false, skipped: "delivery-disabled" }
   }
 
@@ -564,14 +551,16 @@ export async function processEmailDelivery(deliveryId: string) {
     deliveryId: delivery.id,
     eventType: delivery.event.type,
     recipientDomain: recipientDomain(email),
-    mode: deliveryMode(),
+    mode: emailDeliveryModeFromEnv(),
     attachedFinancialDocument: Boolean(financialAttachment),
   })
   return { sent: true, deliveryId: delivery.id }
 }
 
 export async function processEmailOutboxBatch(limit = MAX_OUTBOX_BATCH) {
-  if (deliveryMode() === "disabled") return { processed: 0, failed: 0 }
+  if (emailDeliveryModeFromEnv() === "disabled") {
+    return { processed: 0, failed: 0 }
+  }
   const batchSize = Math.max(1, Math.min(limit, MAX_OUTBOX_BATCH))
   const now = new Date()
   const recovery = await recoverExpiredEmailDeliveryLeases(prisma, { now })
@@ -614,7 +603,7 @@ async function processLegacyEmail(
   jobName: string,
   data: Record<string, unknown>,
 ) {
-  if (deliveryMode() === "disabled") {
+  if (emailDeliveryModeFromEnv() === "disabled") {
     return { sent: false, skipped: "delivery-disabled" }
   }
   if (!LEGACY_JOB_NAMES.has(jobName)) throw new Error("Unsupported email job")
