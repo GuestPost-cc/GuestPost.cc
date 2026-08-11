@@ -224,22 +224,21 @@ merged or deployed. GitHub `main` through dependency consolidation commit
 - Render built merged commit `85a7baa` successfully but the API exited before
   binding its port because Node could not resolve the extensionless
   `./layout` import emitted by the new auth email templates.
-- Combined branch `agent/delivery-fraud-auth-runtime-hardening` uses
-  Node-compatible `.js` relative specifiers in both templates and makes the
-  auth build import their emitted JavaScript, moving this class of failure into
-  build/CI.
+- PR #92 was squash-merged to `main` as `951e363a` after required CI passed on
+  exact head `0a6354c9`. The merged fix uses Node-compatible `.js` relative
+  specifiers in both templates and makes the auth build import their emitted
+  JavaScript, moving this class of failure into build/CI.
 - Local verification is green: all 8 auth suites / 38 tests, the auth runtime
   smoke check, a production-mode package load, and the exact Render API Turbo
-  build (5 packages) pass. The combined branch still needs publication,
-  required CI, merge, and redeployment.
+  build (5 packages) pass. Redeployment remains operator-owned.
 
 ## Current Local Work: Delivery Fraud And Customer Acceptance
 
 - Durable communications and financial documents were squash-merged from PR
   #91 as `85a7baa8`. Required `build-and-test` CI passed against the exact PR
-  head before the authorized repository-owner merge. The fraud hardening was
-  replayed without application-code conflicts onto the combined main-based
-  auth-runtime branch.
+  head before the authorized repository-owner merge. Fraud hardening and the
+  auth runtime repair were squash-merged from PR #92 as `951e363a`; required CI
+  passed against exact head `0a6354c9` before the merge.
 - The Neon test database now has both merged migrations applied through the
   direct owner endpoint. The earlier pooled runtime attempt applied zero steps;
   its exact stale idle PgBouncer advisory-lock holder was terminated before the
@@ -280,7 +279,7 @@ merged or deployed. GitHub `main` through dependency consolidation commit
 - Operator and invariant documentation is in
   `docs/DELIVERY_FRAUD_AND_MANUAL_VERIFICATION.md` and
   `docs/FINANCIAL_INVARIANTS.md`. Focused fraud/intervention coverage passes;
-  the exact-tree API unit regression passes 129 suites / 1,510 tests. Prisma,
+  the exact-tree API unit regression passes 129 suites / 1,518 tests. Prisma,
   dependency policy, Biome, ESLint, workspace typecheck, dependency graph,
   package and UI tests, and all 12 production builds pass on the combined
   tree.
