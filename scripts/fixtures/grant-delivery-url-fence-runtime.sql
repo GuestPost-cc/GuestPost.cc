@@ -6,6 +6,10 @@
 
 BEGIN;
 
+-- Explicit for hardened deployments that revoked schema USAGE from PUBLIC.
+REVOKE CREATE ON SCHEMA public FROM :"runtime_role";
+GRANT USAGE ON SCHEMA public TO :"runtime_role";
+
 REVOKE ALL ON TABLE public."DeliveryUrlClaimFence"
   FROM :"runtime_role";
 REVOKE EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)

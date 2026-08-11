@@ -1,5 +1,7 @@
 -- Establish a SERIALIZABLE snapshot before another connection advances the
--- URL fence. The harness expects the final function call to fail with 40001.
+-- URL fence. The harness keeps this psql session open through a FIFO, runs the
+-- writer to completion, and then streams the release fixture into this same
+-- transaction.
 
 \set ON_ERROR_STOP on
 \set VERBOSITY verbose
@@ -12,11 +14,3 @@ WHERE "normalizedUrl" =
   'https://metrics-rehearsal.invalid/rehearsal-article';
 
 \echo SERIALIZABLE_SNAPSHOT_READY
-
-SELECT pg_sleep(5);
-
-SELECT public."acquire_delivery_url_claim_fence"(
-  'https://metrics-rehearsal.invalid/rehearsal-article'
-);
-
-COMMIT;

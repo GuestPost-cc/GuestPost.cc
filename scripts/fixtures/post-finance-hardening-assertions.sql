@@ -207,8 +207,7 @@ BEGIN
   FROM public."OrderDeliveryVersion" delivery
   JOIN public."DeliveryUrlClaimFence" fence
     ON fence."normalizedUrl" = delivery."normalizedUrl"
-  ORDER BY delivery."id"
-  LIMIT 1;
+  WHERE delivery."id" = 'migration-rehearsal-settlement-delivery';
 
   IF delivery_id IS NULL THEN
     RAISE EXCEPTION 'delivery URL fence trigger rehearsal has no delivery row';

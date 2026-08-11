@@ -13,6 +13,24 @@ const financeRehearsalScript = fs.readFileSync(
   path.join(repoRoot, "scripts/verify-financial-migration-upgrade.sh"),
   "utf8",
 )
+const serializableReaderSql = fs.readFileSync(
+  path.join(
+    repoRoot,
+    "scripts/fixtures/delivery-url-fence-serializable-reader.sql",
+  ),
+  "utf8",
+)
+const concurrentWriterSql = fs.readFileSync(
+  path.join(
+    repoRoot,
+    "scripts/fixtures/delivery-url-fence-concurrent-writer.sql",
+  ),
+  "utf8",
+)
+const runtimeGrantSql = fs.readFileSync(
+  path.join(repoRoot, "scripts/fixtures/grant-delivery-url-fence-runtime.sql"),
+  "utf8",
+)
 
 describe("delivery URL claim fence migration contract", () => {
   it("uses the same advisory namespace as the application lock", () => {
@@ -95,8 +113,16 @@ describe("delivery URL claim fence migration contract", () => {
       "scripts/fixtures/delivery-url-fence-serializable-reader.sql",
     )
     expect(financeRehearsalScript).toContain(
+      "scripts/fixtures/delivery-url-fence-serializable-reader-release.sql",
+    )
+    expect(financeRehearsalScript).toContain(
       "scripts/fixtures/delivery-url-fence-concurrent-writer.sql",
     )
+    expect(financeRehearsalScript).toContain("mkfifo")
+    expect(serializableReaderSql).not.toContain("pg_sleep")
+    expect(concurrentWriterSql).toMatch(/IF NOT FOUND THEN/)
+    expect(runtimeGrantSql).toMatch(/GRANT USAGE ON SCHEMA public/)
+    expect(runtimeGrantSql).toMatch(/REVOKE CREATE ON SCHEMA public/)
     expect(financeRehearsalScript).toContain("ERROR:  40001:")
   })
 })

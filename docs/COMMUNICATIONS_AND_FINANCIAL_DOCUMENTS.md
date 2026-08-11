@@ -449,6 +449,8 @@ authorization.
      FROM :"runtime_role";
    REVOKE EXECUTE ON FUNCTION public."fence_delivery_url_claim_mutation"()
      FROM :"runtime_role";
+   REVOKE CREATE ON SCHEMA public FROM :"runtime_role";
+   GRANT USAGE ON SCHEMA public TO :"runtime_role";
    GRANT SELECT ON TABLE public."DeliveryUrlClaimFence"
      TO :"runtime_role";
    GRANT INSERT ("normalizedUrl", "version")
@@ -463,10 +465,14 @@ authorization.
    If authority is inherited, apply the same revocation/grant boundary to the
    grant-bearing role. Then verify the effective privileges through the exact
    API and worker runtime connections. Expected results are
-   `true, true, true, false, false, true, false` in this order:
+   `true, false, true, true, true, false, false, true, false` in this order:
 
    ```sql
    SELECT
+     has_schema_privilege(current_user, 'public', 'USAGE')
+       AS can_use_schema,
+     has_schema_privilege(current_user, 'public', 'CREATE')
+       AS can_create_in_schema,
      has_column_privilege(current_user,
        'public."DeliveryUrlClaimFence"', 'normalizedUrl', 'INSERT')
        AS can_insert_url,
@@ -507,9 +513,10 @@ authorization.
    ) AS rollback_proved;
    ```
 
-   Do not grant `EXECUTE` on the trigger function, relation ownership,
-   deploy-role membership, schema creation, superuser, or `BYPASSRLS` to make
-   the canary pass.
+   `USAGE` permits object lookup but no object mutation; it is explicit because
+   hardened clusters may revoke the PostgreSQL default from `PUBLIC`. Do not
+   grant `EXECUTE` on the trigger function, schema `CREATE`, relation ownership,
+   deploy-role membership, superuser, or `BYPASSRLS` to make the canary pass.
 8. Deploy the API and worker from the same commit only after both runtime-role
    canaries pass; old delivery writers remain stopped because the new invoker
    trigger intentionally fails closed until these grants exist.

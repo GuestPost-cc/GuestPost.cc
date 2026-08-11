@@ -138,7 +138,8 @@ cross-order insert can legally serialize reader-first without a cycle. Deploy
 the `20260811133000_delivery_url_claim_fence` migration before rolling
 application instances that rely on URL-claim freshness.
 
-The restricted API/worker database role must receive only table `SELECT`,
+The restricted API/worker database role must receive schema `USAGE` (never
+`CREATE`) on `public`, table `SELECT`,
 column-scoped `INSERT ("normalizedUrl", "version")` and `UPDATE ("version")`
 on `DeliveryUrlClaimFence`, plus `EXECUTE` on
 `acquire_delivery_url_claim_fence(text)` before the new image starts. The

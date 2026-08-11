@@ -15,6 +15,10 @@ rehearsal_database="guestpost_finance_migration_rehearsal"
 negative_rehearsal_database="guestpost_finance_migration_negative"
 runtime_rehearsal_role="guestpost_migration_fence_runtime"
 serializable_rehearsal_log=""
+serializable_rehearsal_fifo=""
+serializable_rehearsal_fifo_dir=""
+serializable_reader_fd_open=false
+serializable_reader_pid=""
 hardening_start="20260729085000_payment_provider_event_quarantine"
 migration_root="packages/database/prisma/migrations"
 
@@ -87,19 +91,38 @@ run_rehearsal_file() {
 }
 
 cleanup() {
+  local exit_status=$?
+  if [[ "${serializable_reader_fd_open}" == true ]]; then
+    exec 9>&- || true
+    serializable_reader_fd_open=false
+  fi
+  if [[ -n "${serializable_reader_pid}" ]] \
+      && kill -0 "${serializable_reader_pid}" 2>/dev/null; then
+    kill "${serializable_reader_pid}" 2>/dev/null || true
+    wait "${serializable_reader_pid}" 2>/dev/null || true
+  fi
+  if [[ -n "${serializable_rehearsal_fifo}" \
+      && -p "${serializable_rehearsal_fifo}" ]]; then
+    rm -f "${serializable_rehearsal_fifo}"
+  fi
+  if [[ -n "${serializable_rehearsal_fifo_dir}" \
+      && -d "${serializable_rehearsal_fifo_dir}" ]]; then
+    rmdir "${serializable_rehearsal_fifo_dir}" 2>/dev/null || true
+  fi
   if [[ -n "${serializable_rehearsal_log}" \
       && -f "${serializable_rehearsal_log}" ]]; then
     rm -f "${serializable_rehearsal_log}"
   fi
   run_admin_sql \
     "DROP DATABASE IF EXISTS \"${negative_rehearsal_database}\" WITH (FORCE)" \
-    >/dev/null
+    >/dev/null || true
   run_admin_sql \
     "DROP DATABASE IF EXISTS \"${rehearsal_database}\" WITH (FORCE)" \
-    >/dev/null
+    >/dev/null || true
   run_admin_sql \
     "DROP ROLE IF EXISTS \"${runtime_rehearsal_role}\"" \
-    >/dev/null
+    >/dev/null || true
+  return "${exit_status}"
 }
 trap cleanup EXIT
 
@@ -308,10 +331,16 @@ run_rehearsal_file scripts/fixtures/post-finance-hardening-assertions.sql \
 
 echo "Checking stale SERIALIZABLE URL-claim readers retry after a concurrent writer"
 serializable_rehearsal_log="$(mktemp)"
-run_rehearsal_file \
-  scripts/fixtures/delivery-url-fence-serializable-reader.sql \
+serializable_rehearsal_fifo_dir="$(mktemp -d)"
+serializable_rehearsal_fifo="${serializable_rehearsal_fifo_dir}/reader.sql.fifo"
+mkfifo "${serializable_rehearsal_fifo}"
+run_rehearsal_file "${serializable_rehearsal_fifo}" \
   >"${serializable_rehearsal_log}" 2>&1 &
 serializable_reader_pid=$!
+exec 9>"${serializable_rehearsal_fifo}"
+serializable_reader_fd_open=true
+cat scripts/fixtures/delivery-url-fence-serializable-reader.sql \
+  >&9
 snapshot_ready=false
 for _ in {1..80}; do
   if grep -q "SERIALIZABLE_SNAPSHOT_READY" "${serializable_rehearsal_log}"; then
@@ -324,6 +353,8 @@ for _ in {1..80}; do
   sleep 0.05
 done
 if [[ "${snapshot_ready}" != true ]]; then
+  exec 9>&-
+  serializable_reader_fd_open=false
   wait "${serializable_reader_pid}" || true
   echo "Serializable URL-fence reader did not establish its snapshot:" >&2
   sed -n '1,120p' "${serializable_rehearsal_log}" >&2
@@ -332,6 +363,10 @@ fi
 run_rehearsal_file \
   scripts/fixtures/delivery-url-fence-concurrent-writer.sql \
   >/dev/null
+cat scripts/fixtures/delivery-url-fence-serializable-reader-release.sql \
+  >&9
+exec 9>&-
+serializable_reader_fd_open=false
 if wait "${serializable_reader_pid}"; then
   echo "Stale SERIALIZABLE URL-fence reader unexpectedly committed" >&2
   exit 77
@@ -343,6 +378,11 @@ if ! grep -q "ERROR:  40001:" "${serializable_rehearsal_log}"; then
 fi
 rm -f "${serializable_rehearsal_log}"
 serializable_rehearsal_log=""
+rm -f "${serializable_rehearsal_fifo}"
+serializable_rehearsal_fifo=""
+rmdir "${serializable_rehearsal_fifo_dir}"
+serializable_rehearsal_fifo_dir=""
+serializable_reader_pid=""
 
 echo "Checking restricted delivery URL fence runtime authority"
 run_admin_sql \

@@ -24,9 +24,10 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   point, stop API writers, API on-demand wakes, realtime/legacy workers, both
   schedules, and every active scheduled/on-demand run, then apply all pending
   migrations once from a direct schema-owner connection. Review every legacy
-  audience incident audit before restoring delivery. Provision only fence-table
-  `SELECT`, column-scoped `INSERT`/`UPDATE`, and application-fence `EXECUTE` to
-  the restricted runtime role and pass its rollback canary. Missing privileges
+  audience incident audit before restoring delivery. Provision only schema
+  `USAGE` (not `CREATE`), fence-table `SELECT`, column-scoped `INSERT`/`UPDATE`,
+  and application-fence `EXECUTE` to the restricted runtime role and pass its
+  rollback canary. Missing privileges
   fail closed. Both API and every worker lane need the identical reviewed
   server-only invoice issuer bundle; email mode is explicit per lane and starts
   in capture/disabled. Render stays manual, and every frontend must prove that

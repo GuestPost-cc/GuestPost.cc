@@ -24,6 +24,7 @@ const EMAIL_DELIVERY_MODES = ["disabled", "capture", "live"] as const
 const EMAIL_RECIPIENT_DOMAIN =
   /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 
+/** Resolve the configured delivery mode, failing closed in production. */
 export function emailDeliveryModeFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): EmailDeliveryMode {
@@ -34,6 +35,7 @@ export function emailDeliveryModeFromEnv(
   return env.NODE_ENV === "production" ? "disabled" : "capture"
 }
 
+/** Parse, normalize, deduplicate, and count invalid exact recipient domains. */
 export function emailAllowedRecipientDomainsFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): { configured: boolean; domains: string[]; invalidCount: number } {
@@ -50,6 +52,7 @@ export function emailAllowedRecipientDomainsFromEnv(
   }
 }
 
+/** Return the fail-closed allowlist validation error for an email mode. */
 export function emailRecipientAllowlistIssueFromEnv(
   env: NodeJS.ProcessEnv = process.env,
   mode: EmailDeliveryMode = emailDeliveryModeFromEnv(env),

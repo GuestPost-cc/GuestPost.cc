@@ -9,6 +9,8 @@ SET ROLE :"runtime_role";
 
 DO $$
 DECLARE
+  can_use_schema boolean;
+  can_create_in_schema boolean;
   can_insert_url boolean;
   can_insert_version boolean;
   can_update_version boolean;
@@ -20,6 +22,8 @@ DECLARE
   can_call_trigger_function boolean;
 BEGIN
   SELECT
+    has_schema_privilege(current_user, 'public', 'USAGE'),
+    has_schema_privilege(current_user, 'public', 'CREATE'),
     has_column_privilege(current_user,
       'public."DeliveryUrlClaimFence"', 'normalizedUrl', 'INSERT'),
     has_column_privilege(current_user,
@@ -39,6 +43,8 @@ BEGIN
     has_function_privilege(current_user,
       'public.fence_delivery_url_claim_mutation()', 'EXECUTE')
   INTO
+    can_use_schema,
+    can_create_in_schema,
     can_insert_url,
     can_insert_version,
     can_update_version,
@@ -49,7 +55,9 @@ BEGIN
     can_acquire_fence,
     can_call_trigger_function;
 
-  IF NOT can_insert_url
+  IF NOT can_use_schema
+     OR can_create_in_schema
+     OR NOT can_insert_url
      OR NOT can_insert_version
      OR NOT can_update_version
      OR can_rewrite_url
