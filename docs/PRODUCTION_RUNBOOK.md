@@ -13,7 +13,7 @@ evidence while refusing money mutations.
 
 | Var | Notes |
 |---|---|
-| `DATABASE_URL` | API/worker least-privilege runtime DML role; must not own the schema/tables or have DDL, trigger, superuser, or `BYPASSRLS` authority |
+| `DATABASE_URL` | Real credentials are API/worker-only and use the least-privilege runtime DML role; must not own the schema/tables or have DDL, trigger, superuser, or `BYPASSRLS` authority. A frontend build may receive only the committed unreachable loopback placeholder needed by workspace Prisma generation, never a live credential. |
 | `DIRECT_DATABASE_URL` | isolated deploy/migration job only; schema-owner credential, never injected into API/worker/frontend/job runtimes |
 | `REDIS_URL` | API cache, rate limits, and pub/sub |
 | `QUEUE_REDIS_URL` | BullMQ; falls back to `REDIS_URL`, but use a separate production database |

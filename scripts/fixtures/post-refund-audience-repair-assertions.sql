@@ -53,19 +53,19 @@ DECLARE
   repair_count integer;
   incident_org text;
   repair_org text;
-  terminal_count integer;
+  review_required_count integer;
   suppressed_count integer;
   deleted_count integer;
 BEGIN
   SELECT count(*), min("organizationId"),
-         min(("metadata"->>'terminalUnauthorizedEmailCount')::integer)
-    INTO incident_count, incident_org, terminal_count
+         min(("metadata"->>'reviewRequiredEmailCount')::integer)
+    INTO incident_count, incident_org, review_required_count
   FROM "AuditLog"
   WHERE "action" = 'LEGACY_REFUND_AUDIENCE_DISCLOSURE_REVIEW_REQUIRED'
     AND "entityId" = 'migration-refund-event';
 
   SELECT count(*), min("organizationId"),
-         min(("metadata"->>'preDispatchEmailSuppressed')::integer),
+         min(("metadata"->>'unauthorizedEmailSuppressed')::integer),
          min(("metadata"->>'inAppDeleted')::integer)
     INTO repair_count, repair_org, suppressed_count, deleted_count
   FROM "AuditLog"
@@ -79,8 +79,8 @@ BEGIN
      OR repair_org IS DISTINCT FROM 'migration-rehearsal-org' THEN
     RAISE EXCEPTION 'refund audience audits did not use canonical Order organization: incident %, repair %', incident_org, repair_org;
   END IF;
-  IF terminal_count <> 3 OR suppressed_count <> 4 OR deleted_count <> 2 THEN
-    RAISE EXCEPTION 'refund audience audit counts are wrong: terminal %, suppressed %, deleted %', terminal_count, suppressed_count, deleted_count;
+  IF review_required_count <> 5 OR suppressed_count <> 4 OR deleted_count <> 2 THEN
+    RAISE EXCEPTION 'refund audience audit counts are wrong: review-required %, suppressed %, deleted %', review_required_count, suppressed_count, deleted_count;
   END IF;
 END
 $$;

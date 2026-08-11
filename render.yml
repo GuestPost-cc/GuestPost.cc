@@ -9,6 +9,10 @@
 #
 # Do not place real credentials in this file. Values marked sync: false are
 # filled in the Render Dashboard during Blueprint creation/sync.
+# Database credentials belong only to the API and separately operated worker.
+# Frontend builds receive only an unreachable non-secret Prisma-generation
+# placeholder; the four frontend runtimes must never receive a real database
+# credential.
 
 previews:
   generation: "off"
@@ -178,8 +182,11 @@ services:
         value: production
       - key: NODE_VERSION
         value: 22.22.0
+      # Workspace Prisma generation requires a syntactically valid URL even
+      # though this application has no database runtime. Keep this non-secret,
+      # loopback-only placeholder fail-closed in both build and runtime.
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://build:build@127.0.0.1:5432/build
       - key: NEXT_PUBLIC_API_URL
         value: https://api.guestpost.pro.bd
       - key: NEXT_PUBLIC_WEBSITE_URL
@@ -212,7 +219,7 @@ services:
       - key: NODE_VERSION
         value: 22.22.0
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://build:build@127.0.0.1:5432/build
       - key: NEXT_PUBLIC_API_URL
         value: https://api.guestpost.pro.bd
       - key: NEXT_PUBLIC_WEBSITE_URL
@@ -245,7 +252,7 @@ services:
       - key: NODE_VERSION
         value: 22.22.0
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://build:build@127.0.0.1:5432/build
       - key: NEXT_PUBLIC_API_URL
         value: https://api.guestpost.pro.bd
       - key: NEXT_PUBLIC_PORTAL_URL
@@ -274,7 +281,7 @@ services:
       - key: NODE_VERSION
         value: 22.22.0
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://build:build@127.0.0.1:5432/build
       - key: NEXT_PUBLIC_API_URL
         value: https://api.guestpost.pro.bd
       - key: NEXT_PUBLIC_WEBSITE_URL

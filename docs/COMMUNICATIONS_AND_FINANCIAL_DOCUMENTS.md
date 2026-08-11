@@ -118,8 +118,11 @@ all outstanding deliveries, including rows created by an older replay.
   payloads, invoice snapshots, or tax identifiers.
 - SMTP 550, 551, and 553 responses create a hard-bounce suppression. Mailbox
   full and generic provider-policy errors remain retryable.
-- `disabled`, `capture`, and `live` delivery modes are explicit. Staging should
-  combine `capture` with `EMAIL_ALLOWED_RECIPIENT_DOMAINS`.
+- `disabled`, `capture`, and `live` delivery modes are explicit. Production
+  startup rejects a missing or invalid mode, and the processor independently
+  falls back to `disabled` if startup validation is ever bypassed. Production
+  `capture` requires a non-empty `EMAIL_ALLOWED_RECIPIENT_DOMAINS`; capture
+  still uses its configured SMTP transport and does not redirect recipients.
 
 ## PDF attachment policy
 
@@ -356,50 +359,135 @@ and staging-canary gates below pass. A merge to `main` is not deployment
 authorization.
 
 1. Obtain approved issuer and tax wording from Finance or counsel.
-2. Configure the identical issuer values on the API and worker, plus the
-   worker's SMTP/origin values.
-3. Apply `20260809180000_durable_communications` if not already applied.
-4. Apply `20260810120000_financial_document_attachments` before deploying the
-   new API or worker.
-5. Apply `20260811130000_fenced_email_delivery_dispatch`, allow that enum
-   migration to commit, and then apply
-   `20260811131000_fenced_email_delivery_evidence`.
-   Then apply
-   `20260811131100_validate_fenced_email_delivery_evidence`; keeping validation
-   in its own migration releases the short `ACCESS EXCLUSIVE` schema-change
-   lock before PostgreSQL scans historical delivery rows.
-6. Drain the email worker and keep it drained while applying
-   `20260811132000_refund_financial_audience_repair`, and review every
+2. Configure the identical issuer values on the API and every worker lane.
+   Configure realtime and the combined maintenance dispatcher as `capture`
+   with test SMTP/origins plus a non-empty exact-domain allowlist; configure the
+   non-email on-demand lane as `disabled`.
+3. Record `_prisma_migrations` names and checksums and prove that no migration
+   being edited by the release has already run in any persistent environment.
+   Create and verify a provider-native recovery point. Run
+   `pnpm test:migrations:finance` only against disposable loopback PostgreSQL.
+4. Enter one full writer-quiescence window before the deploy command: stop or
+   ingress-freeze the API paths that write Orders, memberships, communications,
+   notifications, or audits; remove/disable `WORKER_ON_DEMAND_TRIGGER_URL` (or
+   block the run-job endpoint) before freezing ingress so API requests cannot
+   enqueue another Northflank wake; pause both Northflank schedules; gracefully
+   stop every realtime and legacy `WORKER_MODE=all` replica; stop or wait out
+   every active `WORKER_MODE=on-demand` and scheduled execution; prove the
+   orchestrator reports zero active runs; wait for SMTP work to finish; and
+   require zero processing email deliveries. Keep all of those writers and
+   trigger surfaces stopped through migration, grants, audits, and canaries.
+5. From an isolated deploy job, inject the direct schema-owner URL and run the
+   single non-interactive `pnpm db:migrations:deploy` command. Prisma applies
+   every pending directory in order; there is no operator pause within this
+   command. If still pending, durable communications and financial attachments
+   land before these five release migrations:
+
+   1. `20260811130000_fenced_email_delivery_dispatch` (commits the enum label)
+   2. `20260811131000_fenced_email_delivery_evidence`
+   3. `20260811131100_validate_fenced_email_delivery_evidence`
+   4. `20260811132000_refund_financial_audience_repair`
+   5. `20260811133000_delivery_url_claim_fence`
+
+   The separate validation migration releases the short `ACCESS EXCLUSIVE`
+   schema-change lock before PostgreSQL scans historical delivery rows. Destroy
+   the direct credential injection when the deploy job exits. For the five
+   explicit-transaction migrations listed above, a lock timeout rolls back the
+   current migration transaction, but Prisma records that failed attempt and
+   later deploys stop with `P3009`. Keep writers stopped, verify that the
+   explicit transaction left no partial schema or data effects, and inspect the
+   exact failed migration and deploy log. With the same direct schema-owner URL,
+   mark only that fully rolled-back attempt as rolled back, then rerun the
+   unchanged deploy instead of raising the timeout:
+
+   ```bash
+   pnpm --filter @guestpost/database exec prisma migrate resolve \
+     --rolled-back "<exact_failed_migration_name>"
+   pnpm db:migrations:deploy
+   ```
+
+   Never use `--applied` for a migration that timed out and was fully rolled
+   back. If the no-partial-effects check is not conclusive, stop and investigate
+   rather than resolving migration history. If an earlier prerequisite migration
+   without an explicit transaction fails, do not assume rollback and do not run
+   `migrate resolve` until every executed statement and partial effect has been
+   identified and a reviewed recovery procedure is ready.
+6. Review every
    `LEGACY_REFUND_AUDIENCE_DISCLOSURE_REVIEW_REQUIRED` audit row before
-   restoring live delivery. The migration suppresses only unauthorized
-   pre-dispatch email, removes unauthorized in-app rows, and never rewrites
-   sent/uncertain outcomes or immutable credit notes. It also records each
-   safe cleanup as `LEGACY_REFUND_AUDIENCE_PROJECTIONS_REPAIRED`; both audit
-   types are scoped from the canonical Order organization. Before production,
-   run `pnpm test:migrations:finance` against the disposable loopback
-   PostgreSQL rehearsal. That command loads actual pending, pre/post-dispatch,
-   sent, uncertain, deleted-user, customer, and active-owner rows immediately
-   before this migration, asserts the database result, reruns the migration,
-   and asserts idempotency. Review the terminal/in-flight audit counts with the
-   mail provider and incident owner before the worker is restarted.
-7. Apply `20260811133000_delivery_url_claim_fence` before any application
-   process from this commit starts. Provision the restricted runtime role with
-   exactly `SELECT`, `INSERT`, and `UPDATE` on
-   `DeliveryUrlClaimFence` plus `EXECUTE` on
+   restoring live delivery. The migration suppresses unauthorized retryable
+   rows that currently have no dispatch-start evidence, removes unauthorized
+   in-app rows, and never rewrites sent/uncertain outcomes or immutable credit
+   notes. Because historical rows predate dispatch fencing, any such row with
+   `attempts > 0` is also retained in the disclosure-review audit: a null new
+   column cannot prove an older SMTP attempt never occurred. It also records
+   each safe cleanup as `LEGACY_REFUND_AUDIENCE_PROJECTIONS_REPAIRED`; both
+   audit types are scoped from the canonical Order organization. The rehearsal
+   loads actual pending, pre/post-dispatch, sent, uncertain, deleted-user,
+   customer, and active-owner rows immediately before this migration, asserts
+   the database result, reruns the migration, and asserts idempotency. Review
+   every terminal, in-flight, and pre-fence attempted audit entry with the mail
+   provider and incident owner before the worker is restarted.
+7. Before any application process is restarted, provision the restricted
+   runtime role for the installed URL fence with
+   exactly table `SELECT`, column-scoped `INSERT ("normalizedUrl", "version")`
+   and `UPDATE ("version")` on `DeliveryUrlClaimFence`, plus `EXECUTE` on
    `acquire_delivery_url_claim_fence(text)`. In a hardened cluster, revoke the
    default public function surface first; the trigger function is not an
    application call surface. Before running the block in `psql`, set its
    identifier variable `runtime_role` to the exact restricted API/worker role:
 
    ```sql
-   REVOKE EXECUTE ON FUNCTION "acquire_delivery_url_claim_fence"(text)
+   BEGIN;
+   REVOKE ALL ON TABLE public."DeliveryUrlClaimFence" FROM PUBLIC;
+   REVOKE EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)
      FROM PUBLIC;
-   REVOKE EXECUTE ON FUNCTION "fence_delivery_url_claim_mutation"()
+   REVOKE EXECUTE ON FUNCTION public."fence_delivery_url_claim_mutation"()
      FROM PUBLIC;
-   GRANT SELECT, INSERT, UPDATE ON TABLE "DeliveryUrlClaimFence"
+   REVOKE ALL ON TABLE public."DeliveryUrlClaimFence"
+     FROM :"runtime_role";
+   REVOKE EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)
+     FROM :"runtime_role";
+   REVOKE EXECUTE ON FUNCTION public."fence_delivery_url_claim_mutation"()
+     FROM :"runtime_role";
+   GRANT SELECT ON TABLE public."DeliveryUrlClaimFence"
      TO :"runtime_role";
-   GRANT EXECUTE ON FUNCTION "acquire_delivery_url_claim_fence"(text)
+   GRANT INSERT ("normalizedUrl", "version")
+     ON TABLE public."DeliveryUrlClaimFence" TO :"runtime_role";
+   GRANT UPDATE ("version") ON TABLE public."DeliveryUrlClaimFence"
      TO :"runtime_role";
+   GRANT EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)
+     TO :"runtime_role";
+   COMMIT;
+   ```
+
+   If authority is inherited, apply the same revocation/grant boundary to the
+   grant-bearing role. Then verify the effective privileges through the exact
+   API and worker runtime connections. Expected results are
+   `true, true, true, false, false, true, false` in this order:
+
+   ```sql
+   SELECT
+     has_column_privilege(current_user,
+       'public."DeliveryUrlClaimFence"', 'normalizedUrl', 'INSERT')
+       AS can_insert_url,
+     has_column_privilege(current_user,
+       'public."DeliveryUrlClaimFence"', 'version', 'INSERT')
+       AS can_insert_version,
+     has_column_privilege(current_user,
+       'public."DeliveryUrlClaimFence"', 'version', 'UPDATE')
+       AS can_update_version,
+     has_column_privilege(current_user,
+       'public."DeliveryUrlClaimFence"', 'normalizedUrl', 'UPDATE')
+       AS can_rewrite_url,
+     has_table_privilege(current_user,
+       'public."DeliveryUrlClaimFence"', 'DELETE,TRUNCATE,TRIGGER')
+       AS has_forbidden_table_privilege,
+     has_function_privilege(current_user,
+       'public.acquire_delivery_url_claim_fence(text)', 'EXECUTE')
+       AS can_acquire_fence,
+     has_function_privilege(current_user,
+       'public.fence_delivery_url_claim_mutation()', 'EXECUTE')
+       AS can_call_trigger_function;
    ```
 
    Connect as that exact runtime role and run this rollback-only canary; the
@@ -407,13 +495,13 @@ authorization.
 
    ```sql
    BEGIN;
-   SELECT "acquire_delivery_url_claim_fence"(
+   SELECT public."acquire_delivery_url_claim_fence"(
      'https://release-canary.invalid/rollback-only'
    );
    ROLLBACK;
    SELECT NOT EXISTS (
      SELECT 1
-     FROM "DeliveryUrlClaimFence"
+     FROM public."DeliveryUrlClaimFence"
      WHERE "normalizedUrl" =
        'https://release-canary.invalid/rollback-only'
    ) AS rollback_proved;
@@ -422,18 +510,35 @@ authorization.
    Do not grant `EXECUTE` on the trigger function, relation ownership,
    deploy-role membership, schema creation, superuser, or `BYPASSRLS` to make
    the canary pass.
-8. Deploy the API and worker from the same commit.
-9. Keep mail in `capture` mode and restrict recipient domains.
-10. Save a complete owner billing profile.
-11. Exercise a deposit, paid order, and refund. Inspect both the email and PDF.
-12. Confirm outbox retry, PDF hash/size persistence, hard-bounce suppression,
+8. Deploy the API and worker from the same commit only after both runtime-role
+   canaries pass; old delivery writers remain stopped because the new invoker
+   trigger intentionally fails closed until these grants exist.
+9. Sync the reviewed `render.yml` Blueprint while every Render service remains
+   on manual deploy. For each of the four frontends (website, portal, publisher,
+   and admin), inspect the effective environment and inherited environment
+   groups, remove any dashboard/group override that contains a real
+   `DATABASE_URL`, and prove that the only frontend value is the committed,
+   unreachable loopback build placeholder. Then redeploy all four frontends
+   from the same reviewed commit and re-check their effective environment.
+   Keep the API's real runtime database credential server-side and separately
+   least-privileged. Do not complete the release if any frontend still inherits
+   a live database credential.
+10. Keep mail in `capture` mode and restrict recipient domains.
+11. Save a complete owner billing profile.
+12. Exercise a deposit, paid order, and refund. Inspect both the email and PDF.
+13. Confirm outbox retry, PDF hash/size persistence, hard-bounce suppression,
    and no sensitive values in logs or audit metadata.
-13. Enable `live` only after the staged evidence is approved.
+14. Enable `live` only after the staged evidence is approved.
 
-Rollback must stop new API/worker code before reverting schema assumptions.
-Issued financial documents must not be deleted during rollback. If a document
-is factually wrong, issue a credit note or an approved replacement workflow;
-never disable the immutability trigger for ordinary correction.
+This release is forward-fix after migration. Keep all five migrations, the URL
+fence trigger/functions/table, and their narrow grants. Do not reverse audience
+repair audits, resurrect suppressed email, restore deleted unauthorized in-app
+notifications, or resend uncertain outcomes. An old worker is not a rollback
+target after `DELIVERY_UNCERTAIN` can exist unless its compatibility is proved;
+keep mail `capture`/`disabled`, finance fail-closed, and deploy a corrected new
+image. Issued financial documents must not be deleted or rewritten. If a
+document is factually wrong, issue a credit note or an approved replacement
+workflow; never disable the immutability trigger for ordinary correction.
 
 ## Adding a communication or attachment
 

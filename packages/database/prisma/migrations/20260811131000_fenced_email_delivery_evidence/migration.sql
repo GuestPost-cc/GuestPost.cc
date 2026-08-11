@@ -2,6 +2,15 @@
 -- before SMTP dispatch is retryable; once dispatch starts, an unknown outcome
 -- is quarantined instead of risking an automatic duplicate financial email.
 
+-- Prisma 7 does not wrap migrations automatically. Keep the column and both
+-- evidence constraints atomic so a failed statement cannot leave a migration
+-- recorded as failed with only part of the dispatch contract installed.
+BEGIN;
+
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '15min';
+SET LOCAL search_path = pg_catalog, public, pg_temp;
+
 ALTER TABLE "CommunicationDelivery"
   ADD COLUMN "dispatchStartedAt" TIMESTAMP(3);
 
@@ -26,3 +35,5 @@ ALTER TABLE "CommunicationDelivery"
     "status" <> 'DELIVERY_UNCERTAIN'
     OR "dispatchStartedAt" IS NOT NULL
   ) NOT VALID;
+
+COMMIT;

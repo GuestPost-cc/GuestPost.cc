@@ -55,6 +55,15 @@ describe("email delivery fencing migration contract", () => {
     )
   })
 
+  it("installs and validates each multi-statement contract atomically", () => {
+    for (const sql of [enumSql, evidenceSql, validationSql]) {
+      expect(sql.match(/\bBEGIN;/g)).toHaveLength(1)
+      expect(sql.match(/\bCOMMIT;/g)).toHaveLength(1)
+      expect(sql).toMatch(/SET LOCAL lock_timeout = '5s'/)
+      expect(sql).toMatch(/SET LOCAL statement_timeout = '15min'/)
+    }
+  })
+
   it("allows dispatch evidence only for email states reached after SMTP begins", () => {
     expect(evidenceSql).toMatch(/"channel" = 'EMAIL'/)
     expect(evidenceSql).toMatch(/"attempts" > 0/)

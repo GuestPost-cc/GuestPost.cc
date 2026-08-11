@@ -13,7 +13,60 @@ const logger = createLogger("worker.env")
 
 const REQUIRED = ["DATABASE_URL"] as const
 
-const PRODUCTION_REQUIRED = ["QUEUE_SIGNING_SECRET"] as const
+const PRODUCTION_REQUIRED = [
+  "QUEUE_SIGNING_SECRET",
+  "EMAIL_DELIVERY_MODE",
+] as const
+
+export type EmailDeliveryMode = "disabled" | "capture" | "live"
+
+const EMAIL_DELIVERY_MODES = ["disabled", "capture", "live"] as const
+const EMAIL_RECIPIENT_DOMAIN =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
+
+export function emailDeliveryModeFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): EmailDeliveryMode {
+  const configured = env.EMAIL_DELIVERY_MODE?.trim().toLowerCase()
+  if (EMAIL_DELIVERY_MODES.includes(configured as EmailDeliveryMode)) {
+    return configured as EmailDeliveryMode
+  }
+  return env.NODE_ENV === "production" ? "disabled" : "capture"
+}
+
+export function emailAllowedRecipientDomainsFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): { configured: boolean; domains: string[]; invalidCount: number } {
+  const raw = env.EMAIL_ALLOWED_RECIPIENT_DOMAINS ?? ""
+  const entries = raw
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean)
+  const valid = entries.filter((domain) => EMAIL_RECIPIENT_DOMAIN.test(domain))
+  return {
+    configured: raw.trim().length > 0,
+    domains: [...new Set(valid)],
+    invalidCount: entries.length - valid.length,
+  }
+}
+
+export function emailRecipientAllowlistIssueFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  mode: EmailDeliveryMode = emailDeliveryModeFromEnv(env),
+): "invalid-or-empty" | "capture-required" | null {
+  if (mode === "disabled") return null
+  const allowlist = emailAllowedRecipientDomainsFromEnv(env)
+  if (
+    allowlist.configured &&
+    (allowlist.domains.length === 0 || allowlist.invalidCount > 0)
+  ) {
+    return "invalid-or-empty"
+  }
+  if (mode === "capture" && allowlist.domains.length === 0) {
+    return "capture-required"
+  }
+  return null
+}
 
 const EMAIL_REQUIRED = [
   "SMTP_HOST",
@@ -84,13 +137,33 @@ export function validateEnv(): void {
       process.exit(1)
     }
 
-    const emailMode = (process.env.EMAIL_DELIVERY_MODE ?? "live").toLowerCase()
+    const configuredEmailMode =
+      process.env.EMAIL_DELIVERY_MODE?.trim().toLowerCase()
     if (
-      !(["disabled", "capture", "live"] as const).includes(emailMode as any)
+      !EMAIL_DELIVERY_MODES.includes(configuredEmailMode as EmailDeliveryMode)
     ) {
       logger.error("FATAL: invalid EMAIL_DELIVERY_MODE", {
-        allowed: ["disabled", "capture", "live"],
+        allowed: EMAIL_DELIVERY_MODES,
       })
+      process.exit(1)
+    }
+    const emailMode = emailDeliveryModeFromEnv()
+    const emailAllowlist = emailAllowedRecipientDomainsFromEnv()
+    const emailAllowlistIssue = emailRecipientAllowlistIssueFromEnv(
+      process.env,
+      emailMode,
+    )
+    if (emailAllowlistIssue === "invalid-or-empty") {
+      logger.error(
+        "FATAL: EMAIL_ALLOWED_RECIPIENT_DOMAINS contains invalid domains or no usable domain",
+        { invalidCount: emailAllowlist.invalidCount },
+      )
+      process.exit(1)
+    }
+    if (emailAllowlistIssue === "capture-required") {
+      logger.error(
+        "FATAL: capture email mode requires EMAIL_ALLOWED_RECIPIENT_DOMAINS",
+      )
       process.exit(1)
     }
     if (emailMode !== "disabled") {

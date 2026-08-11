@@ -14,7 +14,7 @@ export async function lockOrderAggregate(
   orderId: string,
 ): Promise<void> {
   // Fixed SQL with Prisma-bound interpolation; orderId is never concatenated.
-  await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`
+  await tx.$queryRaw`SELECT "id" FROM public."Order" WHERE "id" = ${orderId} FOR UPDATE`
 }
 
 /**

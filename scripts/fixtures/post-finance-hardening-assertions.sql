@@ -189,6 +189,120 @@ BEGIN
 END;
 $$;
 
+-- A runtime connection may create temporary relations. Prove that the URL
+-- fence function is bound to the public relation explicitly and cannot be
+-- redirected to a same-named pg_temp table through PostgreSQL's implicit
+-- temporary-schema precedence. Roll back the canary row afterward.
+BEGIN;
+
+DO $$
+DECLARE
+  delivery_id TEXT;
+  delivery_url TEXT;
+  version_before BIGINT;
+  version_after BIGINT;
+BEGIN
+  SELECT delivery."id", delivery."normalizedUrl", fence."version"
+    INTO delivery_id, delivery_url, version_before
+  FROM public."OrderDeliveryVersion" delivery
+  JOIN public."DeliveryUrlClaimFence" fence
+    ON fence."normalizedUrl" = delivery."normalizedUrl"
+  ORDER BY delivery."id"
+  LIMIT 1;
+
+  IF delivery_id IS NULL THEN
+    RAISE EXCEPTION 'delivery URL fence trigger rehearsal has no delivery row';
+  END IF;
+
+  UPDATE public."OrderDeliveryVersion"
+  SET "normalizedUrl" = delivery_url
+  WHERE "id" = delivery_id;
+
+  SELECT "version"
+    INTO version_after
+  FROM public."DeliveryUrlClaimFence"
+  WHERE "normalizedUrl" = delivery_url;
+
+  IF version_after IS DISTINCT FROM version_before + 1 THEN
+    RAISE EXCEPTION 'raw delivery-version DML did not advance the URL fence: before %, after %', version_before, version_after;
+  END IF;
+END
+$$;
+
+ROLLBACK;
+
+BEGIN;
+
+CREATE TEMP TABLE "DeliveryUrlClaimFence" (
+  "normalizedUrl" TEXT PRIMARY KEY,
+  "version" BIGINT NOT NULL DEFAULT 0
+);
+
+SELECT public."acquire_delivery_url_claim_fence"(
+  'https://migration-rehearsal.invalid/temp-shadow'
+);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_temp."DeliveryUrlClaimFence"
+    WHERE "normalizedUrl" =
+      'https://migration-rehearsal.invalid/temp-shadow'
+  ) THEN
+    RAISE EXCEPTION 'delivery URL fence was redirected to pg_temp';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public."DeliveryUrlClaimFence"
+    WHERE "normalizedUrl" =
+      'https://migration-rehearsal.invalid/temp-shadow'
+  ) THEN
+    RAISE EXCEPTION 'delivery URL fence did not write the public row';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_proc procedure
+    JOIN pg_namespace namespace
+      ON namespace.oid = procedure.pronamespace
+    CROSS JOIN LATERAL aclexplode(
+      COALESCE(
+        procedure.proacl,
+        acldefault('f', procedure.proowner)
+      )
+    ) function_acl
+    WHERE namespace.nspname = 'public'
+      AND procedure.proname IN (
+        'acquire_delivery_url_claim_fence',
+        'fence_delivery_url_claim_mutation'
+      )
+      AND function_acl.grantee = 0
+      AND function_acl.privilege_type = 'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'delivery URL fence function remains executable by PUBLIC';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class relation
+    JOIN pg_namespace namespace
+      ON namespace.oid = relation.relnamespace
+    CROSS JOIN LATERAL aclexplode(
+      COALESCE(relation.relacl, acldefault('r', relation.relowner))
+    ) relation_acl
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'DeliveryUrlClaimFence'
+      AND relation_acl.grantee = 0
+  ) THEN
+    RAISE EXCEPTION 'delivery URL fence table remains accessible to PUBLIC';
+  END IF;
+END;
+$$;
+
+ROLLBACK;
+
 -- Migration 0970 may reconstruct only exact pre-provider reservation and
 -- post-cutover rejection evidence. Its balance deltas must preserve every
 -- spendable/lifetime amount while closing the carry-forward source gap.
