@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { isUniqueViolation } from "@guestpost/shared"
 import {
   isRetryablePrismaTransactionError,
@@ -19,7 +20,10 @@ import {
   isStripeFeatureEnabled,
 } from "../../common/stripe-client"
 import { AuditService } from "../audit/audit.service"
-import { PayoutEncryptionService } from "./payout-encryption.service"
+import {
+  PayoutEncryptionService,
+  payoutMethodEncryptionContext,
+} from "./payout-encryption.service"
 import { currentPayoutMethodRuntime } from "./payout-method-runtime"
 
 const SERIALIZABLE_ATTEMPTS = 5
@@ -641,18 +645,26 @@ export class StripeConnectService {
       return
     }
 
-    const { ciphertext, version } = this.encryption.encrypt({
-      destinationManagedBy: "stripe",
-    })
+    const methodId = randomUUID()
+    const methodType = "stripe_connect"
+    const { ciphertext, version } = this.encryption.encrypt(
+      { destinationManagedBy: "stripe" },
+      payoutMethodEncryptionContext({
+        id: methodId,
+        publisherId: account.publisherId,
+        type: methodType,
+      }),
+    )
     const methodCount = await db.payoutMethod.count({
       where: { publisherId: account.publisherId, isActive: true },
     })
 
     await db.payoutMethod.create({
       data: {
+        id: methodId,
         publisherId: account.publisherId,
         providerAccountId: account.id,
-        type: "stripe_connect",
+        type: methodType,
         label: "Stripe bank payout",
         details: ciphertext,
         displayDetails: {

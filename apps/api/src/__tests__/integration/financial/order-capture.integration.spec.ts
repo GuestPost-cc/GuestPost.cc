@@ -107,20 +107,62 @@ describe("[INTEGRATION] Financial — canonical order wallet capture", () => {
         attempts.filter((attempt) => attempt.status === "rejected"),
       ).toHaveLength(4)
 
-      const [storedOrder, storedWallet, purchaseRows, reservationRows] =
-        await Promise.all([
-          prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
-          prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } }),
-          prisma.transaction.findMany({
-            where: { orderId: order.id, type: "PURCHASE" },
-          }),
-          prisma.transaction.findMany({
-            where: { orderId: order.id, type: "RESERVATION" },
-          }),
-        ])
+      const [
+        storedOrder,
+        storedWallet,
+        purchaseRows,
+        reservationRows,
+        lifecycleEvents,
+      ] = await Promise.all([
+        prisma.order.findUniqueOrThrow({ where: { id: order.id } }),
+        prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } }),
+        prisma.transaction.findMany({
+          where: { orderId: order.id, type: "PURCHASE" },
+        }),
+        prisma.transaction.findMany({
+          where: { orderId: order.id, type: "RESERVATION" },
+        }),
+        prisma.orderEvent.findMany({
+          where: {
+            orderId: order.id,
+            eventType: { in: ["PAYMENT_CAPTURED", "ORDER_SUBMITTED"] },
+          },
+        }),
+      ])
 
       expect(storedOrder.status).toBe("SUBMITTED")
       expect(storedOrder.paymentStatus).toBe("PAID")
+      expect(storedOrder.version).toBe(order.version + 1)
+      expect(lifecycleEvents).toHaveLength(2)
+      expect(
+        lifecycleEvents.map((event: { eventType: string }) => event.eventType),
+      ).toEqual(expect.arrayContaining(["PAYMENT_CAPTURED", "ORDER_SUBMITTED"]))
+      const lifecycleEventByType = new Map<
+        string,
+        { eventType: string; metadata: unknown }
+      >(
+        lifecycleEvents.map(
+          (event: {
+            eventType: string
+            metadata: unknown
+          }): [string, { eventType: string; metadata: unknown }] => [
+            event.eventType,
+            event,
+          ],
+        ),
+      )
+      expect(
+        lifecycleEventByType.get("PAYMENT_CAPTURED")?.metadata,
+      ).toMatchObject({
+        aggregateVersion: order.version + 1,
+        milestoneSequence: 1,
+      })
+      expect(
+        lifecycleEventByType.get("ORDER_SUBMITTED")?.metadata,
+      ).toMatchObject({
+        aggregateVersion: order.version + 1,
+        milestoneSequence: 2,
+      })
       expect(Number(storedWallet.availableBalance)).toBe(0)
       expect(Number(storedWallet.reservedBalance)).toBe(0)
       expect(purchaseRows).toHaveLength(1)

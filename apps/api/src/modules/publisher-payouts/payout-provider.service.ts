@@ -1,12 +1,13 @@
 import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
-import { ModuleRef } from "@nestjs/core"
 import { PrismaService } from "../../common/prisma.service"
-import { PayoutEncryptionService } from "./payout-encryption.service"
+import {
+  PayoutEncryptionService,
+  payoutProviderEncryptionContext,
+} from "./payout-encryption.service"
 import { decodePayoutProviderConfig } from "./payout-provider-config"
 import { ManualPayoutAdapter } from "./providers/manual-payout.adapter"
 import { PayoutProviderAdapter } from "./providers/payout-provider.interface"
 import { StripeConnectPayoutAdapter } from "./providers/stripe-connect-payout.adapter"
-import { WisePayoutAdapter } from "./providers/wise-payout.adapter"
 
 @Injectable()
 export class PayoutProviderService implements OnModuleInit {
@@ -16,15 +17,15 @@ export class PayoutProviderService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: PayoutEncryptionService,
-    readonly _moduleRef: ModuleRef,
+    private readonly manualAdapter: ManualPayoutAdapter,
+    private readonly stripeAdapter: StripeConnectPayoutAdapter,
   ) {}
 
   async onModuleInit() {
-    this.register(new ManualPayoutAdapter())
-    this.register(new WisePayoutAdapter())
-    this.register(new StripeConnectPayoutAdapter())
+    this.register(this.manualAdapter)
+    this.register(this.stripeAdapter)
     this.logger.log(
-      "Registered built-in provider adapters: manual, wise, stripe_connect",
+      "Registered certified provider adapters: manual, stripe_connect (Wise remains quarantined)",
     )
   }
 
@@ -59,7 +60,12 @@ export class PayoutProviderService implements OnModuleInit {
     const config = decodePayoutProviderConfig(
       provider.config,
       provider.configEncryptionKeyVersion,
-      (ciphertext, version) => this.encryption.decrypt(ciphertext, version),
+      (ciphertext, version) =>
+        this.encryption.decrypt(
+          ciphertext,
+          version,
+          payoutProviderEncryptionContext(provider),
+        ),
     )
     return { ...provider, decryptedConfig: config }
   }

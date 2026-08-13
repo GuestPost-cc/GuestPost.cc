@@ -27,6 +27,7 @@ export type AggregateOrderEvent = {
 export type OrderEventMinAggregateOutputType = {
   id: string | null
   orderId: string | null
+  settlementId: string | null
   eventType: $Enums.OrderEventType | null
   actorId: string | null
   message: string | null
@@ -36,6 +37,7 @@ export type OrderEventMinAggregateOutputType = {
 export type OrderEventMaxAggregateOutputType = {
   id: string | null
   orderId: string | null
+  settlementId: string | null
   eventType: $Enums.OrderEventType | null
   actorId: string | null
   message: string | null
@@ -45,6 +47,7 @@ export type OrderEventMaxAggregateOutputType = {
 export type OrderEventCountAggregateOutputType = {
   id: number
   orderId: number
+  settlementId: number
   eventType: number
   actorId: number
   message: number
@@ -57,6 +60,7 @@ export type OrderEventCountAggregateOutputType = {
 export type OrderEventMinAggregateInputType = {
   id?: true
   orderId?: true
+  settlementId?: true
   eventType?: true
   actorId?: true
   message?: true
@@ -66,6 +70,7 @@ export type OrderEventMinAggregateInputType = {
 export type OrderEventMaxAggregateInputType = {
   id?: true
   orderId?: true
+  settlementId?: true
   eventType?: true
   actorId?: true
   message?: true
@@ -75,6 +80,7 @@ export type OrderEventMaxAggregateInputType = {
 export type OrderEventCountAggregateInputType = {
   id?: true
   orderId?: true
+  settlementId?: true
   eventType?: true
   actorId?: true
   message?: true
@@ -158,6 +164,7 @@ export type OrderEventGroupByArgs<ExtArgs extends runtime.Types.Extensions.Inter
 export type OrderEventGroupByOutputType = {
   id: string
   orderId: string
+  settlementId: string | null
   eventType: $Enums.OrderEventType
   actorId: string | null
   message: string | null
@@ -189,24 +196,28 @@ export type OrderEventWhereInput = {
   NOT?: Prisma.OrderEventWhereInput | Prisma.OrderEventWhereInput[]
   id?: Prisma.StringFilter<"OrderEvent"> | string
   orderId?: Prisma.StringFilter<"OrderEvent"> | string
+  settlementId?: Prisma.StringNullableFilter<"OrderEvent"> | string | null
   eventType?: Prisma.EnumOrderEventTypeFilter<"OrderEvent"> | $Enums.OrderEventType
   actorId?: Prisma.StringNullableFilter<"OrderEvent"> | string | null
   message?: Prisma.StringNullableFilter<"OrderEvent"> | string | null
   metadata?: Prisma.JsonNullableFilter<"OrderEvent">
   createdAt?: Prisma.DateTimeFilter<"OrderEvent"> | Date | string
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
+  settlement?: Prisma.XOR<Prisma.SettlementNullableScalarRelationFilter, Prisma.SettlementWhereInput> | null
   actor?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
 }
 
 export type OrderEventOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  settlementId?: Prisma.SortOrderInput | Prisma.SortOrder
   eventType?: Prisma.SortOrder
   actorId?: Prisma.SortOrderInput | Prisma.SortOrder
   message?: Prisma.SortOrderInput | Prisma.SortOrder
   metadata?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   order?: Prisma.OrderOrderByWithRelationInput
+  settlement?: Prisma.SettlementOrderByWithRelationInput
   actor?: Prisma.UserOrderByWithRelationInput
 }
 
@@ -216,18 +227,21 @@ export type OrderEventWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.OrderEventWhereInput[]
   NOT?: Prisma.OrderEventWhereInput | Prisma.OrderEventWhereInput[]
   orderId?: Prisma.StringFilter<"OrderEvent"> | string
+  settlementId?: Prisma.StringNullableFilter<"OrderEvent"> | string | null
   eventType?: Prisma.EnumOrderEventTypeFilter<"OrderEvent"> | $Enums.OrderEventType
   actorId?: Prisma.StringNullableFilter<"OrderEvent"> | string | null
   message?: Prisma.StringNullableFilter<"OrderEvent"> | string | null
   metadata?: Prisma.JsonNullableFilter<"OrderEvent">
   createdAt?: Prisma.DateTimeFilter<"OrderEvent"> | Date | string
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
+  settlement?: Prisma.XOR<Prisma.SettlementNullableScalarRelationFilter, Prisma.SettlementWhereInput> | null
   actor?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
 }, "id">
 
 export type OrderEventOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  settlementId?: Prisma.SortOrderInput | Prisma.SortOrder
   eventType?: Prisma.SortOrder
   actorId?: Prisma.SortOrderInput | Prisma.SortOrder
   message?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -244,6 +258,7 @@ export type OrderEventScalarWhereWithAggregatesInput = {
   NOT?: Prisma.OrderEventScalarWhereWithAggregatesInput | Prisma.OrderEventScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"OrderEvent"> | string
   orderId?: Prisma.StringWithAggregatesFilter<"OrderEvent"> | string
+  settlementId?: Prisma.StringNullableWithAggregatesFilter<"OrderEvent"> | string | null
   eventType?: Prisma.EnumOrderEventTypeWithAggregatesFilter<"OrderEvent"> | $Enums.OrderEventType
   actorId?: Prisma.StringNullableWithAggregatesFilter<"OrderEvent"> | string | null
   message?: Prisma.StringNullableWithAggregatesFilter<"OrderEvent"> | string | null
@@ -258,12 +273,14 @@ export type OrderEventCreateInput = {
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutEventsInput
+  settlement?: Prisma.SettlementCreateNestedOneWithoutEventsInput
   actor?: Prisma.UserCreateNestedOneWithoutOrderEventsInput
 }
 
 export type OrderEventUncheckedCreateInput = {
   id?: string
   orderId: string
+  settlementId?: string | null
   eventType: $Enums.OrderEventType
   actorId?: string | null
   message?: string | null
@@ -278,12 +295,14 @@ export type OrderEventUpdateInput = {
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutEventsNestedInput
+  settlement?: Prisma.SettlementUpdateOneWithoutEventsNestedInput
   actor?: Prisma.UserUpdateOneWithoutOrderEventsNestedInput
 }
 
 export type OrderEventUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  settlementId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumOrderEventTypeFieldUpdateOperationsInput | $Enums.OrderEventType
   actorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -294,6 +313,7 @@ export type OrderEventUncheckedUpdateInput = {
 export type OrderEventCreateManyInput = {
   id?: string
   orderId: string
+  settlementId?: string | null
   eventType: $Enums.OrderEventType
   actorId?: string | null
   message?: string | null
@@ -312,6 +332,7 @@ export type OrderEventUpdateManyMutationInput = {
 export type OrderEventUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  settlementId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumOrderEventTypeFieldUpdateOperationsInput | $Enums.OrderEventType
   actorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -332,6 +353,7 @@ export type OrderEventOrderByRelationAggregateInput = {
 export type OrderEventCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  settlementId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
   actorId?: Prisma.SortOrder
   message?: Prisma.SortOrder
@@ -342,6 +364,7 @@ export type OrderEventCountOrderByAggregateInput = {
 export type OrderEventMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  settlementId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
   actorId?: Prisma.SortOrder
   message?: Prisma.SortOrder
@@ -351,6 +374,7 @@ export type OrderEventMaxOrderByAggregateInput = {
 export type OrderEventMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  settlementId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
   actorId?: Prisma.SortOrder
   message?: Prisma.SortOrder
@@ -445,6 +469,48 @@ export type EnumOrderEventTypeFieldUpdateOperationsInput = {
   set?: $Enums.OrderEventType
 }
 
+export type OrderEventCreateNestedManyWithoutSettlementInput = {
+  create?: Prisma.XOR<Prisma.OrderEventCreateWithoutSettlementInput, Prisma.OrderEventUncheckedCreateWithoutSettlementInput> | Prisma.OrderEventCreateWithoutSettlementInput[] | Prisma.OrderEventUncheckedCreateWithoutSettlementInput[]
+  connectOrCreate?: Prisma.OrderEventCreateOrConnectWithoutSettlementInput | Prisma.OrderEventCreateOrConnectWithoutSettlementInput[]
+  createMany?: Prisma.OrderEventCreateManySettlementInputEnvelope
+  connect?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+}
+
+export type OrderEventUncheckedCreateNestedManyWithoutSettlementInput = {
+  create?: Prisma.XOR<Prisma.OrderEventCreateWithoutSettlementInput, Prisma.OrderEventUncheckedCreateWithoutSettlementInput> | Prisma.OrderEventCreateWithoutSettlementInput[] | Prisma.OrderEventUncheckedCreateWithoutSettlementInput[]
+  connectOrCreate?: Prisma.OrderEventCreateOrConnectWithoutSettlementInput | Prisma.OrderEventCreateOrConnectWithoutSettlementInput[]
+  createMany?: Prisma.OrderEventCreateManySettlementInputEnvelope
+  connect?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+}
+
+export type OrderEventUpdateManyWithoutSettlementNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderEventCreateWithoutSettlementInput, Prisma.OrderEventUncheckedCreateWithoutSettlementInput> | Prisma.OrderEventCreateWithoutSettlementInput[] | Prisma.OrderEventUncheckedCreateWithoutSettlementInput[]
+  connectOrCreate?: Prisma.OrderEventCreateOrConnectWithoutSettlementInput | Prisma.OrderEventCreateOrConnectWithoutSettlementInput[]
+  upsert?: Prisma.OrderEventUpsertWithWhereUniqueWithoutSettlementInput | Prisma.OrderEventUpsertWithWhereUniqueWithoutSettlementInput[]
+  createMany?: Prisma.OrderEventCreateManySettlementInputEnvelope
+  set?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+  disconnect?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+  delete?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+  connect?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+  update?: Prisma.OrderEventUpdateWithWhereUniqueWithoutSettlementInput | Prisma.OrderEventUpdateWithWhereUniqueWithoutSettlementInput[]
+  updateMany?: Prisma.OrderEventUpdateManyWithWhereWithoutSettlementInput | Prisma.OrderEventUpdateManyWithWhereWithoutSettlementInput[]
+  deleteMany?: Prisma.OrderEventScalarWhereInput | Prisma.OrderEventScalarWhereInput[]
+}
+
+export type OrderEventUncheckedUpdateManyWithoutSettlementNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderEventCreateWithoutSettlementInput, Prisma.OrderEventUncheckedCreateWithoutSettlementInput> | Prisma.OrderEventCreateWithoutSettlementInput[] | Prisma.OrderEventUncheckedCreateWithoutSettlementInput[]
+  connectOrCreate?: Prisma.OrderEventCreateOrConnectWithoutSettlementInput | Prisma.OrderEventCreateOrConnectWithoutSettlementInput[]
+  upsert?: Prisma.OrderEventUpsertWithWhereUniqueWithoutSettlementInput | Prisma.OrderEventUpsertWithWhereUniqueWithoutSettlementInput[]
+  createMany?: Prisma.OrderEventCreateManySettlementInputEnvelope
+  set?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+  disconnect?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+  delete?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+  connect?: Prisma.OrderEventWhereUniqueInput | Prisma.OrderEventWhereUniqueInput[]
+  update?: Prisma.OrderEventUpdateWithWhereUniqueWithoutSettlementInput | Prisma.OrderEventUpdateWithWhereUniqueWithoutSettlementInput[]
+  updateMany?: Prisma.OrderEventUpdateManyWithWhereWithoutSettlementInput | Prisma.OrderEventUpdateManyWithWhereWithoutSettlementInput[]
+  deleteMany?: Prisma.OrderEventScalarWhereInput | Prisma.OrderEventScalarWhereInput[]
+}
+
 export type OrderEventCreateWithoutActorInput = {
   id?: string
   eventType: $Enums.OrderEventType
@@ -452,11 +518,13 @@ export type OrderEventCreateWithoutActorInput = {
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutEventsInput
+  settlement?: Prisma.SettlementCreateNestedOneWithoutEventsInput
 }
 
 export type OrderEventUncheckedCreateWithoutActorInput = {
   id?: string
   orderId: string
+  settlementId?: string | null
   eventType: $Enums.OrderEventType
   message?: string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -495,6 +563,7 @@ export type OrderEventScalarWhereInput = {
   NOT?: Prisma.OrderEventScalarWhereInput | Prisma.OrderEventScalarWhereInput[]
   id?: Prisma.StringFilter<"OrderEvent"> | string
   orderId?: Prisma.StringFilter<"OrderEvent"> | string
+  settlementId?: Prisma.StringNullableFilter<"OrderEvent"> | string | null
   eventType?: Prisma.EnumOrderEventTypeFilter<"OrderEvent"> | $Enums.OrderEventType
   actorId?: Prisma.StringNullableFilter<"OrderEvent"> | string | null
   message?: Prisma.StringNullableFilter<"OrderEvent"> | string | null
@@ -508,11 +577,13 @@ export type OrderEventCreateWithoutOrderInput = {
   message?: string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  settlement?: Prisma.SettlementCreateNestedOneWithoutEventsInput
   actor?: Prisma.UserCreateNestedOneWithoutOrderEventsInput
 }
 
 export type OrderEventUncheckedCreateWithoutOrderInput = {
   id?: string
+  settlementId?: string | null
   eventType: $Enums.OrderEventType
   actorId?: string | null
   message?: string | null
@@ -546,9 +617,56 @@ export type OrderEventUpdateManyWithWhereWithoutOrderInput = {
   data: Prisma.XOR<Prisma.OrderEventUpdateManyMutationInput, Prisma.OrderEventUncheckedUpdateManyWithoutOrderInput>
 }
 
+export type OrderEventCreateWithoutSettlementInput = {
+  id?: string
+  eventType: $Enums.OrderEventType
+  message?: string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  order: Prisma.OrderCreateNestedOneWithoutEventsInput
+  actor?: Prisma.UserCreateNestedOneWithoutOrderEventsInput
+}
+
+export type OrderEventUncheckedCreateWithoutSettlementInput = {
+  id?: string
+  orderId: string
+  eventType: $Enums.OrderEventType
+  actorId?: string | null
+  message?: string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+}
+
+export type OrderEventCreateOrConnectWithoutSettlementInput = {
+  where: Prisma.OrderEventWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderEventCreateWithoutSettlementInput, Prisma.OrderEventUncheckedCreateWithoutSettlementInput>
+}
+
+export type OrderEventCreateManySettlementInputEnvelope = {
+  data: Prisma.OrderEventCreateManySettlementInput | Prisma.OrderEventCreateManySettlementInput[]
+  skipDuplicates?: boolean
+}
+
+export type OrderEventUpsertWithWhereUniqueWithoutSettlementInput = {
+  where: Prisma.OrderEventWhereUniqueInput
+  update: Prisma.XOR<Prisma.OrderEventUpdateWithoutSettlementInput, Prisma.OrderEventUncheckedUpdateWithoutSettlementInput>
+  create: Prisma.XOR<Prisma.OrderEventCreateWithoutSettlementInput, Prisma.OrderEventUncheckedCreateWithoutSettlementInput>
+}
+
+export type OrderEventUpdateWithWhereUniqueWithoutSettlementInput = {
+  where: Prisma.OrderEventWhereUniqueInput
+  data: Prisma.XOR<Prisma.OrderEventUpdateWithoutSettlementInput, Prisma.OrderEventUncheckedUpdateWithoutSettlementInput>
+}
+
+export type OrderEventUpdateManyWithWhereWithoutSettlementInput = {
+  where: Prisma.OrderEventScalarWhereInput
+  data: Prisma.XOR<Prisma.OrderEventUpdateManyMutationInput, Prisma.OrderEventUncheckedUpdateManyWithoutSettlementInput>
+}
+
 export type OrderEventCreateManyActorInput = {
   id?: string
   orderId: string
+  settlementId?: string | null
   eventType: $Enums.OrderEventType
   message?: string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -562,11 +680,13 @@ export type OrderEventUpdateWithoutActorInput = {
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutEventsNestedInput
+  settlement?: Prisma.SettlementUpdateOneWithoutEventsNestedInput
 }
 
 export type OrderEventUncheckedUpdateWithoutActorInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  settlementId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumOrderEventTypeFieldUpdateOperationsInput | $Enums.OrderEventType
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -576,6 +696,7 @@ export type OrderEventUncheckedUpdateWithoutActorInput = {
 export type OrderEventUncheckedUpdateManyWithoutActorInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  settlementId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumOrderEventTypeFieldUpdateOperationsInput | $Enums.OrderEventType
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -584,6 +705,7 @@ export type OrderEventUncheckedUpdateManyWithoutActorInput = {
 
 export type OrderEventCreateManyOrderInput = {
   id?: string
+  settlementId?: string | null
   eventType: $Enums.OrderEventType
   actorId?: string | null
   message?: string | null
@@ -597,11 +719,13 @@ export type OrderEventUpdateWithoutOrderInput = {
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  settlement?: Prisma.SettlementUpdateOneWithoutEventsNestedInput
   actor?: Prisma.UserUpdateOneWithoutOrderEventsNestedInput
 }
 
 export type OrderEventUncheckedUpdateWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  settlementId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumOrderEventTypeFieldUpdateOperationsInput | $Enums.OrderEventType
   actorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -611,6 +735,47 @@ export type OrderEventUncheckedUpdateWithoutOrderInput = {
 
 export type OrderEventUncheckedUpdateManyWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  settlementId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventType?: Prisma.EnumOrderEventTypeFieldUpdateOperationsInput | $Enums.OrderEventType
+  actorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type OrderEventCreateManySettlementInput = {
+  id?: string
+  orderId: string
+  eventType: $Enums.OrderEventType
+  actorId?: string | null
+  message?: string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+}
+
+export type OrderEventUpdateWithoutSettlementInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  eventType?: Prisma.EnumOrderEventTypeFieldUpdateOperationsInput | $Enums.OrderEventType
+  message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  order?: Prisma.OrderUpdateOneRequiredWithoutEventsNestedInput
+  actor?: Prisma.UserUpdateOneWithoutOrderEventsNestedInput
+}
+
+export type OrderEventUncheckedUpdateWithoutSettlementInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  eventType?: Prisma.EnumOrderEventTypeFieldUpdateOperationsInput | $Enums.OrderEventType
+  actorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type OrderEventUncheckedUpdateManyWithoutSettlementInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  orderId?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.EnumOrderEventTypeFieldUpdateOperationsInput | $Enums.OrderEventType
   actorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -623,42 +788,49 @@ export type OrderEventUncheckedUpdateManyWithoutOrderInput = {
 export type OrderEventSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   orderId?: boolean
+  settlementId?: boolean
   eventType?: boolean
   actorId?: boolean
   message?: boolean
   metadata?: boolean
   createdAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  settlement?: boolean | Prisma.OrderEvent$settlementArgs<ExtArgs>
   actor?: boolean | Prisma.OrderEvent$actorArgs<ExtArgs>
 }, ExtArgs["result"]["orderEvent"]>
 
 export type OrderEventSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   orderId?: boolean
+  settlementId?: boolean
   eventType?: boolean
   actorId?: boolean
   message?: boolean
   metadata?: boolean
   createdAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  settlement?: boolean | Prisma.OrderEvent$settlementArgs<ExtArgs>
   actor?: boolean | Prisma.OrderEvent$actorArgs<ExtArgs>
 }, ExtArgs["result"]["orderEvent"]>
 
 export type OrderEventSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   orderId?: boolean
+  settlementId?: boolean
   eventType?: boolean
   actorId?: boolean
   message?: boolean
   metadata?: boolean
   createdAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  settlement?: boolean | Prisma.OrderEvent$settlementArgs<ExtArgs>
   actor?: boolean | Prisma.OrderEvent$actorArgs<ExtArgs>
 }, ExtArgs["result"]["orderEvent"]>
 
 export type OrderEventSelectScalar = {
   id?: boolean
   orderId?: boolean
+  settlementId?: boolean
   eventType?: boolean
   actorId?: boolean
   message?: boolean
@@ -666,17 +838,20 @@ export type OrderEventSelectScalar = {
   createdAt?: boolean
 }
 
-export type OrderEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "eventType" | "actorId" | "message" | "metadata" | "createdAt", ExtArgs["result"]["orderEvent"]>
+export type OrderEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "settlementId" | "eventType" | "actorId" | "message" | "metadata" | "createdAt", ExtArgs["result"]["orderEvent"]>
 export type OrderEventInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  settlement?: boolean | Prisma.OrderEvent$settlementArgs<ExtArgs>
   actor?: boolean | Prisma.OrderEvent$actorArgs<ExtArgs>
 }
 export type OrderEventIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  settlement?: boolean | Prisma.OrderEvent$settlementArgs<ExtArgs>
   actor?: boolean | Prisma.OrderEvent$actorArgs<ExtArgs>
 }
 export type OrderEventIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  settlement?: boolean | Prisma.OrderEvent$settlementArgs<ExtArgs>
   actor?: boolean | Prisma.OrderEvent$actorArgs<ExtArgs>
 }
 
@@ -684,11 +859,13 @@ export type $OrderEventPayload<ExtArgs extends runtime.Types.Extensions.Internal
   name: "OrderEvent"
   objects: {
     order: Prisma.$OrderPayload<ExtArgs>
+    settlement: Prisma.$SettlementPayload<ExtArgs> | null
     actor: Prisma.$UserPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     orderId: string
+    settlementId: string | null
     eventType: $Enums.OrderEventType
     actorId: string | null
     message: string | null
@@ -1089,6 +1266,7 @@ readonly fields: OrderEventFieldRefs;
 export interface Prisma__OrderEventClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   order<T extends Prisma.OrderDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDefaultArgs<ExtArgs>>): Prisma.Prisma__OrderClient<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  settlement<T extends Prisma.OrderEvent$settlementArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderEvent$settlementArgs<ExtArgs>>): Prisma.Prisma__SettlementClient<runtime.Types.Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   actor<T extends Prisma.OrderEvent$actorArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderEvent$actorArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1121,6 +1299,7 @@ export interface Prisma__OrderEventClient<T, Null = never, ExtArgs extends runti
 export interface OrderEventFieldRefs {
   readonly id: Prisma.FieldRef<"OrderEvent", 'String'>
   readonly orderId: Prisma.FieldRef<"OrderEvent", 'String'>
+  readonly settlementId: Prisma.FieldRef<"OrderEvent", 'String'>
   readonly eventType: Prisma.FieldRef<"OrderEvent", 'OrderEventType'>
   readonly actorId: Prisma.FieldRef<"OrderEvent", 'String'>
   readonly message: Prisma.FieldRef<"OrderEvent", 'String'>
@@ -1524,6 +1703,25 @@ export type OrderEventDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Limit how many OrderEvents to delete.
    */
   limit?: number
+}
+
+/**
+ * OrderEvent.settlement
+ */
+export type OrderEvent$settlementArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Settlement
+   */
+  select?: Prisma.SettlementSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Settlement
+   */
+  omit?: Prisma.SettlementOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SettlementInclude<ExtArgs> | null
+  where?: Prisma.SettlementWhereInput
 }
 
 /**

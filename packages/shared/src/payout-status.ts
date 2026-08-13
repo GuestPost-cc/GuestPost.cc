@@ -26,12 +26,16 @@ export interface ProviderStatusResult {
 }
 
 export const WISE_STATUS_MAP: Record<string, ProviderTransferStatus> = {
+  incoming_payment_waiting: "PROCESSING",
+  incoming_payment_initiated: "PROCESSING",
   processing: "PROCESSING",
   funds_converted: "PROCESSING",
   outgoing_payment_sent: "PROCESSING",
-  completed: "COMPLETED",
   cancelled: "FAILED",
-  failed: "FAILED",
+  funds_refunded: "FAILED",
+  bounced_back: "FAILED",
+  charged_back: "FAILED",
+  unknown: "PROCESSING",
 }
 
 export const STRIPE_STATUS_MAP: Record<string, ProviderTransferStatus> = {
@@ -321,7 +325,11 @@ export async function checkProviderTransferStatus(
 ): Promise<ProviderStatusResult | null> {
   switch (providerName) {
     case "wise":
-      return checkWiseTransferStatus(providerExecutionId)
+      // Wise is intentionally absent from the certified provider set. Keeping
+      // this dispatcher fail-closed prevents a future caller from bypassing
+      // the API adapter quarantine and turning an incomplete status model into
+      // money-state authority.
+      return null
     case "stripe_connect":
       return checkStripeTransferStatus(
         providerExecutionId,

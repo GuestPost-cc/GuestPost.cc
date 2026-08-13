@@ -49,7 +49,7 @@ export const ORDER_LIFECYCLE_STAGES: readonly OrderLifecycleStage[] = [
   {
     key: "COMPLETION",
     label: "Complete",
-    statuses: ["SETTLED", "COMPLETED"],
+    statuses: ["COMPLETED"],
   },
 ] as const
 

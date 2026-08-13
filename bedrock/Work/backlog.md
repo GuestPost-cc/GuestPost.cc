@@ -1,10 +1,23 @@
 ---
 note_type: backlog
 project: guestpost-platform
-updated: 2026-08-11
+updated: 2026-08-12
 ---
 
 # Backlog
+
+## Explicitly deferred: staff security and finance governance (2026-08-12)
+
+The owner explicitly deferred this whole workstream. It remains a paid-launch
+gate and must not be represented as fixed by the current correctness work:
+
+- [ ] Phishing-resistant staff MFA and recent step-up authorization for
+  financial-data decryption, payout execution/checking, role changes, platform
+  fee changes, and emergency controls.
+- [ ] Maker-checker approval for every human-initiated money or fee mutation,
+  with actor independence enforced in both application and database policy.
+- [ ] Append-only staff security/finance audit evidence and a rehearsed,
+  independently approved break-glass procedure.
 
 ## Deferred launch-readiness findings (2026-08-11)
 
@@ -17,14 +30,12 @@ not be represented as solved by that change set:
   Internal wallet restoration is not an external cash refund; the future flow
   needs durable Stripe request/evidence states, immutable idempotency binding,
   ambiguous-outcome recovery, reconciliation, and customer-visible status.
-- [ ] Require phishing-resistant staff MFA and recent step-up authorization for
-  finance decryption, payout execution/checking, role changes, and emergency
-  controls. Add a database-enforced append-only boundary for security audit
-  evidence and rehearse break-glass recovery.
 - [ ] Replace staging-grade deployment assumptions with schema-before-code
-  release orchestration, an explicit worker service, dependency readiness
-  checks, external paging, and a tested Neon/object-storage backup and restore
-  runbook. A successful application build is not deployment-safety evidence.
+  release orchestration, dependency readiness checks, external paging, and a
+  tested Neon/object-storage backup and restore runbook. The worker is operated
+  on Northflank outside this repository by owner decision; its deployment and
+  secrets still require separately retained evidence. A successful application
+  build is not deployment-safety evidence.
 - [ ] Finalize the operating entity, address, governing law, forum, privacy and
   tax review, and approve one exact payout country/currency corridor before any
   paid public launch. Provider availability must be verified for that precise
@@ -38,9 +49,8 @@ Until those controls are implemented and evidenced, the public paid-production
 and broad multicountry launch decisions remain **NO-GO** even if the nine code
 fixes in the current hardening set pass CI.
 
-Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 (the 2026-06-15 batch's §11 closed at 31/31 on 2026-06-21).
-
-**2026-06-22 audit dashboard status (current): 18 of 41 findings closed (43.9%)** (not 41/41). **19 open, 4 unchecked**. Each finding (#1-#41) maps to `bedrock/Views/audits/platform-audit-2026-06-22.md` §2.
+Forward roadmap. `bedrock/Views/audits/platform-audit-2026-06-22.md` is a
+historical snapshot, not current status. Open work in this file is canonical.
 
 **Phase 8.X closure progress (completed so far):** #1 (Phase 8.1), #2 (Phase 8.2), #3 (Phase 8.3), #6 (Phase 7.10.2.1), #38 (Phase 8.7), #39 (Phase 8.x), #40 (Phase 8.8), #41 (Phase 8.9).
 
@@ -68,10 +78,11 @@ Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/a
   `recovery_only` permits only reads, inbound evidence, exact recovery, and
   reconciliation; prove `locked` permits only reads/inbound evidence; document
   the evidence and approver required to return to `normal`.
-- [ ] Design an independent authenticated Stripe deposit catch-up aggregate if
-  recovery objectives require one. It must retrieve provider truth and reuse
-  the exact deposit finalizer; the current inbox cannot authorize credit
-  without fresh signed redelivery.
+- [x] Add an independent authenticated Stripe deposit catch-up aggregate.
+  Completed in the 2026-08-12 correctness batch: restricted-key Checkout →
+  PaymentIntent → Charge retrieval, append-only evidence, fenced retries, and
+  the same serializable finalizer used by signed webhooks. Staging provider
+  rehearsal remains an operational release gate.
 - [ ] Add bounded provider revalidation and an incident-reviewed compensation
   design for contradictory late payout failure; never auto-reopen a completed
   withdrawal or rewrite `lifetimePaid`.
@@ -85,12 +96,14 @@ Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/a
   amount/currency evidence, terminal mapping, idempotency retention,
   cancellation, reconciliation, sandbox, and Finance/Security certification
   gates pass.
-- [ ] Before production launch, implement and rehearse hard payout-key
-  rotation: dual-key/keyring reads with explicit key identity, a bounded
-  resumable compare-and-swap re-encryption job covering active and inactive
-  payout methods/providers, per-row verification, metrics, independent
-  approval, and a tested rollback window. Until then, never replace the master
-  key directly.
+- [x] Implement hard payout-key rotation in code: versioned key identities,
+  legacy decrypt-only support, a bounded resumable compare-and-swap rotation
+  command covering active and inactive methods/providers, verification, and a
+  rollback window are present as of 2026-08-12.
+- [ ] Provision a managed KMS/HSM-backed key-provider adapter, migrate the
+  production keyring out of raw environment secrets, and rehearse rotation on
+  a sanitized production-shaped clone. The static environment adapter is for
+  controlled transition/development use and is not KMS protection.
 
 ## Phased Engineering Roadmap (v1.0) — 2026-06-30
 

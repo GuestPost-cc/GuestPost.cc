@@ -500,7 +500,6 @@ describe("DeliveryInterventionService", () => {
 
     it.each([
       "DELIVERED",
-      "SETTLED",
       "COMPLETED",
       "CANCELLED",
       "REFUNDED",
@@ -662,7 +661,6 @@ describe("DeliveryInterventionService", () => {
 
     it.each([
       "DELIVERED",
-      "SETTLED",
       "COMPLETED",
       "CANCELLED",
       "REFUNDED",

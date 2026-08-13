@@ -2129,15 +2129,13 @@ export class MarketplaceService {
       throw new ForbiddenException("You cannot review your own listing")
     }
 
-    // Verify customer completed an order with this publisher. SETTLED is the
-    // actual terminal status (release keeps the order at SETTLED; nothing
-    // sets COMPLETED today) — gating on COMPLETED alone made reviews
-    // impossible for everyone.
+    // DELIVERED covers the settlement review window. Funds release advances
+    // publisher orders to the sole successful terminal state, COMPLETED.
     const completedOrder = await this.prisma.order.findFirst({
       where: {
         customerId: userId,
         website: { publisherId: listingPublisherId },
-        status: { in: ["COMPLETED", "SETTLED", "DELIVERED"] },
+        status: { in: ["COMPLETED", "DELIVERED"] },
       },
     })
     if (!completedOrder) {

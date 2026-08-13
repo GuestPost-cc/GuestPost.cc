@@ -1,5 +1,5 @@
 import { CancellationResponsibility } from "@guestpost/database"
-import { Transform } from "class-transformer"
+import { Transform, Type } from "class-transformer"
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -22,7 +22,9 @@ import {
   MinLength,
   ValidateBy,
   ValidateIf,
+  ValidateNested,
 } from "class-validator"
+import { PublisherCompensationDecisionDto } from "../../orders/dto/order-cancellation.dto"
 
 // Phase 6.7 — Audit finding V-1 closure.
 //
@@ -289,6 +291,14 @@ export class ResolveDisputeDto {
   @ValidateIf((body: ResolveDisputeDto) => body.action === "REFUND")
   @IsEnum(CancellationResponsibility)
   responsibility?: CancellationResponsibility
+
+  // Whether compensation is required depends on the locked order lifecycle,
+  // fulfillment channel and settlement evidence. The service performs that
+  // authoritative check and rejects an omitted decision when applicable.
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PublisherCompensationDecisionDto)
+  publisherCompensation?: PublisherCompensationDecisionDto
 }
 
 // ── Listing moderation ────────────────────────────────────────────────────

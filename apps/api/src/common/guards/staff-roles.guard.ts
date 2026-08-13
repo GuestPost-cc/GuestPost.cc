@@ -6,8 +6,8 @@ import {
   Injectable,
 } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
+import { CurrentAuthorityService } from "../../modules/auth/current-authority.service"
 import { STAFF_ROLES_KEY } from "../decorators/staff-roles.decorator"
-import { PrismaService } from "../prisma.service"
 
 // Phase 6.7 — Audit finding #2 remediation.
 //
@@ -31,7 +31,7 @@ import { PrismaService } from "../prisma.service"
 export class StaffRolesGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly prisma: PrismaService,
+    private readonly authorities: CurrentAuthorityService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -47,37 +47,24 @@ export class StaffRolesGuard implements CanActivate {
       )
     }
 
-    const user = context.switchToHttp().getRequest().user
+    const request = context.switchToHttp().getRequest()
+    const user = request.user
 
-    if (user?.userType !== "STAFF") {
+    if (!user) {
       throw new ForbiddenException("Only staff can access this resource")
     }
 
-    // Staff role is security-sensitive and must never be authorized from the
-    // per-process auth-context projection. A Redis outage or missed pub/sub
-    // message may make that projection stale, while this durable read makes a
-    // demotion effective on the very next protected request on every pod.
-    const membership = await this.prisma.staffMembership.findUnique({
-      where: { userId: user.id },
-      select: {
-        role: true,
-        user: { select: { banned: true, userType: true } },
-      },
-    })
-
-    if (
-      !membership ||
-      membership.user.banned ||
-      membership.user.userType !== "STAFF"
-    ) {
+    const authority = await this.authorities.resolveRequest(request)
+    if (authority.userType !== "STAFF") {
+      throw new ForbiddenException("Only staff can access this resource")
+    }
+    if (!authority.staffRole) {
       throw new ForbiddenException("No staff role assigned")
     }
 
-    if (!requiredRoles.includes(membership.role)) {
+    if (!requiredRoles.includes(authority.staffRole)) {
       throw new ForbiddenException("Insufficient staff permissions")
     }
-
-    user.staffRole = membership.role
 
     return true
   }

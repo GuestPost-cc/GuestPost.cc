@@ -165,6 +165,11 @@ export type OrderDispute = Prisma.OrderDisputeModel
  */
 export type OrderCancellationRequest = Prisma.OrderCancellationRequestModel
 /**
+ * Model PublisherCompensation
+ *
+ */
+export type PublisherCompensation = Prisma.PublisherCompensationModel
+/**
  * Model Settlement
  *
  */
@@ -314,6 +319,16 @@ export type Transaction = Prisma.TransactionModel
  *
  */
 export type DepositAttempt = Prisma.DepositAttemptModel
+/**
+ * Model DepositCreditRecovery
+ *
+ */
+export type DepositCreditRecovery = Prisma.DepositCreditRecoveryModel
+/**
+ * Model DepositCreditEvidence
+ *
+ */
+export type DepositCreditEvidence = Prisma.DepositCreditEvidenceModel
 /**
  * Model PaymentProviderEvent
  *

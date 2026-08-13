@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-08-03
+updated: 2026-08-12
 ---
 
 # Infrastructure
@@ -56,6 +56,14 @@ must configure the non-default mode explicitly, and scheduled jobs must use a
 forbid-concurrency policy. Because free projects allow only two jobs, the
 deployment uses one API-triggerable on-demand job with a ten-minute catch-up
 schedule and one five-minute maintenance dispatcher.
+
+Runtime composition is declared in a side-effect-free typed plan. The
+entrypoint executes that plan through injected factories and capabilities, so
+tests boot `all`, `realtime`, `on-demand`, and `scheduled` without Redis,
+Postgres, or provider secrets and assert exact lane ownership. Partial factory
+failure drains already-created resources while preserving the originating
+error; TERM/INT cleanup is single-flight. A narrow source boundary remains
+only to forbid an eager integration-worker import before lane selection.
 
 Queue traffic can be isolated through `QUEUE_REDIS_URL`, with `REDIS_URL` kept
 as a compatibility fallback. BullMQ's worker drain delay and stalled-job scan
@@ -131,7 +139,11 @@ cancellation, and no deployment secrets. It installs from the frozen lockfile,
 blocks moderate-or-higher production dependency advisories, applies and checks
 all migrations on PostgreSQL 17, provisions the integration-test template,
 runs type/lint/dependency checks plus API/package/UI tests, and builds all 12
-production targets.
+production targets. It then runs Chromium onboarding checks against
+self-started API/customer/publisher processes. The browser harness is fixed to
+loopback, uses deterministic run/test/retry-scoped account identities, starts
+an isolated MinIO instance with the evidence-readiness object, and retains
+failure traces, screenshots, and videos for seven days.
 
 Render remains the deployment owner. Every Blueprint service uses
 `autoDeployTrigger: off`; a green push does not deploy. Operators manually
@@ -270,85 +282,45 @@ Hard rotation procedure:
 Never log keys, plaintext tokens, or decrypted payloads. Rotation output is
 limited to row ids and normalized failure classes.
 
-## Payout Encryption Key Rotation
+## Payout Encryption v2 And Hard Rotation
 
-### Architecture
-- **Algorithm**: AES-256-GCM, random 12-byte IV, 16-byte auth tag.
-- **Key derivation**: `scryptSync(masterKey, "payout-key-v{N}", 32)` per version number.
-- **Master key source**: `PAYOUT_ENCRYPTION_KEY` env var (exactly 64
-  hexadecimal characters / 32 bytes). Any configured malformed value fails in
-  every environment.
-- **Encrypted fields**: every `PayoutMethod.details` value and every non-empty
-  `PayoutProvider.config`. Provider rows that use process-environment
-  credentials may store exactly `{}` as a no-secret sentinel; any non-empty
-  plaintext provider object is rejected by the runtime and verifier.
-- **Version columns**: `PayoutMethod.encryptionKeyVersion`, `PayoutProvider.configEncryptionKeyVersion`.
-- **Current version**: `CURRENT_PAYOUT_KEY_VERSION` at `apps/api/src/modules/publisher-payouts/payout-encryption.constants.ts` — single source of truth shared by the encryption service and the version verifier script.
-- **Dev fallback**: Version 0 (hardcoded dev key, blocked in production).
+Payout encryption writes format-2 envelopes as
+`p2:<opaque-key-id>:<canonical-base64>`. The database integer records envelope
+format, not key identity. AES-256-GCM uses a random 12-byte IV and 16-byte tag;
+additional authenticated data binds payout-method details to method ID,
+publisher ID, and type, and provider config to provider ID and name.
 
-### Rotation procedures
+`PAYOUT_ENCRYPTION_KEYS` is a bounded JSON keyring of at most 16 distinct
+64-hex keys. `PAYOUT_ENCRYPTION_ACTIVE_KEY_ID` selects the sole write key; all
+other IDs are decrypt-only. `PAYOUT_ENCRYPTION_KEY` is a separate v0/v1 read
+key during migration and is never a v2 write key. Missing or malformed v2
+configuration fails every non-test runtime. Deterministic material is available
+only inside a Jest worker with `NODE_ENV=test` and no payout key setting.
 
-#### Soft rotation (version bump, same master key) — RECOMMENDED
+`PayoutEncryptionKeyProvider` is an injected, cloud-neutral boundary. The
+repository includes a bounded environment implementation and network-free
+static test provider. Production KMS/HSM provisioning, least-privilege runtime
+identity, audited unwrap access, retention, recovery, and the concrete managed
+provider adapter remain an operational launch gate; raw environment keys do
+not constitute KMS protection.
 
-New encryptions use a fresh derived key; old rows remain decryptable.
+Migration `20260812101000_payout_encryption_v2_keyring` preserves valid legacy
+rows for read/rotation but hard-blocks legacy inserts and rewrites, envelope
+relabeling/downgrade, and changes to AAD identity. Ciphertext rotation requires
+an exact aggregate version increment. New payout methods and non-empty provider
+configs must be valid p2 envelopes; `{}` remains the only unencrypted provider
+sentinel at format 0.
 
-1. Before the change, run
-   `pnpm tsx scripts/verify-encryption-versions.ts --decrypt`. Any unknown
-   version or decryption failure blocks the rotation.
-2. In `payout-encryption.constants.ts`, increment
-   `CURRENT_PAYOUT_KEY_VERSION` by exactly one.
-3. Deploy without changing `PAYOUT_ENCRYPTION_KEY`. New rows use the new
-   derived key; every version from `0` through the current version remains
-   readable from the same master key.
-4. Run the verifier again and exercise an audited payout-method decrypt plus a
-   new payout-method write/read canary.
+`scripts/rotate-payout-encryption.ts` scans every active/inactive payout method
+and every non-empty provider config in bounded ID batches. It authenticates the
+old row context, refuses rows referenced by nonterminal payout executions,
+locks and compare-and-swaps each re-encryption, and safely resumes by cursor or
+full rerun. `scripts/verify-encryption-versions.ts` fully authenticates every
+encrypted row and reports only safe IDs and format/key distributions;
+`--require-active` also fails if any legacy or decrypt-only envelope remains.
 
-No data migration is required. There is currently no general-purpose
-re-encryption/backfill command; do not improvise one against production data.
-
-#### Hard rotation (change master key) — NOT CURRENTLY SUPPORTED
-
-The runtime accepts only one master key. Directly changing
-`PAYOUT_ENCRYPTION_KEY` makes every row written under the old key
-undecryptable, regardless of its version number. The version verifier is an
-audit tool, not a re-encryption tool.
-
-If the master key may be compromised:
-
-1. Set `FINANCE_RUNTIME_MODE=locked`, disable payout sends, and revoke
-   `FINANCIAL_DATA_DECRYPT` while retaining signed inbound evidence.
-2. Preserve the old key in the approved incident secret vault; do not replace
-   or erase it.
-3. Build and independently review a dual-key/keyring reader plus a resumable,
-   transactional, compare-and-swap re-encryption tool. It must cover active and
-   inactive `PayoutMethod` and `PayoutProvider` rows, retain per-row source-key
-   identity, verify every ciphertext, support safe restart, and preserve a
-   tested rollback window.
-4. Rehearse that tool on a sanitized production clone and approve a dedicated
-   incident change before touching production.
-
-Until that capability exists, a hard master-key rotation is an operational
-blocker, not a manual runbook procedure.
-
-### Verifier
-- `scripts/verify-encryption-versions.ts` — standalone runtime tool.
-- `pnpm tsx scripts/verify-encryption-versions.ts` — version-only audit across
-  active and inactive encrypted rows.
-- `pnpm tsx scripts/verify-encryption-versions.ts --decrypt` — decrypts one
-  payout-method sample per version and validates every provider config,
-  including the empty-sentinel rule.
-- `pnpm tsx scripts/verify-encryption-versions.ts --json --quiet` — CI-friendly output.
-- Shared constant: `CURRENT_PAYOUT_KEY_VERSION` is imported from
-  `payout-encryption.constants.ts`; the supported set is every integer from
-  `0` through the current version, so intermediate historical versions remain
-  valid after repeated soft rotations.
-
-### Post-rotation checklist
-1. [ ] Run `pnpm tsx scripts/verify-encryption-versions.ts` — all versions in supported set.
-2. [ ] Run `pnpm tsx scripts/verify-encryption-versions.ts --decrypt` — all samples decrypt.
-3. [ ] Full tests and the payout security suites pass.
-4. [ ] Perform an authorized, audited decrypt canary for an old row and verify
-       a newly encrypted row can be read.
-5. [ ] Confirm the master-key secret value was not changed.
-6. [ ] Record the rotation date, old/current version, verifier output, and
-       approvers in the change record.
+The cutover is mixed-image incompatible: finance must be locked, payout sends
+disabled, all payout-capable writers drained, the full verifier and dry run
+clean, then the migration applied before only the v2 image starts. The exact
+rotation, verification, key-removal, incident, and forward-fix-only rollback
+procedure is `docs/PAYOUT_ENCRYPTION_RUNBOOK.md`.

@@ -478,7 +478,6 @@ export default function ReportsPage() {
                   <SelectItem value="PUBLISHED">Published</SelectItem>
                   <SelectItem value="VERIFIED">Verified</SelectItem>
                   <SelectItem value="DELIVERED">Delivered</SelectItem>
-                  <SelectItem value="SETTLED">Settled</SelectItem>
                   <SelectItem value="COMPLETED">Completed</SelectItem>
                 </SelectContent>
               </Select>

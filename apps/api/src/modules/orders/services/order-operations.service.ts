@@ -16,6 +16,7 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
+import { transitionOrderCas } from "../order-transition-cas"
 import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderDeliveryService } from "./order-delivery.service"
 import { closeActiveRevisionForResubmission } from "./revision-lifecycle"
@@ -69,29 +70,6 @@ export class OrderOperationsService {
         supersedesId: latest?.id ?? null,
       },
     })
-  }
-
-  private async transition(
-    orderId: string,
-    fromVersion: number,
-    expectedStatus: string,
-    data: any,
-    prisma: any = this.prisma,
-  ) {
-    const r = await prisma.order.updateMany({
-      where: {
-        id: orderId,
-        version: fromVersion,
-        status: expectedStatus as any,
-      },
-      data: { ...data, version: { increment: 1 } },
-    })
-    if (r.count === 0) {
-      throw new ConflictException(
-        "Order was modified by another request. Retry.",
-      )
-    }
-    return prisma.order.findUniqueOrThrow({ where: { id: orderId } })
   }
 
   private async assertPlatformOrder(orderId: string) {
@@ -179,21 +157,18 @@ export class OrderOperationsService {
       : null
 
     return this.prisma.$transaction(async (tx: any) => {
-      const changed = await tx.order.updateMany({
-        where: { id: orderId, version: order.version, status: "SUBMITTED" },
-        data: {
-          status: "ACCEPTED",
+      const updated = await transitionOrderCas({
+        db: tx,
+        orderId,
+        expectedVersion: order.version,
+        fromStatus: "SUBMITTED",
+        toStatus: "ACCEPTED",
+        patch: {
           assigneeId: userId,
           acceptedAt,
           fulfillmentDueAt,
-          version: { increment: 1 },
         },
       })
-      if (changed.count === 0) {
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
-        )
-      }
       await this.guardAssignment(
         tx,
         assignment,
@@ -224,7 +199,7 @@ export class OrderOperationsService {
         },
         tx,
       )
-      return tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      return updated
     })
   }
 
@@ -250,15 +225,13 @@ export class OrderOperationsService {
     await this.cancellation.assertNoActiveCancellation(orderId)
 
     return this.prisma.$transaction(async (tx: any) => {
-      const changed = await tx.order.updateMany({
-        where: { id: orderId, version: order.version, status: order.status },
-        data: { status: "CONTENT_CREATION", version: { increment: 1 } },
+      const updated = await transitionOrderCas({
+        db: tx,
+        orderId,
+        expectedVersion: order.version,
+        fromStatus: order.status,
+        toStatus: "CONTENT_CREATION",
       })
-      if (changed.count === 0) {
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
-        )
-      }
       await this.guardAssignment(
         tx,
         assignment,
@@ -306,7 +279,7 @@ export class OrderOperationsService {
         },
         tx,
       )
-      return tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      return updated
     })
   }
 
@@ -341,15 +314,13 @@ export class OrderOperationsService {
       orderId,
       async (tx: any) => {
         await this.cancellation.assertNoActiveCancellation(orderId, tx)
-        const changed = await tx.order.updateMany({
-          where: { id: orderId, version: order.version, status: order.status },
-          data: { status: "CUSTOMER_REVIEW", version: { increment: 1 } },
+        const transitionedOrder = await transitionOrderCas({
+          db: tx,
+          orderId,
+          expectedVersion: order.version,
+          fromStatus: order.status,
+          toStatus: "CUSTOMER_REVIEW",
         })
-        if (changed.count === 0) {
-          throw new ConflictException(
-            "Order was modified by another request. Retry.",
-          )
-        }
         const fulfilledRevisionId = await closeActiveRevisionForResubmission(
           tx,
           orderId,
@@ -425,7 +396,7 @@ export class OrderOperationsService {
             tx,
           )
         }
-        return tx.order.findUniqueOrThrow({ where: { id: orderId } })
+        return transitionedOrder
       },
     )
 
@@ -452,13 +423,13 @@ export class OrderOperationsService {
     await this.cancellation.assertNoActiveCancellation(orderId)
 
     return this.prisma.$transaction(async (tx: any) => {
-      const updated = await this.transition(
+      const updated = await transitionOrderCas({
+        db: tx,
         orderId,
-        order.version,
-        "CONTENT_CREATION",
-        { status: "CONTENT_READY" },
-        tx,
-      )
+        expectedVersion: order.version,
+        fromStatus: "CONTENT_CREATION",
+        toStatus: "CONTENT_READY",
+      })
       await tx.orderEvent.create({
         data: {
           orderId,
@@ -493,13 +464,13 @@ export class OrderOperationsService {
 
     let communicationEventId: string | null = null
     const updated = await this.prisma.$transaction(async (tx: any) => {
-      const fresh = await this.transition(
+      const fresh = await transitionOrderCas({
+        db: tx,
         orderId,
-        order.version,
-        "CONTENT_READY",
-        { status: "CUSTOMER_REVIEW" },
-        tx,
-      )
+        expectedVersion: order.version,
+        fromStatus: "CONTENT_READY",
+        toStatus: "CUSTOMER_REVIEW",
+      })
       await tx.orderEvent.create({
         data: {
           orderId,

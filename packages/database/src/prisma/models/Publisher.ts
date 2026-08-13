@@ -213,6 +213,7 @@ export type PublisherWhereInput = {
   tickets?: Prisma.TicketListRelationFilter
   providerAccounts?: Prisma.PublisherProviderAccountListRelationFilter
   websiteImportBatches?: Prisma.WebsiteImportBatchListRelationFilter
+  compensations?: Prisma.PublisherCompensationListRelationFilter
 }
 
 export type PublisherOrderByWithRelationInput = {
@@ -238,6 +239,7 @@ export type PublisherOrderByWithRelationInput = {
   tickets?: Prisma.TicketOrderByRelationAggregateInput
   providerAccounts?: Prisma.PublisherProviderAccountOrderByRelationAggregateInput
   websiteImportBatches?: Prisma.WebsiteImportBatchOrderByRelationAggregateInput
+  compensations?: Prisma.PublisherCompensationOrderByRelationAggregateInput
 }
 
 export type PublisherWhereUniqueInput = Prisma.AtLeast<{
@@ -266,6 +268,7 @@ export type PublisherWhereUniqueInput = Prisma.AtLeast<{
   tickets?: Prisma.TicketListRelationFilter
   providerAccounts?: Prisma.PublisherProviderAccountListRelationFilter
   websiteImportBatches?: Prisma.WebsiteImportBatchListRelationFilter
+  compensations?: Prisma.PublisherCompensationListRelationFilter
 }, "id">
 
 export type PublisherOrderByWithAggregationInput = {
@@ -316,6 +319,7 @@ export type PublisherCreateInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateInput = {
@@ -340,6 +344,7 @@ export type PublisherUncheckedCreateInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUpdateInput = {
@@ -364,6 +369,7 @@ export type PublisherUpdateInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateInput = {
@@ -388,6 +394,7 @@ export type PublisherUncheckedUpdateInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateManyInput = {
@@ -575,6 +582,20 @@ export type PublisherUpdateOneRequiredWithoutWebsiteImportBatchesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.PublisherUpdateToOneWithWhereWithoutWebsiteImportBatchesInput, Prisma.PublisherUpdateWithoutWebsiteImportBatchesInput>, Prisma.PublisherUncheckedUpdateWithoutWebsiteImportBatchesInput>
 }
 
+export type PublisherCreateNestedOneWithoutCompensationsInput = {
+  create?: Prisma.XOR<Prisma.PublisherCreateWithoutCompensationsInput, Prisma.PublisherUncheckedCreateWithoutCompensationsInput>
+  connectOrCreate?: Prisma.PublisherCreateOrConnectWithoutCompensationsInput
+  connect?: Prisma.PublisherWhereUniqueInput
+}
+
+export type PublisherUpdateOneRequiredWithoutCompensationsNestedInput = {
+  create?: Prisma.XOR<Prisma.PublisherCreateWithoutCompensationsInput, Prisma.PublisherUncheckedCreateWithoutCompensationsInput>
+  connectOrCreate?: Prisma.PublisherCreateOrConnectWithoutCompensationsInput
+  upsert?: Prisma.PublisherUpsertWithoutCompensationsInput
+  connect?: Prisma.PublisherWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PublisherUpdateToOneWithWhereWithoutCompensationsInput, Prisma.PublisherUpdateWithoutCompensationsInput>, Prisma.PublisherUncheckedUpdateWithoutCompensationsInput>
+}
+
 export type PublisherCreateNestedOneWithoutSettlementsInput = {
   create?: Prisma.XOR<Prisma.PublisherCreateWithoutSettlementsInput, Prisma.PublisherUncheckedCreateWithoutSettlementsInput>
   connectOrCreate?: Prisma.PublisherCreateOrConnectWithoutSettlementsInput
@@ -744,6 +765,7 @@ export type PublisherCreateWithoutActiveContextsInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutActiveContextsInput = {
@@ -767,6 +789,7 @@ export type PublisherUncheckedCreateWithoutActiveContextsInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutActiveContextsInput = {
@@ -806,6 +829,7 @@ export type PublisherUpdateWithoutActiveContextsInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutActiveContextsInput = {
@@ -829,6 +853,7 @@ export type PublisherUncheckedUpdateWithoutActiveContextsInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutOrganizationInput = {
@@ -852,6 +877,7 @@ export type PublisherCreateWithoutOrganizationInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutOrganizationInput = {
@@ -875,6 +901,7 @@ export type PublisherUncheckedCreateWithoutOrganizationInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutOrganizationInput = {
@@ -937,6 +964,7 @@ export type PublisherCreateWithoutPublisherMembershipsInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutPublisherMembershipsInput = {
@@ -960,6 +988,7 @@ export type PublisherUncheckedCreateWithoutPublisherMembershipsInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutPublisherMembershipsInput = {
@@ -999,6 +1028,7 @@ export type PublisherUpdateWithoutPublisherMembershipsInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutPublisherMembershipsInput = {
@@ -1022,6 +1052,7 @@ export type PublisherUncheckedUpdateWithoutPublisherMembershipsInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutWebsitesInput = {
@@ -1045,6 +1076,7 @@ export type PublisherCreateWithoutWebsitesInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutWebsitesInput = {
@@ -1068,6 +1100,7 @@ export type PublisherUncheckedCreateWithoutWebsitesInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutWebsitesInput = {
@@ -1107,6 +1140,7 @@ export type PublisherUpdateWithoutWebsitesInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutWebsitesInput = {
@@ -1130,6 +1164,7 @@ export type PublisherUncheckedUpdateWithoutWebsitesInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutWebsiteImportBatchesInput = {
@@ -1153,6 +1188,7 @@ export type PublisherCreateWithoutWebsiteImportBatchesInput = {
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutWebsiteImportBatchesInput = {
@@ -1176,6 +1212,7 @@ export type PublisherUncheckedCreateWithoutWebsiteImportBatchesInput = {
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutWebsiteImportBatchesInput = {
@@ -1215,6 +1252,7 @@ export type PublisherUpdateWithoutWebsiteImportBatchesInput = {
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutWebsiteImportBatchesInput = {
@@ -1238,6 +1276,119 @@ export type PublisherUncheckedUpdateWithoutWebsiteImportBatchesInput = {
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
+}
+
+export type PublisherCreateWithoutCompensationsInput = {
+  id?: string
+  name: string
+  email?: string | null
+  tier?: $Enums.PublisherTier
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutPublishersInput
+  websites?: Prisma.WebsiteCreateNestedManyWithoutPublisherInput
+  publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
+  balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
+  withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
+  marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
+  profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
+  orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
+  providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+}
+
+export type PublisherUncheckedCreateWithoutCompensationsInput = {
+  id?: string
+  name: string
+  email?: string | null
+  organizationId: string
+  tier?: $Enums.PublisherTier
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  websites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutPublisherInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
+  balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
+  withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
+  profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
+  orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
+  providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+}
+
+export type PublisherCreateOrConnectWithoutCompensationsInput = {
+  where: Prisma.PublisherWhereUniqueInput
+  create: Prisma.XOR<Prisma.PublisherCreateWithoutCompensationsInput, Prisma.PublisherUncheckedCreateWithoutCompensationsInput>
+}
+
+export type PublisherUpsertWithoutCompensationsInput = {
+  update: Prisma.XOR<Prisma.PublisherUpdateWithoutCompensationsInput, Prisma.PublisherUncheckedUpdateWithoutCompensationsInput>
+  create: Prisma.XOR<Prisma.PublisherCreateWithoutCompensationsInput, Prisma.PublisherUncheckedCreateWithoutCompensationsInput>
+  where?: Prisma.PublisherWhereInput
+}
+
+export type PublisherUpdateToOneWithWhereWithoutCompensationsInput = {
+  where?: Prisma.PublisherWhereInput
+  data: Prisma.XOR<Prisma.PublisherUpdateWithoutCompensationsInput, Prisma.PublisherUncheckedUpdateWithoutCompensationsInput>
+}
+
+export type PublisherUpdateWithoutCompensationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tier?: Prisma.EnumPublisherTierFieldUpdateOperationsInput | $Enums.PublisherTier
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutPublishersNestedInput
+  websites?: Prisma.WebsiteUpdateManyWithoutPublisherNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
+  balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
+  withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
+  profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
+  orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
+  providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+}
+
+export type PublisherUncheckedUpdateWithoutCompensationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  tier?: Prisma.EnumPublisherTierFieldUpdateOperationsInput | $Enums.PublisherTier
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  websites?: Prisma.WebsiteUncheckedUpdateManyWithoutPublisherNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
+  balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
+  withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
+  profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
+  orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
+  providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
+  websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutSettlementsInput = {
@@ -1261,6 +1412,7 @@ export type PublisherCreateWithoutSettlementsInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutSettlementsInput = {
@@ -1284,6 +1436,7 @@ export type PublisherUncheckedCreateWithoutSettlementsInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutSettlementsInput = {
@@ -1323,6 +1476,7 @@ export type PublisherUpdateWithoutSettlementsInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutSettlementsInput = {
@@ -1346,6 +1500,7 @@ export type PublisherUncheckedUpdateWithoutSettlementsInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutOrderReviewsInput = {
@@ -1369,6 +1524,7 @@ export type PublisherCreateWithoutOrderReviewsInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutOrderReviewsInput = {
@@ -1392,6 +1548,7 @@ export type PublisherUncheckedCreateWithoutOrderReviewsInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutOrderReviewsInput = {
@@ -1431,6 +1588,7 @@ export type PublisherUpdateWithoutOrderReviewsInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutOrderReviewsInput = {
@@ -1454,6 +1612,7 @@ export type PublisherUncheckedUpdateWithoutOrderReviewsInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutBalanceInput = {
@@ -1477,6 +1636,7 @@ export type PublisherCreateWithoutBalanceInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutBalanceInput = {
@@ -1500,6 +1660,7 @@ export type PublisherUncheckedCreateWithoutBalanceInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutBalanceInput = {
@@ -1539,6 +1700,7 @@ export type PublisherUpdateWithoutBalanceInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutBalanceInput = {
@@ -1562,6 +1724,7 @@ export type PublisherUncheckedUpdateWithoutBalanceInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutWithdrawalsInput = {
@@ -1585,6 +1748,7 @@ export type PublisherCreateWithoutWithdrawalsInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutWithdrawalsInput = {
@@ -1608,6 +1772,7 @@ export type PublisherUncheckedCreateWithoutWithdrawalsInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutWithdrawalsInput = {
@@ -1647,6 +1812,7 @@ export type PublisherUpdateWithoutWithdrawalsInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutWithdrawalsInput = {
@@ -1670,6 +1836,7 @@ export type PublisherUncheckedUpdateWithoutWithdrawalsInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutPayoutMethodsInput = {
@@ -1693,6 +1860,7 @@ export type PublisherCreateWithoutPayoutMethodsInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutPayoutMethodsInput = {
@@ -1716,6 +1884,7 @@ export type PublisherUncheckedCreateWithoutPayoutMethodsInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutPayoutMethodsInput = {
@@ -1755,6 +1924,7 @@ export type PublisherUpdateWithoutPayoutMethodsInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutPayoutMethodsInput = {
@@ -1778,6 +1948,7 @@ export type PublisherUncheckedUpdateWithoutPayoutMethodsInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutProviderAccountsInput = {
@@ -1801,6 +1972,7 @@ export type PublisherCreateWithoutProviderAccountsInput = {
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutProviderAccountsInput = {
@@ -1824,6 +1996,7 @@ export type PublisherUncheckedCreateWithoutProviderAccountsInput = {
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutProviderAccountsInput = {
@@ -1863,6 +2036,7 @@ export type PublisherUpdateWithoutProviderAccountsInput = {
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutProviderAccountsInput = {
@@ -1886,6 +2060,7 @@ export type PublisherUncheckedUpdateWithoutProviderAccountsInput = {
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutTransactionsInput = {
@@ -1909,6 +2084,7 @@ export type PublisherCreateWithoutTransactionsInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutTransactionsInput = {
@@ -1932,6 +2108,7 @@ export type PublisherUncheckedCreateWithoutTransactionsInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutTransactionsInput = {
@@ -1971,6 +2148,7 @@ export type PublisherUpdateWithoutTransactionsInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutTransactionsInput = {
@@ -1994,6 +2172,7 @@ export type PublisherUncheckedUpdateWithoutTransactionsInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutTicketsInput = {
@@ -2017,6 +2196,7 @@ export type PublisherCreateWithoutTicketsInput = {
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutTicketsInput = {
@@ -2040,6 +2220,7 @@ export type PublisherUncheckedCreateWithoutTicketsInput = {
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutTicketsInput = {
@@ -2079,6 +2260,7 @@ export type PublisherUpdateWithoutTicketsInput = {
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutTicketsInput = {
@@ -2102,6 +2284,7 @@ export type PublisherUncheckedUpdateWithoutTicketsInput = {
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutMarketplaceListingsInput = {
@@ -2125,6 +2308,7 @@ export type PublisherCreateWithoutMarketplaceListingsInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutMarketplaceListingsInput = {
@@ -2148,6 +2332,7 @@ export type PublisherUncheckedCreateWithoutMarketplaceListingsInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutMarketplaceListingsInput = {
@@ -2187,6 +2372,7 @@ export type PublisherUpdateWithoutMarketplaceListingsInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutMarketplaceListingsInput = {
@@ -2210,6 +2396,7 @@ export type PublisherUncheckedUpdateWithoutMarketplaceListingsInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateWithoutProfileInput = {
@@ -2233,6 +2420,7 @@ export type PublisherCreateWithoutProfileInput = {
   tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutProfileInput = {
@@ -2256,6 +2444,7 @@ export type PublisherUncheckedCreateWithoutProfileInput = {
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedCreateNestedManyWithoutPublisherInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedCreateNestedManyWithoutPublisherInput
+  compensations?: Prisma.PublisherCompensationUncheckedCreateNestedManyWithoutPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutProfileInput = {
@@ -2295,6 +2484,7 @@ export type PublisherUpdateWithoutProfileInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutProfileInput = {
@@ -2318,6 +2508,7 @@ export type PublisherUncheckedUpdateWithoutProfileInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherCreateManyOrganizationInput = {
@@ -2350,6 +2541,7 @@ export type PublisherUpdateWithoutOrganizationInput = {
   tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutOrganizationInput = {
@@ -2373,6 +2565,7 @@ export type PublisherUncheckedUpdateWithoutOrganizationInput = {
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
   providerAccounts?: Prisma.PublisherProviderAccountUncheckedUpdateManyWithoutPublisherNestedInput
   websiteImportBatches?: Prisma.WebsiteImportBatchUncheckedUpdateManyWithoutPublisherNestedInput
+  compensations?: Prisma.PublisherCompensationUncheckedUpdateManyWithoutPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateManyWithoutOrganizationInput = {
@@ -2402,6 +2595,7 @@ export type PublisherCountOutputType = {
   tickets: number
   providerAccounts: number
   websiteImportBatches: number
+  compensations: number
 }
 
 export type PublisherCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2417,6 +2611,7 @@ export type PublisherCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensi
   tickets?: boolean | PublisherCountOutputTypeCountTicketsArgs
   providerAccounts?: boolean | PublisherCountOutputTypeCountProviderAccountsArgs
   websiteImportBatches?: boolean | PublisherCountOutputTypeCountWebsiteImportBatchesArgs
+  compensations?: boolean | PublisherCountOutputTypeCountCompensationsArgs
 }
 
 /**
@@ -2513,6 +2708,13 @@ export type PublisherCountOutputTypeCountWebsiteImportBatchesArgs<ExtArgs extend
   where?: Prisma.WebsiteImportBatchWhereInput
 }
 
+/**
+ * PublisherCountOutputType without action
+ */
+export type PublisherCountOutputTypeCountCompensationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PublisherCompensationWhereInput
+}
+
 
 export type PublisherSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2537,6 +2739,7 @@ export type PublisherSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   tickets?: boolean | Prisma.Publisher$ticketsArgs<ExtArgs>
   providerAccounts?: boolean | Prisma.Publisher$providerAccountsArgs<ExtArgs>
   websiteImportBatches?: boolean | Prisma.Publisher$websiteImportBatchesArgs<ExtArgs>
+  compensations?: boolean | Prisma.Publisher$compensationsArgs<ExtArgs>
   _count?: boolean | Prisma.PublisherCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["publisher"]>
 
@@ -2589,6 +2792,7 @@ export type PublisherInclude<ExtArgs extends runtime.Types.Extensions.InternalAr
   tickets?: boolean | Prisma.Publisher$ticketsArgs<ExtArgs>
   providerAccounts?: boolean | Prisma.Publisher$providerAccountsArgs<ExtArgs>
   websiteImportBatches?: boolean | Prisma.Publisher$websiteImportBatchesArgs<ExtArgs>
+  compensations?: boolean | Prisma.Publisher$compensationsArgs<ExtArgs>
   _count?: boolean | Prisma.PublisherCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type PublisherIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2616,6 +2820,7 @@ export type $PublisherPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     tickets: Prisma.$TicketPayload<ExtArgs>[]
     providerAccounts: Prisma.$PublisherProviderAccountPayload<ExtArgs>[]
     websiteImportBatches: Prisma.$WebsiteImportBatchPayload<ExtArgs>[]
+    compensations: Prisma.$PublisherCompensationPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3034,6 +3239,7 @@ export interface Prisma__PublisherClient<T, Null = never, ExtArgs extends runtim
   tickets<T extends Prisma.Publisher$ticketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$ticketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   providerAccounts<T extends Prisma.Publisher$providerAccountsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$providerAccountsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PublisherProviderAccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   websiteImportBatches<T extends Prisma.Publisher$websiteImportBatchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$websiteImportBatchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebsiteImportBatchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  compensations<T extends Prisma.Publisher$compensationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$compensationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PublisherCompensationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3794,6 +4000,30 @@ export type Publisher$websiteImportBatchesArgs<ExtArgs extends runtime.Types.Ext
   take?: number
   skip?: number
   distinct?: Prisma.WebsiteImportBatchScalarFieldEnum | Prisma.WebsiteImportBatchScalarFieldEnum[]
+}
+
+/**
+ * Publisher.compensations
+ */
+export type Publisher$compensationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PublisherCompensation
+   */
+  select?: Prisma.PublisherCompensationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PublisherCompensation
+   */
+  omit?: Prisma.PublisherCompensationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PublisherCompensationInclude<ExtArgs> | null
+  where?: Prisma.PublisherCompensationWhereInput
+  orderBy?: Prisma.PublisherCompensationOrderByWithRelationInput | Prisma.PublisherCompensationOrderByWithRelationInput[]
+  cursor?: Prisma.PublisherCompensationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PublisherCompensationScalarFieldEnum | Prisma.PublisherCompensationScalarFieldEnum[]
 }
 
 /**

@@ -7,11 +7,14 @@ import {
 import {
   ACTIVE_CANCELLATION_REQUEST_STATUSES,
   decideOrderCancellation,
+  isSupportedMoneyCurrency,
   orderEventMetadata,
   resolveOrderCancellationConfig,
   runLockedOrderSerializableTransaction,
+  USD_CURRENCY,
 } from "@guestpost/shared"
 import { FinalRefundResponsibility } from "@guestpost/shared/dist/order-refund-core"
+import { lockWalletForUpdate } from "@guestpost/shared/dist/payment-dispute-core"
 import {
   BadRequestException,
   ConflictException,
@@ -20,6 +23,7 @@ import {
   NotFoundException,
   Optional,
 } from "@nestjs/common"
+import { Decimal } from "@prisma/client/runtime/client"
 import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
@@ -125,6 +129,7 @@ export class OrderCancellationService {
       orderId,
       async (tx: any) => {
         const order = await this.loadOrder(tx, orderId)
+        await this.assertFreshActorAuthority(tx, actor)
         // Authorization must precede the idempotency lookup and replay return;
         // knowing another tenant's order ID and command key is not access.
         this.assertActorCanAccess(order, actor)
@@ -218,51 +223,57 @@ export class OrderCancellationService {
     }
 
     let publisherId: string | null = null
-    const result = await this.prisma.$transaction(async (tx: any) => {
-      const order = await this.loadOrder(tx, orderId)
-      this.assertActorCanAccess(order, actor)
-      this.assertExpectedVersion(order.version, body.expectedVersion)
-      const channel = this.channelFor(order)
-      const decision = decideOrderCancellation({
-        status: order.status,
-        paymentStatus: order.paymentStatus,
-        fulfillmentChannel: channel,
-        actor: actor.kind,
-        hasActiveRequest: order.cancellationRequests.length > 0,
-        hasActiveDispute: this.hasActiveDispute(order),
-        fulfillmentDueAt: order.fulfillmentDueAt,
-        warrantyEndsAt: order.warrantyEndsAt,
-      })
-      if (decision.action !== "DECLINE_NOW") {
-        throw new BadRequestException(decision.message)
-      }
+    const result = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        const order = await this.loadOrder(tx, orderId)
+        await this.assertFreshActorAuthority(tx, actor)
+        this.assertActorCanAccess(order, actor)
+        this.assertExpectedVersion(order.version, body.expectedVersion)
+        const channel = this.channelFor(order)
+        const decision = decideOrderCancellation({
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          fulfillmentChannel: channel,
+          actor: actor.kind,
+          hasActiveRequest: order.cancellationRequests.length > 0,
+          hasActiveDispute: this.hasActiveDispute(order),
+          fulfillmentDueAt: order.fulfillmentDueAt,
+          warrantyEndsAt: order.warrantyEndsAt,
+        })
+        if (decision.action !== "DECLINE_NOW") {
+          throw new BadRequestException(decision.message)
+        }
 
-      const responsibility = channel === "PUBLISHER" ? "PUBLISHER" : "PLATFORM"
-      publisherId = order.website?.publisherId ?? null
-      const refunded = await this.refund.refundOrderInTransaction(
-        tx,
-        order,
-        this.reasonText(body.reasonCode, body.note),
-        actor.userId,
-        `decline:${orderId}:${body.idempotencyKey ?? order.version}`,
-        responsibility,
-      )
+        const responsibility =
+          channel === "PUBLISHER" ? "PUBLISHER" : "PLATFORM"
+        publisherId = order.website?.publisherId ?? null
+        const refunded = await this.refund.refundOrderInTransaction(
+          tx,
+          order,
+          this.reasonText(body.reasonCode, body.note),
+          actor.userId,
+          `decline:${orderId}:${body.idempotencyKey ?? order.version}`,
+          responsibility,
+        )
 
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "ORDER_DECLINED",
-          actorId: actor.userId,
-          message: "Unaccepted order declined by fulfiller",
-          metadata: {
-            reasonCode: body.reasonCode,
-            note: body.note,
-            responsibility,
+        await tx.orderEvent.create({
+          data: {
+            orderId,
+            eventType: "ORDER_DECLINED",
+            actorId: actor.userId,
+            message: "Unaccepted order declined by fulfiller",
+            metadata: {
+              reasonCode: body.reasonCode,
+              note: body.note,
+              responsibility,
+            },
           },
-        },
-      })
-      return refunded.order
-    })
+        })
+        return refunded.order
+      },
+    )
     this.refund.dispatchOrderRefundCommunicationsBestEffort(orderId)
 
     if (publisherId) {
@@ -287,6 +298,7 @@ export class OrderCancellationService {
         orderId,
         async (tx: any) => {
           const order = await this.loadOrder(tx, orderId)
+          await this.assertFreshActorAuthority(tx, actor)
           this.assertActorCanAccess(order, actor)
           if (actor.kind === "CUSTOMER") {
             assertOwnerOrCreator({
@@ -432,6 +444,7 @@ export class OrderCancellationService {
       this.prisma,
       orderId,
       async (tx: any) => {
+        await this.assertFreshActorAuthority(tx, actor)
         const request = await tx.orderCancellationRequest.findFirst({
           where: { id: requestId, orderId },
           include: {
@@ -838,35 +851,44 @@ export class OrderCancellationService {
     const finalResponsibility = this.assertFinalResponsibility(
       body.responsibility,
     )
-    const result = await this.prisma.$transaction(async (tx: any) => {
-      const order = await this.loadOrder(tx, orderId)
-      this.assertExpectedVersion(order.version, body.expectedVersion)
-      if (
-        (TERMINAL_ORDER_STATUSES as readonly string[]).includes(order.status)
-      ) {
-        return order
-      }
-      if (order.paymentStatus === "PAID") {
-        return (
-          await this.refund.refundOrderInTransaction(
-            tx,
-            order,
-            `Emergency cancellation: ${this.reasonText(body.reasonCode, auditNote)}`,
-            staffUserId,
-            `force-cancel:${orderId}:${body.idempotencyKey ?? order.version}`,
-            finalResponsibility,
-          )
-        ).order
-      }
-      return this.cancelUnpaidInTransaction(
-        tx,
-        order,
-        staffUserId,
-        body.reasonCode,
-        auditNote,
-        body.responsibility,
-      )
-    })
+    const result = await runLockedOrderSerializableTransaction(
+      this.prisma,
+      orderId,
+      async (tx: any) => {
+        const order = await this.loadOrder(tx, orderId)
+        this.assertExpectedVersion(order.version, body.expectedVersion)
+        if (
+          (TERMINAL_ORDER_STATUSES as readonly string[]).includes(order.status)
+        ) {
+          return order
+        }
+        if (order.paymentStatus === "PAID") {
+          return (
+            await this.refund.refundOrderInTransaction(
+              tx,
+              order,
+              `Emergency cancellation: ${this.reasonText(body.reasonCode, auditNote)}`,
+              staffUserId,
+              `force-cancel:${orderId}:${body.idempotencyKey ?? order.version}`,
+              finalResponsibility,
+              {
+                ...body.publisherCompensation,
+                effectiveOrderStatus:
+                  order.dispute?.previousStatus ?? order.status,
+              },
+            )
+          ).order
+        }
+        return this.cancelUnpaidInTransaction(
+          tx,
+          order,
+          staffUserId,
+          body.reasonCode,
+          auditNote,
+          body.responsibility,
+        )
+      },
+    )
 
     this.refund.dispatchOrderRefundCommunicationsBestEffort(orderId)
     this.communications?.dispatchByDedupKeyBestEffort(
@@ -944,33 +966,119 @@ export class OrderCancellationService {
     note: string | undefined,
     responsibility: CancellationResponsibility | "CUSTOMER",
   ) {
-    const amount = Number(order.amount ?? 0)
+    const amount = new Decimal(order.amount ?? 0)
+    let reservationReleaseTransactionId: string | null = null
     if (
       order.paymentStatus === "PENDING" &&
       order.status === "PENDING_PAYMENT" &&
-      amount > 0
+      amount.greaterThan(0)
     ) {
       // Releasing a reservation makes cash-equivalent wallet funds available
       // again. Keep this writer behind the same fail-closed cutover gate as
       // refunds and deposits; draft cancellations with no reservation remain
       // available while finance is locked.
       assertApiFinanceOperationAllowed("new_liability")
-      const wallet = await tx.wallet.findUnique({
+      const walletIdentity = await tx.wallet.findUnique({
         where: { organizationId: order.organizationId },
+        select: { id: true },
       })
-      if (wallet) {
-        const released = await tx.wallet.updateMany({
-          where: { id: wallet.id, version: wallet.version },
-          data: {
-            reservedBalance: { decrement: amount },
-            availableBalance: { increment: amount },
-            version: { increment: 1 },
-          },
+      if (!walletIdentity) {
+        throw new ConflictException({
+          code: "RESERVATION_WALLET_MISSING",
+          message:
+            "Pending-payment order has no wallet reservation owner; reconciliation is required",
         })
-        if (released.count === 0) {
-          throw new ConflictException("Wallet changed concurrently. Retry.")
-        }
       }
+      await lockWalletForUpdate(tx, walletIdentity.id)
+      const wallet = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletIdentity.id },
+      })
+      if (
+        !isSupportedMoneyCurrency(order.currency) ||
+        !isSupportedMoneyCurrency(wallet.currency)
+      ) {
+        throw new ConflictException({
+          code: "RESERVATION_CURRENCY_INVALID",
+          message:
+            "Pending-payment reservation is not denominated in canonical USD",
+        })
+      }
+      if (new Decimal(wallet.reservedBalance).lessThan(amount)) {
+        throw new ConflictException({
+          code: "RESERVATION_BALANCE_MISMATCH",
+          message:
+            "Pending-payment order exceeds its reserved wallet balance; reconciliation is required",
+        })
+      }
+      // Aggregate reservedBalance is shared by every pending order in the
+      // wallet. Prove this order owns one exact, unconsumed reservation before
+      // making any of it spendable again; otherwise a corrupt order could
+      // release funds reserved for a different checkout.
+      await tx.$queryRawUnsafe(
+        'SELECT "id" FROM "Transaction" WHERE "orderId" = $1 AND "walletId" = $2 AND "type" IN (\'RESERVATION\', \'PURCHASE\', \'RELEASE\') FOR SHARE',
+        order.id,
+        wallet.id,
+      )
+      const reservationLedger = await tx.transaction.findMany({
+        where: {
+          orderId: order.id,
+          walletId: wallet.id,
+          type: { in: ["RESERVATION", "PURCHASE", "RELEASE"] },
+        },
+        select: {
+          id: true,
+          type: true,
+          amount: true,
+          currency: true,
+          publisherId: true,
+          settlementId: true,
+          provider: true,
+          providerRef: true,
+        },
+      })
+      const reservations = reservationLedger.filter(
+        (entry: any) => entry.type === "RESERVATION",
+      )
+      const reservation = reservations[0]
+      if (
+        reservations.length !== 1 ||
+        reservationLedger.some((entry: any) => entry.type !== "RESERVATION") ||
+        !new Decimal(reservation?.amount ?? 0).equals(amount.negated()) ||
+        reservation?.currency !== USD_CURRENCY ||
+        reservation?.publisherId != null ||
+        reservation?.settlementId != null ||
+        reservation?.provider != null ||
+        reservation?.providerRef != null
+      ) {
+        throw new ConflictException({
+          code: "RESERVATION_LEDGER_MISMATCH",
+          message:
+            "Pending-payment order lacks one exact unconsumed reservation ledger row; reconciliation is required",
+        })
+      }
+      const released = await tx.wallet.updateMany({
+        where: { id: wallet.id, version: wallet.version },
+        data: {
+          reservedBalance: { decrement: amount },
+          availableBalance: { increment: amount },
+          version: { increment: 1 },
+        },
+      })
+      if (released.count === 0) {
+        throw new ConflictException("Wallet changed concurrently. Retry.")
+      }
+      const releaseTransaction = await tx.transaction.create({
+        data: {
+          walletId: wallet.id,
+          orderId: order.id,
+          amount,
+          type: "RELEASE",
+          currency: USD_CURRENCY,
+          reference: `reservation-release:${order.id}`,
+          description: `Release of ${amount.toFixed(2)} USD reservation for cancelled order ${order.id}`,
+        },
+      })
+      reservationReleaseTransactionId = releaseTransaction.id
     }
     await tx.fulfillmentAssignment.updateMany({
       where: {
@@ -998,7 +1106,12 @@ export class OrderCancellationService {
         eventType: "ORDER_CANCELLED",
         actorId: actorUserId,
         message: `Order cancelled: ${this.reasonText(reasonCode, note)}`,
-        metadata: { reasonCode, note, responsibility },
+        metadata: {
+          reasonCode,
+          note,
+          responsibility,
+          reservationReleaseTransactionId,
+        },
       },
     })
     await this.audit.log(
@@ -1011,6 +1124,7 @@ export class OrderCancellationService {
           reasonCode,
           note,
           responsibility,
+          reservationReleaseTransactionId,
           ...orderEventMetadata(order),
         },
         userId: actorUserId,
@@ -1103,7 +1217,7 @@ export class OrderCancellationService {
           select: { assignedToUserId: true },
           take: 1,
         },
-        dispute: { select: { id: true, status: true } },
+        dispute: { select: { id: true, status: true, previousStatus: true } },
       },
     })
     if (!order) throw new NotFoundException("Order not found")
@@ -1140,6 +1254,89 @@ export class OrderCancellationService {
       throw new ForbiddenException(
         "Only the assigned Operations user can act for this order",
       )
+    }
+  }
+
+  /**
+   * Re-check the request authority inside the locked financial transaction.
+   * The request-scoped resolver closes dropped cache invalidation; this closes
+   * the smaller revoke-after-guard race before cancellation can issue a refund.
+   */
+  private async assertFreshActorAuthority(
+    tx: any,
+    actor: CancellationActorContext,
+  ): Promise<void> {
+    if (actor.kind === "CUSTOMER") {
+      if (!actor.organizationId) {
+        throw new ForbiddenException("No active customer authority")
+      }
+      const membership = await tx.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: actor.userId,
+            organizationId: actor.organizationId,
+          },
+        },
+        select: {
+          role: true,
+          status: true,
+          user: { select: { banned: true, userType: true } },
+        },
+      })
+      if (
+        membership?.status !== "ACTIVE" ||
+        membership?.user.banned ||
+        membership?.user.userType !== "CUSTOMER" ||
+        membership?.role !== actor.customerRole
+      ) {
+        throw new ForbiddenException("Customer authority changed; retry")
+      }
+      return
+    }
+
+    if (actor.kind === "PUBLISHER") {
+      if (!actor.publisherId) {
+        throw new ForbiddenException("No active publisher authority")
+      }
+      const membership = await tx.publisherMembership.findUnique({
+        where: {
+          userId_publisherId: {
+            userId: actor.userId,
+            publisherId: actor.publisherId,
+          },
+        },
+        select: {
+          role: true,
+          user: { select: { banned: true, userType: true } },
+        },
+      })
+      if (
+        !membership ||
+        membership.user.banned ||
+        membership.user.userType !== "PUBLISHER" ||
+        membership.role !== actor.publisherRole
+      ) {
+        throw new ForbiddenException("Publisher authority changed; retry")
+      }
+      return
+    }
+
+    if (actor.kind === "STAFF") {
+      const membership = await tx.staffMembership.findUnique({
+        where: { userId: actor.userId },
+        select: {
+          role: true,
+          user: { select: { banned: true, userType: true } },
+        },
+      })
+      if (
+        !membership ||
+        membership.user.banned ||
+        membership.user.userType !== "STAFF" ||
+        membership.role !== actor.staffRole
+      ) {
+        throw new ForbiddenException("Staff authority changed; retry")
+      }
     }
   }
 

@@ -101,7 +101,6 @@ export const ORDER_STATUS_PRESENTATION: Record<
   PUBLISHED: { variant: "success", label: "Published", chartColor: "#22c55e" },
   VERIFIED: { variant: "success", label: "Verified", chartColor: "#10b981" },
   DELIVERED: { variant: "success", label: "Delivered", chartColor: "#10b981" },
-  SETTLED: { variant: "success", label: "Settled", chartColor: "#10b981" },
   COMPLETED: { variant: "success", label: "Completed", chartColor: "#10b981" },
   CANCELLED: {
     variant: "destructive",

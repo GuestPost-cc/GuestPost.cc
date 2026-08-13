@@ -148,6 +148,7 @@ describe("OrderDisputeService refund authorization", () => {
       "finance-1",
       "dispute-refund:dispute-1",
       CancellationResponsibility.CUSTOMER,
+      { effectiveOrderStatus: "COMPLETED" },
     )
     expect(
       refund.dispatchOrderRefundCommunicationsBestEffort,
@@ -187,5 +188,104 @@ describe("OrderDisputeService refund authorization", () => {
         "Published delivery did not match the approved brief.",
       ),
     ).rejects.toBeInstanceOf(ConflictException)
+  })
+
+  it("re-checks customer membership inside the locked dispute transaction", async () => {
+    const lockedOrder = {
+      ...order,
+      customerId: "customer-1",
+      status: "PUBLISHED",
+      paymentStatus: "PAID",
+      warrantyEndsAt: null,
+      cancellationRequests: [],
+      dispute: null,
+    }
+    const tx: any = {
+      membership: { findUnique: jest.fn().mockResolvedValue(null) },
+      order: { findFirst: jest.fn().mockResolvedValue(lockedOrder) },
+      orderDispute: { create: jest.fn() },
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
+    }
+    const prisma: any = {
+      order: { findFirst: jest.fn().mockResolvedValue(lockedOrder) },
+      $transaction: jest
+        .fn()
+        .mockImplementation(async (callback: any) => callback(tx)),
+    }
+    const service = new OrderDisputeService(
+      prisma,
+      { log: jest.fn() } as any,
+      {} as any,
+      {} as any,
+    )
+
+    await expect(
+      service.openDispute(
+        "order-1",
+        "org-1",
+        "customer-1",
+        "Published delivery did not match the approved brief.",
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+    expect(tx.orderDispute.create).not.toHaveBeenCalled()
+  })
+
+  it("returns the server-computed compensation boundary for a disputed delivery", async () => {
+    const disputes = [
+      {
+        id: "dispute-1",
+        orderId: "order-1",
+        status: "UNDER_REVIEW",
+        previousStatus: "DELIVERED",
+        reason: "Delivered publication is disputed",
+        createdAt: new Date(),
+        order: {
+          id: "order-1",
+          title: "Publisher order",
+          amount: 100,
+          status: "DISPUTED",
+          fulfillmentChannel: "PUBLISHER",
+          customer: { id: "customer-1", name: "Buyer", email: "b@x.test" },
+          website: {
+            domain: "example.test",
+            url: "https://example.test",
+            ownershipType: "PUBLISHER",
+          },
+          settlements: [
+            { publisherAmount: 80, currency: "USD", status: "PENDING" },
+          ],
+        },
+      },
+    ]
+    const prisma: any = {
+      orderDispute: {
+        findMany: jest.fn().mockResolvedValue(disputes),
+        count: jest
+          .fn()
+          .mockResolvedValueOnce(1)
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(1),
+      },
+      $transaction: jest
+        .fn()
+        .mockImplementation(async (operations: Promise<unknown>[]) =>
+          Promise.all(operations),
+        ),
+    }
+    const service = new OrderDisputeService(
+      prisma,
+      { log: jest.fn() } as any,
+      {} as any,
+      {} as any,
+    )
+
+    const result = await service.listDisputes({})
+
+    expect(result.items[0].order!.publisherCompensationPolicy).toEqual({
+      required: true,
+      maximumAmount: 80,
+      currency: "USD",
+      effectiveOrderStatus: "DELIVERED",
+    })
   })
 })

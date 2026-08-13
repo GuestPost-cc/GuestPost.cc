@@ -44,6 +44,10 @@ const baseModuleNameMapperFromSrc = {
     "<rootDir>/../../../packages/shared/src/payout-provider-metadata",
   "^@guestpost/shared/dist/payment-dispute-core$":
     "<rootDir>/../../../packages/shared/src/payment-dispute-core",
+  "^@guestpost/shared/dist/deposit-credit-core$":
+    "<rootDir>/../../../packages/shared/src/deposit-credit-core",
+  "^@guestpost/shared/dist/stripe-deposit-recovery$":
+    "<rootDir>/../../../packages/shared/src/stripe-deposit-recovery",
   "^@guestpost/shared/dist/prisma-transaction-retry$":
     "<rootDir>/../../../packages/shared/src/prisma-transaction-retry",
   "^@guestpost/shared/dist/observability/request-context$":
@@ -110,6 +114,10 @@ module.exports = {
           "<rootDir>/../../../../../packages/shared/src/payout-provider-metadata",
         "^@guestpost/shared/dist/payment-dispute-core$":
           "<rootDir>/../../../../../packages/shared/src/payment-dispute-core",
+        "^@guestpost/shared/dist/deposit-credit-core$":
+          "<rootDir>/../../../../../packages/shared/src/deposit-credit-core",
+        "^@guestpost/shared/dist/stripe-deposit-recovery$":
+          "<rootDir>/../../../../../packages/shared/src/stripe-deposit-recovery",
         "^@guestpost/shared/dist/prisma-transaction-retry$":
           "<rootDir>/../../../../../packages/shared/src/prisma-transaction-retry",
         "^@guestpost/shared/dist/observability/request-context$":

@@ -76,6 +76,7 @@ export const ModelName = {
   Publication: 'Publication',
   OrderDispute: 'OrderDispute',
   OrderCancellationRequest: 'OrderCancellationRequest',
+  PublisherCompensation: 'PublisherCompensation',
   Settlement: 'Settlement',
   SettlementApproval: 'SettlementApproval',
   FulfillmentAssignment: 'FulfillmentAssignment',
@@ -106,6 +107,8 @@ export const ModelName = {
   Wallet: 'Wallet',
   Transaction: 'Transaction',
   DepositAttempt: 'DepositAttempt',
+  DepositCreditRecovery: 'DepositCreditRecovery',
+  DepositCreditEvidence: 'DepositCreditEvidence',
   PaymentProviderEvent: 'PaymentProviderEvent',
   PaymentDispute: 'PaymentDispute',
   Ticket: 'Ticket',
@@ -550,6 +553,7 @@ export type OrderItemScalarFieldEnum = (typeof OrderItemScalarFieldEnum)[keyof t
 export const OrderEventScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
+  settlementId: 'settlementId',
   eventType: 'eventType',
   actorId: 'actorId',
   message: 'message',
@@ -623,6 +627,26 @@ export const OrderCancellationRequestScalarFieldEnum = {
 } as const
 
 export type OrderCancellationRequestScalarFieldEnum = (typeof OrderCancellationRequestScalarFieldEnum)[keyof typeof OrderCancellationRequestScalarFieldEnum]
+
+
+export const PublisherCompensationScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  publisherId: 'publisherId',
+  refundTransactionId: 'refundTransactionId',
+  compensationTransactionId: 'compensationTransactionId',
+  debtRepaymentTransactionId: 'debtRepaymentTransactionId',
+  disposition: 'disposition',
+  amount: 'amount',
+  currency: 'currency',
+  responsibility: 'responsibility',
+  reason: 'reason',
+  effectiveOrderStatus: 'effectiveOrderStatus',
+  decidedByUserId: 'decidedByUserId',
+  createdAt: 'createdAt'
+} as const
+
+export type PublisherCompensationScalarFieldEnum = (typeof PublisherCompensationScalarFieldEnum)[keyof typeof PublisherCompensationScalarFieldEnum]
 
 
 export const SettlementScalarFieldEnum = {
@@ -1190,6 +1214,70 @@ export const DepositAttemptScalarFieldEnum = {
 } as const
 
 export type DepositAttemptScalarFieldEnum = (typeof DepositAttemptScalarFieldEnum)[keyof typeof DepositAttemptScalarFieldEnum]
+
+
+export const DepositCreditRecoveryScalarFieldEnum = {
+  id: 'id',
+  depositAttemptId: 'depositAttemptId',
+  provider: 'provider',
+  status: 'status',
+  attempts: 'attempts',
+  availableAt: 'availableAt',
+  lockedAt: 'lockedAt',
+  processedAt: 'processedAt',
+  evidenceId: 'evidenceId',
+  lastError: 'lastError',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type DepositCreditRecoveryScalarFieldEnum = (typeof DepositCreditRecoveryScalarFieldEnum)[keyof typeof DepositCreditRecoveryScalarFieldEnum]
+
+
+export const DepositCreditEvidenceScalarFieldEnum = {
+  id: 'id',
+  recoveryId: 'recoveryId',
+  depositAttemptId: 'depositAttemptId',
+  source: 'source',
+  provider: 'provider',
+  providerSessionId: 'providerSessionId',
+  providerPaymentId: 'providerPaymentId',
+  providerChargeId: 'providerChargeId',
+  clientReferenceId: 'clientReferenceId',
+  checkoutStatus: 'checkoutStatus',
+  checkoutPaymentStatus: 'checkoutPaymentStatus',
+  checkoutMode: 'checkoutMode',
+  checkoutAmountTotalMinor: 'checkoutAmountTotalMinor',
+  checkoutCurrency: 'checkoutCurrency',
+  checkoutLivemode: 'checkoutLivemode',
+  checkoutMetadataAttemptId: 'checkoutMetadataAttemptId',
+  checkoutMetadataReference: 'checkoutMetadataReference',
+  checkoutMetadataWalletId: 'checkoutMetadataWalletId',
+  checkoutMetadataUserId: 'checkoutMetadataUserId',
+  checkoutMetadataOrgId: 'checkoutMetadataOrgId',
+  paymentIntentStatus: 'paymentIntentStatus',
+  paymentIntentAmountMinor: 'paymentIntentAmountMinor',
+  paymentIntentReceivedMinor: 'paymentIntentReceivedMinor',
+  paymentIntentCurrency: 'paymentIntentCurrency',
+  paymentIntentLivemode: 'paymentIntentLivemode',
+  paymentMetadataAttemptId: 'paymentMetadataAttemptId',
+  paymentMetadataReference: 'paymentMetadataReference',
+  paymentMetadataWalletId: 'paymentMetadataWalletId',
+  chargePaid: 'chargePaid',
+  chargeCaptured: 'chargeCaptured',
+  chargeRefunded: 'chargeRefunded',
+  chargeAmountMinor: 'chargeAmountMinor',
+  chargeAmountCapturedMinor: 'chargeAmountCapturedMinor',
+  chargeCurrency: 'chargeCurrency',
+  chargeLivemode: 'chargeLivemode',
+  evidenceFingerprint: 'evidenceFingerprint',
+  claimAttempt: 'claimAttempt',
+  claimLockedAt: 'claimLockedAt',
+  retrievedAt: 'retrievedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type DepositCreditEvidenceScalarFieldEnum = (typeof DepositCreditEvidenceScalarFieldEnum)[keyof typeof DepositCreditEvidenceScalarFieldEnum]
 
 
 export const PaymentProviderEventScalarFieldEnum = {

@@ -1,3 +1,9 @@
+import crypto from "node:crypto"
+import {
+  PayoutEncryptionService,
+  payoutMethodEncryptionContext,
+} from "../../../modules/publisher-payouts/payout-encryption.service"
+import { StaticPayoutEncryptionKeyProvider } from "../../../modules/publisher-payouts/payout-encryption-key-provider"
 import { makeOrganization, makePublisher, makeUser } from "../factories"
 import { createTestDatabase, type TestDatabase } from "../helpers/test-db"
 
@@ -16,6 +22,13 @@ interface WithdrawalFixture {
   payoutMethodId: string
   amount: number
 }
+
+const payoutEncryption = new PayoutEncryptionService(
+  new StaticPayoutEncryptionKeyProvider({
+    activeKeyId: "integration-v2",
+    keys: { "integration-v2": "a".repeat(64) },
+  }),
+)
 
 describe("[INTEGRATION] Financial — publisher withdrawal reservation", () => {
   let database: TestDatabase | undefined
@@ -108,13 +121,23 @@ describe("[INTEGRATION] Financial — publisher withdrawal reservation", () => {
         allocationCarryForwardUsed: 0,
       },
     })
+    const payoutMethodId = crypto.randomUUID()
+    const encrypted = payoutEncryption.encrypt(
+      { integrationFixture: true },
+      payoutMethodEncryptionContext({
+        id: payoutMethodId,
+        publisherId: publisher.id,
+        type: "bank_transfer",
+      }),
+    )
     const payoutMethod = await prisma.payoutMethod.create({
       data: {
+        id: payoutMethodId,
         publisherId: publisher.id,
         type: "bank_transfer",
         label: "Integration bank account",
-        details: "encrypted-test-placeholder",
-        encryptionKeyVersion: 1,
+        details: encrypted.ciphertext,
+        encryptionKeyVersion: encrypted.version,
         isDefault: true,
         isActive: true,
       },
@@ -410,6 +433,14 @@ describe("[INTEGRATION] Financial — publisher withdrawal reservation", () => {
             sequence: 0,
           },
         })
+        await tx.publisherBalance.update({
+          where: { publisherId: fixture.publisherId },
+          data: {
+            withdrawableBalance: { decrement: 9 },
+            allocationCarryForwardUsed: { increment: 9 },
+            version: { increment: 1 },
+          },
+        })
       }),
     ).rejects.toThrow(/exact active allocation coverage/)
   }, 30_000)
@@ -442,6 +473,14 @@ describe("[INTEGRATION] Financial — publisher withdrawal reservation", () => {
             amount: 1,
             currency: "USD",
             sequence: 1,
+          },
+        })
+        await tx.publisherBalance.update({
+          where: { publisherId: fixture.publisherId },
+          data: {
+            withdrawableBalance: { decrement: 1 },
+            allocationCarryForwardUsed: { increment: 1 },
+            version: { increment: 1 },
           },
         })
         notifyInsertLocked()

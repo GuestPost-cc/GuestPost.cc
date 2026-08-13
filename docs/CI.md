@@ -23,10 +23,15 @@ The `CI / build-and-test` check performs:
 7. API unit and database-backed integration tests
 8. Shared package and UI coverage tests
 9. A complete production build of every workspace target
+10. Chromium onboarding journeys against self-started API, customer, and
+    publisher processes backed by the migrated disposable CI database, Redis,
+    and an isolated MinIO readiness fixture
 
 The workflow has read-only repository permissions, does not persist checkout
 credentials, does not expose deployment secrets, pins third-party Actions and
-service images, cancels superseded runs, and has a 60-minute timeout.
+service images, cancels superseded runs, and has a 60-minute timeout. Browser
+failures retain a seven-day trace/screenshot/video artifact; the CI fixture ID
+is run- and retry-scoped and never targets a remote application origin.
 
 `pnpm deps:policy` reads `.github/dependency-policy.json`. It rejects mixed
 direct Sentry/TypeScript/PostCSS versions, multiple resolved ioredis or Smithy

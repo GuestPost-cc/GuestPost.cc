@@ -10,6 +10,7 @@ const at = (iso: string) => maintenanceTasksDueAt(new Date(iso))
 test("dispatches the ten and fifteen minute safety tasks", () => {
   assert.deepEqual(at("2026-07-20T12:00:00Z"), [
     "payment-dispute-inbox",
+    "deposit-credit-recovery",
     "delivery-verification-dispatch",
     "communication-outbox",
     "payout-reconcile",
@@ -19,12 +20,14 @@ test("dispatches the ten and fifteen minute safety tasks", () => {
   ])
   assert.deepEqual(at("2026-07-20T12:05:00Z"), [
     "payment-dispute-inbox",
+    "deposit-credit-recovery",
     "delivery-verification-dispatch",
     "communication-outbox",
     "settlement-auto-release",
   ])
   assert.deepEqual(at("2026-07-20T12:10:00Z"), [
     "payment-dispute-inbox",
+    "deposit-credit-recovery",
     "delivery-verification-dispatch",
     "communication-outbox",
     "payout-reconcile",
@@ -36,6 +39,7 @@ test("dispatches the ten and fifteen minute safety tasks", () => {
 test("uses the intended five-minute slot when a cold start is delayed", () => {
   assert.deepEqual(at("2026-07-20T12:12:59Z"), [
     "payment-dispute-inbox",
+    "deposit-credit-recovery",
     "delivery-verification-dispatch",
     "communication-outbox",
     "payout-reconcile",
@@ -47,6 +51,7 @@ test("uses the intended five-minute slot when a cold start is delayed", () => {
 test("dispatches hourly tasks only in their UTC slot", () => {
   assert.deepEqual(at("2026-07-20T12:20:00Z"), [
     "payment-dispute-inbox",
+    "deposit-credit-recovery",
     "delivery-verification-dispatch",
     "communication-outbox",
     "payout-reconcile",
@@ -55,6 +60,7 @@ test("dispatches hourly tasks only in their UTC slot", () => {
   ])
   assert.deepEqual(at("2026-07-20T12:30:00Z"), [
     "payment-dispute-inbox",
+    "deposit-credit-recovery",
     "delivery-verification-dispatch",
     "communication-outbox",
     "payout-reconcile",
@@ -67,6 +73,7 @@ test("dispatches hourly tasks only in their UTC slot", () => {
 test("dispatches daily verification governance and monthly metric refresh", () => {
   assert.deepEqual(at("2026-08-01T03:00:00Z"), [
     "payment-dispute-inbox",
+    "deposit-credit-recovery",
     "delivery-verification-dispatch",
     "communication-outbox",
     "payout-reconcile",
@@ -96,12 +103,20 @@ test("dispatches orphan delivery verification recovery in every five-minute slot
   }
 })
 
+test("dispatches authenticated deposit recovery in every five-minute slot", () => {
+  for (const minute of [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]) {
+    const iso = `2026-07-20T12:${String(minute).padStart(2, "0")}:00Z`
+    assert.equal(at(iso).includes("deposit-credit-recovery"), true)
+  }
+})
+
 test("recovery-only runs evidence recovery but blocks liability mutations", () => {
   const due = at("2026-07-20T12:00:00Z")
   assert.deepEqual(
     maintenanceTasksAllowedForFinanceMode(due, "recovery_only"),
     [
       "payment-dispute-inbox",
+      "deposit-credit-recovery",
       "communication-outbox",
       "payout-reconcile",
       "settlement-link-check",

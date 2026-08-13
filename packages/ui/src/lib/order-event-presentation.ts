@@ -26,7 +26,10 @@ export const ORDER_EVENT_PRESENTATION: Record<string, OrderEventPresentation> =
     ORDER_CANCELLED: { label: "Order cancelled" },
     REFUND_ISSUED: { label: "Refund issued" },
     SETTLEMENT_CREATED: { label: "Settlement created" },
-    SETTLED: { label: "Settlement completed" },
+    PLATFORM_REVENUE_RECOGNIZED: { label: "Platform revenue recognized" },
+    SETTLEMENT_CUSTOMER_APPROVED: { label: "Settlement customer-approved" },
+    SETTLEMENT_RETURNED_TO_REVIEW: { label: "Settlement returned to review" },
+    SETTLEMENT_RELEASED: { label: "Settlement funds released" },
     REFUNDED: { label: "Refund completed" },
     VERIFICATION_ESCALATED: { label: "Verification escalated" },
     AUTO_ACCEPTED: { label: "Auto-accepted" },
@@ -35,6 +38,9 @@ export const ORDER_EVENT_PRESENTATION: Record<string, OrderEventPresentation> =
     CANCELLATION_RESPONDED: { label: "Cancellation response recorded" },
     CANCELLATION_RESOLVED: { label: "Cancellation resolved" },
     ORDER_DECLINED: { label: "Order declined" },
+    PUBLISHER_COMPENSATION_RECORDED: {
+      label: "Publisher compensation recorded",
+    },
   }
 
 export function getOrderEventPresentation(

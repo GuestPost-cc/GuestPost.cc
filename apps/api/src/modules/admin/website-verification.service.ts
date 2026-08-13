@@ -133,7 +133,7 @@ export class WebsiteVerificationService {
       this.prisma.order.count({
         where: {
           websiteId,
-          status: { in: ["DELIVERED", "SETTLED", "COMPLETED"] },
+          status: { in: ["DELIVERED", "COMPLETED"] },
         },
       }),
       this.prisma.orderDispute.count({ where: { order: { websiteId } } }),

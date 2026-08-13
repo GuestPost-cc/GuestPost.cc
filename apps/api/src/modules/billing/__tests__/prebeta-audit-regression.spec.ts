@@ -100,13 +100,16 @@ function makePrismaMock() {
   // Tracks whether the interactive transaction COMMITTED (callback resolved)
   // or ROLLED BACK (callback rejected) — the heart of the F-1/F-6 assertions.
   mock.__committed = null
+  mock.__transactionOutcomes = []
   mock.$transaction = jest.fn().mockImplementation(async (cb: any) => {
     try {
       const result = await cb(mock)
       mock.__committed = true
+      mock.__transactionOutcomes.push(true)
       return result
     } catch (err) {
       mock.__committed = false
+      mock.__transactionOutcomes.push(false)
       throw err
     }
   })
@@ -173,17 +176,26 @@ describe("F-1: deposit webhook double-credit race", () => {
     prisma = makePrismaMock()
     audit = auditMock()
     service = new BillingService(prisma, audit as any)
-    prisma.depositAttempt.findFirst.mockResolvedValue(attempt)
+    prisma.depositAttempt.findMany.mockResolvedValue([attempt])
+    prisma.depositAttempt.findUniqueOrThrow.mockResolvedValue(attempt)
+    prisma.paymentProviderEvent.findUnique.mockResolvedValue(providerEvent)
   })
 
+  const lockedAt = new Date("2026-07-29T00:00:00.000Z")
+  const lease = { kind: "lease", attempt: 1, lockedAt }
   const session = {
     id: "cs_test_123",
+    client_reference_id: "attempt-1",
+    status: "complete",
     amount_total: 25050, // $250.50
     currency: "usd",
     payment_status: "paid",
+    mode: "payment",
+    livemode: false,
     payment_intent: "pi_test_456",
     metadata: {
       depositAttemptId: "attempt-1",
+      publicReference: "DP-TEST-1",
       walletId: "wallet-1",
       organizationId: "org-1",
       userId: "user-1",
@@ -194,13 +206,30 @@ describe("F-1: deposit webhook double-credit race", () => {
     publicReference: "DP-TEST-1",
     walletId: "wallet-1",
     organizationId: "org-1",
+    createdByUserId: "user-1",
     provider: "stripe",
     providerSessionId: "cs_test_123",
     providerPaymentId: null,
+    providerChargeId: null,
     amount: new Decimal("250.50"),
     walletCredit: new Decimal("250.50"),
+    customerFee: new Decimal(0),
     currency: "USD",
     status: "PROCESSING",
+    ledgerTransactionId: null,
+  }
+  const providerEvent = {
+    id: "provider-event-credit",
+    provider: "stripe",
+    providerEventId: "evt_credit",
+    eventType: "checkout.session.completed",
+    objectId: "cs_test_123",
+    livemode: false,
+    status: "PROCESSING",
+    attempts: 1,
+    lockedAt,
+    processedAt: null,
+    depositAttemptId: null,
   }
   const exactReplay = {
     id: "t-1",
@@ -220,14 +249,19 @@ describe("F-1: deposit webhook double-credit race", () => {
   }
 
   it("commits exactly one wallet increment with the ledger row (happy path)", async () => {
-    prisma.transaction.findFirst.mockResolvedValue(null)
     prisma.wallet.findUniqueOrThrow.mockResolvedValue({
       id: "wallet-1",
       version: 3,
       currency: "USD",
     })
+    prisma.transaction.findMany.mockResolvedValue([])
 
-    await (service as any).processSuccessfulPayment(session)
+    await (service as any).processSuccessfulPayment(
+      session,
+      providerEvent.id,
+      lease,
+      false,
+    )
 
     expect(prisma.__committed).toBe(true)
     expect(prisma.wallet.updateMany).toHaveBeenCalledWith(
@@ -252,8 +286,7 @@ describe("F-1: deposit webhook double-credit race", () => {
     })
   })
 
-  it("ROLLS BACK the wallet increment when the ledger insert hits P2002 (duplicate race)", async () => {
-    prisma.transaction.findFirst.mockResolvedValue(null) // fast path passes — race window
+  it("aborts on a ledger P2002 and acknowledges only the exact race winner", async () => {
     prisma.wallet.findUniqueOrThrow.mockResolvedValue({
       id: "wallet-1",
       version: 3,
@@ -262,48 +295,92 @@ describe("F-1: deposit webhook double-credit race", () => {
     prisma.transaction.create.mockRejectedValue(
       Object.assign(new Error("unique"), { code: "P2002" }),
     )
-    prisma.transaction.findMany.mockResolvedValue([exactReplay])
+    prisma.transaction.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([exactReplay])
+    prisma.depositAttempt.findMany
+      .mockResolvedValueOnce([attempt])
+      .mockResolvedValue([exactReplay.depositAttempt])
+    prisma.depositAttempt.findUniqueOrThrow
+      .mockResolvedValueOnce(attempt)
+      .mockResolvedValue(exactReplay.depositAttempt)
 
-    // Service swallows the duplicate (webhook returns 200 so Stripe stops retrying)…
+    // The first serializable transaction must abort. A retry may acknowledge
+    // only after re-reading the winner's exact ledger-and-attempt evidence.
     await expect(
-      (service as any).processSuccessfulPayment(session),
+      (service as any).processSuccessfulPayment(
+        session,
+        providerEvent.id,
+        lease,
+        false,
+      ),
     ).resolves.toBeUndefined()
 
-    // …but the transaction itself must have ABORTED: the previous behavior
-    // caught P2002 inside the callback and returned, committing the wallet
-    // increment without a ledger row.
-    expect(prisma.__committed).toBe(false)
+    expect(prisma.__transactionOutcomes).toEqual([false, true])
+    // Ledger creation precedes the wallet increment, so the losing writer
+    // never reaches a balance mutation before its transaction aborts.
+    expect(prisma.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prisma.paymentProviderEvent.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: providerEvent.id,
+        status: "PROCESSING",
+        attempts: 1,
+        lockedAt,
+      },
+      data: expect.objectContaining({
+        status: "PROCESSED",
+        depositAttemptId: attempt.id,
+      }),
+    })
   })
 
-  it("rolls back when the fast-path dedupe finds an existing ledger row", async () => {
-    prisma.transaction.findFirst.mockResolvedValue({
-      id: "t-1",
-      reference: "cs_test_123",
-    })
+  it("commits only the inbox acknowledgement for an exact replay", async () => {
     prisma.transaction.findMany.mockResolvedValue([exactReplay])
+    prisma.depositAttempt.findMany.mockResolvedValue([
+      exactReplay.depositAttempt,
+    ])
+    prisma.depositAttempt.findUniqueOrThrow.mockResolvedValue(
+      exactReplay.depositAttempt,
+    )
+    prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      id: "wallet-1",
+      version: 4,
+      currency: "USD",
+    })
 
     await expect(
-      (service as any).processSuccessfulPayment(session),
+      (service as any).processSuccessfulPayment(
+        session,
+        providerEvent.id,
+        lease,
+        false,
+      ),
     ).resolves.toBeUndefined()
-    expect(prisma.__committed).toBe(false)
+    expect(prisma.__transactionOutcomes).toEqual([true])
     expect(prisma.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prisma.transaction.create).not.toHaveBeenCalled()
   })
 
   it("marks an exact ledger-and-attempt replay processed", async () => {
-    const lockedAt = new Date("2026-07-29T00:00:00.000Z")
-    const lease = { kind: "lease", attempt: 1, lockedAt }
-    prisma.transaction.findFirst.mockResolvedValue(null)
+    prisma.depositAttempt.findMany.mockResolvedValue([
+      exactReplay.depositAttempt,
+    ])
+    prisma.depositAttempt.findUniqueOrThrow.mockResolvedValue(
+      exactReplay.depositAttempt,
+    )
     prisma.wallet.findUniqueOrThrow.mockResolvedValue({
       id: "wallet-1",
       version: 3,
       currency: "USD",
     })
-    prisma.transaction.create.mockRejectedValue(
-      Object.assign(new Error("unique"), { code: "P2002" }),
-    )
     prisma.transaction.findMany.mockResolvedValue([exactReplay])
     prisma.paymentProviderEvent.findUnique.mockResolvedValue({
       id: "provider-event-exact",
+      provider: "stripe",
+      providerEventId: "evt_exact",
+      eventType: "checkout.session.completed",
+      objectId: session.id,
+      livemode: false,
       status: "PROCESSING",
       attempts: 1,
       lockedAt,
@@ -315,6 +392,7 @@ describe("F-1: deposit webhook double-credit race", () => {
         session,
         "provider-event-exact",
         lease,
+        false,
       ),
     ).resolves.toBeUndefined()
 
@@ -347,7 +425,6 @@ describe("F-1: deposit webhook double-credit race", () => {
   ])("quarantines a duplicate-key %s mismatch after rollback", async (_name, candidateOverride) => {
     const lockedAt = new Date("2026-07-29T00:00:00.000Z")
     const lease = { kind: "lease", attempt: 1, lockedAt }
-    prisma.transaction.findFirst.mockResolvedValue(null)
     prisma.wallet.findUniqueOrThrow.mockResolvedValue({
       id: "wallet-1",
       version: 3,
@@ -356,14 +433,22 @@ describe("F-1: deposit webhook double-credit race", () => {
     prisma.transaction.create.mockRejectedValue(
       Object.assign(new Error("unique"), { code: "P2002" }),
     )
-    prisma.transaction.findMany.mockResolvedValue([
-      { ...exactReplay, ...candidateOverride },
-    ])
+    prisma.transaction.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([{ ...exactReplay, ...candidateOverride }])
+    prisma.depositAttempt.findMany
+      .mockResolvedValueOnce([attempt])
+      .mockResolvedValue([exactReplay.depositAttempt])
+    prisma.depositAttempt.findUniqueOrThrow
+      .mockResolvedValueOnce(attempt)
+      .mockResolvedValue(exactReplay.depositAttempt)
     prisma.paymentProviderEvent.findUnique.mockResolvedValue({
       id: "provider-event-collision",
       provider: "stripe",
       providerEventId: "evt_collision",
       eventType: "checkout.session.completed",
+      objectId: session.id,
+      livemode: false,
       status: "PROCESSING",
       attempts: 1,
       lockedAt,
@@ -375,6 +460,7 @@ describe("F-1: deposit webhook double-credit race", () => {
         session,
         "provider-event-collision",
         lease,
+        false,
       ),
     ).resolves.toBeUndefined()
 
@@ -402,11 +488,16 @@ describe("F-1: deposit webhook double-credit race", () => {
 
   it("never credits a Checkout session unless Stripe explicitly marks it paid", async () => {
     await expect(
-      (service as any).processSuccessfulPayment({
-        ...session,
-        id: "cs_test_unpaid",
-        payment_status: "unpaid",
-      }),
+      (service as any).processSuccessfulPayment(
+        {
+          ...session,
+          id: "cs_test_unpaid",
+          payment_status: "unpaid",
+        },
+        providerEvent.id,
+        lease,
+        false,
+      ),
     ).rejects.toThrow(/not paid/i)
 
     expect(prisma.wallet.updateMany).not.toHaveBeenCalled()
@@ -1147,14 +1238,14 @@ describe("F-2: payout webhook normalization (real provider shapes)", () => {
     expect(n.rawStatus).toBe("outgoing_payment_sent")
   })
 
-  it("maps the unwrapped inner Wise data the webhook controller enqueues", () => {
+  it("fails closed for the non-official Wise completed state", () => {
     const inner = {
       resource: { id: 99, type: "transfer" },
       current_state: "completed",
     }
     const n = normalizeProviderWebhook("wise", inner)
     expect(n.providerExecutionId).toBe("99")
-    expect(n.status).toBe("COMPLETED")
+    expect(n.status).toBeNull()
   })
 
   it("maps Wise cancelled to FAILED", () => {

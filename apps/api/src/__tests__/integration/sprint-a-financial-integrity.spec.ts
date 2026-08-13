@@ -1,21 +1,25 @@
 import crypto from "node:crypto"
+import {
+  CancellationReasonCode,
+  CancellationResponsibility,
+} from "@guestpost/database"
 import { BadRequestException } from "@nestjs/common"
 import { makeUser } from "./factories"
 import { setupFinancialTest } from "./factories/financial-fixture"
 import { createTestApp } from "./helpers/create-test-app"
 
 describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
-  // ─── C-3 TOCTOU: concurrent adminApprove + refundOrder ──────────────
-  it("C-3: concurrent adminApprove + refundOrder — exactly one succeeds", async () => {
+  // ─── C-3 TOCTOU: concurrent release + emergency force-cancel ───────
+  it("C-3: serializes settlement release against emergency force-cancel", async () => {
     const { app, prisma, cleanup } = await createTestApp()
     try {
       const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
       const { SettlementsService } =
         require("../../modules/settlements/settlements.service") as any
       const settlements: any = app.get(SettlementsService)
-      const { RefundService } =
-        require("../../modules/orders/services/refund.service") as any
-      const refunds: any = app.get(RefundService)
+      const { OrderCancellationService } =
+        require("../../modules/orders/services/order-cancellation.service") as any
+      const cancellations: any = app.get(OrderCancellationService)
 
       // Create settlement + customer-approve it
       const settlement = await settlements.createSettlement(
@@ -31,7 +35,13 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         "OWNER",
       )
 
-      // Fire approve + refund concurrently
+      const orderBeforeRace = await prisma.order.findUniqueOrThrow({
+        where: { id: ctx.order.id },
+      })
+
+      // Fire the ordinary release and the emergency refund command at the same
+      // time. Either ordering is legal; the final accounting chain must be the
+      // same and the publisher may be credited exactly once.
       const results = await Promise.allSettled([
         settlements.adminApprove(
           settlement.id,
@@ -39,21 +49,30 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
           ctx.customer.user.id,
           "SUPER_ADMIN",
         ),
-        refunds.refundOrder(
-          ctx.order.id,
-          "Customer refund test",
-          ctx.customer.user.id,
-          undefined,
-          { responsibility: "SYSTEM" },
-        ),
+        cancellations.forceCancel(ctx.order.id, ctx.customer.user.id, {
+          reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
+          note: "Verified system emergency requiring an immediate refund.",
+          expectedVersion: orderBeforeRace.version,
+          confirmationOrderId: ctx.order.id,
+          responsibility: CancellationResponsibility.SYSTEM,
+          publisherCompensation: {
+            amount: 80,
+            reason:
+              "Publisher delivery remains payable if the system-attributed refund wins the race.",
+          },
+        }),
       ])
 
-      // At least one succeeded; at most one succeeded
+      // Force-cancel is the terminal command and must eventually succeed. The
+      // release may win first (then be clawed back) or lose to cancellation.
       const fulfilled = results.filter((r) => r.status === "fulfilled")
       expect(fulfilled.length).toBeGreaterThanOrEqual(1)
       expect(fulfilled.length).toBeLessThanOrEqual(2)
+      expect(results[1].status).toBe("fulfilled")
 
-      // Verify no contradictory states
+      // Verify one coherent terminal chain, regardless of lock acquisition
+      // order: refund + explicit compensation, never a live released
+      // settlement alongside a refunded order.
       const finalSettlement = await prisma.settlement.findUnique({
         where: { id: settlement.id },
       })
@@ -61,14 +80,34 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         where: { id: ctx.order.id },
       })
 
-      if (finalSettlement?.status === "RELEASED") {
-        // Settlement released means refund did NOT go through
-        expect(order.status).not.toBe("REFUNDED")
-      }
-      if (order?.status === "REFUNDED") {
-        // Refund succeeded means settlement was NOT released
-        expect(finalSettlement?.status).not.toBe("RELEASED")
-      }
+      expect(order?.status).toBe("REFUNDED")
+      expect(finalSettlement?.status).toBe("CANCELLED")
+
+      const [releaseCount, refundCount, compensationCount, balance, wallet] =
+        await Promise.all([
+          prisma.transaction.count({
+            where: { orderId: ctx.order.id, type: "SETTLEMENT_RELEASE" },
+          }),
+          prisma.transaction.count({
+            where: { orderId: ctx.order.id, type: "REFUND" },
+          }),
+          prisma.transaction.count({
+            where: { orderId: ctx.order.id, type: "PUBLISHER_COMPENSATION" },
+          }),
+          prisma.publisherBalance.findUniqueOrThrow({
+            where: { publisherId: ctx.publisher.publisher.id },
+          }),
+          prisma.wallet.findUniqueOrThrow({
+            where: { organizationId: ctx.organization.id },
+          }),
+        ])
+      expect(releaseCount).toBeLessThanOrEqual(1)
+      expect(refundCount).toBe(1)
+      expect(compensationCount).toBe(1)
+      expect(Number(balance.withdrawableBalance)).toBe(80)
+      expect(Number(balance.debtBalance)).toBe(0)
+      expect(Number(balance.lifetimeEarnings)).toBe(80)
+      expect(Number(wallet.availableBalance)).toBe(100)
     } finally {
       await cleanup()
     }
@@ -225,23 +264,25 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         },
       )
 
-      // Model the state after a legitimate 50 USD reservation: the
-      // withdrawable balance is already reduced and an immutable allocation
-      // exactly covers the APPROVED withdrawal.
+      // Establish bounded legacy capacity first. The active carry allocation
+      // and its used projection are committed together below; neither side is
+      // valid evidence on its own.
       await prisma.publisherBalance.upsert({
         where: { publisherId: ctx.publisher.publisher.id },
         create: {
           publisherId: ctx.publisher.publisher.id,
-          withdrawableBalance: 50,
+          withdrawableBalance: 100,
           debtBalance: 50,
+          allocationCutoverAt: new Date(),
           allocationCarryForward: 100,
-          allocationCarryForwardUsed: 50,
+          allocationCarryForwardUsed: 0,
         },
         update: {
-          withdrawableBalance: 50,
+          withdrawableBalance: 100,
           debtBalance: 50,
+          allocationCutoverAt: new Date(),
           allocationCarryForward: 100,
-          allocationCarryForwardUsed: 50,
+          allocationCarryForwardUsed: 0,
         },
       })
 
@@ -285,6 +326,14 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
             amount: 50,
             currency: "USD",
             sequence: 0,
+          },
+        })
+        await tx.publisherBalance.update({
+          where: { publisherId: ctx.publisher.publisher.id },
+          data: {
+            withdrawableBalance: { decrement: 50 },
+            allocationCarryForwardUsed: { increment: 50 },
+            version: { increment: 1 },
           },
         })
         return created

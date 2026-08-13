@@ -13,6 +13,8 @@ import {
   DialogTitle,
   ErrorState,
   getDisputeStatusPresentation,
+  Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -72,11 +74,17 @@ export default function DisputesPage() {
   const [resolveTarget, setResolveTarget] = useState<{
     id: string
     action: ResolveAction
+    publisherCompensationRequired?: boolean
+    publisherCompensationMaximum?: number
   } | null>(null)
   const [reason, setReason] = useState("")
   const [responsibility, setResponsibility] = useState<
     RefundResponsibility | ""
   >("")
+  const [publisherCompensationAmount, setPublisherCompensationAmount] =
+    useState("")
+  const [publisherCompensationReason, setPublisherCompensationReason] =
+    useState("")
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["admin", "disputes", status],
@@ -102,17 +110,28 @@ export default function DisputesPage() {
       action,
       resolution,
       responsibility,
+      publisherCompensation,
     }: {
       id: string
       action: ResolveAction
       resolution: string
       responsibility?: RefundResponsibility
-    }) => api.admin.resolveDispute(id, action, resolution, responsibility),
+      publisherCompensation?: { amount: number; reason: string }
+    }) =>
+      api.admin.resolveDispute(
+        id,
+        action,
+        resolution,
+        responsibility,
+        publisherCompensation,
+      ),
     onSuccess: () => {
       toast.success("Dispute resolved")
       setResolveTarget(null)
       setReason("")
       setResponsibility("")
+      setPublisherCompensationAmount("")
+      setPublisherCompensationReason("")
       refresh()
       qc.invalidateQueries({ queryKey: ["admin", "orders"] })
     },
@@ -316,6 +335,12 @@ export default function DisputesPage() {
                                       setResolveTarget({
                                         id: d.id,
                                         action: "REFUND",
+                                        publisherCompensationRequired:
+                                          d.order?.publisherCompensationPolicy
+                                            ?.required === true,
+                                        publisherCompensationMaximum:
+                                          d.order?.publisherCompensationPolicy
+                                            ?.maximumAmount ?? 0,
                                       })
                                     }
                                   >
@@ -358,6 +383,8 @@ export default function DisputesPage() {
             setResolveTarget(null)
             setReason("")
             setResponsibility("")
+            setPublisherCompensationAmount("")
+            setPublisherCompensationReason("")
           }
         }}
       >
@@ -403,6 +430,52 @@ export default function DisputesPage() {
               </SelectContent>
             </Select>
           )}
+          {resolveTarget?.action === "REFUND" &&
+            resolveTarget.publisherCompensationRequired &&
+            responsibility !== "PUBLISHER" && (
+              <div className="space-y-4 rounded-md border p-4">
+                <p className="text-sm font-medium">
+                  Publisher compensation decision
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Publication work may already have been performed. Record the
+                  exact platform-funded amount owed to the publisher; zero must
+                  be an explicit reviewed decision.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="dispute-publisher-compensation">
+                    Compensation amount (USD)
+                  </Label>
+                  <Input
+                    id="dispute-publisher-compensation"
+                    type="number"
+                    min="0"
+                    max={resolveTarget.publisherCompensationMaximum ?? 0}
+                    step="0.01"
+                    inputMode="decimal"
+                    value={publisherCompensationAmount}
+                    onChange={(event) =>
+                      setPublisherCompensationAmount(event.target.value)
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dispute-publisher-compensation-reason">
+                    Compensation reason
+                  </Label>
+                  <Textarea
+                    id="dispute-publisher-compensation-reason"
+                    value={publisherCompensationReason}
+                    onChange={(event) =>
+                      setPublisherCompensationReason(event.target.value)
+                    }
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="Explain why this exact compensation amount is appropriate..."
+                  />
+                </div>
+              </div>
+            )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -410,6 +483,8 @@ export default function DisputesPage() {
                 setResolveTarget(null)
                 setReason("")
                 setResponsibility("")
+                setPublisherCompensationAmount("")
+                setPublisherCompensationReason("")
               }}
             >
               Cancel
@@ -418,7 +493,19 @@ export default function DisputesPage() {
               disabled={
                 resolve.isPending ||
                 reason.trim().length < 10 ||
-                (resolveTarget?.action === "REFUND" && !responsibility)
+                (resolveTarget?.action === "REFUND" && !responsibility) ||
+                (resolveTarget?.action === "REFUND" &&
+                  resolveTarget.publisherCompensationRequired &&
+                  responsibility !== "PUBLISHER" &&
+                  (publisherCompensationAmount.trim() === "" ||
+                    !/^\d+(?:\.\d{1,2})?$/.test(
+                      publisherCompensationAmount.trim(),
+                    ) ||
+                    !Number.isFinite(Number(publisherCompensationAmount)) ||
+                    Number(publisherCompensationAmount) < 0 ||
+                    Number(publisherCompensationAmount) >
+                      (resolveTarget.publisherCompensationMaximum ?? 0) ||
+                    publisherCompensationReason.trim().length < 20))
               }
               onClick={() =>
                 resolveTarget &&
@@ -429,6 +516,15 @@ export default function DisputesPage() {
                   responsibility:
                     resolveTarget.action === "REFUND" && responsibility
                       ? responsibility
+                      : undefined,
+                  publisherCompensation:
+                    resolveTarget.action === "REFUND" &&
+                    resolveTarget.publisherCompensationRequired &&
+                    responsibility !== "PUBLISHER"
+                      ? {
+                          amount: Number(publisherCompensationAmount),
+                          reason: publisherCompensationReason.trim(),
+                        }
                       : undefined,
                 })
               }

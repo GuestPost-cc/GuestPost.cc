@@ -27,7 +27,7 @@ export const PUBLISHER_ORDER_STAGE_GROUPS = [
   {
     key: "delivered",
     label: "Delivered",
-    statuses: ["DELIVERED", "SETTLED", "COMPLETED"],
+    statuses: ["DELIVERED", "COMPLETED"],
   },
   {
     key: "closed",
@@ -45,12 +45,7 @@ const ATTENTION_STATUSES = new Set([
   "DISPUTED",
 ])
 
-const CLOSED_STATUSES = new Set([
-  "COMPLETED",
-  "CANCELLED",
-  "REFUNDED",
-  "SETTLED",
-])
+const CLOSED_STATUSES = new Set(["COMPLETED", "CANCELLED", "REFUNDED"])
 
 export function getPublisherOrderStage(status: string) {
   return (

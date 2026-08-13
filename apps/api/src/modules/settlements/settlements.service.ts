@@ -325,6 +325,7 @@ export class SettlementsService {
         await tx.orderEvent.create({
           data: {
             orderId,
+            settlementId: settlement.id,
             eventType: "SETTLEMENT_CREATED",
             actorId: userId,
             message: `Settlement created — customer amount: ${grossAmount}, publisher amount: ${publisherAmount}`,
@@ -396,6 +397,62 @@ export class SettlementsService {
       )
     }
     return settlement
+  }
+
+  /**
+   * Read-only advisory snapshot for Finance UI. The approval/release mutation
+   * deliberately re-evaluates the same rules under the Order lock; this GET
+   * never refreshes URL-reuse evidence or creates fraud state.
+   */
+  async getSettlementEligibility(id: string) {
+    const evaluated = await this.prisma.$transaction(
+      async (tx: any) => {
+        const settlement = await tx.settlement.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            orderId: true,
+            status: true,
+            version: true,
+          },
+        })
+        if (!settlement) throw new NotFoundException("Settlement not found")
+        const snapshot = await buildSettlementEligibilitySnapshot(
+          tx,
+          settlement.orderId,
+        )
+        return {
+          settlement,
+          snapshot,
+          eligibility: evaluateSettlementEligibility(snapshot),
+        }
+      },
+      { isolationLevel: "RepeatableRead" },
+    )
+
+    return {
+      settlement: evaluated.settlement,
+      order: {
+        id: evaluated.settlement.orderId,
+        status: evaluated.snapshot.orderStatus,
+        version: evaluated.snapshot.orderVersion,
+      },
+      eligible: evaluated.eligibility.eligible,
+      blockers: evaluated.eligibility.blockers,
+      activeDelivery: evaluated.snapshot.activeDeliveryVersionId
+        ? {
+            id: evaluated.snapshot.activeDeliveryVersionId,
+            belongsToOrder: evaluated.snapshot.activeDeliveryMatchesOrder,
+            current: evaluated.snapshot.activeDeliveryIsCurrent,
+            verificationStatus:
+              evaluated.snapshot.activeDeliveryVerificationStatus,
+            interventionStatus:
+              evaluated.snapshot.activeDeliveryInterventionStatus,
+          }
+        : null,
+      evaluatedAt: new Date().toISOString(),
+      mutationRechecksUnderLock: true,
+    }
   }
 
   async listSettlements(
@@ -538,7 +595,8 @@ export class SettlementsService {
         await tx.orderEvent.create({
           data: {
             orderId: settlement.orderId,
-            eventType: "SETTLED",
+            settlementId: id,
+            eventType: "SETTLEMENT_CUSTOMER_APPROVED",
             actorId: userId,
             message: `Settlement customer-approved`,
             metadata: {
@@ -1196,7 +1254,8 @@ export class SettlementsService {
       await tx.orderEvent.create({
         data: {
           orderId: settlement.orderId,
-          eventType: "SETTLED",
+          settlementId: id,
+          eventType: "SETTLEMENT_RETURNED_TO_REVIEW",
           actorId: userId,
           message: `Settlement returned to review: ${reason}`,
           metadata: revoked
@@ -1299,6 +1358,21 @@ export class SettlementsService {
       }
     }
 
+    // Follow the aggregate lock order documented by the payout domain:
+    // Settlement (already locked by the approval CAS) -> PublisherBalance.
+    // Acquire the money row before recording the terminal release state so the
+    // code order mirrors the financial effect, even though both roll back as
+    // one transaction on any later failure.
+    const balance = await lockPublisherBalanceForUpdate(
+      tx,
+      settlement.publisherId,
+    )
+    if (balance && balance.currency !== "USD") {
+      throw new BadRequestException(
+        "Publisher balance currency must be exactly USD",
+      )
+    }
+
     // Prevent duplicate release: only release if status is ADMIN_APPROVED and version matches
     const released = await tx.settlement.updateMany({
       where: {
@@ -1316,16 +1390,6 @@ export class SettlementsService {
     if (released.count === 0) {
       throw new ConflictException(
         "Settlement was already released or modified by another request",
-      )
-    }
-
-    const balance = await lockPublisherBalanceForUpdate(
-      tx,
-      settlement.publisherId,
-    )
-    if (balance && balance.currency !== "USD") {
-      throw new BadRequestException(
-        "Publisher balance currency must be exactly USD",
       )
     }
 
@@ -1360,9 +1424,10 @@ export class SettlementsService {
       checkPublisherBalanceInvariant(
         {
           ...balance,
-          withdrawableBalance:
-            Number(balance.withdrawableBalance) + Number(credited),
-          debtBalance: Number(balance.debtBalance ?? 0) - Number(debtApplied),
+          withdrawableBalance: new Decimal(balance.withdrawableBalance).plus(
+            credited,
+          ),
+          debtBalance: new Decimal(balance.debtBalance ?? 0).minus(debtApplied),
         },
         this.logger,
         "releaseFundsInternal",
@@ -1444,7 +1509,8 @@ export class SettlementsService {
     await tx.orderEvent.create({
       data: {
         orderId: settlement.orderId,
-        eventType: "SETTLED",
+        settlementId,
+        eventType: "SETTLEMENT_RELEASED",
         actorId: userId,
         message: debtApplied.greaterThan(0)
           ? `Settlement released — ${debtApplied.toFixed(2)} applied to publisher debt and ${credited.toFixed(2)} added to withdrawable balance`

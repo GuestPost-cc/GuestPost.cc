@@ -470,28 +470,25 @@ describe("Provider adapters — idempotency and production safety", () => {
     )
   })
 
-  it("Wise adapter sends customerTransactionId to the API", async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ id: 123, fee: { amount: 1 } }),
-    })
+  it("keeps the uncertified Wise adapter fail-closed before network I/O", async () => {
+    const fetchMock = jest.fn()
     global.fetch = fetchMock as any
 
     const adapter = new WisePayoutAdapter()
-    await adapter.createTransfer({
-      amount: 100,
-      currency: "usd",
-      recipientDetails: { recipientId: "r-1" },
-      providerConfig: { apiKey: "wise-key" },
-      idempotencyKey: "payout-wd-1-v0",
-      description: "test",
-    })
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(body.customerTransactionId).toBe(
-      idempotencyKeyToUuid("payout-wd-1-v0"),
-    )
-    expect(body.idempotencyKey).toBeUndefined()
+    await expect(
+      adapter.createTransfer({
+        amount: 100,
+        currency: "usd",
+        recipientDetails: { recipientId: "r-1" },
+        providerConfig: { apiKey: "wise-key" },
+        idempotencyKey: "payout-wd-1-v0",
+        description: "test",
+      }),
+    ).rejects.toThrow(/disabled until.*certified/i)
+    await expect(
+      adapter.validateRecipient({ recipientId: "r-1" }),
+    ).resolves.toMatchObject({ valid: false })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it("Stripe adapter sends the Idempotency-Key header, not a body field", async () => {
@@ -777,20 +774,16 @@ describe("Provider adapters — idempotency and production safety", () => {
       description: "",
     }
 
-    await expect(wise.createTransfer(params as any)).rejects.toThrow(
-      /WISE_API_KEY/,
-    )
+    await expect(wise.createTransfer(params as any)).rejects.toThrow(/disabled/)
     await expect(stripe.createTransfer(params as any)).rejects.toThrow(
       /disabled/,
     )
-    await expect(wise.checkTransferStatus("t-1")).rejects.toThrow(
-      /WISE_API_KEY/,
-    )
+    await expect(wise.checkTransferStatus("t-1")).rejects.toThrow(/disabled/)
     await expect(stripe.checkTransferStatus("tr_1")).resolves.toMatchObject({
       status: "PROCESSING",
     })
     await expect(wise.cancelTransfer("t-1", "test-key")).rejects.toThrow(
-      /WISE_API_KEY/,
+      /disabled/,
     )
     await expect(stripe.cancelTransfer("tr_1", "test-key")).rejects.toThrow(
       /required for recovery/,

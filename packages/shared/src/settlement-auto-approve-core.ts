@@ -218,7 +218,8 @@ export async function runSettlementAutoApprove(
           await tx.orderEvent.create({
             data: {
               orderId: settlement.orderId,
-              eventType: "SETTLED",
+              settlementId: settlement.id,
+              eventType: "SETTLEMENT_CUSTOMER_APPROVED",
               actorId: null,
               message: `Settlement auto-approved — review window ended ${settlement.reviewEndsAt?.toISOString()}`,
               metadata: { settlementId: settlement.id, auto: true },

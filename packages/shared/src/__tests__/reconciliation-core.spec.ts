@@ -48,8 +48,17 @@ describe("ReconciliationCode enum", () => {
     expect(ReconciliationCode.SETTLEMENT_ORDER_COMPLETED_NONE).toBe(
       "SETTLEMENT_ORDER_COMPLETED_NONE",
     )
+    expect(
+      ReconciliationCode.SETTLEMENT_ORDER_COMPLETED_RELEASE_EVENT_INVALID,
+    ).toBe("SETTLEMENT_ORDER_COMPLETED_RELEASE_EVENT_INVALID")
     expect(ReconciliationCode.PAYMENT_UNMATCHED).toBe("PAYMENT_UNMATCHED")
+    expect(ReconciliationCode.PAYMENT_RESERVATION_RELEASE_INVALID).toBe(
+      "PAYMENT_RESERVATION_RELEASE_INVALID",
+    )
     expect(ReconciliationCode.REFUND_DUPLICATE).toBe("REFUND_DUPLICATE")
+    expect(ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_MISSING).toBe(
+      "REFUND_PUBLISHER_COMPENSATION_MISSING",
+    )
     expect(ReconciliationCode.PAYOUT_STALE_PROCESSING).toBe(
       "PAYOUT_STALE_PROCESSING",
     )
@@ -122,6 +131,71 @@ describe("runReconciliation with mock prisma", () => {
     expect(report.walletDrift[0].entityId).toBe("wallet-1")
   })
 
+  it("excludes reservation bucket transfers from wallet cash parity", async () => {
+    const prisma = mockPrisma()
+    prisma.wallet.findMany.mockResolvedValue([
+      {
+        id: "wallet-1",
+        organizationId: "org-1",
+        availableBalance: "100.00",
+        reservedBalance: "0.00",
+      },
+    ])
+    prisma.transaction.groupBy.mockResolvedValue([
+      { walletId: "wallet-1", type: "DEPOSIT", _sum: { amount: 100 } },
+      { walletId: "wallet-1", type: "RESERVATION", _sum: { amount: -40 } },
+      { walletId: "wallet-1", type: "RELEASE", _sum: { amount: 40 } },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(report.walletDrift).toEqual([])
+  })
+
+  it("detects a cancelled reservation with no release evidence", async () => {
+    const prisma = mockPrisma()
+    prisma.order.findMany.mockImplementation(async ({ where }: any) => {
+      if (where?.status !== "CANCELLED") return []
+      return [
+        {
+          id: "order-reserved",
+          status: "CANCELLED",
+          paymentStatus: "PENDING",
+          amount: "40.00",
+          currency: "USD",
+          organizationId: "org-1",
+          transactions: [
+            {
+              id: "reservation-1",
+              type: "RESERVATION",
+              amount: "-40.00",
+              currency: "USD",
+              reference: null,
+              walletId: "wallet-1",
+              publisherId: null,
+              settlementId: null,
+              provider: null,
+              providerRef: null,
+              wallet: { organizationId: "org-1" },
+            },
+          ],
+          events: [],
+        },
+      ]
+    })
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(report.orderPaymentRecon).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "PAYMENT_RESERVATION_RELEASE_MISSING",
+          entityId: "order-reserved",
+        }),
+      ]),
+    )
+  })
+
   it("detects settlement amount mismatch", async () => {
     const prisma = mockPrisma()
     prisma.settlement.findMany.mockResolvedValue([
@@ -185,6 +259,99 @@ describe("runReconciliation with mock prisma", () => {
     expect(completenessIssues.length).toBe(1)
     expect(completenessIssues[0].group).toBe("completeness")
     expect(completenessIssues[0].severity).toBe("critical")
+  })
+
+  it("accepts a completed publisher order only with exact release evidence", async () => {
+    const prisma = mockPrisma()
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: "publisher-complete-exact",
+        status: "COMPLETED",
+        amount: "100.00",
+        fulfillmentChannel: "PUBLISHER",
+        website: { ownershipType: "PUBLISHER" },
+        settlements: [
+          {
+            id: "settlement-exact",
+            orderId: "publisher-complete-exact",
+            publisherId: "publisher-exact",
+            publisherAmount: "90.00",
+            currency: "USD",
+            status: "RELEASED",
+            settledAt: new Date(),
+            transactions: [
+              {
+                type: "SETTLEMENT_RELEASE",
+                settlementId: "settlement-exact",
+                orderId: "publisher-complete-exact",
+                publisherId: "publisher-exact",
+                amount: "90.00",
+                currency: "USD",
+                walletId: null,
+                provider: null,
+                providerRef: null,
+              },
+            ],
+            events: [
+              {
+                eventType: "SETTLEMENT_RELEASED",
+                settlementId: "settlement-exact",
+                orderId: "publisher-complete-exact",
+              },
+            ],
+          },
+        ],
+        platformRevenue: null,
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.settlementDrift.some(
+        (row) => row.entityId === "publisher-complete-exact",
+      ),
+    ).toBe(false)
+  })
+
+  it("reports each missing release fact on a completed publisher order", async () => {
+    const prisma = mockPrisma()
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: "publisher-complete-broken",
+        status: "COMPLETED",
+        amount: "100.00",
+        fulfillmentChannel: "PUBLISHER",
+        website: { ownershipType: "PUBLISHER" },
+        settlements: [
+          {
+            id: "settlement-broken",
+            orderId: "publisher-complete-broken",
+            publisherId: "publisher-broken",
+            publisherAmount: "90.00",
+            currency: "USD",
+            status: "ADMIN_APPROVED",
+            settledAt: null,
+            transactions: [],
+            events: [],
+          },
+        ],
+        platformRevenue: null,
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+    const codes = report.settlementDrift
+      .filter((row) => row.entityId === "publisher-complete-broken")
+      .map((row) => row.code)
+
+    expect(codes).toEqual(
+      expect.arrayContaining([
+        ReconciliationCode.SETTLEMENT_ORDER_COMPLETED_NOT_RELEASED,
+        ReconciliationCode.SETTLEMENT_ORDER_COMPLETED_RELEASE_LEDGER_INVALID,
+        ReconciliationCode.SETTLEMENT_ORDER_COMPLETED_RELEASE_EVENT_INVALID,
+      ]),
+    )
   })
 
   it("accepts a completed platform order with balanced platform revenue", async () => {
@@ -1107,6 +1274,123 @@ describe("runReconciliation with mock prisma", () => {
     )
     expect(noTxIssues.length).toBe(1)
     expect(noTxIssues[0].severity).toBe("critical")
+  })
+
+  it("requires an explicit disposition for a post-publication publisher refund", async () => {
+    const prisma = mockPrisma()
+    prisma.order.findMany.mockImplementation(async (args: any) =>
+      args?.where?.status === "REFUNDED"
+        ? [
+            {
+              id: "order-refund-missing-compensation",
+              amount: "100.00",
+              status: "REFUNDED",
+              fulfillmentChannel: "PUBLISHER",
+              website: {
+                ownershipType: "PUBLISHER",
+                publisherId: "publisher-1",
+              },
+              dispute: { previousStatus: "DELIVERED" },
+              settlements: [],
+              publisherCompensation: null,
+            },
+          ]
+        : [],
+    )
+    prisma.transaction.findMany.mockImplementation(async (args: any) =>
+      args?.where?.type === "REFUND"
+        ? [
+            {
+              id: "refund-1",
+              amount: "100.00",
+              orderId: "order-refund-missing-compensation",
+            },
+          ]
+        : [],
+    )
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.refundRecon.some(
+        (row) =>
+          row.code === ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_MISSING,
+      ),
+    ).toBe(true)
+  })
+
+  it("accepts exact publisher-compensation aggregate and ledger evidence", async () => {
+    const prisma = mockPrisma()
+    prisma.order.findMany.mockImplementation(async (args: any) =>
+      args?.where?.status === "REFUNDED"
+        ? [
+            {
+              id: "order-refund-exact-compensation",
+              amount: "100.00",
+              status: "REFUNDED",
+              fulfillmentChannel: "PUBLISHER",
+              website: {
+                ownershipType: "PUBLISHER",
+                publisherId: "publisher-1",
+              },
+              dispute: { previousStatus: "DELIVERED" },
+              settlements: [
+                {
+                  id: "settlement-1",
+                  publisherId: "publisher-1",
+                  publisherAmount: "80.00",
+                  status: "CANCELLED",
+                },
+              ],
+              publisherCompensation: {
+                id: "compensation-1",
+                publisherId: "publisher-1",
+                refundTransactionId: "refund-1",
+                compensationTransactionId: "compensation-credit-1",
+                debtRepaymentTransactionId: null,
+                disposition: "EXACT_AMOUNT",
+                amount: "60.00",
+                currency: "USD",
+                responsibility: "PLATFORM",
+                reason:
+                  "Publisher completed verified publication work before the platform failure.",
+                effectiveOrderStatus: "DELIVERED",
+                compensationTransaction: {
+                  id: "compensation-credit-1",
+                  type: "PUBLISHER_COMPENSATION",
+                  orderId: "order-refund-exact-compensation",
+                  publisherId: "publisher-1",
+                  amount: "60.00",
+                  currency: "USD",
+                },
+                debtRepaymentTransaction: null,
+              },
+            },
+          ]
+        : [],
+    )
+    prisma.transaction.findMany.mockImplementation(async (args: any) =>
+      args?.where?.type === "REFUND"
+        ? [
+            {
+              id: "refund-1",
+              amount: "100.00",
+              orderId: "order-refund-exact-compensation",
+            },
+          ]
+        : [],
+    )
+
+    const report = await runReconciliation(prisma as any)
+
+    expect(
+      report.refundRecon.filter((row) =>
+        [
+          ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_MISSING,
+          ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_INVALID,
+        ].includes(row.code),
+      ),
+    ).toEqual([])
   })
 
   it("flags completed payouts with missing canonical evidence", async () => {

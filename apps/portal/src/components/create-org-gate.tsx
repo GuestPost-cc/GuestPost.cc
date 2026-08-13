@@ -15,10 +15,10 @@ import { Building2 } from "lucide-react"
 import { useState } from "react"
 import { api } from "../lib/api"
 
-// A freshly registered customer has no organization, and every money action
-// (deposit, checkout, orders) requires the OWNER role on one. This gate
-// blocks the dashboard until the org exists — previously those actions all
-// returned 403 with no path forward (audit A-2).
+// Signup normally provisions a customer organization, wallet, and OWNER
+// membership atomically. This gate is the recovery path for legacy or repaired
+// accounts whose active organization projection is missing; money actions
+// remain unavailable until that invariant has been restored.
 export function CreateOrgGate({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("")
 

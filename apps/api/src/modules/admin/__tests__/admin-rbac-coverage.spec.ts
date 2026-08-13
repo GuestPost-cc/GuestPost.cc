@@ -351,18 +351,14 @@ import { ForbiddenException } from "@nestjs/common"
 import { StaffRolesGuard } from "../../../common/guards/staff-roles.guard"
 
 describe("StaffRolesGuard — fail-closed contract", () => {
-  const prisma = (role: string | null = null) =>
+  const authorities = (role: string | null = null, userType = "STAFF") =>
     ({
-      staffMembership: {
-        findUnique: jest.fn().mockResolvedValue(
-          role
-            ? {
-                role,
-                user: { banned: false, userType: "STAFF" },
-              }
-            : null,
-        ),
-      },
+      resolveRequest: jest.fn().mockResolvedValue({
+        id: "staff-1",
+        userType,
+        staffRole: role,
+        staffPermissions: [],
+      }),
     }) as any
 
   function makeCtx(_metadata: string[] | undefined, user: any) {
@@ -377,7 +373,7 @@ describe("StaffRolesGuard — fail-closed contract", () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(undefined),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector, prisma("SUPER_ADMIN"))
+    const guard = new StaffRolesGuard(reflector, authorities("SUPER_ADMIN"))
     await expect(
       guard.canActivate(
         makeCtx(undefined, {
@@ -393,7 +389,7 @@ describe("StaffRolesGuard — fail-closed contract", () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue([]),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector, prisma("SUPER_ADMIN"))
+    const guard = new StaffRolesGuard(reflector, authorities("SUPER_ADMIN"))
     await expect(
       guard.canActivate(
         makeCtx([], {
@@ -409,7 +405,7 @@ describe("StaffRolesGuard — fail-closed contract", () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN"]),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector, prisma("SUPER_ADMIN"))
+    const guard = new StaffRolesGuard(reflector, authorities(null, "CUSTOMER"))
     await expect(
       guard.canActivate(makeCtx(["SUPER_ADMIN"], { userType: "CUSTOMER" })),
     ).rejects.toThrow(ForbiddenException)
@@ -419,7 +415,7 @@ describe("StaffRolesGuard — fail-closed contract", () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN"]),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector, prisma("FINANCE"))
+    const guard = new StaffRolesGuard(reflector, authorities("FINANCE"))
     await expect(
       guard.canActivate(
         makeCtx(["SUPER_ADMIN"], {
@@ -435,7 +431,7 @@ describe("StaffRolesGuard — fail-closed contract", () => {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN", "FINANCE"]),
     } as unknown as Reflector
-    const guard = new StaffRolesGuard(reflector, prisma("FINANCE"))
+    const guard = new StaffRolesGuard(reflector, authorities("FINANCE"))
     await expect(
       guard.canActivate(
         makeCtx(["SUPER_ADMIN", "FINANCE"], {

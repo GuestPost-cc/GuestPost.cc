@@ -77,12 +77,26 @@ Checkout-success rows do not persist a replayable provider payload. If an
 event arrives while finance mode is `locked`, the API persists its immutable
 inbox envelope as `PENDING` and returns 503. An early redelivery that finds a
 live `PROCESSING` lease also returns 503. Both responses keep Stripe
-redelivery active. A later signed delivery can claim the pending row after
-recovery is enabled or recover an expired lease; hourly reconciliation reports
-stale, failed, or quarantined rows. Local state alone is never used to
-synthesize a wallet credit. There is currently no independent authenticated
-Checkout/PaymentIntent catch-up processor; recovery for this gap depends on a
-fresh signature-verified Stripe redelivery.
+redelivery active. Independently, the five-minute deposit-credit recovery lane
+finds aged attached attempts and authenticates directly to Stripe with the
+distinct least-privilege `STRIPE_DEPOSIT_RECOVERY_KEY`. It retrieves the fixed
+Checkout Session, its PaymentIntent, and the latest Charge; persists bounded
+typed facts as append-only `DepositCreditEvidence`; and never fabricates a
+webhook, signature, or `PaymentProviderEvent`.
+
+The signed webhook and authenticated retrieval paths share one serializable
+finalizer. It requires exact attempt/client-reference, wallet, creator,
+organization, public-reference, amount, currency, mode, and provider identity
+bindings. Retrieval additionally requires a complete/paid Checkout,
+`succeeded` PaymentIntent, paid/captured/non-refunded Charge, equal minor-unit
+amounts and modes across all three objects, exact PaymentIntent metadata, and
+current Charge evidence proving `disputed=false` and `amount_refunded=0`.
+Authority is fenced by `(attempts, lockedAt)`, the wallet row is locked, and an
+exact ledger replay is the only acceptable concurrent winner. Contradictory
+evidence is quarantined for Finance; transient provider failures back off.
+Exact paid authority may recover a locally `EXPIRED` attempt: provider
+settlement can win the expiry race and paid funds must not be stranded.
+The customer deposit-status GET remains read-only.
 
 In locked mode, only normalized dispute events may return 2xx as deferred
 because the five-minute worker can replay their complete durable envelope.

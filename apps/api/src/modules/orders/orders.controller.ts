@@ -11,13 +11,12 @@ import {
   UseGuards,
 } from "@nestjs/common"
 import { ActorType } from "../../common/decorators/actor-type.decorator"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { CurrentAuthority } from "../../common/decorators/current-authority.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { RequireOrderOwnership } from "../../common/decorators/order-ownership.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { OrderOwnershipGuard } from "../../common/guards/order-ownership.guard"
-import { AuthGuard } from "../auth/auth.guard"
 import { AddOrderItemDto } from "./dto/add-order-item.dto"
 import { CreateOrderDto } from "./dto/create-order.dto"
 import {
@@ -44,7 +43,7 @@ import { OrderPaymentService } from "./services/order-payment.service"
 import { OrderReviewService } from "./services/order-review.service"
 
 @Controller("orders")
-@UseGuards(AuthGuard, ActorTypeGuard)
+@UseGuards(ActorTypeGuard)
 export class OrdersController {
   constructor(
     private readonly orders: OrdersService,
@@ -62,7 +61,7 @@ export class OrdersController {
   @UseGuards(MemberRolesGuard)
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
-  create(@Body() body: CreateOrderDto, @CurrentUser() user: any) {
+  create(@Body() body: CreateOrderDto, @CurrentAuthority() user: any) {
     return this.orders.createOrder(
       { ...body, customerId: user.id, organizationId: user.organizationId },
       user.id,
@@ -71,7 +70,10 @@ export class OrdersController {
 
   @ActorType("CUSTOMER", "PUBLISHER")
   @Get()
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER", "MEMBER", "PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   list(
+    @CurrentAuthority() user: any,
     @Query("campaignId") campaignId?: string,
     @Query("serviceType") serviceType?: string,
     @Query("status") status?: string,
@@ -81,7 +83,6 @@ export class OrdersController {
     @Query("sort") sort?: string,
     @Query("take") take?: string,
     @Query("skip") skip?: string,
-    @CurrentUser() user?: any,
   ) {
     const t = Math.min(Math.max(parseInt(take ?? "50", 10) || 50, 1), 100)
     const s = Math.max(0, parseInt(skip ?? "0", 10) || 0)
@@ -133,7 +134,7 @@ export class OrdersController {
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
-  get(@Param("id") id: string, @CurrentUser() user: any) {
+  get(@Param("id") id: string, @CurrentAuthority() user: any) {
     // Publishers have no organizationId — the ownership guard above is their
     // access check (order.website.publisherId === user.publisherId)
     return this.orders.getOrder(
@@ -147,7 +148,7 @@ export class OrdersController {
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
-  async getEvents(@Param("id") id: string, @CurrentUser() user: any) {
+  async getEvents(@Param("id") id: string, @CurrentAuthority() user: any) {
     const order = await this.orders.getOrder(
       id,
       user.userType === "PUBLISHER" ? null : user.organizationId,
@@ -164,7 +165,7 @@ export class OrdersController {
   async submitContentForReview(
     @Param("id") id: string,
     @Body() body: { content?: string },
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     const content = body.content?.trim()
     if (!content) throw new BadRequestException("Content is required")
@@ -192,7 +193,7 @@ export class OrdersController {
   addItem(
     @Param("id") id: string,
     @Body() body: AddOrderItemDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.orders.addOrderItem(
       id,
@@ -211,7 +212,7 @@ export class OrdersController {
   removeItem(
     @Param("id") id: string,
     @Param("itemId") itemId: string,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.orders.removeOrderItem(
       id,
@@ -239,7 +240,7 @@ export class OrdersController {
   submitPayment(
     @Param("id") id: string,
     @Body() body: SubmitPaymentDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.payment.submitPayment(
       id,
@@ -258,7 +259,7 @@ export class OrdersController {
   async cancelOrder(
     @Param("id") id: string,
     @Body() body: CancelOrderDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return projectExternalOrder(
       await this.cancellation.cancelNow(id, cancellationActor(user), body),
@@ -270,7 +271,10 @@ export class OrdersController {
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
-  async cancellationPreview(@Param("id") id: string, @CurrentUser() user: any) {
+  async cancellationPreview(
+    @Param("id") id: string,
+    @CurrentAuthority() user: any,
+  ) {
     const preview = await this.cancellation.preview(id, cancellationActor(user))
     return {
       ...preview,
@@ -285,7 +289,7 @@ export class OrdersController {
   async requestCancellation(
     @Param("id") id: string,
     @Body() body: CreateCancellationRequestDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return projectExternalCancellationRequest(
       await this.cancellation.createRequest(id, cancellationActor(user), body),
@@ -300,7 +304,7 @@ export class OrdersController {
     @Param("id") id: string,
     @Param("requestId") requestId: string,
     @Body() body: RespondCancellationRequestDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return projectExternalCancellationRequest(
       await this.cancellation.respond(
@@ -321,7 +325,7 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  async approveContent(@Param("id") id: string, @CurrentUser() user: any) {
+  async approveContent(@Param("id") id: string, @CurrentAuthority() user: any) {
     return projectExternalOrder(
       await this.review.approveContent(id, user.organizationId, user.id),
       "CUSTOMER",
@@ -336,7 +340,7 @@ export class OrdersController {
   async requestRevision(
     @Param("id") id: string,
     @Body("notes") notes: string,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return projectExternalOrder(
       await this.review.requestRevision(
@@ -357,7 +361,10 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  async confirmDelivery(@Param("id") id: string, @CurrentUser() user: any) {
+  async confirmDelivery(
+    @Param("id") id: string,
+    @CurrentAuthority() user: any,
+  ) {
     return projectExternalOrder(
       await this.review.confirmDelivery(id, user.organizationId, user.id),
       "CUSTOMER",
@@ -373,7 +380,7 @@ export class OrdersController {
   async submitReview(
     @Param("id") id: string,
     @Body() body: { rating: number; comment?: string },
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return projectExternalOrderReview(
       await this.review.submitReview(
@@ -390,7 +397,7 @@ export class OrdersController {
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
-  async getReview(@Param("id") id: string, @CurrentUser() user: any) {
+  async getReview(@Param("id") id: string, @CurrentAuthority() user: any) {
     return projectExternalOrderReview(
       await this.review.getReview(id, {
         organizationId:
@@ -407,7 +414,7 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  acceptDelivery(@Param("id") id: string, @CurrentUser() user: any) {
+  acceptDelivery(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.delivery.customerAcceptDelivery(
       id,
       user.organizationId,
@@ -421,7 +428,7 @@ export class OrdersController {
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
-  deliveryProof(@Param("id") id: string, @CurrentUser() user: any) {
+  deliveryProof(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.delivery.deliveryProof(id, {
       organizationId: user.userType === "CUSTOMER" ? user.organizationId : null,
       publisherId: user.userType === "PUBLISHER" ? user.publisherId : null,
@@ -436,7 +443,7 @@ export class OrdersController {
   async openDispute(
     @Param("id") id: string,
     @Body("reason") reason: string,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return projectExternalOrderDispute(
       await this.dispute.openDispute(id, user.organizationId, user.id, reason),
@@ -450,7 +457,7 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  async acceptOrder(@Param("id") id: string, @CurrentUser() user: any) {
+  async acceptOrder(@Param("id") id: string, @CurrentAuthority() user: any) {
     return projectExternalOrder(
       await this.fulfillment.acceptOrder(id, user.publisherId, user.id),
       "PUBLISHER",
@@ -465,7 +472,7 @@ export class OrdersController {
   async declineOrder(
     @Param("id") id: string,
     @Body() body: CancelOrderDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return projectExternalOrder(
       await this.cancellation.decline(id, cancellationActor(user), body),
@@ -481,7 +488,7 @@ export class OrdersController {
   async submitContent(
     @Param("id") id: string,
     @Body("content") content: string,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return projectExternalOrder(
       await this.fulfillment.submitContent(
@@ -499,7 +506,10 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  async markContentReady(@Param("id") id: string, @CurrentUser() user: any) {
+  async markContentReady(
+    @Param("id") id: string,
+    @CurrentAuthority() user: any,
+  ) {
     return projectExternalOrder(
       await this.fulfillment.markContentReady(id, user.publisherId, user.id),
       "PUBLISHER",
@@ -511,7 +521,10 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  async submitForReview(@Param("id") id: string, @CurrentUser() user: any) {
+  async submitForReview(
+    @Param("id") id: string,
+    @CurrentAuthority() user: any,
+  ) {
     return projectExternalOrder(
       await this.fulfillment.submitForReview(id, user.publisherId, user.id),
       "PUBLISHER",
@@ -526,7 +539,7 @@ export class OrdersController {
   async markPublished(
     @Param("id") id: string,
     @Body("url") url: string,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return projectExternalOrder(
       await this.fulfillment.markPublished(id, user.publisherId, user.id, url),

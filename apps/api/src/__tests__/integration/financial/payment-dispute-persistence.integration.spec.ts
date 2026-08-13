@@ -25,7 +25,7 @@ interface DepositFixture {
   organization: { id: string }
   user: { id: string }
   wallet: { id: string }
-  depositAttempt: { id: string }
+  depositAttempt: { id: string; publicReference: string }
   depositTransaction: { id: string; amount: unknown }
   providerSessionId: string
   paymentIntentId: string
@@ -1248,12 +1248,20 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
 
     const replaySession = {
       id: fixture.providerSessionId,
+      client_reference_id: fixture.depositAttempt.id,
+      status: "complete",
       amount_total: 10_000,
       currency: "usd",
       payment_status: "paid",
+      mode: "payment",
+      livemode: false,
       payment_intent: fixture.paymentIntentId,
       metadata: {
         depositAttemptId: fixture.depositAttempt.id,
+        publicReference: fixture.depositAttempt.publicReference,
+        walletId: fixture.wallet.id,
+        userId: fixture.user.id,
+        organizationId: fixture.organization.id,
       },
     }
     const lease = {
@@ -1426,11 +1434,21 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
         data: {
           object: {
             id: fixture.providerSessionId,
+            client_reference_id: fixture.depositAttempt.id,
+            status: "complete",
             amount_total: 10_000,
             currency: "usd",
             payment_status: "paid",
+            mode: "payment",
+            livemode: false,
             payment_intent: fixture.paymentIntentId,
-            metadata: { depositAttemptId: fixture.depositAttempt.id },
+            metadata: {
+              depositAttemptId: fixture.depositAttempt.id,
+              publicReference: fixture.depositAttempt.publicReference,
+              walletId: fixture.wallet.id,
+              userId: fixture.user.id,
+              organizationId: fixture.organization.id,
+            },
           },
         },
       }),
@@ -1651,12 +1669,20 @@ describe("[INTEGRATION] Financial — payment dispute persistence", () => {
       (billing as any).processSuccessfulPayment(
         {
           id: conflictingSessionId,
+          client_reference_id: conflictingAttempt.id,
+          status: "complete",
           amount_total: 10_000,
           currency: "usd",
           payment_status: "paid",
+          mode: "payment",
+          livemode: false,
           payment_intent: fixture.paymentIntentId,
           metadata: {
             depositAttemptId: conflictingAttempt.id,
+            publicReference: conflictingAttempt.publicReference,
+            walletId: fixture.wallet.id,
+            userId: fixture.user.id,
+            organizationId: fixture.organization.id,
           },
         },
         providerEvent.id,

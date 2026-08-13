@@ -26,7 +26,7 @@ Operations, Finance, and Super Admin pages must use that mapping.
 | Published | `PUBLISHED` |
 | Verified | `VERIFIED` |
 | Delivered | `DELIVERED` |
-| Complete | `SETTLED`, `COMPLETED` |
+| Complete | `COMPLETED` |
 
 `CANCELLED`, `REFUNDED`, and `DISPUTED` are exception states. They do not map
 to a normal stage. A dispute pauses normal fulfillment and settlement
@@ -34,10 +34,16 @@ progression. Cancellation and refund behavior follows the dedicated
 cancellation policy.
 
 The progress component marks stages before the current stage complete. The
-current stage remains current until the order advances. A `COMPLETED` or
-`SETTLED` order marks the final stage complete. Statuses that share a stage are
-still shown with their specific status label so, for example, `ACCEPTED` and
-`CONTENT_READY` are not visually indistinguishable.
+current stage remains current until the order advances. `COMPLETED` is the sole
+successful terminal order state. Publisher settlement progress is represented
+by `Settlement.status`; funds release is `RELEASED` and atomically advances the
+order from `DELIVERED` to `COMPLETED`.
+
+Settlement workflow events are also explicit: customer approval,
+return-to-review, and funds release use distinct event types. A completed
+publisher order is financially coherent only with one `RELEASED` settlement,
+one exact `SETTLEMENT_RELEASE` ledger row, and one exact
+`SETTLEMENT_RELEASED` order event bound relationally to that settlement.
 
 ## Creation and payment
 
@@ -55,8 +61,12 @@ The customer marketplace is the only order-creation entry point.
 6. If the reviewed quote is stale, creation fails with `REQUOTE_REQUIRED`.
 7. The API creates the draft, priced order items, customer article version,
    canonical event, and audit evidence in the required transaction boundary.
-8. Payment moves the order through `PENDING_PAYMENT` to `PAID`; fulfillment
-   visibility begins only after the applicable paid/submitted boundary.
+8. The canonical payment command compares `DRAFT`/`PENDING` plus the reviewed
+   aggregate version and commits `SUBMITTED`/`PAID` in one CAS and one version
+   increment. It writes ordered `PAYMENT_CAPTURED` and `ORDER_SUBMITTED`
+   milestone events in that same transaction. `PAID` remains a recognized
+   compatibility/recovery `OrderStatus`, but is not a separately committed
+   intermediate state of this command.
 
 Campaign actions route to `/dashboard/marketplace?campaignId=...`. The
 `campaignId` is preserved through listing and service navigation. The portal
@@ -203,6 +213,12 @@ Every domain transition must:
 Idempotency protects order creation and money commands. Optimistic versions
 protect lifecycle commands. Neither mechanism replaces database uniqueness,
 foreign keys, check constraints, or transaction isolation.
+
+An aggregate version counts committed commands, not event rows. One command
+may atomically emit multiple milestone events; those events must carry the
+same aggregate version and an explicit sequence when their causal order
+matters. Consumers must not infer event counts from version deltas or order
+same-transaction events solely by `createdAt`.
 
 ## Financial invariants
 

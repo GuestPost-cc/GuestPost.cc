@@ -498,6 +498,74 @@ async function promoteStalePayoutStages(
   }
 }
 
+async function holdUncertifiedWiseExecution(
+  client: any,
+  execution: any,
+): Promise<boolean> {
+  return client.$transaction(
+    async (tx: any) => {
+      await tx.$queryRawUnsafe(
+        'SELECT "id" FROM "Withdrawal" WHERE "id" = $1 FOR UPDATE',
+        execution.withdrawalId,
+      )
+      await tx.$queryRawUnsafe(
+        'SELECT "id" FROM "PayoutExecution" WHERE "id" = $1 FOR UPDATE',
+        execution.id,
+      )
+      const held = await tx.payoutExecution.updateMany({
+        where: {
+          id: execution.id,
+          withdrawalId: execution.withdrawalId,
+          status: "PROCESSING",
+          version: execution.version,
+          stage: execution.stage,
+        },
+        data: {
+          stage: "PROVIDER_CERTIFICATION_REQUIRED",
+          errorMessage:
+            "Wise execution is quarantined until provider certification and returned-funds handling are complete",
+          version: { increment: 1 },
+        },
+      })
+      if (held.count !== 1) return false
+
+      const staff = await tx.staffMembership.findMany({
+        where: { role: { in: ["FINANCE", "SUPER_ADMIN"] } },
+        select: { userId: true },
+      })
+      if (staff.length > 0) {
+        await tx.notification.createMany({
+          data: staff.map((member: { userId: string }) => ({
+            userId: member.userId,
+            organizationId: null,
+            type: "PAYOUT_EXECUTION_REVIEW_REQUIRED",
+            message: `Legacy Wise payout execution ${execution.id} requires evidence-aware provider review`,
+            dedupKey: `payout-provider-certification:${execution.id}:${member.userId}`,
+          })),
+          skipDuplicates: true,
+        })
+      }
+      await tx.auditLog.create({
+        data: {
+          action: "PAYOUT_PROVIDER_CERTIFICATION_REQUIRED",
+          entityType: "PayoutExecution",
+          entityId: execution.id,
+          metadata: {
+            provider: "wise",
+            providerExecutionId: execution.providerExecutionId,
+            previousStage: execution.stage,
+          },
+          userId: null,
+          organizationId:
+            execution.withdrawal?.publisher?.organizationId ?? null,
+        },
+      })
+      return true
+    },
+    { isolationLevel: "Serializable" },
+  )
+}
+
 export async function handleCheckStatus(
   job: any,
   client: any = prisma,
@@ -526,6 +594,7 @@ export async function handleCheckStatus(
           "PROVIDER_SEND_CLAIM_EXPIRED",
           "BANK_PAYOUT_CLAIM_EXPIRED",
           "CANCEL_REQUESTED",
+          "PROVIDER_CERTIFICATION_REQUIRED",
         ],
       },
     },
@@ -541,6 +610,11 @@ export async function handleCheckStatus(
   let failed = 0
   let skipped = 0
   for (const execution of pendingExecutions) {
+    if (execution.provider.name === "wise") {
+      await holdUncertifiedWiseExecution(client, execution)
+      skipped++
+      continue
+    }
     let result
     try {
       const connectedAccountId =

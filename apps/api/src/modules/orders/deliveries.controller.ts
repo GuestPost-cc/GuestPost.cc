@@ -8,7 +8,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { CurrentAuthority } from "../../common/decorators/current-authority.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
 import { PrismaService } from "../../common/prisma.service"
@@ -38,7 +38,7 @@ export class DeliveriesController {
   ) {}
 
   private role(user: any) {
-    return user.staffRole ?? user.role
+    return user.staffRole
   }
 
   // ── Reads ──────────────────────────────────────────────────────────────
@@ -85,14 +85,14 @@ export class DeliveriesController {
   // ── Platform fulfillment (Operations) — Finance excluded ─────────────────
   @Get("operations/fulfillment-queue")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  fulfillmentQueue(@CurrentUser() user: any) {
+  fulfillmentQueue(@CurrentAuthority() user: any) {
     return this.assignment.operationsQueue(user)
   }
 
   @Get("operations/fulfillment")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   operationsInbox(
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
     @Query("view") rawView?: string,
     @Query("take") rawTake?: string,
     @Query("skip") rawSkip?: string,
@@ -121,13 +121,13 @@ export class DeliveriesController {
 
   @Get("operations/fulfillment/:id")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  operationsOrder(@Param("id") id: string, @CurrentUser() user: any) {
+  operationsOrder(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.assignment.getOperationsOrder(id, user)
   }
 
   @Post("orders/:id/claim")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  claim(@Param("id") id: string, @CurrentUser() user: any) {
+  claim(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.assignment.claim(id, user.id, user.staffRole)
   }
 
@@ -136,7 +136,7 @@ export class DeliveriesController {
   assign(
     @Param("id") id: string,
     @Body("assignedToUserId") to: string,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.assignment.assign(id, to, user.id)
   }
@@ -146,7 +146,7 @@ export class DeliveriesController {
   reassign(
     @Param("id") id: string,
     @Body("assignedToUserId") to: string,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.assignment.reassign(id, to, user.id)
   }
@@ -162,7 +162,7 @@ export class DeliveriesController {
       notes?: string
       screenshotUrl?: string
     },
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.operations.markPublished(
       id,
@@ -180,7 +180,7 @@ export class DeliveriesController {
   // ── Intervention ─────────────────────────────────────────────────────────
   @Post("deliveries/:id/reverify")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  reverify(@Param("id") id: string, @CurrentUser() user: any) {
+  reverify(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.intervention.reverify(id, user.id, this.role(user))
   }
 
@@ -189,7 +189,7 @@ export class DeliveriesController {
   manualApprove(
     @Param("id") id: string,
     @Body() body: DeliveryInterventionReasonDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.intervention.manualApprove(
       id,
@@ -204,7 +204,7 @@ export class DeliveriesController {
   manualReject(
     @Param("id") id: string,
     @Body() body: DeliveryInterventionReasonDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.intervention.manualReject(
       id,
@@ -219,7 +219,7 @@ export class DeliveriesController {
   override(
     @Param("id") id: string,
     @Body() body: OverrideDeliveryVerificationDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.intervention.override(
       id,
@@ -235,7 +235,7 @@ export class DeliveriesController {
   resolveFraudFlag(
     @Param("id") id: string,
     @Body() body: ResolveDeliveryFraudFlagDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.intervention.resolveFraudFlag(
       id,

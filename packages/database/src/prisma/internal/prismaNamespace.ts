@@ -409,6 +409,7 @@ export const ModelName = {
   Publication: 'Publication',
   OrderDispute: 'OrderDispute',
   OrderCancellationRequest: 'OrderCancellationRequest',
+  PublisherCompensation: 'PublisherCompensation',
   Settlement: 'Settlement',
   SettlementApproval: 'SettlementApproval',
   FulfillmentAssignment: 'FulfillmentAssignment',
@@ -439,6 +440,8 @@ export const ModelName = {
   Wallet: 'Wallet',
   Transaction: 'Transaction',
   DepositAttempt: 'DepositAttempt',
+  DepositCreditRecovery: 'DepositCreditRecovery',
+  DepositCreditEvidence: 'DepositCreditEvidence',
   PaymentProviderEvent: 'PaymentProviderEvent',
   PaymentDispute: 'PaymentDispute',
   Ticket: 'Ticket',
@@ -493,7 +496,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "billingProfile" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryUrlClaimFence" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "communicationEvent" | "communicationDelivery" | "financialDocument" | "notificationPreference" | "emailSuppression" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "billingProfile" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "publisherCompensation" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryUrlClaimFence" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "depositCreditRecovery" | "depositCreditEvidence" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "communicationEvent" | "communicationDelivery" | "financialDocument" | "notificationPreference" | "emailSuppression" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2344,6 +2347,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.OrderCancellationRequestCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.OrderCancellationRequestCountAggregateOutputType> | number
+        }
+      }
+    }
+    PublisherCompensation: {
+      payload: Prisma.$PublisherCompensationPayload<ExtArgs>
+      fields: Prisma.PublisherCompensationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PublisherCompensationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PublisherCompensationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload>
+        }
+        findFirst: {
+          args: Prisma.PublisherCompensationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PublisherCompensationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload>
+        }
+        findMany: {
+          args: Prisma.PublisherCompensationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload>[]
+        }
+        create: {
+          args: Prisma.PublisherCompensationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload>
+        }
+        createMany: {
+          args: Prisma.PublisherCompensationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PublisherCompensationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload>[]
+        }
+        delete: {
+          args: Prisma.PublisherCompensationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload>
+        }
+        update: {
+          args: Prisma.PublisherCompensationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload>
+        }
+        deleteMany: {
+          args: Prisma.PublisherCompensationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PublisherCompensationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PublisherCompensationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload>[]
+        }
+        upsert: {
+          args: Prisma.PublisherCompensationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublisherCompensationPayload>
+        }
+        aggregate: {
+          args: Prisma.PublisherCompensationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePublisherCompensation>
+        }
+        groupBy: {
+          args: Prisma.PublisherCompensationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PublisherCompensationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PublisherCompensationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PublisherCompensationCountAggregateOutputType> | number
         }
       }
     }
@@ -4564,6 +4641,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.DepositAttemptCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.DepositAttemptCountAggregateOutputType> | number
+        }
+      }
+    }
+    DepositCreditRecovery: {
+      payload: Prisma.$DepositCreditRecoveryPayload<ExtArgs>
+      fields: Prisma.DepositCreditRecoveryFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DepositCreditRecoveryFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DepositCreditRecoveryFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload>
+        }
+        findFirst: {
+          args: Prisma.DepositCreditRecoveryFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DepositCreditRecoveryFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload>
+        }
+        findMany: {
+          args: Prisma.DepositCreditRecoveryFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload>[]
+        }
+        create: {
+          args: Prisma.DepositCreditRecoveryCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload>
+        }
+        createMany: {
+          args: Prisma.DepositCreditRecoveryCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DepositCreditRecoveryCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload>[]
+        }
+        delete: {
+          args: Prisma.DepositCreditRecoveryDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload>
+        }
+        update: {
+          args: Prisma.DepositCreditRecoveryUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload>
+        }
+        deleteMany: {
+          args: Prisma.DepositCreditRecoveryDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DepositCreditRecoveryUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DepositCreditRecoveryUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload>[]
+        }
+        upsert: {
+          args: Prisma.DepositCreditRecoveryUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditRecoveryPayload>
+        }
+        aggregate: {
+          args: Prisma.DepositCreditRecoveryAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDepositCreditRecovery>
+        }
+        groupBy: {
+          args: Prisma.DepositCreditRecoveryGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DepositCreditRecoveryGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DepositCreditRecoveryCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DepositCreditRecoveryCountAggregateOutputType> | number
+        }
+      }
+    }
+    DepositCreditEvidence: {
+      payload: Prisma.$DepositCreditEvidencePayload<ExtArgs>
+      fields: Prisma.DepositCreditEvidenceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DepositCreditEvidenceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DepositCreditEvidenceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload>
+        }
+        findFirst: {
+          args: Prisma.DepositCreditEvidenceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DepositCreditEvidenceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload>
+        }
+        findMany: {
+          args: Prisma.DepositCreditEvidenceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload>[]
+        }
+        create: {
+          args: Prisma.DepositCreditEvidenceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload>
+        }
+        createMany: {
+          args: Prisma.DepositCreditEvidenceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DepositCreditEvidenceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload>[]
+        }
+        delete: {
+          args: Prisma.DepositCreditEvidenceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload>
+        }
+        update: {
+          args: Prisma.DepositCreditEvidenceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload>
+        }
+        deleteMany: {
+          args: Prisma.DepositCreditEvidenceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DepositCreditEvidenceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DepositCreditEvidenceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload>[]
+        }
+        upsert: {
+          args: Prisma.DepositCreditEvidenceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DepositCreditEvidencePayload>
+        }
+        aggregate: {
+          args: Prisma.DepositCreditEvidenceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDepositCreditEvidence>
+        }
+        groupBy: {
+          args: Prisma.DepositCreditEvidenceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DepositCreditEvidenceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DepositCreditEvidenceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DepositCreditEvidenceCountAggregateOutputType> | number
         }
       }
     }
@@ -7879,6 +8104,7 @@ export type OrderItemScalarFieldEnum = (typeof OrderItemScalarFieldEnum)[keyof t
 export const OrderEventScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
+  settlementId: 'settlementId',
   eventType: 'eventType',
   actorId: 'actorId',
   message: 'message',
@@ -7952,6 +8178,26 @@ export const OrderCancellationRequestScalarFieldEnum = {
 } as const
 
 export type OrderCancellationRequestScalarFieldEnum = (typeof OrderCancellationRequestScalarFieldEnum)[keyof typeof OrderCancellationRequestScalarFieldEnum]
+
+
+export const PublisherCompensationScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  publisherId: 'publisherId',
+  refundTransactionId: 'refundTransactionId',
+  compensationTransactionId: 'compensationTransactionId',
+  debtRepaymentTransactionId: 'debtRepaymentTransactionId',
+  disposition: 'disposition',
+  amount: 'amount',
+  currency: 'currency',
+  responsibility: 'responsibility',
+  reason: 'reason',
+  effectiveOrderStatus: 'effectiveOrderStatus',
+  decidedByUserId: 'decidedByUserId',
+  createdAt: 'createdAt'
+} as const
+
+export type PublisherCompensationScalarFieldEnum = (typeof PublisherCompensationScalarFieldEnum)[keyof typeof PublisherCompensationScalarFieldEnum]
 
 
 export const SettlementScalarFieldEnum = {
@@ -8519,6 +8765,70 @@ export const DepositAttemptScalarFieldEnum = {
 } as const
 
 export type DepositAttemptScalarFieldEnum = (typeof DepositAttemptScalarFieldEnum)[keyof typeof DepositAttemptScalarFieldEnum]
+
+
+export const DepositCreditRecoveryScalarFieldEnum = {
+  id: 'id',
+  depositAttemptId: 'depositAttemptId',
+  provider: 'provider',
+  status: 'status',
+  attempts: 'attempts',
+  availableAt: 'availableAt',
+  lockedAt: 'lockedAt',
+  processedAt: 'processedAt',
+  evidenceId: 'evidenceId',
+  lastError: 'lastError',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type DepositCreditRecoveryScalarFieldEnum = (typeof DepositCreditRecoveryScalarFieldEnum)[keyof typeof DepositCreditRecoveryScalarFieldEnum]
+
+
+export const DepositCreditEvidenceScalarFieldEnum = {
+  id: 'id',
+  recoveryId: 'recoveryId',
+  depositAttemptId: 'depositAttemptId',
+  source: 'source',
+  provider: 'provider',
+  providerSessionId: 'providerSessionId',
+  providerPaymentId: 'providerPaymentId',
+  providerChargeId: 'providerChargeId',
+  clientReferenceId: 'clientReferenceId',
+  checkoutStatus: 'checkoutStatus',
+  checkoutPaymentStatus: 'checkoutPaymentStatus',
+  checkoutMode: 'checkoutMode',
+  checkoutAmountTotalMinor: 'checkoutAmountTotalMinor',
+  checkoutCurrency: 'checkoutCurrency',
+  checkoutLivemode: 'checkoutLivemode',
+  checkoutMetadataAttemptId: 'checkoutMetadataAttemptId',
+  checkoutMetadataReference: 'checkoutMetadataReference',
+  checkoutMetadataWalletId: 'checkoutMetadataWalletId',
+  checkoutMetadataUserId: 'checkoutMetadataUserId',
+  checkoutMetadataOrgId: 'checkoutMetadataOrgId',
+  paymentIntentStatus: 'paymentIntentStatus',
+  paymentIntentAmountMinor: 'paymentIntentAmountMinor',
+  paymentIntentReceivedMinor: 'paymentIntentReceivedMinor',
+  paymentIntentCurrency: 'paymentIntentCurrency',
+  paymentIntentLivemode: 'paymentIntentLivemode',
+  paymentMetadataAttemptId: 'paymentMetadataAttemptId',
+  paymentMetadataReference: 'paymentMetadataReference',
+  paymentMetadataWalletId: 'paymentMetadataWalletId',
+  chargePaid: 'chargePaid',
+  chargeCaptured: 'chargeCaptured',
+  chargeRefunded: 'chargeRefunded',
+  chargeAmountMinor: 'chargeAmountMinor',
+  chargeAmountCapturedMinor: 'chargeAmountCapturedMinor',
+  chargeCurrency: 'chargeCurrency',
+  chargeLivemode: 'chargeLivemode',
+  evidenceFingerprint: 'evidenceFingerprint',
+  claimAttempt: 'claimAttempt',
+  claimLockedAt: 'claimLockedAt',
+  retrievedAt: 'retrievedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type DepositCreditEvidenceScalarFieldEnum = (typeof DepositCreditEvidenceScalarFieldEnum)[keyof typeof DepositCreditEvidenceScalarFieldEnum]
 
 
 export const PaymentProviderEventScalarFieldEnum = {
@@ -9781,6 +10091,20 @@ export type ListEnumCancellationResolutionFieldRefInput<$PrismaModel> = FieldRef
 
 
 /**
+ * Reference to a field of type 'PublisherCompensationDisposition'
+ */
+export type EnumPublisherCompensationDispositionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PublisherCompensationDisposition'>
+
+
+
+/**
+ * Reference to a field of type 'PublisherCompensationDisposition[]'
+ */
+export type ListEnumPublisherCompensationDispositionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PublisherCompensationDisposition[]'>
+
+
+
+/**
  * Reference to a field of type 'SettlementStatus'
  */
 export type EnumSettlementStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SettlementStatus'>
@@ -10127,6 +10451,34 @@ export type EnumDepositFailureCodeFieldRefInput<$PrismaModel> = FieldRefInputTyp
  * Reference to a field of type 'DepositFailureCode[]'
  */
 export type ListEnumDepositFailureCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DepositFailureCode[]'>
+
+
+
+/**
+ * Reference to a field of type 'DepositCreditRecoveryStatus'
+ */
+export type EnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DepositCreditRecoveryStatus'>
+
+
+
+/**
+ * Reference to a field of type 'DepositCreditRecoveryStatus[]'
+ */
+export type ListEnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DepositCreditRecoveryStatus[]'>
+
+
+
+/**
+ * Reference to a field of type 'DepositCreditEvidenceSource'
+ */
+export type EnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DepositCreditEvidenceSource'>
+
+
+
+/**
+ * Reference to a field of type 'DepositCreditEvidenceSource[]'
+ */
+export type ListEnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DepositCreditEvidenceSource[]'>
 
 
 
@@ -10642,6 +10994,7 @@ export type GlobalOmitConfig = {
   publication?: Prisma.PublicationOmit
   orderDispute?: Prisma.OrderDisputeOmit
   orderCancellationRequest?: Prisma.OrderCancellationRequestOmit
+  publisherCompensation?: Prisma.PublisherCompensationOmit
   settlement?: Prisma.SettlementOmit
   settlementApproval?: Prisma.SettlementApprovalOmit
   fulfillmentAssignment?: Prisma.FulfillmentAssignmentOmit
@@ -10672,6 +11025,8 @@ export type GlobalOmitConfig = {
   wallet?: Prisma.WalletOmit
   transaction?: Prisma.TransactionOmit
   depositAttempt?: Prisma.DepositAttemptOmit
+  depositCreditRecovery?: Prisma.DepositCreditRecoveryOmit
+  depositCreditEvidence?: Prisma.DepositCreditEvidenceOmit
   paymentProviderEvent?: Prisma.PaymentProviderEventOmit
   paymentDispute?: Prisma.PaymentDisputeOmit
   ticket?: Prisma.TicketOmit

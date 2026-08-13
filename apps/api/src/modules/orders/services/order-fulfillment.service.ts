@@ -15,6 +15,7 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
+import { transitionOrderCas } from "../order-transition-cas"
 import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderDeliveryService } from "./order-delivery.service"
 import { closeActiveRevisionForResubmission } from "./revision-lifecycle"
@@ -70,32 +71,6 @@ export class OrderFulfillmentService {
     })
   }
 
-  // Optimistic-lock status transition: the row only changes if its version
-  // AND current status still match what the caller read, preventing lost
-  // updates / concurrent state corruption. Returns the fresh row.
-  private async transition(
-    orderId: string,
-    fromVersion: number,
-    expectedStatus: string,
-    data: any,
-    prisma: any = this.prisma,
-  ) {
-    const r = await prisma.order.updateMany({
-      where: {
-        id: orderId,
-        version: fromVersion,
-        status: expectedStatus as any,
-      },
-      data: { ...data, version: { increment: 1 } },
-    })
-    if (r.count === 0) {
-      throw new ConflictException(
-        "Order was modified by another request. Retry.",
-      )
-    }
-    return prisma.order.findUniqueOrThrow({ where: { id: orderId } })
-  }
-
   async acceptOrder(orderId: string, publisherId: string, userId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, website: { publisherId } },
@@ -112,18 +87,18 @@ export class OrderFulfillmentService {
 
     let communicationEventId: string | null = null
     const result = await this.prisma.$transaction(async (tx: any) => {
-      const updated = await this.transition(
+      const updated = await transitionOrderCas({
+        db: tx,
         orderId,
-        order.version,
-        "SUBMITTED",
-        {
-          status: "ACCEPTED",
+        expectedVersion: order.version,
+        fromStatus: "SUBMITTED",
+        toStatus: "ACCEPTED",
+        patch: {
           assigneeId: userId,
           acceptedAt,
           fulfillmentDueAt,
         },
-        tx,
-      )
+      })
       await tx.orderEvent.create({
         data: {
           orderId,
@@ -197,13 +172,13 @@ export class OrderFulfillmentService {
     await this.cancellation.assertNoActiveCancellation(orderId)
 
     return this.prisma.$transaction(async (tx: any) => {
-      const updated = await this.transition(
+      const updated = await transitionOrderCas({
+        db: tx,
         orderId,
-        order.version,
-        order.status,
-        { status: "CONTENT_CREATION" },
-        tx,
-      )
+        expectedVersion: order.version,
+        fromStatus: order.status,
+        toStatus: "CONTENT_CREATION",
+      })
       await tx.contentOrder.upsert({
         where: { orderId },
         create: {
@@ -250,13 +225,13 @@ export class OrderFulfillmentService {
     await this.cancellation.assertNoActiveCancellation(orderId)
 
     return this.prisma.$transaction(async (tx: any) => {
-      const updated = await this.transition(
+      const updated = await transitionOrderCas({
+        db: tx,
         orderId,
-        order.version,
-        "CONTENT_CREATION",
-        { status: "CONTENT_READY" },
-        tx,
-      )
+        expectedVersion: order.version,
+        fromStatus: "CONTENT_CREATION",
+        toStatus: "CONTENT_READY",
+      })
       await tx.orderEvent.create({
         data: {
           orderId,
@@ -295,13 +270,13 @@ export class OrderFulfillmentService {
           )
         }
         await this.cancellation.assertNoActiveCancellation(orderId, tx)
-        const fresh = await this.transition(
+        const fresh = await transitionOrderCas({
+          db: tx,
           orderId,
-          current.version,
-          "CONTENT_READY",
-          { status: "CUSTOMER_REVIEW" },
-          tx,
-        )
+          expectedVersion: current.version,
+          fromStatus: "CONTENT_READY",
+          toStatus: "CUSTOMER_REVIEW",
+        })
         const fulfilledRevisionId = await closeActiveRevisionForResubmission(
           tx,
           orderId,
@@ -404,13 +379,13 @@ export class OrderFulfillmentService {
           )
         }
         await this.cancellation.assertNoActiveCancellation(orderId, tx)
-        const fresh = await this.transition(
+        const fresh = await transitionOrderCas({
+          db: tx,
           orderId,
-          current.version,
-          current.status,
-          { status: "CUSTOMER_REVIEW" },
-          tx,
-        )
+          expectedVersion: current.version,
+          fromStatus: current.status,
+          toStatus: "CUSTOMER_REVIEW",
+        })
         const fulfilledRevisionId = await closeActiveRevisionForResubmission(
           tx,
           orderId,

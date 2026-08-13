@@ -31,17 +31,18 @@ describe("deposit status evidence classes", () => {
     }
   })
 
-  it("keeps terminal expiry out of the signed-event credit path", () => {
+  it("accepts exact authoritative late-payment evidence after local expiry", () => {
     expect(CREDITABLE_PRE_CREDIT_DEPOSIT_STATUSES).toEqual([
       "CREATED",
       "PENDING_CUSTOMER_ACTION",
       "PROCESSING",
       "FAILED",
+      "EXPIRED",
     ])
     for (const status of CREDITABLE_PRE_CREDIT_DEPOSIT_STATUSES) {
       expect(isCreditablePreCreditDepositStatus(status)).toBe(true)
     }
-    expect(isCreditablePreCreditDepositStatus("EXPIRED")).toBe(false)
+    expect(isCreditablePreCreditDepositStatus("EXPIRED")).toBe(true)
     expect(isCreditablePreCreditDepositStatus("SUCCEEDED")).toBe(false)
   })
 })

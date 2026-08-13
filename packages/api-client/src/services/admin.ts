@@ -13,6 +13,7 @@ import type {
   CancellationPreviewResponse,
   CancellationRequestResponse,
   CancellationRequestStatus,
+  PublisherCompensationDecisionInput,
 } from "./orders"
 
 export interface PaginatedResponse<T> {
@@ -657,6 +658,12 @@ export interface AdminOrderDetailResponse {
       message: string
     }>
   }
+  publisherCompensationPolicy?: {
+    required: boolean
+    maximumAmount: string | number
+    currency: string
+    effectiveOrderStatus: string
+  }
   organization?: { id: string; name: string; slug?: string } | null
   events: AdminOrderTimelineEvent[]
   customer?: {
@@ -747,7 +754,11 @@ export interface AdminOrderDetailResponse {
       approvedAt: string
     }>
   }>
-  dispute?: { id: string; status: string } | null
+  dispute?: {
+    id: string
+    status: string
+    previousStatus?: string | null
+  } | null
   cancellation?: { id: string; status: string } | null
   activeAssignment?: {
     id: string
@@ -1090,6 +1101,48 @@ export interface AdminSettlementResponse {
   publisher: { id: string; name: string | null; email: string }
 }
 
+export type AdminSettlementEligibilityBlockerCode =
+  | "ORDER_STATUS"
+  | "ORDER_CURRENCY"
+  | "ORDER_PAYMENT_STATUS"
+  | "ACTIVE_DELIVERY_MISSING"
+  | "ACTIVE_DELIVERY_ORDER_MISMATCH"
+  | "ACTIVE_DELIVERY_SUPERSEDED"
+  | "ACTIVE_DELIVERY_REJECTED"
+  | "ACTIVE_DELIVERY_UNVERIFIED"
+  | "ACTIVE_DISPUTE"
+  | "ACTIVE_REVISION"
+  | "ACTIVE_CANCELLATION"
+  | "UNRESOLVED_FRAUD"
+
+export interface AdminSettlementEligibilityResponse {
+  settlement: {
+    id: string
+    orderId: string
+    status: SettlementStatus
+    version: number
+  }
+  order: {
+    id: string
+    status: OrderStatus
+    version: number
+  }
+  eligible: boolean
+  blockers: Array<{
+    code: AdminSettlementEligibilityBlockerCode
+    message: string
+  }>
+  activeDelivery: {
+    id: string
+    belongsToOrder: boolean
+    current: boolean
+    verificationStatus: string | null
+    interventionStatus: string | null
+  } | null
+  evaluatedAt: string
+  mutationRechecksUnderLock: true
+}
+
 export interface AdminWithdrawalResponse {
   id: string
   publisherId: string
@@ -1240,6 +1293,7 @@ export class AdminService {
     data: CancellationMutationData & {
       confirmationOrderId: string
       responsibility: string
+      publisherCompensation?: PublisherCompensationDecisionInput
     },
   ) {
     return this.client.post<any>(`/admin/orders/${id}/force-cancel`, {
@@ -1316,6 +1370,12 @@ export class AdminService {
       {
         params: { take, skip, status: statuses?.join(",") },
       } as RequestOptions,
+    )
+  }
+
+  getSettlementEligibility(id: string) {
+    return this.client.get<AdminSettlementEligibilityResponse>(
+      `/admin/settlements/${id}/eligibility`,
     )
   }
 
@@ -1794,9 +1854,10 @@ export class AdminService {
     action: "RESTORE" | "REFUND" | "REJECT",
     resolution: string,
     responsibility?: string,
+    publisherCompensation?: PublisherCompensationDecisionInput,
   ) {
     return this.client.post<any>(`/admin/disputes/${disputeId}/resolve`, {
-      json: { action, resolution, responsibility },
+      json: { action, resolution, responsibility, publisherCompensation },
     })
   }
   reverifyDelivery(deliveryId: string) {

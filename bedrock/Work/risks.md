@@ -1,19 +1,16 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-08-11
+updated: 2026-08-12
 ---
 
 # Risks
 
-Updated 2026-08-03 after the financial evidence, order capture, settlement,
-Google-metric quarantine, integration-encryption hardening, and exact legacy
-withdrawal-reservation repair. All
-historical audit findings at Medium severity or above are closed; the remaining
-items are staging gates, strategic/long-horizon risks, and operator-action
-follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
-
-The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
+Updated 2026-08-12 after lifecycle, deposit-recovery, payout-encryption,
+refund/cancellation, authorization, worker-runtime, and browser-harness
+hardening. Historical audit Views are snapshots, not current status;
+`Work/backlog.md` is the canonical open-work register and this file is the
+canonical launch-risk register.
 
 ## Current local-work risk
 
@@ -97,11 +94,13 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   money-safe but can increase MTTR. Mitigation: alert on resolved mode, rehearse
   `normal -> recovery_only -> locked` behavior, and require an explicit
   evidence-backed decision before reopening `normal`.
-- **Stripe deposit crash-gap recovery depends on provider redelivery.** The
-  normalized checkout inbox cannot independently replay a wallet credit and no
-  authenticated Checkout/PaymentIntent catch-up worker exists. Stripe
-  redelivery plus stale/failed/quarantined reconciliation alerts contain the
-  risk; an independent retrieval path remains strategic work.
+- **Authenticated Stripe deposit recovery now exists, but provider rehearsal is
+  still required.** The worker retrieves bounded Checkout, PaymentIntent, and
+  Charge facts with a distinct restricted credential and shares the webhook's
+  serializable finalizer. Paid launch still requires Stripe test-mode rehearsal
+  of lost redelivery, 429/5xx backoff, concurrent webhook/retrieval, dispute and
+  refund rejection, stale leases, and alert delivery on a production-shaped
+  database.
 - **A late provider failure after payout completion needs incident
   adjudication.** The event is quarantined and alerted without automatically
   rewriting `lifetimePaid`, allocations, or completed state. Bounded
@@ -115,13 +114,14 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   claimed-send replay must remain disabled until terminal amount/currency
   evidence, idempotency retention, cancellation, and provider-side
   reconciliation are proven.
-- **Hard payout master-key rotation is not yet supported.** The runtime has
-  versioned derivation under one master key, but no dual-key/keyring reader or
-  resumable verified re-encryption command. Directly replacing the secret
-  would make historical payout ciphertext unreadable. Mitigation: soft
-  rotations may increment the version without changing the key; suspected
-  compromise requires finance lock, decrypt revocation, old-key preservation,
-  and a dedicated independently reviewed migration before replacement.
+- **Payout KMS/HSM provisioning is still an operational launch gate.** The v2
+  runtime now has a bounded active/decrypt-only key-provider contract,
+  identity-authenticated envelopes, legacy reads, and resumable verified hard
+  rotation. The checked-in provider still loads raw key material from process
+  environment for network-free operation. Paid production must provision the
+  managed KMS/HSM policy, least-privilege runtime identity, audited unwrap
+  access, availability/recovery behavior, and a concrete provider adapter;
+  environment keyring plus database exposure can still reveal all plaintext.
 
 ## Closed in this batch (no longer active)
 

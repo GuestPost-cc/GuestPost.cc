@@ -1,3 +1,10 @@
+---
+note_type: domain-memory
+domain: orders-fulfillment
+project: guestpost-platform
+updated: 2026-08-12
+---
+
 # Order Lifecycle Integrity
 
 The durable engineering and operations guide is

@@ -789,6 +789,12 @@ function FinancePageInner() {
     publisherLabel: string
   } | null>(null)
 
+  const settlementEligibilityQ = useQuery({
+    queryKey: ["settlement-eligibility", approveTarget],
+    queryFn: () => api.admin.getSettlementEligibility(approveTarget!),
+    enabled: approveTarget !== null,
+  })
+
   const approveSettlement = useMutation({
     mutationFn: ({
       id,
@@ -802,7 +808,7 @@ function FinancePageInner() {
       force
         ? api.admin.forceApproveSettlement(id, reason)
         : api.admin.approveSettlement(id, reason),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success(
         forceApproval
           ? "Customer approval recorded by Super Admin"
@@ -812,6 +818,9 @@ function FinancePageInner() {
       setApproveReason("")
       setForceApproval(false)
       queryClient.invalidateQueries({ queryKey: ["settlements"] })
+      queryClient.invalidateQueries({
+        queryKey: ["settlement-eligibility", variables.id],
+      })
     },
     onError: (e: any) =>
       toast.error(e?.message ?? "Failed to approve settlement"),
@@ -2443,6 +2452,29 @@ function FinancePageInner() {
               {approveReason.length}/1000 characters
             </p>
           </div>
+          <div className="rounded-md border p-3 text-sm">
+            {settlementEligibilityQ.isLoading ? (
+              <Skeleton className="h-5 w-full" />
+            ) : settlementEligibilityQ.error ? (
+              <p className="text-destructive">
+                Eligibility could not be loaded. Approval remains blocked.
+              </p>
+            ) : settlementEligibilityQ.data?.eligible ? (
+              <p className="text-emerald-700">
+                Current delivery and order evidence is eligible. The mutation
+                will recheck it under lock.
+              </p>
+            ) : (
+              <div className="space-y-1 text-destructive">
+                <p className="font-medium">Settlement is currently blocked:</p>
+                <ul className="space-y-1">
+                  {settlementEligibilityQ.data?.blockers.map((blocker) => (
+                    <li key={blocker.code}>{blocker.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -2456,7 +2488,9 @@ function FinancePageInner() {
             </Button>
             <Button
               disabled={
-                approveReason.trim().length < 1 || approveSettlement.isPending
+                approveReason.trim().length < 1 ||
+                approveSettlement.isPending ||
+                !settlementEligibilityQ.data?.eligible
               }
               onClick={() =>
                 approveSettlement.mutate({

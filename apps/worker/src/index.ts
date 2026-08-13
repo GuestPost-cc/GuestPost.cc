@@ -25,15 +25,24 @@ import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { assertObjectStorageReady } from "@guestpost/shared/dist/object-storage"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { Queue, QueueEvents } from "bullmq"
-import { type HealthServerHandle, startHealthServer } from "./lib/health-server"
+import { startHealthServer } from "./lib/health-server"
 import {
-  MAINTENANCE_DISPATCH_TASK,
   type MaintenanceTaskName,
   maintenanceTasksAllowedForFinanceMode,
   maintenanceTasksDueAt,
 } from "./lib/maintenance-schedule"
+import {
+  createWorkerRuntime,
+  installWorkerSignalHandlers,
+  type WorkerFactoryRegistry,
+} from "./lib/worker-runtime"
+import {
+  buildScheduledTaskRuntimePlan,
+  type ScheduledTaskRuntimePlan,
+} from "./lib/worker-runtime-plan"
 import { createAutoAcceptWorker } from "./processors/auto-accept.processor"
 import { createDeliveryVerificationWorker } from "./processors/delivery-verification.processor"
+import { processDepositCreditRecovery } from "./processors/deposit-credit-recovery.processor"
 import { createDomainMetricsWorker } from "./processors/domain-metrics.processor"
 import { createEmailWorker } from "./processors/email.processor"
 import { createNotificationWorker } from "./processors/notification.processor"
@@ -157,6 +166,33 @@ async function registerPaymentDisputeInbox(): Promise<RegisteredJob> {
     name: "payment-dispute-inbox",
     queue: QUEUES.RECONCILIATION,
   }
+}
+
+async function registerDepositCreditRecovery(): Promise<RegisteredJob> {
+  const everyMs = 5 * 60 * 1000
+  const jobName = QUEUE_JOBS[QUEUES.RECONCILIATION].DEPOSIT_CREDIT_RECOVERY
+  const queue = new Queue(QUEUES.RECONCILIATION, { connection })
+  await queue.removeRepeatable(jobName, { every: everyMs }).catch(() => {})
+  await queue.add(
+    jobName,
+    signJobPayload(
+      {
+        limit: positiveInt(process.env.DEPOSIT_CREDIT_RECOVERY_BATCH_SIZE, 25),
+      },
+      0,
+    ),
+    {
+      repeat: { every: everyMs },
+      jobId: jobName,
+      removeOnComplete: { count: 24 },
+      removeOnFail: { count: 24 },
+    },
+  )
+  await queue.close()
+  logger.info("registered authenticated deposit credit recovery", {
+    intervalMs: everyMs,
+  })
+  return { name: jobName, queue: QUEUES.RECONCILIATION }
 }
 
 // Daily governance sweep expires temporary overrides within 24h. The core
@@ -481,7 +517,7 @@ async function checkConnections() {
     logger.error("FATAL: Redis connection failed", {
       err: err instanceof Error ? err.message : String(err),
     })
-    process.exit(1)
+    throw err
   }
   try {
     await prisma.$queryRaw`SELECT 1`
@@ -489,46 +525,50 @@ async function checkConnections() {
     logger.error("FATAL: Database connection failed", {
       err: err instanceof Error ? err.message : String(err),
     })
-    process.exit(1)
+    throw err
   }
   logger.info("Redis + database connections verified")
 }
 
-type WorkerFactory = () => { close: () => Promise<void> }
-type WorkerMode = "all" | "realtime" | "on-demand" | "scheduled"
-
-const REALTIME_WORKERS: WorkerFactory[] = [
-  createEmailWorker,
-  createNotificationWorker,
-  createWebsiteVerificationWorker,
-  createDeliveryVerificationWorker,
-]
-
-const ON_DEMAND_WORKERS: WorkerFactory[] = [
-  createReportWorker,
-  createVerificationWorker,
-  createPayoutWorker, // drains pre-inbox rollout jobs only
-  createPublisherTrustWorker,
-  createDomainMetricsWorker,
-]
-
-async function createIntegrationWorkers(): Promise<
-  Array<{ close: () => Promise<void> }>
-> {
+async function loadIntegrationWorkerFactories() {
   // Importing the integrations worker package constructs its encryption
   // adapter. Keep that import inside the only lanes that process integration
   // queues so realtime and scheduled workloads do not need the integration
   // encryption key (or Google credentials) merely to boot.
-  const { createDiscoveryWorker, createSyncWorker } = await import(
-    "@guestpost/integrations/workers"
-  )
-  return [
-    createDiscoveryWorker(connection as any) as {
-      close: () => Promise<void>
-    },
-    createSyncWorker(connection as any) as { close: () => Promise<void> },
-  ]
+  return import("@guestpost/integrations/workers")
 }
+
+async function createIntegrationDiscoveryWorker() {
+  const { createDiscoveryWorker } = await loadIntegrationWorkerFactories()
+  return createDiscoveryWorker(connection as any) as {
+    close: () => Promise<void>
+  }
+}
+
+async function createIntegrationSyncWorker() {
+  const { createSyncWorker } = await loadIntegrationWorkerFactories()
+  return createSyncWorker(connection as any) as {
+    close: () => Promise<void>
+  }
+}
+
+const WORKER_FACTORIES = {
+  email: createEmailWorker,
+  report: createReportWorker,
+  notification: createNotificationWorker,
+  verification: createVerificationWorker,
+  payout: createPayoutWorker,
+  reconciliation: createReconciliationWorker,
+  "website-verification": createWebsiteVerificationWorker,
+  "delivery-verification": createDeliveryVerificationWorker,
+  "publisher-trust": createPublisherTrustWorker,
+  "settlement-auto-approve": createSettlementAutoApproveWorker,
+  "settlement-release": createSettlementReleaseWorker,
+  "auto-accept": createAutoAcceptWorker,
+  "domain-metrics": createDomainMetricsWorker,
+  "integration-discovery": createIntegrationDiscoveryWorker,
+  "integration-sync": createIntegrationSyncWorker,
+} satisfies WorkerFactoryRegistry
 
 const ON_DEMAND_QUEUES = [
   QUEUES.REPORT,
@@ -544,7 +584,6 @@ interface ScheduledTaskConfig {
   queue: string
   jobName: string
   data: Record<string, unknown>
-  createWorker: WorkerFactory
 }
 
 function positiveInt(value: string | undefined, fallback: number): number {
@@ -566,19 +605,16 @@ function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
       queue: QUEUES.EMAIL,
       jobName: QUEUE_JOBS[QUEUES.EMAIL].SWEEP_OUTBOX,
       data: {},
-      createWorker: createEmailWorker,
     },
     "payout-reconcile": {
       queue: QUEUES.PAYOUT,
       jobName: QUEUE_JOBS[QUEUES.PAYOUT].CHECK_STATUS,
       data: { limit: positiveInt(process.env.PAYOUT_STATUS_BATCH_SIZE, 50) },
-      createWorker: createPayoutWorker,
     },
     reconciliation: {
       queue: QUEUES.RECONCILIATION,
       jobName: QUEUE_JOBS[QUEUES.RECONCILIATION].RUN,
       data: {},
-      createWorker: createReconciliationWorker,
     },
     "payment-dispute-inbox": {
       queue: QUEUES.RECONCILIATION,
@@ -586,25 +622,28 @@ function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
       data: {
         limit: positiveInt(process.env.PAYMENT_DISPUTE_INBOX_BATCH_SIZE, 100),
       },
-      createWorker: createReconciliationWorker,
+    },
+    "deposit-credit-recovery": {
+      queue: QUEUES.RECONCILIATION,
+      jobName: QUEUE_JOBS[QUEUES.RECONCILIATION].DEPOSIT_CREDIT_RECOVERY,
+      data: {
+        limit: positiveInt(process.env.DEPOSIT_CREDIT_RECOVERY_BATCH_SIZE, 25),
+      },
     },
     "website-reverify": {
       queue: QUEUES.WEBSITE_VERIFICATION,
       jobName: QUEUE_JOBS[QUEUES.WEBSITE_VERIFICATION].REVERIFY_SWEEP,
       data: {},
-      createWorker: createWebsiteVerificationWorker,
     },
     "domain-metrics-refresh": {
       queue: QUEUES.DOMAIN_METRICS,
       jobName: "domain-metrics-refresh",
       data: { batchSize: 100 },
-      createWorker: createDomainMetricsWorker,
     },
     "settlement-link-check": {
       queue: QUEUES.DELIVERY_VERIFICATION,
       jobName: QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].HOLD_LINK_SWEEP,
       data: {},
-      createWorker: createDeliveryVerificationWorker,
     },
     "delivery-verification-dispatch": {
       queue: QUEUES.DELIVERY_VERIFICATION,
@@ -615,7 +654,6 @@ function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
           100,
         ),
       },
-      createWorker: createDeliveryVerificationWorker,
     },
     "settlement-auto-approve": {
       queue: QUEUES.SETTLEMENT,
@@ -626,7 +664,6 @@ function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
           100,
         ),
       },
-      createWorker: createSettlementAutoApproveWorker,
     },
     "settlement-auto-release": {
       queue: QUEUES.SETTLEMENT_RELEASE,
@@ -637,49 +674,29 @@ function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
           100,
         ),
       },
-      createWorker: createSettlementReleaseWorker,
     },
     "auto-accept": {
       queue: QUEUES.AUTO_ACCEPT,
       jobName: QUEUE_JOBS[QUEUES.AUTO_ACCEPT].SWEEP,
       data: {},
-      createWorker: createAutoAcceptWorker,
     },
     "review-reminders": {
       queue: QUEUES.AUTO_ACCEPT,
       jobName: QUEUE_JOBS[QUEUES.AUTO_ACCEPT].REMINDER_SWEEP,
       data: {},
-      createWorker: createAutoAcceptWorker,
     },
     "cancellation-timeouts": {
       queue: QUEUES.AUTO_ACCEPT,
       jobName: QUEUE_JOBS[QUEUES.AUTO_ACCEPT].CANCELLATION_TIMEOUT_SWEEP,
       data: { responseSweepMinutes: cancellation.responseSweepMinutes },
-      createWorker: createAutoAcceptWorker,
     },
     "acceptance-timeouts": {
       queue: QUEUES.AUTO_ACCEPT,
       jobName: QUEUE_JOBS[QUEUES.AUTO_ACCEPT].ACCEPTANCE_TIMEOUT_SWEEP,
       data: { acceptanceSweepMinutes: cancellation.acceptanceSweepMinutes },
-      createWorker: createAutoAcceptWorker,
     },
   }
   return tasks[name]
-}
-
-function resolveWorkerMode(): WorkerMode {
-  const value = (process.env.WORKER_MODE ?? "all").trim()
-  if (
-    value === "all" ||
-    value === "realtime" ||
-    value === "on-demand" ||
-    value === "scheduled"
-  ) {
-    return value
-  }
-  throw new Error(
-    `Invalid WORKER_MODE=${value}; expected all, realtime, on-demand, or scheduled`,
-  )
 }
 
 async function removeHybridRepeatables(): Promise<void> {
@@ -700,6 +717,7 @@ async function removeHybridRepeatables(): Promise<void> {
       names: [
         QUEUE_JOBS[QUEUES.RECONCILIATION].RUN,
         QUEUE_JOBS[QUEUES.RECONCILIATION].PAYMENT_DISPUTE_INBOX,
+        QUEUE_JOBS[QUEUES.RECONCILIATION].DEPOSIT_CREDIT_RECOVERY,
       ],
     },
     {
@@ -756,7 +774,11 @@ async function removeHybridRepeatables(): Promise<void> {
   logger.info("owned legacy BullMQ repeatables removed for hybrid runtime")
 }
 
-async function runScheduledTask(taskName: string): Promise<void> {
+async function runScheduledTask(
+  plan: ScheduledTaskRuntimePlan,
+  objectStorageReady = false,
+): Promise<void> {
+  const { taskName } = plan
   const task = getScheduledTask(taskName)
   if (!task) {
     throw new Error(`Unknown WORKER_TASK=${taskName}`)
@@ -764,7 +786,7 @@ async function runScheduledTask(taskName: string): Promise<void> {
 
   // These scheduled tasks share the delivery-verification queue with snapshot
   // writes, so their temporary worker needs storage before it consumes.
-  if (task.queue === QUEUES.DELIVERY_VERIFICATION) {
+  if (task.queue === QUEUES.DELIVERY_VERIFICATION && !objectStorageReady) {
     await assertObjectStorageReadiness()
   }
 
@@ -777,11 +799,12 @@ async function runScheduledTask(taskName: string): Promise<void> {
 
   const events = new QueueEvents(task.queue, { connection })
   await events.waitUntilReady()
-  const worker = task.createWorker()
+  const worker = await WORKER_FACTORIES[plan.workerFactories[0]]()
   const queue = new Queue(task.queue, { connection })
   try {
     const jobBucketMs =
       taskName === "payment-dispute-inbox" ||
+      taskName === "deposit-credit-recovery" ||
       taskName === "delivery-verification-dispatch"
         ? 5 * 60 * 1000
         : 10 * 60 * 1000
@@ -841,7 +864,7 @@ async function runMaintenanceDispatch(now = new Date()): Promise<void> {
   const failures: Array<{ taskName: MaintenanceTaskName; error: Error }> = []
   for (const taskName of dueTasks) {
     try {
-      await runScheduledTask(taskName)
+      await runScheduledTask(buildScheduledTaskRuntimePlan(taskName))
     } catch (error) {
       const normalized =
         error instanceof Error ? error : new Error(String(error))
@@ -881,6 +904,9 @@ async function drainOnDemandQueues(): Promise<void> {
       const disputeInbox = await processPaymentDisputeInbox(
         positiveInt(process.env.PAYMENT_DISPUTE_INBOX_BATCH_SIZE, 100),
       )
+      const depositRecovery = await processDepositCreditRecovery(
+        positiveInt(process.env.DEPOSIT_CREDIT_RECOVERY_BATCH_SIZE, 25),
+      )
       const counts = await Promise.all(
         queueHandles.map((queue) =>
           queue.getJobCounts("waiting", "active", "prioritized"),
@@ -904,7 +930,20 @@ async function drainOnDemandQueues(): Promise<void> {
         disputeInbox.processed -
         disputeInbox.retried -
         disputeInbox.quarantined
-      if (queued === 0 && inboxPending <= 0 && disputeInboxPending <= 0)
+      const depositRecoveryPending =
+        depositRecovery.claimed -
+        depositRecovery.credited -
+        depositRecovery.replayed -
+        depositRecovery.closedUnpaid -
+        depositRecovery.superseded -
+        depositRecovery.retried -
+        depositRecovery.quarantined
+      if (
+        queued === 0 &&
+        inboxPending <= 0 &&
+        disputeInboxPending <= 0 &&
+        depositRecoveryPending <= 0
+      )
         quietChecks++
       else quietChecks = 0
       if (quietChecks >= 2) return
@@ -917,9 +956,6 @@ async function drainOnDemandQueues(): Promise<void> {
     await Promise.all(queueHandles.map((queue) => queue.close()))
   }
 }
-
-const workers: Array<{ close: () => Promise<void> }> = []
-let healthServer: HealthServerHandle | undefined
 
 // Phase 7.0 — unhandledRejection policy.
 //
@@ -973,151 +1009,84 @@ process.on("uncaughtException", (err: Error) => {
   void flushAndExit(1, "uncaughtException", err)
 })
 
-async function bootstrap() {
-  await checkConnections()
-  const mode = resolveWorkerMode()
-  logger.info("worker runtime selected", { mode })
-
-  if (mode === "all") {
-    await assertObjectStorageReadiness()
-    healthServer = await startHealthServer()
-    workers.push(
-      createEmailWorker(),
-      createReportWorker(),
-      createNotificationWorker(),
-      createVerificationWorker(),
-      createPayoutWorker(),
-      createReconciliationWorker(),
-      createWebsiteVerificationWorker(),
-      createDeliveryVerificationWorker(),
-      createPublisherTrustWorker(),
-      createSettlementAutoApproveWorker(),
-      createSettlementReleaseWorker(),
-      createAutoAcceptWorker(),
-      createDomainMetricsWorker(),
-    )
-    workers.push(...(await createIntegrationWorkers()))
-    logger.info("legacy-compatible worker fleet started", {
-      count: workers.length,
-    })
-    const registeredJobs = await Promise.all([
-      registerCommunicationOutboxSweep(),
-      registerPayoutStatusPoll(),
-      registerReconciliationSweep(),
-      registerPaymentDisputeInbox(),
-      registerWebsiteReverifySweep(),
-      registerDomainMetricsRefresh(),
-      registerDeliveryVerificationDispatchSweep(),
-      registerSettlementHoldLinkSweep(),
-      registerSettlementAutoApproveSweep(),
-      registerSettlementAutoReleaseSweep(),
-      registerAutoAcceptSweep(),
-      registerReviewReminderSweep(),
-      registerCancellationResponseTimeoutSweep(),
-      registerOrderAcceptanceTimeoutSweep(),
-    ])
-    assertNoRegistryDrift(registeredJobs)
-    return
-  }
-
-  if (mode === "realtime") {
-    await assertObjectStorageReadiness()
-    await removeHybridRepeatables()
-    healthServer = await startHealthServer()
-    workers.push(...REALTIME_WORKERS.map((createWorker) => createWorker()))
-    logger.info("realtime worker lane started", {
-      count: workers.length,
-      queues: [
-        QUEUES.EMAIL,
-        QUEUES.NOTIFICATION,
-        QUEUES.WEBSITE_VERIFICATION,
-        QUEUES.DELIVERY_VERIFICATION,
-      ],
-    })
-    return
-  }
-
-  if (mode === "on-demand") {
-    workers.push(...ON_DEMAND_WORKERS.map((createWorker) => createWorker()))
-    workers.push(...(await createIntegrationWorkers()))
-    logger.info("on-demand worker lane started", {
-      count: workers.length,
-      queues: ON_DEMAND_QUEUES,
-    })
-    await drainOnDemandQueues()
-    await shutdown("on-demand-complete")
-    return
-  }
-
-  const taskName = process.env.WORKER_TASK?.trim()
-  if (!taskName) {
-    throw new Error("WORKER_TASK is required when WORKER_MODE=scheduled")
-  }
-  if (taskName === MAINTENANCE_DISPATCH_TASK) {
-    await runMaintenanceDispatch()
-    await shutdown(`scheduled-complete:${taskName}`)
-    return
-  }
-  await runScheduledTask(taskName)
-  await shutdown(`scheduled-complete:${taskName}`)
+async function registerLegacyRepeatables(): Promise<void> {
+  const registeredJobs = await Promise.all([
+    registerCommunicationOutboxSweep(),
+    registerPayoutStatusPoll(),
+    registerReconciliationSweep(),
+    registerPaymentDisputeInbox(),
+    registerDepositCreditRecovery(),
+    registerWebsiteReverifySweep(),
+    registerDomainMetricsRefresh(),
+    registerDeliveryVerificationDispatchSweep(),
+    registerSettlementHoldLinkSweep(),
+    registerSettlementAutoApproveSweep(),
+    registerSettlementAutoReleaseSweep(),
+    registerAutoAcceptSweep(),
+    registerReviewReminderSweep(),
+    registerCancellationResponseTimeoutSweep(),
+    registerOrderAcceptanceTimeoutSweep(),
+  ])
+  assertNoRegistryDrift(registeredJobs)
 }
 
-bootstrap().catch((err) => {
-  logger.error("FATAL: bootstrap failed", {
-    err: err instanceof Error ? err.message : String(err),
-  })
-  Sentry.captureException(err)
-  void Sentry.flush(2000).finally(() => process.exit(1))
+const runtime = createWorkerRuntime({
+  workerFactories: WORKER_FACTORIES,
+  checkConnections,
+  assertObjectStorageReadiness,
+  startHealthServer,
+  removeHybridRepeatables,
+  registerLegacyRepeatables,
+  drainOnDemandQueues,
+  runScheduledTask: (plan) => runScheduledTask(plan, true),
+  runMaintenanceDispatch,
+  closeRedis: async () => {
+    await connection.quit()
+  },
+  disconnectDatabase: () => prisma.$disconnect(),
+  flushTelemetry: async () => {
+    await Sentry.flush(2000)
+  },
+  logger,
 })
 
-async function shutdown(signal: string): Promise<void> {
-  logger.info("signal received — draining workers", { signal })
-  const SHUTDOWN_TIMEOUT_MS = 30_000
-  const drainTimeout = setTimeout(() => {
-    logger.error("shutdown timeout reached — forcing exit", {
-      timeoutMs: SHUTDOWN_TIMEOUT_MS,
+const SHUTDOWN_TIMEOUT_MS = 30_000
+let shutdownTimeout: NodeJS.Timeout | undefined
+
+installWorkerSignalHandlers(runtime, process, {
+  onSignal: (signal) => {
+    logger.info("signal received — draining workers", { signal })
+    shutdownTimeout = setTimeout(() => {
+      logger.error("shutdown timeout reached — forcing exit", {
+        signal,
+        timeoutMs: SHUTDOWN_TIMEOUT_MS,
+      })
+      process.exit(1)
+    }, SHUTDOWN_TIMEOUT_MS)
+  },
+  onShutdownComplete: () => {
+    if (shutdownTimeout) clearTimeout(shutdownTimeout)
+    process.exit(0)
+  },
+  onShutdownError: (error, signal) => {
+    if (shutdownTimeout) clearTimeout(shutdownTimeout)
+    logger.error("worker shutdown failed", {
+      signal,
+      err: error instanceof Error ? error.message : String(error),
     })
     process.exit(1)
-  }, SHUTDOWN_TIMEOUT_MS)
-  await Promise.all(
-    workers.map((w) =>
-      w.close().catch((err) =>
-        logger.error("worker close error", {
-          err: err instanceof Error ? err.message : String(err),
-        }),
-      ),
-    ),
-  )
-  try {
-    await connection.quit()
-  } catch (err) {
-    logger.error("redis connection close error", {
-      err: err instanceof Error ? err.message : String(err),
-    })
-  }
-  if (healthServer) {
-    await healthServer.close().catch((err) =>
-      logger.error("health server close error", {
-        err: err instanceof Error ? err.message : String(err),
-      }),
-    )
-  }
-  try {
-    await prisma.$disconnect()
-  } catch (err) {
-    logger.error("prisma $disconnect error", {
-      err: err instanceof Error ? err.message : String(err),
-    })
-  }
-  try {
-    await Sentry.flush(2000)
-  } catch {
-    /* best-effort */
-  }
-  clearTimeout(drainTimeout)
-  logger.info("shutdown complete", { signal })
-  process.exit(0)
-}
+  },
+})
 
-process.on("SIGTERM", () => void shutdown("SIGTERM"))
-process.on("SIGINT", () => void shutdown("SIGINT"))
+runtime
+  .bootstrap(process.env)
+  .then(({ disposition }) => {
+    if (disposition === "completed") process.exit(0)
+  })
+  .catch((err) => {
+    logger.error("FATAL: bootstrap failed", {
+      err: err instanceof Error ? err.message : String(err),
+    })
+    Sentry.captureException(err)
+    void Sentry.flush(2000).finally(() => process.exit(1))
+  })

@@ -26,7 +26,7 @@ describe("payout-status provider checks", () => {
     ).toBeNull()
   })
 
-  it("maps Wise statuses correctly", async () => {
+  it("never treats a non-contract Wise completed state as proof of payment", async () => {
     process.env.WISE_API_KEY = "key"
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -34,7 +34,8 @@ describe("payout-status provider checks", () => {
     }) as any
 
     const result = await checkWiseTransferStatus("t-1")
-    expect(result).toMatchObject({ status: "COMPLETED", fee: 2.5 })
+    expect(result).toMatchObject({ status: "PROCESSING", fee: 2.5 })
+    expect(await checkProviderTransferStatus("wise", "t-1")).toBeNull()
   })
 
   it("maps unknown provider statuses to PROCESSING, never COMPLETED", async () => {

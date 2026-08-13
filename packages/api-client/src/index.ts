@@ -9,6 +9,11 @@ export type {
   SyncJob,
   TriggerSyncResponse,
 } from "@guestpost/integrations/client"
+export {
+  apiV1Url,
+  resolveApiOrigin,
+  resolveApiV1Url,
+} from "./api-origin"
 export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, HttpClient } from "./client"
 export type {
@@ -50,6 +55,8 @@ export type {
   AdminOrderTimelineEvent,
   AdminPlatformListingServiceResponse,
   AdminPlatformWebsiteResponse,
+  AdminSettlementEligibilityBlockerCode,
+  AdminSettlementEligibilityResponse,
   AdminSettlementResponse,
   AdminStaffPerformanceItem,
   AdminStaffPerformanceResponse,
@@ -110,6 +117,7 @@ export type {
   CreateOrderData,
   OrderItemData,
   OrderResponse,
+  PublisherCompensationDecisionInput,
 } from "./services/orders"
 export { OrdersService } from "./services/orders"
 export type {

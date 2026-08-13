@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
+import { CurrentAuthorityService } from "../../modules/auth/current-authority.service"
 import { ORDER_OWNERSHIP_KEY } from "../decorators/order-ownership.decorator"
 import { PrismaService } from "../prisma.service"
 
@@ -14,6 +15,7 @@ export class OrderOwnershipGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
+    private readonly authorities: CurrentAuthorityService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -33,6 +35,7 @@ export class OrderOwnershipGuard implements CanActivate {
     if (!paramId) {
       throw new ForbiddenException("Order identifier is required")
     }
+    const authority = await this.authorities.resolveRequest(request)
 
     // Phase 6.5: also pull fulfillmentChannel so we can refuse access when
     // a publisher's website later gets reassigned out from under them.
@@ -60,8 +63,12 @@ export class OrderOwnershipGuard implements CanActivate {
       throw new NotFoundException("Order not found")
     }
 
-    if (user.userType === "CUSTOMER") {
-      if (order.organizationId !== user.organizationId) {
+    if (authority.userType === "CUSTOMER") {
+      if (
+        !authority.organizationId ||
+        !authority.customerRole ||
+        order.organizationId !== authority.organizationId
+      ) {
         throw new ForbiddenException(
           "Order does not belong to your organization",
         )
@@ -69,8 +76,12 @@ export class OrderOwnershipGuard implements CanActivate {
       return true
     }
 
-    if (user.userType === "PUBLISHER") {
-      if (order.website?.publisherId !== user.publisherId) {
+    if (authority.userType === "PUBLISHER") {
+      if (
+        !authority.publisherId ||
+        !authority.publisherRole ||
+        order.website?.publisherId !== authority.publisherId
+      ) {
         throw new ForbiddenException(
           "Order is not assigned to your publisher account",
         )

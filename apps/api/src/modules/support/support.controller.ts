@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from "@nestjs/common"
 import { ActorType } from "../../common/decorators/actor-type.decorator"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { CurrentAuthority } from "../../common/decorators/current-authority.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
@@ -62,7 +62,7 @@ export class SupportController {
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER", "MEMBER")
-  createTicket(@Body() body: CreateTicketDto, @CurrentUser() user: any) {
+  createTicket(@Body() body: CreateTicketDto, @CurrentAuthority() user: any) {
     return this.support.createTicket({
       subject: body.subject,
       description: body.description,
@@ -75,26 +75,29 @@ export class SupportController {
   // ── Multi-actor list / get / reply ───────────────────────────────────────
   // Same path; the service decides the visible slice via buildActor().
   @Get("tickets")
-  @UseGuards(ActorTypeGuard)
-  @ActorType("CUSTOMER", "PUBLISHER", "STAFF")
-  listTickets(@CurrentUser() user: any, @Query("status") status?: string) {
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @MemberRoles("OWNER", "MEMBER", "PUBLISHER_OWNER", "PUBLISHER_MEMBER")
+  listTickets(@CurrentAuthority() user: any, @Query("status") status?: string) {
     return this.support.listTickets(buildActor(user), { status })
   }
 
   @Get("tickets/:id")
-  @UseGuards(ActorTypeGuard)
-  @ActorType("CUSTOMER", "PUBLISHER", "STAFF")
-  getTicket(@Param("id") id: string, @CurrentUser() user: any) {
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @MemberRoles("OWNER", "MEMBER", "PUBLISHER_OWNER", "PUBLISHER_MEMBER")
+  getTicket(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.support.getTicket(id, buildActor(user))
   }
 
   @Post("tickets/:id/messages")
-  @UseGuards(ActorTypeGuard)
-  @ActorType("CUSTOMER", "PUBLISHER", "STAFF")
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @MemberRoles("OWNER", "MEMBER", "PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   addMessage(
     @Param("id") ticketId: string,
     @Body() body: AddTicketMessageDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.support.addMessage(ticketId, buildActor(user), {
       content: body.content,
@@ -114,7 +117,7 @@ export class SupportController {
       assignedPublisherId?: string | null
       reason?: string
     },
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.support.reassignTicket(ticketId, body, {
       userId: user.id,

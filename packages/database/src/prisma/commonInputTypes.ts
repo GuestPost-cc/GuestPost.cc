@@ -970,6 +970,23 @@ export type EnumCancellationResolutionNullableWithAggregatesFilter<$PrismaModel 
   _max?: Prisma.NestedEnumCancellationResolutionNullableFilter<$PrismaModel>
 }
 
+export type EnumPublisherCompensationDispositionFilter<$PrismaModel = never> = {
+  equals?: $Enums.PublisherCompensationDisposition | Prisma.EnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  in?: $Enums.PublisherCompensationDisposition[] | Prisma.ListEnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PublisherCompensationDisposition[] | Prisma.ListEnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPublisherCompensationDispositionFilter<$PrismaModel> | $Enums.PublisherCompensationDisposition
+}
+
+export type EnumPublisherCompensationDispositionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PublisherCompensationDisposition | Prisma.EnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  in?: $Enums.PublisherCompensationDisposition[] | Prisma.ListEnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PublisherCompensationDisposition[] | Prisma.ListEnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPublisherCompensationDispositionWithAggregatesFilter<$PrismaModel> | $Enums.PublisherCompensationDisposition
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPublisherCompensationDispositionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPublisherCompensationDispositionFilter<$PrismaModel>
+}
+
 export type EnumSettlementStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.SettlementStatus | Prisma.EnumSettlementStatusFieldRefInput<$PrismaModel>
   in?: $Enums.SettlementStatus[] | Prisma.ListEnumSettlementStatusFieldRefInput<$PrismaModel>
@@ -1494,6 +1511,40 @@ export type EnumDepositFailureCodeNullableWithAggregatesFilter<$PrismaModel = ne
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel>
   _max?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel>
+}
+
+export type EnumDepositCreditRecoveryStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositCreditRecoveryStatus | Prisma.EnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositCreditRecoveryStatus[] | Prisma.ListEnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositCreditRecoveryStatus[] | Prisma.ListEnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositCreditRecoveryStatusFilter<$PrismaModel> | $Enums.DepositCreditRecoveryStatus
+}
+
+export type EnumDepositCreditRecoveryStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositCreditRecoveryStatus | Prisma.EnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositCreditRecoveryStatus[] | Prisma.ListEnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositCreditRecoveryStatus[] | Prisma.ListEnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositCreditRecoveryStatusWithAggregatesFilter<$PrismaModel> | $Enums.DepositCreditRecoveryStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDepositCreditRecoveryStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDepositCreditRecoveryStatusFilter<$PrismaModel>
+}
+
+export type EnumDepositCreditEvidenceSourceFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositCreditEvidenceSource | Prisma.EnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositCreditEvidenceSource[] | Prisma.ListEnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositCreditEvidenceSource[] | Prisma.ListEnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositCreditEvidenceSourceFilter<$PrismaModel> | $Enums.DepositCreditEvidenceSource
+}
+
+export type EnumDepositCreditEvidenceSourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositCreditEvidenceSource | Prisma.EnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositCreditEvidenceSource[] | Prisma.ListEnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositCreditEvidenceSource[] | Prisma.ListEnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositCreditEvidenceSourceWithAggregatesFilter<$PrismaModel> | $Enums.DepositCreditEvidenceSource
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDepositCreditEvidenceSourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDepositCreditEvidenceSourceFilter<$PrismaModel>
 }
 
 export type EnumPaymentProviderEventStatusFilter<$PrismaModel = never> = {
@@ -2907,6 +2958,23 @@ export type NestedEnumCancellationResolutionNullableWithAggregatesFilter<$Prisma
   _max?: Prisma.NestedEnumCancellationResolutionNullableFilter<$PrismaModel>
 }
 
+export type NestedEnumPublisherCompensationDispositionFilter<$PrismaModel = never> = {
+  equals?: $Enums.PublisherCompensationDisposition | Prisma.EnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  in?: $Enums.PublisherCompensationDisposition[] | Prisma.ListEnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PublisherCompensationDisposition[] | Prisma.ListEnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPublisherCompensationDispositionFilter<$PrismaModel> | $Enums.PublisherCompensationDisposition
+}
+
+export type NestedEnumPublisherCompensationDispositionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PublisherCompensationDisposition | Prisma.EnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  in?: $Enums.PublisherCompensationDisposition[] | Prisma.ListEnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PublisherCompensationDisposition[] | Prisma.ListEnumPublisherCompensationDispositionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPublisherCompensationDispositionWithAggregatesFilter<$PrismaModel> | $Enums.PublisherCompensationDisposition
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPublisherCompensationDispositionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPublisherCompensationDispositionFilter<$PrismaModel>
+}
+
 export type NestedEnumSettlementStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.SettlementStatus | Prisma.EnumSettlementStatusFieldRefInput<$PrismaModel>
   in?: $Enums.SettlementStatus[] | Prisma.ListEnumSettlementStatusFieldRefInput<$PrismaModel>
@@ -3431,6 +3499,40 @@ export type NestedEnumDepositFailureCodeNullableWithAggregatesFilter<$PrismaMode
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel>
   _max?: Prisma.NestedEnumDepositFailureCodeNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumDepositCreditRecoveryStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositCreditRecoveryStatus | Prisma.EnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositCreditRecoveryStatus[] | Prisma.ListEnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositCreditRecoveryStatus[] | Prisma.ListEnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositCreditRecoveryStatusFilter<$PrismaModel> | $Enums.DepositCreditRecoveryStatus
+}
+
+export type NestedEnumDepositCreditRecoveryStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositCreditRecoveryStatus | Prisma.EnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositCreditRecoveryStatus[] | Prisma.ListEnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositCreditRecoveryStatus[] | Prisma.ListEnumDepositCreditRecoveryStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositCreditRecoveryStatusWithAggregatesFilter<$PrismaModel> | $Enums.DepositCreditRecoveryStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDepositCreditRecoveryStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDepositCreditRecoveryStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumDepositCreditEvidenceSourceFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositCreditEvidenceSource | Prisma.EnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositCreditEvidenceSource[] | Prisma.ListEnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositCreditEvidenceSource[] | Prisma.ListEnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositCreditEvidenceSourceFilter<$PrismaModel> | $Enums.DepositCreditEvidenceSource
+}
+
+export type NestedEnumDepositCreditEvidenceSourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositCreditEvidenceSource | Prisma.EnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositCreditEvidenceSource[] | Prisma.ListEnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositCreditEvidenceSource[] | Prisma.ListEnumDepositCreditEvidenceSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositCreditEvidenceSourceWithAggregatesFilter<$PrismaModel> | $Enums.DepositCreditEvidenceSource
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDepositCreditEvidenceSourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDepositCreditEvidenceSourceFilter<$PrismaModel>
 }
 
 export type NestedEnumPaymentProviderEventStatusFilter<$PrismaModel = never> = {

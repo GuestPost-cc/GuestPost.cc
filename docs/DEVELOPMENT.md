@@ -111,7 +111,9 @@ testing is finished.
   that run with `WITHDRAWAL_HOLD_DAYS=0`: `pnpm test:integration`
 - Money race/idempotency harness against the same isolated zero-hold stack:
   `pnpm test:concurrency`
-- E2E tests: `npx playwright test`
+- Browser E2E tests: `pnpm test:e2e` after `pnpm services:up` and migrations.
+  Playwright starts only the API, customer portal, and publisher portal, uses
+  fixed loopback origins, and reuses already-running local app servers.
 - UI component tests: `pnpm --filter @guestpost/ui test:coverage`
 
 The zero-hold override is test-process configuration, not persisted data or a

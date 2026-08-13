@@ -356,3 +356,86 @@ test("status polling rejects current Stripe key drift before provider I/O or sta
     }
   }
 })
+
+test("status polling quarantines legacy Wise executions without provider I/O", async () => {
+  const previousRuntimeMode = process.env.FINANCE_RUNTIME_MODE
+  process.env.FINANCE_RUNTIME_MODE = "normal"
+  const { handleCheckStatus } = await import(
+    "../src/processors/payout.processor"
+  )
+  let providerCalls = 0
+  const writes: any[] = []
+  const audits: any[] = []
+  const notifications: any[] = []
+  const execution = {
+    id: "execution-wise-legacy",
+    withdrawalId: "withdrawal-wise-legacy",
+    status: "PROCESSING",
+    stage: "SENT",
+    version: 3,
+    providerExecutionId: "wise-transfer-1",
+    providerPayoutId: null,
+    livemode: null,
+    provider: { name: "wise" },
+    withdrawal: {
+      status: "PROCESSING",
+      publisher: { organizationId: "organization-1" },
+    },
+  }
+  const client: any = {
+    payoutExecution: {
+      findMany: async (request: any) =>
+        typeof request.where.stage === "string" ? [] : [execution],
+      updateMany: async (request: any) => {
+        writes.push(request)
+        return { count: 1 }
+      },
+    },
+    staffMembership: {
+      findMany: async () => [{ userId: "finance-1" }],
+    },
+    notification: {
+      createMany: async (request: any) => {
+        notifications.push(request)
+        return { count: 1 }
+      },
+    },
+    auditLog: {
+      create: async (request: any) => {
+        audits.push(request)
+        return request.data
+      },
+    },
+    $queryRawUnsafe: async () => [{ id: "locked" }],
+    $transaction: async (work: (tx: any) => Promise<unknown>) => work(client),
+  }
+
+  try {
+    const result = await handleCheckStatus(
+      { data: { limit: 10 } },
+      client,
+      async () => {
+        providerCalls += 1
+        return null
+      },
+    )
+
+    assert.equal(providerCalls, 0)
+    assert.equal(result.skipped, 1)
+    assert.equal(writes.length, 1)
+    assert.equal(writes[0].data.stage, "PROVIDER_CERTIFICATION_REQUIRED")
+    assert.equal(
+      audits[0].data.action,
+      "PAYOUT_PROVIDER_CERTIFICATION_REQUIRED",
+    )
+    assert.equal(notifications.length, 1)
+  } finally {
+    const { connection } = await import("../src/redis")
+    connection.disconnect()
+    if (previousRuntimeMode === undefined) {
+      delete process.env.FINANCE_RUNTIME_MODE
+    } else {
+      process.env.FINANCE_RUNTIME_MODE = previousRuntimeMode
+    }
+  }
+})

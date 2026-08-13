@@ -509,7 +509,7 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
             await tx.orderEvent.create({
               data: {
                 orderId: canonicalOrder.id,
-                eventType: "SETTLEMENT_CREATED",
+                eventType: "PLATFORM_REVENUE_RECOGNIZED",
                 actorId: null,
                 message: `Platform revenue recognized after auto-accept — amount: ${grossAmount}`,
                 metadata: {
@@ -584,6 +584,7 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
             await tx.orderEvent.create({
               data: {
                 orderId: canonicalOrder.id,
+                settlementId: settlement.id,
                 eventType: "SETTLEMENT_CREATED",
                 actorId: null,
                 message: `Settlement auto-created after auto-accept — amount: ${grossAmount}`,

@@ -4,6 +4,11 @@ import {
   isRetryablePrismaTransactionError,
   prismaTransactionRetryDelayMs,
 } from "@guestpost/shared/dist/prisma-transaction-retry"
+import {
+  PayoutEncryptionService,
+  payoutMethodEncryptionContext,
+} from "../../../modules/publisher-payouts/payout-encryption.service"
+import { StaticPayoutEncryptionKeyProvider } from "../../../modules/publisher-payouts/payout-encryption-key-provider"
 import { makeOrganization, makePublisher, makeUser } from "../factories"
 import { createTestDatabase, type TestDatabase } from "../helpers/test-db"
 
@@ -26,6 +31,23 @@ interface PayoutFixture {
   providerAccountExternalId: string | null
   publicReference: string
   amount: number
+}
+
+const payoutEncryption = new PayoutEncryptionService(
+  new StaticPayoutEncryptionKeyProvider({
+    activeKeyId: "integration-v2",
+    keys: { "integration-v2": "a".repeat(64) },
+  }),
+)
+
+function encryptedPayoutMethod(
+  identity: { id: string; publisherId: string; type: string },
+  marker: string,
+) {
+  return payoutEncryption.encrypt(
+    { integrationFixture: marker },
+    payoutMethodEncryptionContext(identity),
+  )
 }
 
 describe("[INTEGRATION] Financial — canonical payout completion persistence", () => {
@@ -122,12 +144,12 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
     const balance = await prisma.publisherBalance.create({
       data: {
         publisherId: publisher.id,
-        withdrawableBalance: 0,
+        withdrawableBalance: amount,
         lifetimeEarnings: amount,
         lifetimePaid: 0,
         allocationCutoverAt: new Date(),
         allocationCarryForward: amount,
-        allocationCarryForwardUsed: amount,
+        allocationCarryForwardUsed: 0,
       },
     })
     const provider = await prisma.payoutProvider.upsert({
@@ -162,16 +184,25 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
             },
           })
         : null
+    const payoutMethodId = crypto.randomUUID()
+    const payoutMethodType =
+      providerName === "stripe_connect" ? "stripe_connect" : "bank_transfer"
+    const encryptedDetails = encryptedPayoutMethod(
+      {
+        id: payoutMethodId,
+        publisherId: publisher.id,
+        type: payoutMethodType,
+      },
+      suffix,
+    )
     const payoutMethod = await prisma.payoutMethod.create({
       data: {
+        id: payoutMethodId,
         publisherId: publisher.id,
-        type:
-          providerName === "stripe_connect"
-            ? "stripe_connect"
-            : "bank_transfer",
+        type: payoutMethodType,
         label: `Integration ${suffix}`,
-        details: { ciphertext: `integration-${suffix}` },
-        encryptionKeyVersion: 1,
+        details: encryptedDetails.ciphertext,
+        encryptionKeyVersion: encryptedDetails.version,
         isActive: true,
         providerAccountId: providerAccount?.id ?? null,
       },
@@ -201,6 +232,14 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
           amount,
           currency: "USD",
           sequence: 0,
+        },
+      })
+      await tx.publisherBalance.update({
+        where: { id: balance.id },
+        data: {
+          withdrawableBalance: { decrement: amount },
+          allocationCarryForwardUsed: { increment: amount },
+          version: { increment: 1 },
         },
       })
       return created
@@ -691,13 +730,23 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
         isActive: true,
       },
     })
+    const methodId = crypto.randomUUID()
+    const encryptedDetails = encryptedPayoutMethod(
+      {
+        id: methodId,
+        publisherId: publisher.id,
+        type: "stripe_connect",
+      },
+      suffix,
+    )
     const method = await prisma.payoutMethod.create({
       data: {
+        id: methodId,
         publisherId: publisher.id,
         type: "stripe_connect",
         label: "Reservation race destination",
-        details: { ciphertext: `integration-${suffix}` },
-        encryptionKeyVersion: 1,
+        details: encryptedDetails.ciphertext,
+        encryptionKeyVersion: encryptedDetails.version,
         isActive: true,
         providerAccountId: account.id,
       },
@@ -749,7 +798,9 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       ])
 
     expect(balance.lifetimePaid.toString()).toBe(String(fixture.amount))
-    expect(balance.version).toBe(1)
+    // The fixture reserves carry-forward once; completion is the second
+    // balance mutation.
+    expect(balance.version).toBe(2)
     expect(withdrawal).toMatchObject({ status: "COMPLETED", version: 3 })
     expect(execution).toMatchObject({
       status: "COMPLETED",
@@ -1113,7 +1164,9 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       }),
     ])
     expect(balance.lifetimePaid.toString()).toBe(String(fixture.amount))
-    expect(balance.version).toBe(1)
+    // The fixture reserves carry-forward once; completion is the second
+    // balance mutation. Exact replay must not add a third bump.
+    expect(balance.version).toBe(2)
     expect(afterReplay).toMatchObject({
       completionSource: "PROVIDER_RESPONSE",
       completionWebhookEventId: null,
@@ -1766,6 +1819,7 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       where: { id: fixture.withdrawalId },
       select: { method: true, payoutMethodId: true },
     })
+    await addReservedCapacity(fixture, 20)
     const createPending = (label: string) =>
       prisma.$transaction(async (tx: any) => {
         const withdrawal = await tx.withdrawal.create({
@@ -1790,6 +1844,14 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
             amount: 10,
             currency: "USD",
             sequence: 0,
+          },
+        })
+        await tx.publisherBalance.update({
+          where: { id: fixture.balanceId },
+          data: {
+            withdrawableBalance: { decrement: 10 },
+            allocationCarryForwardUsed: { increment: 10 },
+            version: { increment: 1 },
           },
         })
         return withdrawal
@@ -1852,6 +1914,7 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       where: { id: fixture.executionId },
     })
     const suffix = crypto.randomUUID()
+    await addReservedCapacity(fixture, fixture.amount)
     const requested = await prisma.$transaction(async (tx: any) => {
       const withdrawal = await tx.withdrawal.create({
         data: {
@@ -1875,6 +1938,14 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
           amount: fixture.amount,
           currency: "USD",
           sequence: 0,
+        },
+      })
+      await tx.publisherBalance.update({
+        where: { id: fixture.balanceId },
+        data: {
+          withdrawableBalance: { decrement: fixture.amount },
+          allocationCarryForwardUsed: { increment: fixture.amount },
+          version: { increment: 1 },
         },
       })
       return withdrawal
@@ -2525,6 +2596,7 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       where: { id: fixture.withdrawalId },
     })
     const suffix = crypto.randomUUID()
+    await addReservedCapacity(fixture, 25)
     const { withdrawal, allocation } = await prisma.$transaction(
       async (tx: any) => {
         const createdWithdrawal = await tx.withdrawal.create({
@@ -2550,6 +2622,14 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
             amount: 25,
             currency: "USD",
             sequence: 0,
+          },
+        })
+        await tx.publisherBalance.update({
+          where: { id: fixture.balanceId },
+          data: {
+            withdrawableBalance: { decrement: 25 },
+            allocationCarryForwardUsed: { increment: 25 },
+            version: { increment: 1 },
           },
         })
         return {
@@ -2604,6 +2684,14 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       await tx.withdrawalAllocation.update({
         where: { id: allocation.id },
         data: { releasedAt },
+      })
+      await tx.publisherBalance.update({
+        where: { id: fixture.balanceId },
+        data: {
+          withdrawableBalance: { increment: 25 },
+          allocationCarryForwardUsed: { decrement: 25 },
+          version: { increment: 1 },
+        },
       })
     })
     await expectDatabaseRejection(
@@ -3124,14 +3212,14 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
         role: "PUBLISHER_OWNER",
       },
     })
-    await prisma.publisherBalance.create({
+    const balance = await prisma.publisherBalance.create({
       data: {
         publisherId: publisher.id,
-        withdrawableBalance: 0,
+        withdrawableBalance: amount,
         lifetimeEarnings: amount,
         allocationCutoverAt: new Date(),
         allocationCarryForward: amount,
-        allocationCarryForwardUsed: amount,
+        allocationCarryForwardUsed: 0,
       },
     })
     const provider = await prisma.payoutProvider.upsert({
@@ -3144,13 +3232,19 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       },
       update: { isActive: true },
     })
+    const methodId = crypto.randomUUID()
+    const encryptedDetails = encryptedPayoutMethod(
+      { id: methodId, publisherId: publisher.id, type: "wise" },
+      suffix,
+    )
     const method = await prisma.payoutMethod.create({
       data: {
+        id: methodId,
         publisherId: publisher.id,
         type: "wise",
         label: `Historical Wise ${suffix}`,
-        details: { ciphertext: `wise-${suffix}` },
-        encryptionKeyVersion: 1,
+        details: encryptedDetails.ciphertext,
+        encryptionKeyVersion: encryptedDetails.version,
         isActive: true,
       },
     })
@@ -3179,6 +3273,14 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
           amount,
           currency: "USD",
           sequence: 0,
+        },
+      })
+      await tx.publisherBalance.update({
+        where: { id: balance.id },
+        data: {
+          withdrawableBalance: { decrement: amount },
+          allocationCarryForwardUsed: { increment: amount },
+          version: { increment: 1 },
         },
       })
       return created
@@ -3354,7 +3456,7 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
         where: { id: fixture.methodId },
         data: { type: "wise", version: { increment: 1 } },
       }),
-      /Payout method routing identity is immutable/,
+      /payout method encryption context identity is immutable/,
     )
     await expectDatabaseRejection(
       prisma.publisherProviderAccount.update({
@@ -3511,13 +3613,23 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       }),
     })
 
+    const unusedId = crypto.randomUUID()
+    const unusedEncryptedDetails = encryptedPayoutMethod(
+      {
+        id: unusedId,
+        publisherId: fixture.publisherId,
+        type: "bank_transfer",
+      },
+      `unused-${unusedId}`,
+    )
     const unused = await prisma.payoutMethod.create({
       data: {
+        id: unusedId,
         publisherId: fixture.publisherId,
         type: "bank_transfer",
         label: "Unused audited method",
-        details: { ciphertext: `unused-${crypto.randomUUID()}` },
-        encryptionKeyVersion: 1,
+        details: unusedEncryptedDetails.ciphertext,
+        encryptionKeyVersion: unusedEncryptedDetails.version,
       },
     })
     await expect(

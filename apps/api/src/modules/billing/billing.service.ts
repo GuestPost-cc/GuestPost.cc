@@ -2,15 +2,19 @@ import { createHash, randomUUID } from "node:crypto"
 import {
   customerWalletStatementDescriptor,
   initialStripeFeeDisclosure,
-  isCreditablePreCreditDepositStatus,
   isFinanceOperationAllowed,
   isSupportedMoneyCurrency,
   isUniqueViolation,
-  isWalletCreditBackedDepositStatus,
   normalizeFinancialReference,
   resolveFinanceRuntimeMode,
   USD_CURRENCY,
 } from "@guestpost/shared"
+import {
+  type DepositCreditAuthority,
+  DepositCreditFinalizationError,
+  depositCreditFactsFromSignedCheckoutSession,
+  finalizeDepositCredit,
+} from "@guestpost/shared/dist/deposit-credit-core"
 import { createFinancialReference } from "@guestpost/shared/dist/financial-reference-server"
 import {
   type FingerprintablePaymentDisputeEvent,
@@ -51,23 +55,6 @@ import {
 } from "./providers/deposit-provider.interface"
 import { DepositProviderService } from "./providers/deposit-provider.service"
 import { StripeDepositAdapter } from "./providers/stripe-deposit.adapter"
-
-// Thrown inside an interactive transaction to force a ROLLBACK when a
-// concurrent duplicate is detected via P2002. Returning normally from the
-// transaction callback would COMMIT everything done before the constraint
-// violation (e.g. a wallet increment) — minting money on duplicate webhooks.
-class DuplicateEventError extends Error {
-  constructor(reference: string) {
-    super(`Duplicate event: ${reference}`)
-  }
-}
-
-class DepositEvidenceError extends Error {
-  constructor(readonly code: string) {
-    super(code)
-    this.name = "DepositEvidenceError"
-  }
-}
 
 class PaymentProviderEventOwnershipError extends Error {
   readonly code = "PAYMENT_PROVIDER_EVENT_LEASE_LOST"
@@ -1295,6 +1282,7 @@ export class BillingService {
             object,
             providerEvent.id,
             terminalSnapshot,
+            event.livemode,
           )
           const finalEvent = await providerEvents.findUnique({
             where: { id: providerEvent.id },
@@ -1440,7 +1428,12 @@ export class BillingService {
         eventType === "checkout.session.completed" ||
         eventType === "checkout.session.async_payment_succeeded"
       ) {
-        await this.processSuccessfulPayment(object, providerEvent.id, lease)
+        await this.processSuccessfulPayment(
+          object,
+          providerEvent.id,
+          lease,
+          event.livemode,
+        )
       } else if (
         eventType === "checkout.session.expired" ||
         eventType === "checkout.session.async_payment_failed"
@@ -2258,547 +2251,166 @@ export class BillingService {
     )
   }
 
-  private async completeDepositReplayEvent(
-    providerEventRowId: string | undefined,
-    depositAttemptId: string,
-    authority?: PaymentProviderEventAuthority,
-  ): Promise<void> {
-    if (!providerEventRowId) return
-    if (!authority) throw new PaymentProviderEventOwnershipError()
-
-    let terminalEvidenceMismatch = false
-    await this.prisma.$transaction(async (tx: any) => {
-      const event = await this.lockAndAssertPaymentProviderEventAuthority(
-        tx,
-        providerEventRowId,
-        authority,
-      )
-      if (authority.kind === "snapshot") {
-        terminalEvidenceMismatch =
-          authority.status !== "PROCESSED" ||
-          event.depositAttemptId !== depositAttemptId
-        return
-      }
-      await this.completePaymentProviderEventLease(
-        tx,
-        providerEventRowId,
-        authority,
-        {
-          status: "PROCESSED",
-          processedAt: new Date(),
-          lockedAt: null,
-          lastError: null,
-          depositAttemptId,
-        },
-      )
-    })
-
-    if (terminalEvidenceMismatch) {
-      await this.quarantinePaymentProviderEvent(
-        providerEventRowId,
-        "DEPOSIT_PROCESSED_EVIDENCE_MISMATCH",
-        authority,
-      )
-    }
-  }
-
-  private async resolveDepositLedgerReplay(input: {
-    providerEventRowId?: string
-    providerEventAuthority?: PaymentProviderEventAuthority
-    attempt: any
-    walletId: string
-    amount: Decimal
-    currency: string
-    sessionId: string
-    providerPaymentId: string
-  }): Promise<void> {
-    const candidates = await (this.prisma as any).transaction.findMany({
-      where: {
-        OR: [
-          { reference: input.sessionId },
-          {
-            provider: "stripe",
-            providerRef: input.providerPaymentId,
-          },
-        ],
-      },
-      include: { depositAttempt: true },
-    })
-    const candidate = candidates.length === 1 ? candidates[0] : null
-    const linkedAttempt = candidate?.depositAttempt
-    const exact =
-      candidate?.type === "DEPOSIT" &&
-      candidate.reference === input.sessionId &&
-      candidate.provider === "stripe" &&
-      candidate.providerRef === input.providerPaymentId &&
-      candidate.walletId === input.walletId &&
-      candidate.currency === input.currency &&
-      new Decimal(candidate.amount).equals(input.amount) &&
-      linkedAttempt?.id === input.attempt.id &&
-      linkedAttempt.walletId === input.walletId &&
-      linkedAttempt.provider === "stripe" &&
-      linkedAttempt.providerSessionId === input.sessionId &&
-      linkedAttempt.providerPaymentId === input.providerPaymentId &&
-      linkedAttempt.ledgerTransactionId === candidate.id &&
-      isWalletCreditBackedDepositStatus(linkedAttempt.status) &&
-      linkedAttempt.currency === input.currency &&
-      new Decimal(linkedAttempt.amount).equals(input.amount) &&
-      new Decimal(linkedAttempt.walletCredit).equals(input.amount)
-
-    if (exact) {
-      await this.completeDepositReplayEvent(
-        input.providerEventRowId,
-        input.attempt.id,
-        input.providerEventAuthority,
-      )
-      return
-    }
-
-    this.logger.error("Stripe deposit idempotency collision quarantined", {
-      providerEventRowId: input.providerEventRowId ?? null,
-      depositAttemptId: input.attempt.id,
-    })
-    if (input.providerEventRowId) {
-      if (!input.providerEventAuthority) {
-        throw new PaymentProviderEventOwnershipError()
-      }
-      await this.quarantinePaymentProviderEvent(
-        input.providerEventRowId,
-        "DEPOSIT_IDEMPOTENCY_COLLISION",
-        input.providerEventAuthority,
-      )
-      return
-    }
-    throw new ConflictException(
-      "Deposit identity conflicts with existing financial evidence",
-    )
-  }
-
-  private async rejectMalformedDepositEvent(
-    providerEventRowId: string | undefined,
-    reason: string,
-    authority?: PaymentProviderEventAuthority,
-  ): Promise<void> {
-    if (providerEventRowId) {
-      if (!authority) throw new PaymentProviderEventOwnershipError()
-      await this.quarantinePaymentProviderEvent(
-        providerEventRowId,
-        reason,
-        authority,
-      )
-      return
-    }
-    throw new BadRequestException("Stripe deposit evidence is invalid")
-  }
-
   private async processSuccessfulPayment(
     session: any,
     providerEventRowId?: string,
     authority?: PaymentProviderEventAuthority,
-  ) {
+    eventLivemode: boolean = session?.livemode,
+  ): Promise<void> {
     assertApiFinanceOperationAllowed("recovery")
     if ((providerEventRowId == null) !== (authority == null)) {
       throw new PaymentProviderEventOwnershipError()
     }
-    const sessionId = typeof session?.id === "string" ? session.id.trim() : ""
-    const paymentIntent =
-      typeof session?.payment_intent === "string"
-        ? session.payment_intent.trim()
-        : typeof session?.payment_intent?.id === "string"
-          ? session.payment_intent.id.trim()
-          : ""
-    if (
-      !sessionId ||
-      sessionId.length > 191 ||
-      !paymentIntent ||
-      paymentIntent.length > 191
-    ) {
-      await this.rejectMalformedDepositEvent(
-        providerEventRowId,
-        "INVALID_DEPOSIT_IDENTITY",
-        authority,
+
+    let facts
+    try {
+      facts = depositCreditFactsFromSignedCheckoutSession(
+        session,
+        eventLivemode,
       )
-      return
+    } catch (error) {
+      if (
+        providerEventRowId &&
+        authority &&
+        error instanceof DepositCreditFinalizationError
+      ) {
+        await this.quarantinePaymentProviderEvent(
+          providerEventRowId,
+          error.code,
+          authority,
+        )
+        return
+      }
+      throw new BadRequestException("Stripe deposit evidence is invalid")
     }
 
-    const depositAttemptDelegate = (this.prisma as any).depositAttempt
-    const attemptId = session.metadata?.depositAttemptId
-    const attempt = depositAttemptDelegate
-      ? await depositAttemptDelegate.findFirst({
-          where: {
-            OR: [
-              { id: attemptId ?? "__missing__" },
-              { providerSessionId: sessionId },
-            ],
+    const canonicalAuthority: DepositCreditAuthority | null =
+      providerEventRowId && authority
+        ? {
+            kind: "WEBHOOK_EVENT",
+            eventRowId: providerEventRowId,
+            lease:
+              authority.kind === "lease"
+                ? {
+                    kind: "lease",
+                    attempts: authority.attempt,
+                    lockedAt: authority.lockedAt,
+                  }
+                : {
+                    kind: "snapshot",
+                    status: authority.status,
+                    attempts: authority.attempts,
+                    lockedAt: authority.lockedAt,
+                    processedAt: authority.processedAt,
+                  },
+          }
+        : null
+    if (!canonicalAuthority) {
+      throw new PaymentProviderEventOwnershipError()
+    }
+
+    try {
+      const outcome = await finalizeDepositCredit(
+        this.prisma,
+        {
+          audit: async (tx, auditInput) => {
+            await this.audit.log(auditInput, tx)
           },
-        })
-      : null
-    if (!attempt) {
-      await this.rejectMalformedDepositEvent(
-        providerEventRowId,
-        "DEPOSIT_ATTEMPT_NOT_FOUND",
-        authority,
+          recordSuccess: async (tx, input) => {
+            if (!this.communications) return []
+            const organizationRecipients =
+              await this.communications.organizationRecipients(
+                input.organizationId,
+                true,
+                tx,
+              )
+            const recipients = [
+              ...new Set<string>([
+                input.createdByUserId,
+                ...organizationRecipients,
+              ]),
+            ]
+            const event = await this.communications.record(
+              {
+                type: "BILLING_DEPOSIT_SUCCEEDED",
+                aggregateType: "DepositAttempt",
+                aggregateId: input.depositAttemptId,
+                organizationId: input.organizationId,
+                title: "Wallet deposit completed",
+                message:
+                  new Decimal(input.amount).toFixed(2) +
+                  " " +
+                  input.currency +
+                  " was added to your wallet.",
+                actionPath: "/dashboard/billing",
+                dedupKey: `deposit:${input.depositAttemptId}:succeeded`,
+                recipientUserIds: recipients,
+              },
+              tx,
+            )
+            const eventIds = [event.eventId]
+            if (
+              new Decimal(input.amount).greaterThan(
+                notificationThreshold(
+                  "ADMIN_HIGH_VALUE_DEPOSIT_THRESHOLD",
+                  1000,
+                ),
+              )
+            ) {
+              const staffRecipients = await this.communications.staffRecipients(
+                ["SUPER_ADMIN", "FINANCE"],
+                tx,
+              )
+              const staffEvent = await this.communications.record(
+                {
+                  type: "STAFF_HIGH_VALUE_DEPOSIT",
+                  aggregateType: "DepositAttempt",
+                  aggregateId: input.depositAttemptId,
+                  organizationId: input.organizationId,
+                  title: "High-value wallet deposit",
+                  message:
+                    new Decimal(input.amount).toFixed(2) +
+                    " " +
+                    input.currency +
+                    " was deposited into a customer wallet.",
+                  actionPath: "/dashboard/finance",
+                  payload: {
+                    amount: input.amount,
+                    currency: input.currency,
+                    walletId: input.walletId,
+                  },
+                  dedupKey: `staff:deposit:${input.depositAttemptId}:high-value`,
+                  recipientUserIds: staffRecipients,
+                },
+                tx,
+              )
+              eventIds.push(staffEvent.eventId)
+            }
+            return eventIds
+          },
+        },
+        { authority: canonicalAuthority, facts },
       )
-      return
-    }
-    const walletId = attempt.walletId
-
-    // Amount from Stripe authoritative source (amount_total is in cents).
-    // Exact Decimal division — Math.round(cents/100) would round $10.50 to
-    // $11 and mint money on every non-whole-dollar deposit.
-    const amountCents = session.amount_total ?? 0
-    if (!Number.isInteger(amountCents) || amountCents <= 0) {
-      this.logger.warn({
-        providerEventRowId: providerEventRowId ?? null,
-        depositAttemptId: attempt.id,
-        sessionFingerprint: logReferenceFingerprint(sessionId),
-        reason: !Number.isInteger(amountCents)
-          ? "amount_not_integer"
-          : "amount_not_positive",
-        message: "Rejected invalid Stripe deposit amount evidence",
-      })
-      await this.rejectMalformedDepositEvent(
-        providerEventRowId,
-        "INVALID_DEPOSIT_AMOUNT",
-        authority,
-      )
-      return
-    }
-    const amount = new Decimal(amountCents).div(100)
-    // Stripe Checkout emits lowercase ISO currency codes. Do not accept
-    // arbitrary case/whitespace and then normalize it; only the exact provider
-    // value crosses into our canonical internal USD representation.
-    if (
-      session.currency !== "usd" ||
-      !this.depositProvider.capabilities.supportedCurrencies.includes(
-        USD_CURRENCY,
-      )
-    ) {
-      await this.rejectMalformedDepositEvent(
-        providerEventRowId,
-        "INVALID_DEPOSIT_CURRENCY",
-        authority,
-      )
-      return
-    }
-    const currency = USD_CURRENCY
-
-    // Never infer payment from the event name alone. Checkout can emit a
-    // completion event before delayed methods settle, and malformed fixtures
-    // may omit payment_status. Only Stripe's explicit `paid` state can mint
-    // wallet value.
-    if (session.payment_status !== "paid") {
-      if (providerEventRowId && authority) {
-        if (authority.kind !== "lease") {
-          await this.rejectMalformedDepositEvent(
-            providerEventRowId,
-            "DEPOSIT_TERMINAL_REPLAY_STATE_MISMATCH",
-            authority,
+      this.communications?.dispatchManyBestEffort(outcome.communicationEventIds)
+    } catch (error) {
+      if (error instanceof DepositCreditFinalizationError) {
+        if (error.code === "AUTHORITY_LEASE_LOST") {
+          throw new PaymentProviderEventOwnershipError()
+        }
+        if (!error.retryable) {
+          await this.quarantinePaymentProviderEvent(
+            providerEventRowId!,
+            error.code,
+            authority!,
           )
           return
         }
-        await this.prisma.$transaction(async (tx: any) => {
-          await this.lockAndAssertPaymentProviderEventAuthority(
-            tx,
-            providerEventRowId,
-            authority,
-          )
-          await tx.depositAttempt.updateMany({
-            where: {
-              id: attempt.id,
-              status: {
-                in: ["CREATED", "PENDING_CUSTOMER_ACTION", "PROCESSING"],
-              },
-            },
-            data: { status: "PROCESSING" },
-          })
-        })
-      } else {
-        await depositAttemptDelegate.update({
-          where: { id: attempt.id },
-          data: { status: "PROCESSING" },
-        })
+        if (error.code === "DEPOSIT_PROVIDER_STATE_NOT_PAID") {
+          throw new BadRequestException("Stripe Checkout payment is not paid")
+        }
       }
-      throw new BadRequestException("Stripe Checkout payment is not paid")
+      throw error
     }
-
-    if (attempt) {
-      if (
-        attempt.provider !== "stripe" ||
-        attempt.providerSessionId !== sessionId ||
-        (attempt.providerPaymentId != null &&
-          attempt.providerPaymentId !== paymentIntent) ||
-        (attemptId != null && attemptId !== attempt.id) ||
-        !new Decimal(attempt.amount).equals(amount) ||
-        !new Decimal(attempt.walletCredit).equals(amount) ||
-        attempt.currency !== currency
-      ) {
-        await this.rejectMalformedDepositEvent(
-          providerEventRowId,
-          "DEPOSIT_ATTEMPT_EVIDENCE_MISMATCH",
-          authority,
-        )
-        return
-      }
-      const isCreditedReplay = isWalletCreditBackedDepositStatus(attempt.status)
-      const isCreditableAttempt = isCreditablePreCreditDepositStatus(
-        attempt.status,
-      )
-      if (
-        (!isCreditedReplay && !isCreditableAttempt) ||
-        (isCreditableAttempt && attempt.ledgerTransactionId != null)
-      ) {
-        await this.rejectMalformedDepositEvent(
-          providerEventRowId,
-          "DEPOSIT_ATTEMPT_STATE_MISMATCH",
-          authority,
-        )
-        return
-      }
-      if (isCreditedReplay) {
-        await this.resolveDepositLedgerReplay({
-          providerEventRowId,
-          providerEventAuthority: authority,
-          attempt,
-          walletId,
-          amount,
-          currency,
-          sessionId,
-          providerPaymentId: paymentIntent,
-        })
-        return
-      }
-    }
-
-    if (providerEventRowId && authority && authority.kind !== "lease") {
-      await this.rejectMalformedDepositEvent(
-        providerEventRowId,
-        "DEPOSIT_TERMINAL_REPLAY_STATE_MISMATCH",
-        authority,
-      )
-      return
-    }
-
-    const orgId = attempt.organizationId
-    const communicationEventIds: string[] = []
-
-    try {
-      await this.prisma.$transaction(async (tx: any) => {
-        if (providerEventRowId && authority) {
-          await this.lockAndAssertPaymentProviderEventAuthority(
-            tx,
-            providerEventRowId,
-            authority,
-          )
-        }
-        // Idempotency: unique constraint on Transaction.reference prevents duplicates
-        // Even if two webhooks arrive concurrently, only one tx.reference = session.id commits
-        const existingTx = await tx.transaction.findFirst({
-          where: { reference: sessionId },
-        })
-        if (existingTx) throw new DuplicateEventError(sessionId)
-
-        const wallet = await tx.wallet.findUniqueOrThrow({
-          where: { id: walletId },
-        })
-        if (wallet.currency !== currency) {
-          throw new DepositEvidenceError("DEPOSIT_WALLET_CURRENCY_MISMATCH")
-        }
-        const updated = await tx.wallet.updateMany({
-          where: { id: walletId, version: wallet.version },
-          data: {
-            availableBalance: { increment: amount },
-            version: { increment: 1 },
-          },
-        })
-        if (updated.count === 0) {
-          throw new ConflictException(
-            "Wallet was modified by another request. Retry.",
-          )
-        }
-
-        // P2002 here MUST propagate and roll the transaction back — catching
-        // it and returning would commit the wallet increment above without a
-        // ledger row (double credit). The unique constraint on
-        // `reference` (session.id) is the primary idempotency guarantee; the
-        // provider-aware partial unique on `(provider, providerRef)` added in
-        // FIN-02 is a defense-in-depth backstop for the rare case where a
-        // Stripe event replays under a new session.id but the same
-        // payment_intent. Either constraint firing surfaces as P2002 here.
-        // The findFirst above is only the fast path.
-        const ledgerTransaction = await tx.transaction.create({
-          data: {
-            walletId,
-            amount,
-            type: "DEPOSIT",
-            currency: USD_CURRENCY,
-            reference: sessionId,
-            // FIN-02: explicit provider label pairs with `providerRef` to
-            // populate the `(provider, providerRef)` unique key — identical
-            // row identity for write and lookup paths.
-            provider: "stripe",
-            // payment_intent linkage lets chargeback webhooks find this deposit
-            providerRef: paymentIntent,
-            description: `GuestPost wallet deposit ${attempt.publicReference}`,
-          },
-        })
-
-        const completedAttempt = await tx.depositAttempt.updateMany({
-          where: {
-            id: attempt.id,
-            walletId,
-            provider: "stripe",
-            providerSessionId: sessionId,
-            amount,
-            walletCredit: amount,
-            currency,
-            status: {
-              in: [
-                "CREATED",
-                "PENDING_CUSTOMER_ACTION",
-                "PROCESSING",
-                "FAILED",
-              ],
-            },
-          },
-          data: {
-            status: "SUCCEEDED",
-            providerPaymentId: paymentIntent,
-            ledgerTransactionId: ledgerTransaction.id,
-            completedAt: new Date(),
-            failedAt: null,
-            failureCode: null,
-          },
-        })
-        if (completedAttempt.count !== 1) {
-          throw new ConflictException(
-            "Deposit attempt changed while applying the provider payment",
-          )
-        }
-        if (providerEventRowId && authority) {
-          await this.completePaymentProviderEventLease(
-            tx,
-            providerEventRowId,
-            authority as PaymentProviderEventLease,
-            {
-              status: "PROCESSED",
-              processedAt: new Date(),
-              lockedAt: null,
-              depositAttemptId: attempt.id,
-              lastError: null,
-            },
-          )
-        }
-
-        await this.audit.log(
-          {
-            action: "WALLET_DEPOSIT",
-            entityType: "Wallet",
-            entityId: walletId,
-            metadata: {
-              amount: amount.toNumber(),
-              reference: attempt.publicReference,
-              providerSessionId: sessionId,
-              method: "stripe",
-            },
-            userId: session.metadata?.userId || null,
-            organizationId: orgId,
-          },
-          tx,
-        )
-        if (this.communications) {
-          const organizationRecipients =
-            await this.communications.organizationRecipients(
-              attempt.organizationId,
-              true,
-              tx,
-            )
-          const recipients = [
-            ...new Set<string>([
-              attempt.createdByUserId,
-              ...organizationRecipients,
-            ]),
-          ]
-          const event = await this.communications.record(
-            {
-              type: "BILLING_DEPOSIT_SUCCEEDED",
-              aggregateType: "DepositAttempt",
-              aggregateId: attempt.id,
-              organizationId: attempt.organizationId,
-              title: "Wallet deposit completed",
-              message: `${amount.toFixed(2)} ${currency} was added to your wallet.`,
-              actionPath: "/dashboard/billing",
-              dedupKey: `deposit:${attempt.id}:succeeded`,
-              recipientUserIds: recipients,
-            },
-            tx,
-          )
-          communicationEventIds.push(event.eventId)
-
-          if (
-            amount.greaterThan(
-              notificationThreshold("ADMIN_HIGH_VALUE_DEPOSIT_THRESHOLD", 1000),
-            )
-          ) {
-            const staffRecipients = await this.communications.staffRecipients(
-              ["SUPER_ADMIN", "FINANCE"],
-              tx,
-            )
-            const staffEvent = await this.communications.record(
-              {
-                type: "STAFF_HIGH_VALUE_DEPOSIT",
-                aggregateType: "DepositAttempt",
-                aggregateId: attempt.id,
-                organizationId: orgId,
-                title: "High-value wallet deposit",
-                message: `${amount.toFixed(2)} ${currency} was deposited into a customer wallet.`,
-                actionPath: "/dashboard/finance",
-                payload: {
-                  amount: amount.toString(),
-                  currency,
-                  walletId,
-                },
-                dedupKey: `staff:deposit:${attempt.id}:high-value`,
-                recipientUserIds: staffRecipients,
-              },
-              tx,
-            )
-            communicationEventIds.push(staffEvent.eventId)
-          }
-        }
-      })
-    } catch (err: any) {
-      if (err instanceof DepositEvidenceError) {
-        await this.rejectMalformedDepositEvent(
-          providerEventRowId,
-          err.code,
-          authority,
-        )
-        return
-      }
-      if (err instanceof DuplicateEventError || isUniqueViolation(err)) {
-        this.logger.warn({
-          providerEventRowId: providerEventRowId ?? null,
-          depositAttemptId: attempt.id,
-          sessionFingerprint: logReferenceFingerprint(sessionId),
-          message:
-            "Potential duplicate Stripe deposit rolled back pending exact evidence comparison",
-        })
-        await this.resolveDepositLedgerReplay({
-          providerEventRowId,
-          providerEventAuthority: authority,
-          attempt,
-          walletId,
-          amount,
-          currency,
-          sessionId,
-          providerPaymentId: paymentIntent,
-        })
-        return
-      }
-      throw err
-    }
-    this.communications?.dispatchManyBestEffort(communicationEventIds)
   }
 
   async getWallet(organizationId: string | null, userId: string) {
