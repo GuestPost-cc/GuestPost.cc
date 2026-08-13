@@ -245,6 +245,14 @@ SET CONSTRAINTS ALL IMMEDIATE;
 ALTER TABLE public."Order" ALTER COLUMN "status" DROP DEFAULT;
 ALTER TABLE public."OrderItem" ALTER COLUMN "status" DROP DEFAULT;
 
+-- PostgreSQL stores the enum OID of 'DRAFT' in this CHECK expression. After
+-- the old type is renamed, changing Order.status to the replacement type while
+-- the CHECK remains attached makes PostgreSQL compare values from two distinct
+-- enum types (which has no equality operator). Rebuild the constraint around
+-- the column conversion so its literal is bound to the replacement enum.
+ALTER TABLE public."Order"
+  DROP CONSTRAINT "Order_websiteId_required";
+
 ALTER TYPE public."OrderStatus" RENAME TO "OrderStatus_before_settled_removal";
 
 CREATE TYPE public."OrderStatus" AS ENUM (
@@ -279,6 +287,13 @@ ALTER TABLE public."OrderDispute"
 ALTER TABLE public."OrderCancellationRequest"
   ALTER COLUMN "previousOrderStatus" TYPE public."OrderStatus"
   USING ("previousOrderStatus"::text::public."OrderStatus");
+
+ALTER TABLE public."Order"
+  ADD CONSTRAINT "Order_websiteId_required"
+  CHECK (
+    "status" = 'DRAFT'::public."OrderStatus"
+    OR "websiteId" IS NOT NULL
+  );
 
 ALTER TABLE public."Order"
   ALTER COLUMN "status" SET DEFAULT 'DRAFT'::public."OrderStatus";
