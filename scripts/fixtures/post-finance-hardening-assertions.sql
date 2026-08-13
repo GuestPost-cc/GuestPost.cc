@@ -3193,7 +3193,7 @@ BEGIN
     WHEN check_violation THEN
       GET STACKED DIAGNOSTICS rejection_message = MESSAGE_TEXT;
       IF rejection_message IS DISTINCT FROM
-         'released settlement requires matching release ledger evidence' THEN
+         'released settlement requires exact release ledger and event evidence' THEN
         RAISE;
       END IF;
   END;
@@ -3217,6 +3217,22 @@ BEGIN
     'migration-rehearsal-settlement-order',
     'migration-rehearsal-publisher',
     'migration-rehearsal-settlement',
+    CURRENT_TIMESTAMP
+  );
+
+  INSERT INTO "OrderEvent" (
+    "id", "orderId", "settlementId", "eventType", "message", "metadata",
+    "createdAt"
+  ) VALUES (
+    'migration-rehearsal-settlement-release-event',
+    'migration-rehearsal-settlement-order',
+    'migration-rehearsal-settlement',
+    'SETTLEMENT_RELEASED',
+    'Settlement released — migration rehearsal',
+    jsonb_build_object(
+      'settlementId', 'migration-rehearsal-settlement',
+      'releaseTransactionId', 'migration-rehearsal-settlement-release'
+    ),
     CURRENT_TIMESTAMP
   );
 

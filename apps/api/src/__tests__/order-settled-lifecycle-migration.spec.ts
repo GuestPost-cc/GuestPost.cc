@@ -9,6 +9,10 @@ const migrationSql = fs.readFileSync(
   ),
   "utf8",
 )
+const financeRehearsalAssertions = fs.readFileSync(
+  path.join(repoRoot, "scripts/fixtures/post-finance-hardening-assertions.sql"),
+  "utf8",
+)
 
 describe("order SETTLED lifecycle removal migration contract", () => {
   it("rebinds the Order status CHECK to the replacement enum", () => {
@@ -46,6 +50,15 @@ describe("order SETTLED lifecycle removal migration contract", () => {
     )
     expect(migrationSql).toMatch(
       /END::public\."OrderEventType"[\s\S]*DROP TYPE public\."OrderEventType_before_settled_split"/,
+    )
+  })
+
+  it("rehearses the exact three-part settlement release evidence", () => {
+    expect(financeRehearsalAssertions).toContain(
+      "released settlement requires exact release ledger and event evidence",
+    )
+    expect(financeRehearsalAssertions).toMatch(
+      /INSERT INTO "Transaction"[\s\S]*'migration-rehearsal-settlement-release'[\s\S]*INSERT INTO "OrderEvent"[\s\S]*'migration-rehearsal-settlement-release-event'[\s\S]*'SETTLEMENT_RELEASED'[\s\S]*SET CONSTRAINTS ALL IMMEDIATE/,
     )
   })
 })
