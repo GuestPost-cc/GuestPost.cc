@@ -1,5 +1,5 @@
 /**
- * Customer journey: signup → authenticated org gate → verification policy.
+ * Customer journey: signup → birth-time workspace → verification policy.
  * Creates a run-scoped throwaway account — no privileged seed coupling.
  */
 import { expect, test } from "@playwright/test"

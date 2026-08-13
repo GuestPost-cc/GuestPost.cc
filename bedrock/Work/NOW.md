@@ -66,18 +66,19 @@ to `History/NOW-through-2026-08-11.md`.
 
 The frozen-lockfile install is clean and does not change `pnpm-lock.yaml`.
 Repository type, format, lint, dependency-policy, health, API, worker, shared,
-auth, integrations, API-client, and UI gates pass locally. The remaining
-environment-sensitive gates (PostgreSQL migration rehearsal, all Next.js
-production builds, Poppler-backed worker tests, and Playwright) must pass in
-GitHub CI on the exact commit before any rollout.
+auth, integrations, API-client, and UI gates pass locally. PR #100's GitHub CI
+also passes migration apply/status, the populated historical-data rehearsal,
+the integration-template migration, all database-backed financial suites, all
+production builds, Ubuntu/Poppler worker coverage, UI coverage, and the
+self-starting Chromium onboarding journeys. No persistent production database
+has been migrated by this task.
 
 ## Next actions
 
-1. Open the hardening PR against `main` and let CI run migration rehearsal,
-   typecheck, lint, unit/integration suites, builds, and Playwright.
-2. Fix any exact CI failure; do not weaken financial guards or skip migration
-   assertions to obtain green status.
-3. Rehearse the hard-drain schema-before-code rollout on a sanitized,
-   production-shaped clone. Production migration requires a direct Neon
-   connection, a recorded restore point, and a confirmed drain of every API,
-   worker, scheduler, webhook, reconciliation, and recovery writer.
+1. Review PR #100 against `main`; keep staff governance and managed KMS/HSM as
+   explicit follow-up gates rather than silently widening this batch.
+2. Rehearse the hard-drain schema-before-code rollout on a recent Neon branch
+   using a direct connection, then record a production restore/PITR point.
+3. Confirm every API, Northflank worker, scheduler, webhook, reconciliation,
+   and recovery writer is drained before `prisma migrate deploy`; deploy the
+   matching application images before writers resume.

@@ -8,14 +8,12 @@ local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
 last_backfill_import: 2026-08-13
-last_project_sync: 2026-08-13T12:26:16Z
+last_project_sync: 2026-08-13T15:41:11Z
 last_compaction: 2026-06-11
-last_validation: 2026-08-13T12:26:31Z
+last_validation: 2026-08-13T15:41:12Z
 last_validation_result: ok
-last_doctor: 2026-08-13T12:26:31Z
+last_doctor: 2026-08-13T15:41:12Z
 last_doctor_result: ok
-framework_version: "0.4.16"
-last_system_refresh: 2026-07-16T14:54:05Z
 ---
 
 # Knowledge Status: guestpost-platform
@@ -32,10 +30,10 @@ last_system_refresh: 2026-07-16T14:54:05Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-08-13`
-- Last project sync: `2026-08-13T12:26:16Z`
+- Last project sync: `2026-08-13T15:41:11Z`
 - Last compaction: `2026-06-11`
-- Last validation: `2026-08-13T12:26:31Z` (`ok`)
-- Last doctor: `2026-08-13T12:26:31Z` (`ok`)
+- Last validation: `2026-08-13T15:41:12Z` (`ok`)
+- Last doctor: `2026-08-13T15:41:12Z` (`ok`)
 
 ## Health Warnings
 
