@@ -798,7 +798,9 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       ])
 
     expect(balance.lifetimePaid.toString()).toBe(String(fixture.amount))
-    expect(balance.version).toBe(1)
+    // The fixture reserves carry-forward once; completion is the second
+    // balance mutation.
+    expect(balance.version).toBe(2)
     expect(withdrawal).toMatchObject({ status: "COMPLETED", version: 3 })
     expect(execution).toMatchObject({
       status: "COMPLETED",
@@ -1162,7 +1164,9 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       }),
     ])
     expect(balance.lifetimePaid.toString()).toBe(String(fixture.amount))
-    expect(balance.version).toBe(1)
+    // The fixture reserves carry-forward once; completion is the second
+    // balance mutation. Exact replay must not add a third bump.
+    expect(balance.version).toBe(2)
     expect(afterReplay).toMatchObject({
       completionSource: "PROVIDER_RESPONSE",
       completionWebhookEventId: null,
