@@ -58,8 +58,8 @@ a mixed rolling deployment.
 4. With the new release artifact and no writers, verify every row:
 
    ```bash
-   pnpm tsx scripts/verify-encryption-versions.ts --batch-size 25
-   pnpm tsx scripts/rotate-payout-encryption.ts --dry-run --batch-size 25
+   pnpm payout-encryption:verify --batch-size 25
+   pnpm payout-encryption:rotate --dry-run --batch-size 25
    ```
 
    Either command exiting non-zero blocks the release. Output contains only
@@ -74,7 +74,7 @@ a mixed rolling deployment.
    config:
 
    ```bash
-   pnpm tsx scripts/rotate-payout-encryption.ts --batch-size 25
+   pnpm payout-encryption:rotate --batch-size 25
    ```
 
    Each row is locked, authenticated using its persisted immutable context,
@@ -83,8 +83,8 @@ a mixed rolling deployment.
 8. Re-run both full verification paths:
 
    ```bash
-   pnpm tsx scripts/rotate-payout-encryption.ts --verify-only --batch-size 25
-   pnpm tsx scripts/verify-encryption-versions.ts --require-active --json
+   pnpm payout-encryption:rotate --verify-only --batch-size 25
+   pnpm payout-encryption:verify --require-active --json
    ```
 
 9. Run an audited payout-method create/decrypt canary and provider sandbox

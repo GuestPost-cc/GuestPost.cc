@@ -2425,18 +2425,17 @@ BEGIN
     RAISE EXCEPTION 'Delivery fraud resolution/hold/evidence guards are missing';
   END IF;
 
-  -- This constraint is intentionally NOT VALID: immutable historical rows
-  -- predate classified dispositions, while PostgreSQL still enforces the
-  -- check for every new insert. Do not require convalidated here unless a
-  -- separate evidence-preserving historical backfill is introduced first.
+  -- The final validation boundary proves retained history already satisfies
+  -- the disposition contract without rewriting immutable staff evidence.
   SELECT COUNT(*)
     INTO fraud_resolution_constraint_count
     FROM pg_constraint
    WHERE conrelid = '"DeliveryFraudFlagResolution"'::regclass
      AND conname = 'DeliveryFraudFlagResolution_staff_disposition_check'
-     AND contype = 'c';
+     AND contype = 'c'
+     AND convalidated;
   IF fraud_resolution_constraint_count <> 1 THEN
-    RAISE EXCEPTION 'Delivery fraud disposition constraint is missing';
+    RAISE EXCEPTION 'Delivery fraud disposition constraint is missing or unvalidated';
   END IF;
 
   SELECT COUNT(*)

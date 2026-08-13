@@ -799,6 +799,14 @@ copy them between recoveries, or retry by reusing an old claim fence.
 Processed deposit-success evidence must also match exactly:
 
 ```sql
+WITH evidence_cutover AS (
+  SELECT
+    MIN(started_at) AS started_at
+  FROM "_prisma_migrations"
+  WHERE migration_name = '20260729090000_payment_dispute_cases'
+    AND rolled_back_at IS NULL
+    AND finished_at IS NOT NULL
+)
 SELECT
   e.id AS event_id,
   e."providerEventId",
@@ -811,6 +819,7 @@ SELECT
   a."ledgerTransactionId",
   deposit.id AS deposit_transaction_id
 FROM "PaymentProviderEvent" e
+CROSS JOIN evidence_cutover cutover
 LEFT JOIN "DepositAttempt" a
   ON a.id = e."depositAttemptId"
 LEFT JOIN "Transaction" deposit
@@ -831,7 +840,14 @@ WHERE e."eventType" IN (
       'DISPUTED',
       'CHARGEBACK'
     )
-    OR (e.provider = 'stripe' AND e.livemode IS NULL)
+    OR (
+      e.provider = 'stripe'
+      AND e.livemode IS NULL
+      AND (
+        cutover.started_at IS NULL
+        OR (e."receivedAt" AT TIME ZONE 'UTC') >= cutover.started_at
+      )
+    )
     OR deposit.id IS NULL
     OR deposit.type <> 'DEPOSIT'
     OR deposit."walletId" IS DISTINCT FROM a."walletId"
@@ -847,7 +863,12 @@ Any row is a critical local-evidence contradiction. Retrieve the Stripe
 Checkout Session and PaymentIntent before deciding whether a compensating
 wallet action is required. Refund and dispute states are derivative states of
 the credited deposit; they must not be treated as proof that the original
-credit is missing.
+credit is missing. A mode-less Stripe row received before the evidence
+migration started is preserved historical evidence, not a post-cutover
+contradiction,
+provided every other attempt and ledger fact above matches exactly. It cannot
+authorize any new money transition and remains visible in the mode inventory
+below for incident review; never infer or backfill its mode.
 
 Review Stripe mode evidence separately and compare it with the recorded
 deployment/key mode:
