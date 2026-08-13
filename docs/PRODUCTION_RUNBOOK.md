@@ -61,9 +61,9 @@ Hard rotation is supported by adding a new key ID, making it active, and
 running the resumable compare-and-swap rotator. Before and after rotation, run:
 
 ```bash
-pnpm tsx scripts/verify-encryption-versions.ts
+pnpm payout-encryption:verify
 # After rotation or before removing any decrypt-only key:
-pnpm tsx scripts/verify-encryption-versions.ts --require-active
+pnpm payout-encryption:verify --require-active
 ```
 
 The verifier decrypts every active and inactive payout method and every
@@ -433,6 +433,12 @@ before/after counts for `PayoutExecutionClaim`, `PaymentProviderEvent`,
 withdrawals, executions, allocations, and money ledger rows; explain every
 migration classification rather than treating matching totals as provider
 truth.
+
+For the `20260812` financial-hardening boundary, migration status must report
+all 75 migrations current through
+`20260812102500_validate_delivery_fraud_staff_disposition`. That final
+validation migration intentionally fails closed rather than rewriting any
+legacy staff-resolution evidence.
 
 ### CRITICAL: exactly one worker code version
 Realtime and short-lived job modes may overlap only when they use the same

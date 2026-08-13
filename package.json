@@ -40,8 +40,8 @@
     "test:migrations:finance": "bash scripts/verify-financial-migration-upgrade.sh",
     "test:load": "pnpm tsx scripts/load-test.ts",
     "test:e2e": "playwright test",
-    "payout-encryption:verify": "node --import tsx scripts/verify-encryption-versions.ts",
-    "payout-encryption:rotate": "node --import tsx scripts/rotate-payout-encryption.ts",
+    "payout-encryption:verify": "TSX_TSCONFIG_PATH=apps/api/tsconfig.json node --import tsx scripts/verify-encryption-versions.ts",
+    "payout-encryption:rotate": "TSX_TSCONFIG_PATH=apps/api/tsconfig.json node --import tsx scripts/rotate-payout-encryption.ts",
     "setup:integration-test-db": "bash scripts/setup-integration-test-db.sh",
     "prepare": "husky"
   },

@@ -298,6 +298,43 @@ for migration_file in "${migration_root}"/*/migration.sql; do
         >/dev/null
       echo "Refund audience repair atomic rollback passed"
     fi
+    if [[ "${migration_name}" == "20260812102500_validate_delivery_fraud_staff_disposition" ]]; then
+      echo "Proving staff-disposition validation rejects unclassified immutable history"
+      run_admin_sql \
+        "DROP DATABASE IF EXISTS \"${negative_rehearsal_database}\" WITH (FORCE)" \
+        >/dev/null
+      run_admin_sql \
+        "CREATE DATABASE \"${negative_rehearsal_database}\" TEMPLATE \"${rehearsal_database}\"" \
+        >/dev/null
+      run_rehearsal_file_in_database \
+        "${negative_rehearsal_database}" \
+        scripts/fixtures/pre-delivery-fraud-disposition-validation-unsafe.sql \
+        >/dev/null
+      disposition_migration_succeeded=false
+      if disposition_output="$(
+        run_rehearsal_file_in_database \
+          "${negative_rehearsal_database}" \
+          "${migration_file}" \
+          2>&1
+      )"; then
+        disposition_migration_succeeded=true
+      fi
+      # Drop the isolated unsafe history before evaluating the result. The
+      # global EXIT trap remains a backstop for fixture/setup failures.
+      run_admin_sql \
+        "DROP DATABASE IF EXISTS \"${negative_rehearsal_database}\" WITH (FORCE)" \
+        >/dev/null
+      if [[ "${disposition_migration_succeeded}" == true ]]; then
+        echo "Staff-disposition validation unexpectedly accepted unclassified history" >&2
+        exit 79
+      fi
+      if [[ "${disposition_output}" != *"DeliveryFraudFlagResolution_staff_disposition_check"* ]]; then
+        echo "Staff-disposition validation failed for an unexpected reason:" >&2
+        echo "${disposition_output}" >&2
+        exit 80
+      fi
+      echo "Unclassified staff-disposition validation rejection passed"
+    fi
     migration_started_at="$(date +%s)"
     run_rehearsal_file "${migration_file}" >/dev/null
     migration_finished_at="$(date +%s)"
