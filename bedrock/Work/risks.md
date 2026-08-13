@@ -1,35 +1,31 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-08-12
+updated: 2026-08-14
 ---
 
 # Risks
 
-Updated 2026-08-12 after lifecycle, deposit-recovery, payout-encryption,
-refund/cancellation, authorization, worker-runtime, and browser-harness
-hardening. Historical audit Views are snapshots, not current status;
+Updated 2026-08-14 after the controlled Neon cutover and worker-fleet
+containment. Historical audit Views are snapshots, not current status;
 `Work/backlog.md` is the canonical open-work register and this file is the
 canonical launch-risk register.
 
-## Current local-work risk
+## Current production-hold risk
 
-- **The launch-blocker communication/fraud release has one hard-drain cutover.**
-  None of the edited `2026081113*` migrations was applied to the checked Neon
-  target as of 2026-08-11; every persistent target must independently prove the
-  same before these files may be promoted. Verify a provider-native recovery
-  point, stop API writers, API on-demand wakes, realtime/legacy workers, both
-  schedules, and every active scheduled/on-demand run, then apply all pending
-  migrations once from a direct schema-owner connection. Review every legacy
-  audience incident audit before restoring delivery. Provision only schema
-  `USAGE` (not `CREATE`), fence-table `SELECT`, column-scoped `INSERT`/`UPDATE`,
-  and application-fence `EXECUTE` to the restricted runtime role and pass its
-  rollback canary. Missing privileges
-  fail closed. Both API and every worker lane need the identical reviewed
-  server-only invoice issuer bundle; email mode is explicit per lane and starts
-  in capture/disabled. Render stays manual, and every frontend must prove that
-  no effective/inherited live database credential remains before redeploy. Do
-  not roll forward only the application, only the schema, or a mixed image.
+- **The schema cutover succeeded, but the worker hard drain missed one workload.**
+  All 75 migrations are committed on Neon and exact SHA `512b851` is live on
+  Render in finance-locked mode. The final topology audit then found continuous
+  Northflank service `guestpost-worker` still running `1/1` on incompatible SHA
+  `0e68af7`; it was scaled to `0/0`, with CI/CD disabled. Its final logs showed
+  every realtime queue failing closed on exhausted Upstash quota, and a
+  least-privilege database audit found no writes during or after the migration,
+  no old delivery-snapshot fingerprint, unchanged financial counts, and zero
+  integrity anomalies. Keep the realtime service at zero and both jobs inactive
+  until Redis capacity is restored and all three workloads have the exact
+  reviewed image, explicit mode, protected locked environment, and successful
+  canary. A clean audit proves containment, not rollback safety; never restart
+  or deploy the old image against the migrated schema.
 
 - **PR #91 and its Neon test-schema rollout are complete.** The durable
   communications and financial-document migrations are current, runtime DML
@@ -194,7 +190,15 @@ canonical launch-risk register.
   after a healthy cutover. The old value still exists in Git history, so assess
   repository-history/access containment before production. Do not copy any
   credential into tickets, logs, or Bedrock notes.
-- **Redis auth-limit capacity is exhausted in the current staging provider account.** The application now degrades to a bounded per-instance email limiter instead of returning authentication 500s or failing open, but the fallback is not cluster-global. Reset/upgrade the Redis request quota and add capacity alerts so normal cross-pod enforcement is restored before production traffic.
+- **Redis request capacity is exhausted in the current provider account.** The
+  API auth limiter degrades to a bounded per-instance fallback instead of
+  returning authentication 500s or failing open, but that fallback is not
+  cluster-global. The retired Northflank worker also failed every realtime queue
+  connection with `ERR max requests limit exceeded`, so email, notification,
+  website-verification, and delivery-verification processing is unavailable.
+  Keep all workers stopped, reset/upgrade the quota, separate capacity where
+  appropriate, and add usage/saturation alerts before any worker canary or
+  production traffic.
 - **On-demand wake is best-effort by design.** A bad Northflank endpoint/token
   can increase report, trust, integration, or payout-webhook processing latency.
   It cannot be the only trigger: the documented 10-minute catch-up schedule and

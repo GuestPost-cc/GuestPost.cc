@@ -7,12 +7,12 @@ real_knowledge_path: /Users/shohan/Desktop/GuestPost/GuestPost.cc/bedrock
 local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
-last_backfill_import: 2026-08-13
-last_project_sync: 2026-08-13T15:41:11Z
+last_backfill_import: 2026-08-14
+last_project_sync: 2026-08-13T19:20:34Z
 last_compaction: 2026-06-11
-last_validation: 2026-08-13T15:41:12Z
+last_validation: 2026-08-13T19:34:27Z
 last_validation_result: ok
-last_doctor: 2026-08-13T15:41:12Z
+last_doctor: 2026-08-13T19:34:28Z
 last_doctor_result: ok
 ---
 
@@ -29,11 +29,11 @@ last_doctor_result: ok
 ## Activity
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
-- Last backfill/import: `2026-08-13`
-- Last project sync: `2026-08-13T15:41:11Z`
+- Last backfill/import: `2026-08-14`
+- Last project sync: `2026-08-13T19:20:34Z`
 - Last compaction: `2026-06-11`
-- Last validation: `2026-08-13T15:41:12Z` (`ok`)
-- Last doctor: `2026-08-13T15:41:12Z` (`ok`)
+- Last validation: `2026-08-13T19:34:27Z` (`ok`)
+- Last doctor: `2026-08-13T19:34:28Z` (`ok`)
 
 ## Health Warnings
 

@@ -1,15 +1,20 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-08-13
+updated: 2026-08-14
 ---
 
 # Current focus
 
-The active branch contains the 2026-08-12 correctness and security hardening
-batch. It has not been deployed. `Work/backlog.md` owns open work;
-`Work/risks.md` owns launch risks. Historical PR and rollout diaries were moved
-to `History/NOW-through-2026-08-11.md`.
+The 2026-08-12 correctness and security hardening batch is merged and deployed
+at `main` SHA `512b851`. Neon production is fully migrated and the matching
+Render API is live in finance-locked mode. The complete Northflank worker fleet
+is intentionally stopped: the continuous realtime service is scaled to zero
+and both jobs have inactive schedules. None may resume until its protected
+environment and old deployment are replaced with the matching locked release.
+`Work/backlog.md` owns open work; `Work/risks.md`
+owns launch risks. Historical PR and rollout diaries were moved to
+`History/NOW-through-2026-08-11.md`.
 
 ## Implemented in the active batch
 
@@ -57,8 +62,11 @@ to `History/NOW-through-2026-08-11.md`.
   static environment keyring is not equivalent to managed key protection.
 - Keep Wise disabled until a complete quote/transfer/funding/recovery/returned-
   funds design passes real sandbox certification.
-- Run the full populated PostgreSQL migration rehearsal and all CI gates against
-  this exact change set; no persistent database has been migrated by this task.
+- Restore Northflank Redis capacity, re-authenticate protected settings, and
+  deploy exact SHA `512b851` with the locked v2 keyring/runtime-role contract to
+  the continuous `WORKER_MODE=realtime` service plus the on-demand and
+  maintenance jobs. Prove each workload's SHA, mode, environment, and canary
+  before scaling realtime above zero or resuming either schedule.
 - Complete provider, backup/restore, paging, legal/entity, underwriting, and
   corridor-specific operational gates tracked in `Work/backlog.md`.
 
@@ -66,19 +74,34 @@ to `History/NOW-through-2026-08-11.md`.
 
 The frozen-lockfile install is clean and does not change `pnpm-lock.yaml`.
 Repository type, format, lint, dependency-policy, health, API, worker, shared,
-auth, integrations, API-client, and UI gates pass locally. PR #100's GitHub CI
-also passes migration apply/status, the populated historical-data rehearsal,
-the integration-template migration, all database-backed financial suites, all
-production builds, Ubuntu/Poppler worker coverage, UI coverage, and the
-self-starting Chromium onboarding journeys. No persistent production database
-has been migrated by this task.
+auth, integrations, API-client, and UI gates pass. PR #100, PR #101, and final
+`main` push CI run `31729969759` passed migration apply/status, the populated
+historical-data rehearsal, integration-template migration, all database-backed
+financial suites, every production build, UI coverage, and Chromium E2E.
+Neon production has all 75 migrations; the exact-clone and production
+postflights matched with zero anomaly findings. Render API readiness reports
+database and Redis healthy on exact SHA `512b851`.
+
+The final topology audit found the continuous Northflank `guestpost-worker`
+still running one replica of incompatible SHA `0e68af7` after the migration.
+It was immediately scaled to `0/0`; CI and CD are both disabled. Its last logs
+show all four realtime queues failing closed on the exhausted Upstash request
+quota. A least-privilege production audit then found no database activity in
+the seven-second migration window or afterward, no old-image delivery snapshot
+fingerprint, unchanged financial row counts, and zero lifecycle, settlement,
+payout, constraint, or index anomalies. The temporary local DSN file and audit
+script were destroyed. This clean containment evidence does not make the old
+image safe to restart.
 
 ## Next actions
 
-1. Review PR #100 against `main`; keep staff governance and managed KMS/HSM as
-   explicit follow-up gates rather than silently widening this batch.
-2. Rehearse the hard-drain schema-before-code rollout on a recent Neon branch
-   using a direct connection, then record a production restore/PITR point.
-3. Confirm every API, Northflank worker, scheduler, webhook, reconciliation,
-   and recovery writer is drained before `prisma migrate deploy`; deploy the
-   matching application images before writers resume.
+1. Restore/upgrade Upstash request capacity, then re-authenticate Northflank and
+   configure the protected locked-mode environment for `guestpost-worker`,
+   `guestpost-on-demand`, and `guestpost-maintenance-dispatch`. Deploy exact SHA
+   `512b851`, verify each workload's SHA/mode/environment, canary realtime at one
+   replica before scaling, and only then resume schedules one at a time.
+2. Monitor Render readiness and Upstash usage; keep finance, payouts, and new
+   deposits disabled until the operational/provider gates are explicitly met.
+3. Keep staff governance and managed KMS/HSM as explicit follow-up gates rather
+   than silently treating this schema/application cutover as paid-launch
+   approval.

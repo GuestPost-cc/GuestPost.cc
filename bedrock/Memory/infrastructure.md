@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-08-12
+updated: 2026-08-14
 ---
 
 # Infrastructure
@@ -81,6 +81,62 @@ contain embedded credentials, query parameters, or fragments. See
 `docs/WORKER_ARCHITECTURE.md` for the deployment contract, task schedule,
 rollout, rollback, and quota-monitoring procedure.
 
+## Controlled finance-hardening cutover (2026-08-14)
+
+The reviewed hardening release is merged at `main` SHA `512b851`. GitHub push
+CI run `31729969759` passed all 75 migrations, the populated historical-data
+rehearsal, unit/integration/package/UI suites, every production build, and the
+self-starting Chromium journeys.
+
+Neon's `production` branch has all 75 migrations applied. The cutover was
+rehearsed first against an exact child clone, and the permanent restore branch
+`pre-migration-512b851-20260814` was created immediately before the production
+deploy. Pre/post row counts matched; all public constraints and indexes are
+valid; expected finance triggers and lifecycle enums are present; all 28
+financial incident-query blocks passed. The API/worker role remains
+`guestpost_runtime` on a pooled endpoint with no owner, schema-create, trigger,
+or role-escalation capability. Schema-owner passwords were reset on both
+production and the permanent restore branch after postflight; disposable
+rehearsal branches were deleted; all local connection/key files were
+destroyed.
+
+Render API deploy `dep-d9v0sf7qj5pc738no0o0` is live from exact SHA `512b851`.
+It is intentionally held with `FINANCE_RUNTIME_MODE=locked`,
+`PAYOUT_EXECUTION_ENABLED=false`, and `STRIPE_DEPOSITS_ENABLED=false`; the v2
+payout keyring is stored only in Render. Both `/api/v1/health` and the
+dependency-aware `/api/v1/health/ready` passed after the deploy. A startup
+Redis warning cleared on the API readiness path, but that does not prove queue
+capacity: the Northflank queue Redis quota remained exhausted and must be
+restored before any worker canary.
+
+Northflank is a deliberate full-fleet hold. `guestpost-on-demand` and
+`guestpost-maintenance-dispatch` have inactive schedules and CD disabled. The
+continuous `guestpost-worker` (`WORKER_MODE=realtime`) was discovered during
+the final topology audit still running `1/1` on incompatible historical SHA
+`0e68af7`; it was immediately scaled to `0/0`, and its CI and CD controls are
+both disabled. Never scale that deployment up, resume a schedule, or manually
+run either job.
+
+The retired realtime pod's final log stream ended at `2026-08-13T19:09:03Z`
+with all four queues (email, notification, website verification, and delivery
+verification) repeatedly failing closed because the Upstash request quota was
+exhausted. Delivery verification was still a material mixed-version risk: the
+old image did not honor the new finance lock and could have written verification
+evidence, snapshots, fraud holds, or order state. A least-privilege production
+audit used the committed migration window
+`2026-08-13T18:31:56.762Z..18:32:03.594Z` and found no timestamped database
+activity during or after it, no old-image snapshot key
+`deliveries/{deliveryVersionId}/page.html`, no realtime-lane evidence, unchanged
+financial baselines, and zero lifecycle/settlement/payout/schema anomalies.
+The temporary local DSN file and audit script were destroyed immediately.
+
+Northflank requires an operator password re-check to open protected environment
+settings. First restore or upgrade Redis capacity. After re-authentication,
+configure the least-privilege runtime DSN, finance lock, disabled payout/deposit
+flags, and the same v2 keyring on all three workloads; build/deploy exact SHA
+`512b851`; verify each workload's SHA, explicit mode, and protected environment;
+canary the realtime service at one replica in locked mode; and only then scale
+or resume schedules deliberately.
 
 
 ## Docker Compose
