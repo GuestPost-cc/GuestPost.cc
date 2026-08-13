@@ -18,7 +18,7 @@ test("publisher signup provisions an account and opens the publisher workspace",
   await page.getByRole("checkbox", { name: /Terms of Service/ }).check()
   await page.getByLabel("Full name").fill("E2E Publisher")
   await page.getByLabel("Email address").fill(email)
-  await page.getByLabel("Password").fill("E2EPublisher123!")
+  await page.getByLabel("Password", { exact: true }).fill("E2EPublisher123!")
   await page.getByRole("button", { name: "Create publisher account" }).click()
 
   // Birth-time provisioning happened during signup — the publisher shell renders.

@@ -14,7 +14,7 @@ test("customer signup reaches the organization gate and enforces email verificat
   await page.getByRole("checkbox", { name: /Terms of Service/ }).check()
   await page.getByLabel("Full name").fill("E2E Customer")
   await page.getByLabel("Email address").fill(email)
-  await page.getByLabel("Password").fill("E2ECustomer123!")
+  await page.getByLabel("Password", { exact: true }).fill("E2ECustomer123!")
   await page.getByRole("button", { name: "Create customer account" }).click()
 
   // Fresh customers hit the org-creation gate before any dashboard content
