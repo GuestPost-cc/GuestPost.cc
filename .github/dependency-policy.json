@@ -60,6 +60,11 @@
       "package": "valibot",
       "minimumVersion": "1.4.2",
       "reason": "GHSA-5qjj-4xww-7phc is fixed in Valibot 1.4.2."
+    },
+    {
+      "package": "nanoid",
+      "minimumVersion": "3.3.18",
+      "reason": "GHSA-2v37-7h3g-55p8 is fixed in the 3.x line at 3.3.18."
     }
   ],
   "resolvedSecurityFloors": [
