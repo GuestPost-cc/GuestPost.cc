@@ -5,6 +5,7 @@ import {
   makeTransaction,
   makeUser,
   makeWallet,
+  makeWebsite,
 } from "../factories"
 import { createTestApp } from "../helpers/create-test-app"
 
@@ -14,9 +15,11 @@ describe("[INTEGRATION] Financial — reservation release persistence", () => {
     try {
       const organization = await makeOrganization(prisma)
       const customer = await makeUser(prisma, { userType: "CUSTOMER" })
+      const website = await makeWebsite(prisma)
       const order = await makeOrder(prisma, {
         organizationId: organization.id,
         customerId: customer.id,
+        websiteId: website.id,
         status: "PENDING_PAYMENT",
         paymentStatus: "PENDING",
         amount: 100,

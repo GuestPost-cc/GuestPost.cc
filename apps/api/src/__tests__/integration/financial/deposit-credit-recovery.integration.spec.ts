@@ -74,7 +74,7 @@ describe("[INTEGRATION] Financial — deposit credit recovery", () => {
         providerSessionId,
       },
     })
-    const event = await prisma.paymentProviderEvent.create({
+    const pendingEvent = await prisma.paymentProviderEvent.create({
       data: {
         provider: "stripe",
         providerEventId: `evt_${suffix}`,
@@ -82,10 +82,26 @@ describe("[INTEGRATION] Financial — deposit credit recovery", () => {
         objectId: providerSessionId,
         livemode: false,
         eventFingerprint: crypto.randomBytes(32).toString("hex"),
-        status: "PROCESSING",
-        attempts: 1,
-        lockedAt: new Date(),
+        status: "PENDING",
       },
+    })
+    const eventLockedAt = new Date()
+    const claimedEvent = await prisma.paymentProviderEvent.updateMany({
+      where: {
+        id: pendingEvent.id,
+        status: "PENDING",
+        attempts: 0,
+        lockedAt: null,
+      },
+      data: {
+        status: "PROCESSING",
+        attempts: { increment: 1 },
+        lockedAt: eventLockedAt,
+      },
+    })
+    expect(claimedEvent.count).toBe(1)
+    const event = await prisma.paymentProviderEvent.findUniqueOrThrow({
+      where: { id: pendingEvent.id },
     })
     const recoveryPending = await prisma.depositCreditRecovery.create({
       data: { depositAttemptId: attempt.id },

@@ -433,6 +433,14 @@ describe("[INTEGRATION] Financial — publisher withdrawal reservation", () => {
             sequence: 0,
           },
         })
+        await tx.publisherBalance.update({
+          where: { publisherId: fixture.publisherId },
+          data: {
+            withdrawableBalance: { decrement: 9 },
+            allocationCarryForwardUsed: { increment: 9 },
+            version: { increment: 1 },
+          },
+        })
       }),
     ).rejects.toThrow(/exact active allocation coverage/)
   }, 30_000)
@@ -465,6 +473,14 @@ describe("[INTEGRATION] Financial — publisher withdrawal reservation", () => {
             amount: 1,
             currency: "USD",
             sequence: 1,
+          },
+        })
+        await tx.publisherBalance.update({
+          where: { publisherId: fixture.publisherId },
+          data: {
+            withdrawableBalance: { decrement: 1 },
+            allocationCarryForwardUsed: { increment: 1 },
+            version: { increment: 1 },
           },
         })
         notifyInsertLocked()

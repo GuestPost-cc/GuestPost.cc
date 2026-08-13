@@ -264,23 +264,25 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         },
       )
 
-      // Model the state after a legitimate 50 USD reservation: the
-      // withdrawable balance is already reduced and an immutable allocation
-      // exactly covers the APPROVED withdrawal.
+      // Establish bounded legacy capacity first. The active carry allocation
+      // and its used projection are committed together below; neither side is
+      // valid evidence on its own.
       await prisma.publisherBalance.upsert({
         where: { publisherId: ctx.publisher.publisher.id },
         create: {
           publisherId: ctx.publisher.publisher.id,
-          withdrawableBalance: 50,
+          withdrawableBalance: 100,
           debtBalance: 50,
+          allocationCutoverAt: new Date(),
           allocationCarryForward: 100,
-          allocationCarryForwardUsed: 50,
+          allocationCarryForwardUsed: 0,
         },
         update: {
-          withdrawableBalance: 50,
+          withdrawableBalance: 100,
           debtBalance: 50,
+          allocationCutoverAt: new Date(),
           allocationCarryForward: 100,
-          allocationCarryForwardUsed: 50,
+          allocationCarryForwardUsed: 0,
         },
       })
 
@@ -324,6 +326,14 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
             amount: 50,
             currency: "USD",
             sequence: 0,
+          },
+        })
+        await tx.publisherBalance.update({
+          where: { publisherId: ctx.publisher.publisher.id },
+          data: {
+            withdrawableBalance: { decrement: 50 },
+            allocationCarryForwardUsed: { increment: 50 },
+            version: { increment: 1 },
           },
         })
         return created
