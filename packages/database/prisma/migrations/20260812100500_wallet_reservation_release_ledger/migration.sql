@@ -50,12 +50,12 @@ END;
 $$;
 
 CREATE UNIQUE INDEX "Transaction_reservation_release_order_unique"
-  ON "Transaction"("orderId")
-  WHERE "type"::TEXT = 'RELEASE' AND "orderId" IS NOT NULL;
+  ON public."Transaction"("orderId")
+  WHERE "type" = 'RELEASE'::public."TransactionType" AND "orderId" IS NOT NULL;
 
 CREATE UNIQUE INDEX "Transaction_reservation_order_unique"
-  ON "Transaction"("orderId")
-  WHERE "type"::TEXT = 'RESERVATION' AND "orderId" IS NOT NULL;
+  ON public."Transaction"("orderId")
+  WHERE "type" = 'RESERVATION'::public."TransactionType" AND "orderId" IS NOT NULL;
 
 ALTER TABLE "Transaction"
   ADD CONSTRAINT "Transaction_reservation_release_identity_check" CHECK (
