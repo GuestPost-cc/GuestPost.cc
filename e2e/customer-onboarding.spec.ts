@@ -5,7 +5,7 @@
 import { expect, test } from "@playwright/test"
 import { fixtureEmail } from "./support/fixture-identity"
 
-test("customer signup reaches the organization gate and enforces email verification", async ({
+test("customer signup provisions a workspace and enforces email verification", async ({
   page,
 }, testInfo) => {
   const email = fixtureEmail(testInfo, "customer")
@@ -17,23 +17,36 @@ test("customer signup reaches the organization gate and enforces email verificat
   await page.getByLabel("Password", { exact: true }).fill("E2ECustomer123!")
   await page.getByRole("button", { name: "Create customer account" }).click()
 
-  // Fresh customers hit the org-creation gate before any dashboard content
-  await expect(page.getByText("Create your organization")).toBeVisible({
-    timeout: 20_000,
+  // Birth-time provisioning must attach an active organization before the
+  // customer shell renders. A missing projection would show the creation gate.
+  const navigation = page.getByRole("navigation", {
+    name: "Customer navigation",
   })
+  await expect(
+    navigation.getByRole("link", { name: "Work Queue" }),
+  ).toBeVisible({ timeout: 20_000 })
 
-  // A new account is intentionally unverified. Prove the real authorization
-  // boundary rather than bypassing it with a privileged seed: organization
-  // creation is a mutation and must remain blocked until email verification.
-  await page.getByLabel("Organization name").fill("E2E Test Organization")
-  const createResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      response.url().endsWith("/api/v1/identity/organizations"),
-  )
-  await page.getByRole("button", { name: "Create organization" }).click()
-  const response = await createResponse
-  expect(response.status()).toBe(403)
-  expect(JSON.stringify(await response.json())).toContain("EMAIL_NOT_VERIFIED")
-  await expect(page.getByText("Create your organization")).toBeVisible()
+  // A new account is intentionally unverified. Exercise the real browser
+  // session, CORS and CSRF path and prove a state-changing command remains
+  // blocked without creating a privileged test bypass.
+  const mutation = await page.evaluate(async () => {
+    const response = await fetch(
+      "http://localhost:4000/api/v1/identity/organizations",
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-protection": "1",
+        },
+        body: JSON.stringify({
+          name: "E2E Unverified Organization",
+          slug: "e2e-unverified-organization",
+        }),
+      },
+    )
+    return { status: response.status, body: await response.text() }
+  })
+  expect(mutation.status).toBe(403)
+  expect(mutation.body).toContain("EMAIL_NOT_VERIFIED")
 })
