@@ -55,13 +55,41 @@ describe("OrderCancellationService", () => {
         }),
       },
       orderEvent: { create: jest.fn().mockResolvedValue({}) },
-      publisherMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      membership: {
+        findUnique: jest.fn().mockResolvedValue({
+          role: "MEMBER",
+          status: "ACTIVE",
+          user: { banned: false, userType: "CUSTOMER" },
+        }),
+      },
+      publisherMembership: {
+        findUnique: jest.fn().mockResolvedValue({
+          role: "PUBLISHER_OWNER",
+          user: { banned: false, userType: "PUBLISHER" },
+        }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      staffMembership: {
+        findUnique: jest.fn().mockResolvedValue({
+          role: "OPERATIONS",
+          user: { banned: false, userType: "STAFF" },
+        }),
+      },
       fulfillmentAssignment: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      wallet: { findUnique: jest.fn() },
-      transaction: { findFirst: jest.fn().mockResolvedValue(null) },
+      wallet: {
+        findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      transaction: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({ id: "release-transaction-1" }),
+      },
       $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
+      $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: "wallet-1" }]),
       $transaction: jest
         .fn()
         .mockImplementation(async (callback: any) => callback(prisma)),
@@ -87,6 +115,26 @@ describe("OrderCancellationService", () => {
     ).rejects.toBeInstanceOf(BadRequestException)
 
     expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it("locks the order aggregate before an emergency paid refund", async () => {
+    refund.refundOrderInTransaction.mockResolvedValue({
+      order: { ...order, status: "REFUNDED" },
+      refundTransactionId: "refund-1",
+    })
+
+    await service.forceCancel("order-1", "admin-1", {
+      reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
+      expectedVersion: 4,
+      confirmationOrderId: "order-1",
+      responsibility: CancellationResponsibility.SYSTEM,
+      note: "Verified legal emergency requiring an immediate cancellation.",
+    })
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1)
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      refund.refundOrderInTransaction.mock.invocationCallOrder[0],
+    )
   })
 
   it("returns a request action after the acceptance boundary", async () => {
@@ -137,6 +185,29 @@ describe("OrderCancellationService", () => {
     expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       prisma.orderCancellationRequest.create.mock.invocationCallOrder[0],
     )
+  })
+
+  it("re-checks membership in the locked transaction before creating a cancellation", async () => {
+    prisma.membership.findUnique.mockResolvedValue(null)
+
+    await expect(
+      service.createRequest(
+        "order-1",
+        {
+          userId: "customer-1",
+          kind: "CUSTOMER",
+          organizationId: "org-1",
+          customerRole: "MEMBER",
+        },
+        {
+          reasonCode: CancellationReasonCode.CUSTOMER_CHANGED_MIND,
+          expectedVersion: 4,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+
+    expect(prisma.order.updateMany).not.toHaveBeenCalled()
+    expect(prisma.orderCancellationRequest.create).not.toHaveBeenCalled()
   })
 
   it("blocks fulfillment while an active case exists", async () => {
@@ -263,6 +334,38 @@ describe("OrderCancellationService", () => {
         data: expect.objectContaining({ responsibility: "SHARED" }),
       }),
     )
+  })
+
+  it("re-checks counterparty authority before issuing a cancellation refund", async () => {
+    const request = {
+      id: "cancel-1",
+      orderId: "order-1",
+      status: "REQUESTED",
+      requesterType: "CUSTOMER",
+      reasonCode: CancellationReasonCode.OTHER,
+      responsibility: CancellationResponsibility.UNDETERMINED,
+      fulfillmentChannel: "PUBLISHER",
+      order,
+    }
+    prisma.orderCancellationRequest.findFirst.mockResolvedValue(request)
+    prisma.publisherMembership.findUnique.mockResolvedValue(null)
+
+    await expect(
+      service.respond(
+        "order-1",
+        "cancel-1",
+        {
+          userId: "publisher-owner-1",
+          kind: "PUBLISHER",
+          publisherId: "publisher-1",
+          publisherRole: "PUBLISHER_OWNER",
+        },
+        { action: CancellationResponseAction.ACCEPT },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+
+    expect(refund.refundOrderInTransaction).not.toHaveBeenCalled()
+    expect(prisma.orderEvent.create).not.toHaveBeenCalled()
   })
 
   it("requires Operations to claim a platform order before requesting cancellation", async () => {
@@ -453,6 +556,129 @@ describe("OrderCancellationService", () => {
 
     expect(prisma.wallet.findUnique).not.toHaveBeenCalled()
     expect(prisma.order.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("records the reservation release in the ledger atomically", async () => {
+    const pendingOrder = {
+      ...order,
+      status: "PENDING_PAYMENT",
+      paymentStatus: "PENDING",
+      version: 1,
+      cancellationRequests: [],
+    }
+    prisma.order.findUnique.mockResolvedValue(pendingOrder)
+    prisma.wallet.findUnique.mockResolvedValue({ id: "wallet-1" })
+    prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      id: "wallet-1",
+      organizationId: "org-1",
+      currency: "USD",
+      availableBalance: 0,
+      reservedBalance: 100,
+      version: 7,
+    })
+    prisma.transaction.findMany.mockResolvedValue([
+      {
+        id: "reservation-transaction-1",
+        type: "RESERVATION",
+        amount: -100,
+        currency: "USD",
+        publisherId: null,
+        settlementId: null,
+        provider: null,
+        providerRef: null,
+      },
+    ])
+
+    await service.cancelNow(
+      "order-1",
+      {
+        userId: "customer-1",
+        kind: "CUSTOMER",
+        organizationId: "org-1",
+        customerRole: "MEMBER",
+      },
+      {
+        reasonCode: CancellationReasonCode.CUSTOMER_CHANGED_MIND,
+        expectedVersion: 1,
+      },
+    )
+
+    expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
+      'SELECT "id" FROM "Wallet" WHERE "id" = $1 FOR UPDATE',
+      "wallet-1",
+    )
+    expect(prisma.wallet.updateMany).toHaveBeenCalledWith({
+      where: { id: "wallet-1", version: 7 },
+      data: {
+        reservedBalance: { decrement: expect.anything() },
+        availableBalance: { increment: expect.anything() },
+        version: { increment: 1 },
+      },
+    })
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith({
+      where: {
+        orderId: "order-1",
+        walletId: "wallet-1",
+        type: { in: ["RESERVATION", "PURCHASE", "RELEASE"] },
+      },
+      select: expect.objectContaining({
+        id: true,
+        type: true,
+        amount: true,
+      }),
+    })
+    expect(prisma.transaction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        walletId: "wallet-1",
+        orderId: "order-1",
+        type: "RELEASE",
+        currency: "USD",
+        reference: "reservation-release:order-1",
+      }),
+    })
+  })
+
+  it("does not release another order's aggregate reservation", async () => {
+    const pendingOrder = {
+      ...order,
+      status: "PENDING_PAYMENT",
+      paymentStatus: "PENDING",
+      version: 1,
+      cancellationRequests: [],
+    }
+    prisma.order.findUnique.mockResolvedValue(pendingOrder)
+    prisma.wallet.findUnique.mockResolvedValue({ id: "wallet-1" })
+    prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      id: "wallet-1",
+      organizationId: "org-1",
+      currency: "USD",
+      availableBalance: 0,
+      reservedBalance: 100,
+      version: 7,
+    })
+    prisma.transaction.findMany.mockResolvedValue([])
+
+    await expect(
+      service.cancelNow(
+        "order-1",
+        {
+          userId: "customer-1",
+          kind: "CUSTOMER",
+          organizationId: "org-1",
+          customerRole: "MEMBER",
+        },
+        {
+          reasonCode: CancellationReasonCode.CUSTOMER_CHANGED_MIND,
+          expectedVersion: 1,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "RESERVATION_LEDGER_MISMATCH",
+      }),
+    })
+    expect(prisma.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prisma.transaction.create).not.toHaveBeenCalled()
   })
 
   it("attributes a server-verified acceptance timeout to the fulfiller", async () => {

@@ -99,11 +99,20 @@ const statusConfig: Record<
   PUBLISHED: { icon: Check, description: "Content published" },
   VERIFIED: { icon: ShieldCheck, description: "Content verified" },
   DELIVERED: { icon: CheckCircle, description: "Order delivered" },
-  SETTLED: { icon: CheckCircle, description: "Settlement processed" },
   COMPLETED: { icon: CheckCircle, description: "Order completed" },
   CANCELLED: { icon: XCircle, description: "Order cancelled" },
   REFUNDED: { icon: RefreshCw, description: "Refund issued" },
   DISPUTED: { icon: AlertCircle, description: "Order disputed" },
+}
+
+function needsPublisherCompensationDecision(
+  order: AdminOrderDetailResponse,
+  responsibility: string,
+) {
+  return (
+    responsibility !== "PUBLISHER" &&
+    order.publisherCompensationPolicy?.required === true
+  )
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -284,6 +293,10 @@ export default function OrderDetailPage() {
   const [reason, setReason] = useState("")
   const [responsibility, setResponsibility] = useState("SYSTEM")
   const [confirmationOrderId, setConfirmationOrderId] = useState("")
+  const [publisherCompensationAmount, setPublisherCompensationAmount] =
+    useState("")
+  const [publisherCompensationReason, setPublisherCompensationReason] =
+    useState("")
 
   const {
     data: order,
@@ -317,12 +330,23 @@ export default function OrderDetailPage() {
         idempotencyKey: `admin-${id}-${order!.version}`,
         confirmationOrderId: confirmationOrderId.trim(),
         responsibility,
+        publisherCompensation: needsPublisherCompensationDecision(
+          order!,
+          responsibility,
+        )
+          ? {
+              amount: Number(publisherCompensationAmount),
+              reason: publisherCompensationReason.trim(),
+            }
+          : undefined,
       }),
     onSuccess: () => {
       toast.success("Order force-cancelled")
       setAction(null)
       setReason("")
       setConfirmationOrderId("")
+      setPublisherCompensationAmount("")
+      setPublisherCompensationReason("")
       refreshOrder()
     },
     onError: (e: any) => {
@@ -428,12 +452,9 @@ export default function OrderDetailPage() {
     : order.access.canWorkFulfillment
       ? "Available to work"
       : "Context only"
-  const nextDeadline = [
-    "SETTLED",
-    "COMPLETED",
-    "CANCELLED",
-    "REFUNDED",
-  ].includes(order.status)
+  const nextDeadline = ["COMPLETED", "CANCELLED", "REFUNDED"].includes(
+    order.status,
+  )
     ? null
     : (order.fulfillmentDueAt ?? order.autoAcceptAt)
 
@@ -1431,6 +1452,8 @@ export default function OrderDetailPage() {
             setAction(null)
             setReason("")
             setConfirmationOrderId("")
+            setPublisherCompensationAmount("")
+            setPublisherCompensationReason("")
           }
         }}
       >
@@ -1476,6 +1499,57 @@ export default function OrderDetailPage() {
               </SelectContent>
             </Select>
           </div>
+          {needsPublisherCompensationDecision(order, responsibility) && (
+            <div className="space-y-4 rounded-md border p-4">
+              <AdminNotice
+                title="Publisher compensation decision required"
+                tone="warning"
+              >
+                This publisher order crossed publication. Record the exact
+                platform-funded amount owed to the publisher. Enter zero only
+                when the reviewed decision is explicitly no compensation.
+              </AdminNotice>
+              <div className="space-y-2">
+                <Label htmlFor="force-cancel-publisher-compensation">
+                  Publisher compensation (USD)
+                </Label>
+                <Input
+                  id="force-cancel-publisher-compensation"
+                  type="number"
+                  min="0"
+                  max={Number(
+                    order.publisherCompensationPolicy?.maximumAmount ?? 0,
+                  )}
+                  step="0.01"
+                  inputMode="decimal"
+                  value={publisherCompensationAmount}
+                  onChange={(event) =>
+                    setPublisherCompensationAmount(event.target.value)
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="force-cancel-publisher-compensation-reason">
+                  Compensation decision reason
+                </Label>
+                <Textarea
+                  id="force-cancel-publisher-compensation-reason"
+                  value={publisherCompensationReason}
+                  onChange={(event) =>
+                    setPublisherCompensationReason(event.target.value)
+                  }
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Explain why this exact publisher compensation amount is appropriate..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  Minimum 20 characters ·
+                  {publisherCompensationReason.trim().length}
+                  /2000
+                </p>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="force-cancel-confirmation">
               Type the complete order ID to confirm
@@ -1496,6 +1570,8 @@ export default function OrderDetailPage() {
                 setAction(null)
                 setReason("")
                 setConfirmationOrderId("")
+                setPublisherCompensationAmount("")
+                setPublisherCompensationReason("")
               }}
             >
               Cancel
@@ -1505,7 +1581,19 @@ export default function OrderDetailPage() {
               disabled={
                 intervene.isPending ||
                 reason.trim().length < 20 ||
-                confirmationOrderId.trim() !== order.id
+                confirmationOrderId.trim() !== order.id ||
+                (needsPublisherCompensationDecision(order, responsibility) &&
+                  (publisherCompensationAmount.trim() === "" ||
+                    !/^\d+(?:\.\d{1,2})?$/.test(
+                      publisherCompensationAmount.trim(),
+                    ) ||
+                    !Number.isFinite(Number(publisherCompensationAmount)) ||
+                    Number(publisherCompensationAmount) < 0 ||
+                    Number(publisherCompensationAmount) >
+                      Number(
+                        order.publisherCompensationPolicy?.maximumAmount ?? 0,
+                      ) ||
+                    publisherCompensationReason.trim().length < 20))
               }
               onClick={() =>
                 action && intervene.mutate({ reasonText: reason.trim() })

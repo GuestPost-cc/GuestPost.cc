@@ -221,7 +221,7 @@ reconciliation issue.
 - **Claimed**: orders the Operations member explicitly self-claimed from the
   shared queue. Auto-assigned work is not counted as claimed.
 - **Completed**: assigned orders whose fulfillment assignment is delivered and
-  whose order has reached `DELIVERED`, `SETTLED`, or `COMPLETED`.
+  whose order has reached `DELIVERED` or `COMPLETED`.
 - **Sales**: full order amount for completed platform-fulfilled work, grouped
   by currency. This is operational production value, not staff compensation.
 - **Finance handled volume**: gross order value associated with the Finance

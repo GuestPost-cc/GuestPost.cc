@@ -148,11 +148,18 @@ outbound Stripe feature flags are disabled.
 - duplicate and out-of-order events: one state transition;
 - amount/currency/metadata mismatch: no credit and an actionable error/audit;
 - Stripe retry after temporary API/DB failure: event is safely reprocessed;
-- crash after a checkout-success inbox claim: an early redelivery receives
-  non-2xx while the 15-minute lease is live; after expiry a fresh signed
-  delivery recovers the row and credits exactly once. Verify no local worker
-  or operator action independently completes it: the current release has no
-  authenticated Checkout/PaymentIntent catch-up path;
+- suppress checkout-success delivery after a paid test Checkout. After the
+  attempt reaches the recovery age, run `deposit-credit-recovery`; verify one
+  append-only retrieval observation, one wallet increment, one `DEPOSIT` row,
+  and a terminal recovery aggregate. Redeliver the signed webhook and verify
+  it proves the exact replay without a second credit;
+- race a signed success delivery against the recovery job and verify both
+  authorities terminalize while the wallet and ledger change exactly once;
+- retrieve mismatched amount, currency, mode, metadata, PaymentIntent, or
+  Charge test fixtures and verify quarantine plus Finance alert with no money;
+- retrieve disputed and partially refunded Charge fixtures and verify they are
+  rejected before persistence/credit; race a paid Checkout against local
+  expiry and verify the exact paid authority credits the `EXPIRED` attempt;
 - force duplicate-key collisions independently on session reference,
   PaymentIntent, wallet, amount, and currency: only an exact ledger plus linked
   `DepositAttempt` replay is accepted; every mismatch rolls back the wallet,

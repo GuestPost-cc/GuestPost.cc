@@ -20,7 +20,8 @@ evidence while refusing money mutations.
 | `JWT_SECRET` | 32+ random chars, never a documented default |
 | `QUEUE_SIGNING_SECRET` | must differ from JWT_SECRET |
 | `TRUSTED_ORIGINS` | comma-separated app origins — **API throws without it in production** |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe deposits; prefer a least-privilege `rk_*` key whose mode matches the webhook |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe deposit creation and signed evidence; prefer a least-privilege `rk_*` key whose mode matches the webhook |
+| `STRIPE_DEPOSIT_RECOVERY_KEY` | distinct least-privilege `rk_*` key with read access to Checkout Sessions, PaymentIntents, and Charges; required by authenticated deposit catch-up and must not equal `STRIPE_SECRET_KEY` |
 | `STRIPE_PAYOUT_WEBHOOK_SECRET` | Stripe platform-transfer route (`/payout-webhooks/stripe_connect/platform`) secret; no fallback/reuse |
 | `STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET` | separate connected-account route (`/payout-webhooks/stripe_connect/connected`) secret; required with Connect |
 | `STRIPE_DEPOSITS_ENABLED`, `STRIPE_CONNECT_ENABLED` | direction/provider gates; false unless deliberately enabled |
@@ -30,7 +31,9 @@ evidence while refusing money mutations.
 | `NEXT_PUBLIC_PORTAL_URL`, `NEXT_PUBLIC_PUBLISHER_URL` | exact HTTPS, credential-free return origins; required when the corresponding Stripe flow is enabled in production |
 | `PAYOUT_LEGACY_METHODS_ENABLED` | false for Stripe rollout; only enable after the selected legacy provider is certified |
 | `WISE_API_KEY`, `WISE_WEBHOOK_PUBLIC_KEY` | Reserved for Wise certification/webhook verification; automated Wise sends remain disabled until typed settlement and recovery evidence are approved |
-| `PAYOUT_ENCRYPTION_KEY` | Exactly 64 hexadecimal characters (32 bytes); malformed configured keys fail startup in every environment, and payout-details encryption refuses the dev-derived fallback in production |
+| `PAYOUT_ENCRYPTION_KEYS` | Required bounded JSON object (maximum 16) from opaque key IDs to distinct 64-hex data-encryption keys; all configured non-active IDs are decrypt-only |
+| `PAYOUT_ENCRYPTION_ACTIVE_KEY_ID` | Required opaque ID present in `PAYOUT_ENCRYPTION_KEYS`; every new payout ciphertext uses this key ID |
+| `PAYOUT_ENCRYPTION_KEY` | Optional legacy v0/v1 read key during migration only; it cannot authorize new writes and must differ from every v2 key |
 | `INTEGRATION_ENCRYPTION_KEY` | Legacy integration-token key registered as version 1; exactly 64 hexadecimal characters; mutually exclusive with the keyring variables |
 | `INTEGRATION_ENCRYPTION_KEYS` | Bounded JSON object mapping positive integer versions to distinct exact 64-hex keys; production rotation mode; an explicitly empty value is invalid |
 | `INTEGRATION_ENCRYPTION_ACTIVE_VERSION` | Highest version present in `INTEGRATION_ENCRYPTION_KEYS`, and at least 2; all new OAuth/token-refresh writes use it |
@@ -48,31 +51,37 @@ retry telemetry before tuning the 600/minute staging/production default.
 
 ### Payout encryption rotation boundary
 
-`CURRENT_PAYOUT_KEY_VERSION` supports a soft rotation only: increment the
-version while retaining the exact same `PAYOUT_ENCRYPTION_KEY`. The runtime
-derives and can read every version from `0` through the current version. Before
-and after a soft bump, run:
+Payout encryption uses the format-2 `p2:<key-id>:<payload>` envelope. The
+database version is the envelope format, while the opaque envelope key ID
+selects the active or decrypt-only key. AES-GCM authenticated data binds payout
+method ciphertext to method ID, publisher ID, and method type, and binds
+provider config to provider ID and name.
+
+Hard rotation is supported by adding a new key ID, making it active, and
+running the resumable compare-and-swap rotator. Before and after rotation, run:
 
 ```bash
-pnpm tsx scripts/verify-encryption-versions.ts --decrypt
+pnpm tsx scripts/verify-encryption-versions.ts
+# After rotation or before removing any decrypt-only key:
+pnpm tsx scripts/verify-encryption-versions.ts --require-active
 ```
 
-The verifier checks active and inactive payout records, samples real
-payout-method decryption, and validates every provider config without printing
-plaintext. `PayoutProvider.config` may be an empty `{}` only when credentials
-come from the process environment; every non-empty provider config must be
-authenticated ciphertext. Any unknown version, plaintext non-empty config, or
-decrypt failure blocks deployment.
+The verifier decrypts every active and inactive payout method and every
+non-empty provider config without printing plaintext or ciphertext. Any
+unknown key ID, legacy/key mismatch, malformed envelope, identity transplant,
+or decrypt failure blocks deployment. Follow the drain, migration, rotation,
+verification, and rollback procedure in `docs/PAYOUT_ENCRYPTION_RUNBOOK.md`.
 
-A hard master-key replacement is not currently supported because the runtime
-has no dual-key reader or reviewed re-encryption command. Never directly
-replace or erase the production master key: doing so makes historical
-ciphertext unreadable. If compromise is suspected, set
-`FINANCE_RUNTIME_MODE=locked`, disable payout sends and decrypt permission,
-preserve the old key in the incident vault, and require a separately reviewed
-dual-key/keyring migration with complete verification and rollback rehearsal.
-The detailed engineering contract is in
-`bedrock/Memory/infrastructure.md#payout-encryption-key-rotation`.
+Never erase a decrypt-only key until the full verifier reports zero rows for
+that key ID and the rollback window has closed. If compromise is suspected,
+set `FINANCE_RUNTIME_MODE=locked`, disable payout sends and decrypt permission,
+preserve the old key in the incident vault, add a fresh active key, rotate every
+row with the reviewed command, and verify the complete corpus before removing
+the compromised key. Rotation limits future exposure; it cannot undo disclosure
+of ciphertext and key material already obtained together. The environment
+keyring remains transitional: paid production still requires the selected
+managed KMS/HSM adapter and its audited access policy. The detailed engineering
+contract is in `bedrock/Memory/infrastructure.md#payout-encryption-key-rotation`.
 
 ### Integration OAuth-token key rotation
 
@@ -373,8 +382,8 @@ mixed-version deployment is unsupported.
      aggregate).
    Do not cherry-pick, reorder, or manually mark any of them applied.
 4. Start only the new API and worker image. Confirm the five-minute
-   `payment-dispute-inbox` maintenance task is registered and the hourly
-   reconciliation sweep is healthy.
+   `payment-dispute-inbox` and `deposit-credit-recovery` maintenance tasks are
+   registered and the hourly reconciliation sweep is healthy.
 5. Redeliver sandbox checkout/dispute events. Run
    `docs/FINANCIAL_INCIDENT_QUERIES.md` and require zero unexplained inbox,
    case, ledger, or deposit-status findings before re-enabling new deposits.
@@ -614,10 +623,21 @@ persists `PENDING` evidence and returns 503; a redelivery that sees a fresh
 follow the same non-2xx ownership rule. These responses preserve Stripe
 redelivery. The hourly reconciliation sweep pages on
 `DEPOSIT_INBOX_STALE`, `DEPOSIT_INBOX_FAILED`, and
-`DEPOSIT_INBOX_QUARANTINED`. The current release has no independent
-authenticated Checkout/PaymentIntent catch-up processor: recover only from a
-fresh signature-verified Stripe redelivery, never from local status, redirect
-state, or an operator assertion.
+`DEPOSIT_INBOX_QUARANTINED`. Separately, `deposit-credit-recovery` runs every
+five minutes for aged attached attempts. It uses
+`STRIPE_DEPOSIT_RECOVERY_KEY` to retrieve Checkout, PaymentIntent, and Charge,
+persists append-only bounded evidence, and enters the same serializable
+finalizer as the webhook. Do not manually change inbox/recovery status or
+credit from local status, redirect state, or an operator assertion.
+Authenticated recovery refuses any Charge already disputed or with non-zero
+refunded minor units. Exact paid authority can credit a locally `EXPIRED`
+attempt because provider settlement may win the expiry race.
+
+`STRIPE_DEPOSIT_RECOVERY_KEY` should be a distinct restricted key with read
+access to Checkout Sessions, PaymentIntents, and Charges. A missing/invalid
+key produces durable bounded backoff without claiming payment success. Inspect
+`DepositCreditRecovery` for stale leases and `QUARANTINED` rows, and correlate
+the selected `DepositCreditEvidence`; never copy provider JSON into the DB.
 
 The same signed-body rule applies to checkout expiry/failure and Radar
 early-fraud-warning events: locked mode stores `PENDING` evidence and returns

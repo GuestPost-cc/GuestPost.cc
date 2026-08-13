@@ -289,6 +289,9 @@ export type TransactionWhereInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeListRelationFilter
   paymentDisputeHold?: Prisma.XOR<Prisma.PaymentDisputeNullableScalarRelationFilter, Prisma.PaymentDisputeWhereInput> | null
   paymentDisputeResolution?: Prisma.XOR<Prisma.PaymentDisputeNullableScalarRelationFilter, Prisma.PaymentDisputeWhereInput> | null
+  publisherCompensationRefund?: Prisma.XOR<Prisma.PublisherCompensationNullableScalarRelationFilter, Prisma.PublisherCompensationWhereInput> | null
+  publisherCompensationCredit?: Prisma.XOR<Prisma.PublisherCompensationNullableScalarRelationFilter, Prisma.PublisherCompensationWhereInput> | null
+  publisherCompensationDebt?: Prisma.XOR<Prisma.PublisherCompensationNullableScalarRelationFilter, Prisma.PublisherCompensationWhereInput> | null
 }
 
 export type TransactionOrderByWithRelationInput = {
@@ -314,6 +317,9 @@ export type TransactionOrderByWithRelationInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeOrderByRelationAggregateInput
   paymentDisputeHold?: Prisma.PaymentDisputeOrderByWithRelationInput
   paymentDisputeResolution?: Prisma.PaymentDisputeOrderByWithRelationInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationOrderByWithRelationInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationOrderByWithRelationInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationOrderByWithRelationInput
 }
 
 export type TransactionWhereUniqueInput = Prisma.AtLeast<{
@@ -342,6 +348,9 @@ export type TransactionWhereUniqueInput = Prisma.AtLeast<{
   originatingPaymentDisputes?: Prisma.PaymentDisputeListRelationFilter
   paymentDisputeHold?: Prisma.XOR<Prisma.PaymentDisputeNullableScalarRelationFilter, Prisma.PaymentDisputeWhereInput> | null
   paymentDisputeResolution?: Prisma.XOR<Prisma.PaymentDisputeNullableScalarRelationFilter, Prisma.PaymentDisputeWhereInput> | null
+  publisherCompensationRefund?: Prisma.XOR<Prisma.PublisherCompensationNullableScalarRelationFilter, Prisma.PublisherCompensationWhereInput> | null
+  publisherCompensationCredit?: Prisma.XOR<Prisma.PublisherCompensationNullableScalarRelationFilter, Prisma.PublisherCompensationWhereInput> | null
+  publisherCompensationDebt?: Prisma.XOR<Prisma.PublisherCompensationNullableScalarRelationFilter, Prisma.PublisherCompensationWhereInput> | null
 }, "id" | "reference">
 
 export type TransactionOrderByWithAggregationInput = {
@@ -403,6 +412,9 @@ export type TransactionCreateInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateInput = {
@@ -424,6 +436,9 @@ export type TransactionUncheckedCreateInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUpdateInput = {
@@ -445,6 +460,9 @@ export type TransactionUpdateInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateInput = {
@@ -466,6 +484,9 @@ export type TransactionUncheckedUpdateInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionCreateManyInput = {
@@ -520,6 +541,11 @@ export type TransactionListRelationFilter = {
 
 export type TransactionOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
+}
+
+export type TransactionScalarRelationFilter = {
+  is?: Prisma.TransactionWhereInput
+  isNot?: Prisma.TransactionWhereInput
 }
 
 export type TransactionNullableScalarRelationFilter = {
@@ -581,11 +607,6 @@ export type TransactionMinOrderByAggregateInput = {
 
 export type TransactionSumOrderByAggregateInput = {
   amount?: Prisma.SortOrder
-}
-
-export type TransactionScalarRelationFilter = {
-  is?: Prisma.TransactionWhereInput
-  isNot?: Prisma.TransactionWhereInput
 }
 
 export type TransactionCreateNestedManyWithoutPublisherInput = {
@@ -670,6 +691,52 @@ export type TransactionUncheckedUpdateManyWithoutOrderNestedInput = {
   update?: Prisma.TransactionUpdateWithWhereUniqueWithoutOrderInput | Prisma.TransactionUpdateWithWhereUniqueWithoutOrderInput[]
   updateMany?: Prisma.TransactionUpdateManyWithWhereWithoutOrderInput | Prisma.TransactionUpdateManyWithWhereWithoutOrderInput[]
   deleteMany?: Prisma.TransactionScalarWhereInput | Prisma.TransactionScalarWhereInput[]
+}
+
+export type TransactionCreateNestedOneWithoutPublisherCompensationRefundInput = {
+  create?: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationRefundInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationRefundInput>
+  connectOrCreate?: Prisma.TransactionCreateOrConnectWithoutPublisherCompensationRefundInput
+  connect?: Prisma.TransactionWhereUniqueInput
+}
+
+export type TransactionCreateNestedOneWithoutPublisherCompensationCreditInput = {
+  create?: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationCreditInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationCreditInput>
+  connectOrCreate?: Prisma.TransactionCreateOrConnectWithoutPublisherCompensationCreditInput
+  connect?: Prisma.TransactionWhereUniqueInput
+}
+
+export type TransactionCreateNestedOneWithoutPublisherCompensationDebtInput = {
+  create?: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationDebtInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationDebtInput>
+  connectOrCreate?: Prisma.TransactionCreateOrConnectWithoutPublisherCompensationDebtInput
+  connect?: Prisma.TransactionWhereUniqueInput
+}
+
+export type TransactionUpdateOneRequiredWithoutPublisherCompensationRefundNestedInput = {
+  create?: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationRefundInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationRefundInput>
+  connectOrCreate?: Prisma.TransactionCreateOrConnectWithoutPublisherCompensationRefundInput
+  upsert?: Prisma.TransactionUpsertWithoutPublisherCompensationRefundInput
+  connect?: Prisma.TransactionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TransactionUpdateToOneWithWhereWithoutPublisherCompensationRefundInput, Prisma.TransactionUpdateWithoutPublisherCompensationRefundInput>, Prisma.TransactionUncheckedUpdateWithoutPublisherCompensationRefundInput>
+}
+
+export type TransactionUpdateOneWithoutPublisherCompensationCreditNestedInput = {
+  create?: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationCreditInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationCreditInput>
+  connectOrCreate?: Prisma.TransactionCreateOrConnectWithoutPublisherCompensationCreditInput
+  upsert?: Prisma.TransactionUpsertWithoutPublisherCompensationCreditInput
+  disconnect?: Prisma.TransactionWhereInput | boolean
+  delete?: Prisma.TransactionWhereInput | boolean
+  connect?: Prisma.TransactionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TransactionUpdateToOneWithWhereWithoutPublisherCompensationCreditInput, Prisma.TransactionUpdateWithoutPublisherCompensationCreditInput>, Prisma.TransactionUncheckedUpdateWithoutPublisherCompensationCreditInput>
+}
+
+export type TransactionUpdateOneWithoutPublisherCompensationDebtNestedInput = {
+  create?: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationDebtInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationDebtInput>
+  connectOrCreate?: Prisma.TransactionCreateOrConnectWithoutPublisherCompensationDebtInput
+  upsert?: Prisma.TransactionUpsertWithoutPublisherCompensationDebtInput
+  disconnect?: Prisma.TransactionWhereInput | boolean
+  delete?: Prisma.TransactionWhereInput | boolean
+  connect?: Prisma.TransactionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TransactionUpdateToOneWithWhereWithoutPublisherCompensationDebtInput, Prisma.TransactionUpdateWithoutPublisherCompensationDebtInput>, Prisma.TransactionUncheckedUpdateWithoutPublisherCompensationDebtInput>
 }
 
 export type TransactionCreateNestedManyWithoutSettlementInput = {
@@ -856,6 +923,9 @@ export type TransactionCreateWithoutPublisherInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutPublisherInput = {
@@ -876,6 +946,9 @@ export type TransactionUncheckedCreateWithoutPublisherInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutPublisherInput = {
@@ -941,6 +1014,9 @@ export type TransactionCreateWithoutOrderInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutOrderInput = {
@@ -961,6 +1037,9 @@ export type TransactionUncheckedCreateWithoutOrderInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutOrderInput = {
@@ -989,6 +1068,330 @@ export type TransactionUpdateManyWithWhereWithoutOrderInput = {
   data: Prisma.XOR<Prisma.TransactionUpdateManyMutationInput, Prisma.TransactionUncheckedUpdateManyWithoutOrderInput>
 }
 
+export type TransactionCreateWithoutPublisherCompensationRefundInput = {
+  id?: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: string
+  type: $Enums.TransactionType
+  reference?: string | null
+  providerRef?: string | null
+  provider?: string | null
+  description?: string | null
+  createdAt?: Date | string
+  wallet?: Prisma.WalletCreateNestedOneWithoutTransactionsInput
+  order?: Prisma.OrderCreateNestedOneWithoutTransactionsInput
+  publisher?: Prisma.PublisherCreateNestedOneWithoutTransactionsInput
+  settlement?: Prisma.SettlementCreateNestedOneWithoutTransactionsInput
+  depositAttempt?: Prisma.DepositAttemptCreateNestedOneWithoutLedgerTransactionInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSourceTransactionInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
+  paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
+}
+
+export type TransactionUncheckedCreateWithoutPublisherCompensationRefundInput = {
+  id?: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: string
+  type: $Enums.TransactionType
+  reference?: string | null
+  providerRef?: string | null
+  provider?: string | null
+  description?: string | null
+  walletId?: string | null
+  orderId?: string | null
+  publisherId?: string | null
+  settlementId?: string | null
+  createdAt?: Date | string
+  depositAttempt?: Prisma.DepositAttemptUncheckedCreateNestedOneWithoutLedgerTransactionInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSourceTransactionInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
+  paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
+}
+
+export type TransactionCreateOrConnectWithoutPublisherCompensationRefundInput = {
+  where: Prisma.TransactionWhereUniqueInput
+  create: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationRefundInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationRefundInput>
+}
+
+export type TransactionCreateWithoutPublisherCompensationCreditInput = {
+  id?: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: string
+  type: $Enums.TransactionType
+  reference?: string | null
+  providerRef?: string | null
+  provider?: string | null
+  description?: string | null
+  createdAt?: Date | string
+  wallet?: Prisma.WalletCreateNestedOneWithoutTransactionsInput
+  order?: Prisma.OrderCreateNestedOneWithoutTransactionsInput
+  publisher?: Prisma.PublisherCreateNestedOneWithoutTransactionsInput
+  settlement?: Prisma.SettlementCreateNestedOneWithoutTransactionsInput
+  depositAttempt?: Prisma.DepositAttemptCreateNestedOneWithoutLedgerTransactionInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSourceTransactionInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
+  paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
+}
+
+export type TransactionUncheckedCreateWithoutPublisherCompensationCreditInput = {
+  id?: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: string
+  type: $Enums.TransactionType
+  reference?: string | null
+  providerRef?: string | null
+  provider?: string | null
+  description?: string | null
+  walletId?: string | null
+  orderId?: string | null
+  publisherId?: string | null
+  settlementId?: string | null
+  createdAt?: Date | string
+  depositAttempt?: Prisma.DepositAttemptUncheckedCreateNestedOneWithoutLedgerTransactionInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSourceTransactionInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
+  paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
+}
+
+export type TransactionCreateOrConnectWithoutPublisherCompensationCreditInput = {
+  where: Prisma.TransactionWhereUniqueInput
+  create: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationCreditInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationCreditInput>
+}
+
+export type TransactionCreateWithoutPublisherCompensationDebtInput = {
+  id?: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: string
+  type: $Enums.TransactionType
+  reference?: string | null
+  providerRef?: string | null
+  provider?: string | null
+  description?: string | null
+  createdAt?: Date | string
+  wallet?: Prisma.WalletCreateNestedOneWithoutTransactionsInput
+  order?: Prisma.OrderCreateNestedOneWithoutTransactionsInput
+  publisher?: Prisma.PublisherCreateNestedOneWithoutTransactionsInput
+  settlement?: Prisma.SettlementCreateNestedOneWithoutTransactionsInput
+  depositAttempt?: Prisma.DepositAttemptCreateNestedOneWithoutLedgerTransactionInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSourceTransactionInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
+  paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+}
+
+export type TransactionUncheckedCreateWithoutPublisherCompensationDebtInput = {
+  id?: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: string
+  type: $Enums.TransactionType
+  reference?: string | null
+  providerRef?: string | null
+  provider?: string | null
+  description?: string | null
+  walletId?: string | null
+  orderId?: string | null
+  publisherId?: string | null
+  settlementId?: string | null
+  createdAt?: Date | string
+  depositAttempt?: Prisma.DepositAttemptUncheckedCreateNestedOneWithoutLedgerTransactionInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSourceTransactionInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
+  paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+}
+
+export type TransactionCreateOrConnectWithoutPublisherCompensationDebtInput = {
+  where: Prisma.TransactionWhereUniqueInput
+  create: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationDebtInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationDebtInput>
+}
+
+export type TransactionUpsertWithoutPublisherCompensationRefundInput = {
+  update: Prisma.XOR<Prisma.TransactionUpdateWithoutPublisherCompensationRefundInput, Prisma.TransactionUncheckedUpdateWithoutPublisherCompensationRefundInput>
+  create: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationRefundInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationRefundInput>
+  where?: Prisma.TransactionWhereInput
+}
+
+export type TransactionUpdateToOneWithWhereWithoutPublisherCompensationRefundInput = {
+  where?: Prisma.TransactionWhereInput
+  data: Prisma.XOR<Prisma.TransactionUpdateWithoutPublisherCompensationRefundInput, Prisma.TransactionUncheckedUpdateWithoutPublisherCompensationRefundInput>
+}
+
+export type TransactionUpdateWithoutPublisherCompensationRefundInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
+  reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallet?: Prisma.WalletUpdateOneWithoutTransactionsNestedInput
+  order?: Prisma.OrderUpdateOneWithoutTransactionsNestedInput
+  publisher?: Prisma.PublisherUpdateOneWithoutTransactionsNestedInput
+  settlement?: Prisma.SettlementUpdateOneWithoutTransactionsNestedInput
+  depositAttempt?: Prisma.DepositAttemptUpdateOneWithoutLedgerTransactionNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSourceTransactionNestedInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
+  paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
+}
+
+export type TransactionUncheckedUpdateWithoutPublisherCompensationRefundInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
+  reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  settlementId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  depositAttempt?: Prisma.DepositAttemptUncheckedUpdateOneWithoutLedgerTransactionNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSourceTransactionNestedInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
+  paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
+}
+
+export type TransactionUpsertWithoutPublisherCompensationCreditInput = {
+  update: Prisma.XOR<Prisma.TransactionUpdateWithoutPublisherCompensationCreditInput, Prisma.TransactionUncheckedUpdateWithoutPublisherCompensationCreditInput>
+  create: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationCreditInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationCreditInput>
+  where?: Prisma.TransactionWhereInput
+}
+
+export type TransactionUpdateToOneWithWhereWithoutPublisherCompensationCreditInput = {
+  where?: Prisma.TransactionWhereInput
+  data: Prisma.XOR<Prisma.TransactionUpdateWithoutPublisherCompensationCreditInput, Prisma.TransactionUncheckedUpdateWithoutPublisherCompensationCreditInput>
+}
+
+export type TransactionUpdateWithoutPublisherCompensationCreditInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
+  reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallet?: Prisma.WalletUpdateOneWithoutTransactionsNestedInput
+  order?: Prisma.OrderUpdateOneWithoutTransactionsNestedInput
+  publisher?: Prisma.PublisherUpdateOneWithoutTransactionsNestedInput
+  settlement?: Prisma.SettlementUpdateOneWithoutTransactionsNestedInput
+  depositAttempt?: Prisma.DepositAttemptUpdateOneWithoutLedgerTransactionNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSourceTransactionNestedInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
+  paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
+}
+
+export type TransactionUncheckedUpdateWithoutPublisherCompensationCreditInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
+  reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  settlementId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  depositAttempt?: Prisma.DepositAttemptUncheckedUpdateOneWithoutLedgerTransactionNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSourceTransactionNestedInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
+  paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
+}
+
+export type TransactionUpsertWithoutPublisherCompensationDebtInput = {
+  update: Prisma.XOR<Prisma.TransactionUpdateWithoutPublisherCompensationDebtInput, Prisma.TransactionUncheckedUpdateWithoutPublisherCompensationDebtInput>
+  create: Prisma.XOR<Prisma.TransactionCreateWithoutPublisherCompensationDebtInput, Prisma.TransactionUncheckedCreateWithoutPublisherCompensationDebtInput>
+  where?: Prisma.TransactionWhereInput
+}
+
+export type TransactionUpdateToOneWithWhereWithoutPublisherCompensationDebtInput = {
+  where?: Prisma.TransactionWhereInput
+  data: Prisma.XOR<Prisma.TransactionUpdateWithoutPublisherCompensationDebtInput, Prisma.TransactionUncheckedUpdateWithoutPublisherCompensationDebtInput>
+}
+
+export type TransactionUpdateWithoutPublisherCompensationDebtInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
+  reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallet?: Prisma.WalletUpdateOneWithoutTransactionsNestedInput
+  order?: Prisma.OrderUpdateOneWithoutTransactionsNestedInput
+  publisher?: Prisma.PublisherUpdateOneWithoutTransactionsNestedInput
+  settlement?: Prisma.SettlementUpdateOneWithoutTransactionsNestedInput
+  depositAttempt?: Prisma.DepositAttemptUpdateOneWithoutLedgerTransactionNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSourceTransactionNestedInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
+  paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+}
+
+export type TransactionUncheckedUpdateWithoutPublisherCompensationDebtInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
+  reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  settlementId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  depositAttempt?: Prisma.DepositAttemptUncheckedUpdateOneWithoutLedgerTransactionNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSourceTransactionNestedInput
+  originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
+  paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
+  paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+}
+
 export type TransactionCreateWithoutSettlementInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1007,6 +1410,9 @@ export type TransactionCreateWithoutSettlementInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutSettlementInput = {
@@ -1027,6 +1433,9 @@ export type TransactionUncheckedCreateWithoutSettlementInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutSettlementInput = {
@@ -1073,6 +1482,9 @@ export type TransactionCreateWithoutWithdrawalAllocationsInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutWithdrawalAllocationsInput = {
@@ -1093,6 +1505,9 @@ export type TransactionUncheckedCreateWithoutWithdrawalAllocationsInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutWithdrawalAllocationsInput = {
@@ -1129,6 +1544,9 @@ export type TransactionUpdateWithoutWithdrawalAllocationsInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutWithdrawalAllocationsInput = {
@@ -1149,6 +1567,9 @@ export type TransactionUncheckedUpdateWithoutWithdrawalAllocationsInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionCreateWithoutWalletInput = {
@@ -1169,6 +1590,9 @@ export type TransactionCreateWithoutWalletInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutWalletInput = {
@@ -1189,6 +1613,9 @@ export type TransactionUncheckedCreateWithoutWalletInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutWalletInput = {
@@ -1235,6 +1662,9 @@ export type TransactionCreateWithoutDepositAttemptInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutDepositAttemptInput = {
@@ -1255,6 +1685,9 @@ export type TransactionUncheckedCreateWithoutDepositAttemptInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutDepositAttemptInput = {
@@ -1291,6 +1724,9 @@ export type TransactionUpdateWithoutDepositAttemptInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutDepositAttemptInput = {
@@ -1311,6 +1747,9 @@ export type TransactionUncheckedUpdateWithoutDepositAttemptInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionCreateWithoutOriginatingPaymentDisputesInput = {
@@ -1331,6 +1770,9 @@ export type TransactionCreateWithoutOriginatingPaymentDisputesInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSourceTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutOriginatingPaymentDisputesInput = {
@@ -1351,6 +1793,9 @@ export type TransactionUncheckedCreateWithoutOriginatingPaymentDisputesInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSourceTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutOriginatingPaymentDisputesInput = {
@@ -1376,6 +1821,9 @@ export type TransactionCreateWithoutPaymentDisputeHoldInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSourceTransactionInput
   originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutPaymentDisputeHoldInput = {
@@ -1396,6 +1844,9 @@ export type TransactionUncheckedCreateWithoutPaymentDisputeHoldInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSourceTransactionInput
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutResolutionTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutPaymentDisputeHoldInput = {
@@ -1421,6 +1872,9 @@ export type TransactionCreateWithoutPaymentDisputeResolutionInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSourceTransactionInput
   originatingPaymentDisputes?: Prisma.PaymentDisputeCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeCreateNestedOneWithoutHoldTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionUncheckedCreateWithoutPaymentDisputeResolutionInput = {
@@ -1441,6 +1895,9 @@ export type TransactionUncheckedCreateWithoutPaymentDisputeResolutionInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSourceTransactionInput
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedCreateNestedManyWithoutDepositTransactionInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedCreateNestedOneWithoutHoldTransactionInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutRefundTransactionInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutCompensationTransactionInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutDebtRepaymentTransactionInput
 }
 
 export type TransactionCreateOrConnectWithoutPaymentDisputeResolutionInput = {
@@ -1477,6 +1934,9 @@ export type TransactionUpdateWithoutOriginatingPaymentDisputesInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSourceTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutOriginatingPaymentDisputesInput = {
@@ -1497,6 +1957,9 @@ export type TransactionUncheckedUpdateWithoutOriginatingPaymentDisputesInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSourceTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUpsertWithoutPaymentDisputeHoldInput = {
@@ -1528,6 +1991,9 @@ export type TransactionUpdateWithoutPaymentDisputeHoldInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSourceTransactionNestedInput
   originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutPaymentDisputeHoldInput = {
@@ -1548,6 +2014,9 @@ export type TransactionUncheckedUpdateWithoutPaymentDisputeHoldInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSourceTransactionNestedInput
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUpsertWithoutPaymentDisputeResolutionInput = {
@@ -1579,6 +2048,9 @@ export type TransactionUpdateWithoutPaymentDisputeResolutionInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSourceTransactionNestedInput
   originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutPaymentDisputeResolutionInput = {
@@ -1599,6 +2071,9 @@ export type TransactionUncheckedUpdateWithoutPaymentDisputeResolutionInput = {
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSourceTransactionNestedInput
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionCreateManyPublisherInput = {
@@ -1634,6 +2109,9 @@ export type TransactionUpdateWithoutPublisherInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutPublisherInput = {
@@ -1654,6 +2132,9 @@ export type TransactionUncheckedUpdateWithoutPublisherInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateManyWithoutPublisherInput = {
@@ -1704,6 +2185,9 @@ export type TransactionUpdateWithoutOrderInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutOrderInput = {
@@ -1724,6 +2208,9 @@ export type TransactionUncheckedUpdateWithoutOrderInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateManyWithoutOrderInput = {
@@ -1774,6 +2261,9 @@ export type TransactionUpdateWithoutSettlementInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutSettlementInput = {
@@ -1794,6 +2284,9 @@ export type TransactionUncheckedUpdateWithoutSettlementInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateManyWithoutSettlementInput = {
@@ -1844,6 +2337,9 @@ export type TransactionUpdateWithoutWalletInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateWithoutWalletInput = {
@@ -1864,6 +2360,9 @@ export type TransactionUncheckedUpdateWithoutWalletInput = {
   originatingPaymentDisputes?: Prisma.PaymentDisputeUncheckedUpdateManyWithoutDepositTransactionNestedInput
   paymentDisputeHold?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutHoldTransactionNestedInput
   paymentDisputeResolution?: Prisma.PaymentDisputeUncheckedUpdateOneWithoutResolutionTransactionNestedInput
+  publisherCompensationRefund?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutRefundTransactionNestedInput
+  publisherCompensationCredit?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutCompensationTransactionNestedInput
+  publisherCompensationDebt?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutDebtRepaymentTransactionNestedInput
 }
 
 export type TransactionUncheckedUpdateManyWithoutWalletInput = {
@@ -1944,6 +2443,9 @@ export type TransactionSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   originatingPaymentDisputes?: boolean | Prisma.Transaction$originatingPaymentDisputesArgs<ExtArgs>
   paymentDisputeHold?: boolean | Prisma.Transaction$paymentDisputeHoldArgs<ExtArgs>
   paymentDisputeResolution?: boolean | Prisma.Transaction$paymentDisputeResolutionArgs<ExtArgs>
+  publisherCompensationRefund?: boolean | Prisma.Transaction$publisherCompensationRefundArgs<ExtArgs>
+  publisherCompensationCredit?: boolean | Prisma.Transaction$publisherCompensationCreditArgs<ExtArgs>
+  publisherCompensationDebt?: boolean | Prisma.Transaction$publisherCompensationDebtArgs<ExtArgs>
   _count?: boolean | Prisma.TransactionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["transaction"]>
 
@@ -2014,6 +2516,9 @@ export type TransactionInclude<ExtArgs extends runtime.Types.Extensions.Internal
   originatingPaymentDisputes?: boolean | Prisma.Transaction$originatingPaymentDisputesArgs<ExtArgs>
   paymentDisputeHold?: boolean | Prisma.Transaction$paymentDisputeHoldArgs<ExtArgs>
   paymentDisputeResolution?: boolean | Prisma.Transaction$paymentDisputeResolutionArgs<ExtArgs>
+  publisherCompensationRefund?: boolean | Prisma.Transaction$publisherCompensationRefundArgs<ExtArgs>
+  publisherCompensationCredit?: boolean | Prisma.Transaction$publisherCompensationCreditArgs<ExtArgs>
+  publisherCompensationDebt?: boolean | Prisma.Transaction$publisherCompensationDebtArgs<ExtArgs>
   _count?: boolean | Prisma.TransactionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TransactionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2041,6 +2546,9 @@ export type $TransactionPayload<ExtArgs extends runtime.Types.Extensions.Interna
     originatingPaymentDisputes: Prisma.$PaymentDisputePayload<ExtArgs>[]
     paymentDisputeHold: Prisma.$PaymentDisputePayload<ExtArgs> | null
     paymentDisputeResolution: Prisma.$PaymentDisputePayload<ExtArgs> | null
+    publisherCompensationRefund: Prisma.$PublisherCompensationPayload<ExtArgs> | null
+    publisherCompensationCredit: Prisma.$PublisherCompensationPayload<ExtArgs> | null
+    publisherCompensationDebt: Prisma.$PublisherCompensationPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2459,6 +2967,9 @@ export interface Prisma__TransactionClient<T, Null = never, ExtArgs extends runt
   originatingPaymentDisputes<T extends Prisma.Transaction$originatingPaymentDisputesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Transaction$originatingPaymentDisputesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PaymentDisputePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   paymentDisputeHold<T extends Prisma.Transaction$paymentDisputeHoldArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Transaction$paymentDisputeHoldArgs<ExtArgs>>): Prisma.Prisma__PaymentDisputeClient<runtime.Types.Result.GetResult<Prisma.$PaymentDisputePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   paymentDisputeResolution<T extends Prisma.Transaction$paymentDisputeResolutionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Transaction$paymentDisputeResolutionArgs<ExtArgs>>): Prisma.Prisma__PaymentDisputeClient<runtime.Types.Result.GetResult<Prisma.$PaymentDisputePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  publisherCompensationRefund<T extends Prisma.Transaction$publisherCompensationRefundArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Transaction$publisherCompensationRefundArgs<ExtArgs>>): Prisma.Prisma__PublisherCompensationClient<runtime.Types.Result.GetResult<Prisma.$PublisherCompensationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  publisherCompensationCredit<T extends Prisma.Transaction$publisherCompensationCreditArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Transaction$publisherCompensationCreditArgs<ExtArgs>>): Prisma.Prisma__PublisherCompensationClient<runtime.Types.Result.GetResult<Prisma.$PublisherCompensationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  publisherCompensationDebt<T extends Prisma.Transaction$publisherCompensationDebtArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Transaction$publisherCompensationDebtArgs<ExtArgs>>): Prisma.Prisma__PublisherCompensationClient<runtime.Types.Result.GetResult<Prisma.$PublisherCompensationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3080,6 +3591,63 @@ export type Transaction$paymentDisputeResolutionArgs<ExtArgs extends runtime.Typ
    */
   include?: Prisma.PaymentDisputeInclude<ExtArgs> | null
   where?: Prisma.PaymentDisputeWhereInput
+}
+
+/**
+ * Transaction.publisherCompensationRefund
+ */
+export type Transaction$publisherCompensationRefundArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PublisherCompensation
+   */
+  select?: Prisma.PublisherCompensationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PublisherCompensation
+   */
+  omit?: Prisma.PublisherCompensationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PublisherCompensationInclude<ExtArgs> | null
+  where?: Prisma.PublisherCompensationWhereInput
+}
+
+/**
+ * Transaction.publisherCompensationCredit
+ */
+export type Transaction$publisherCompensationCreditArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PublisherCompensation
+   */
+  select?: Prisma.PublisherCompensationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PublisherCompensation
+   */
+  omit?: Prisma.PublisherCompensationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PublisherCompensationInclude<ExtArgs> | null
+  where?: Prisma.PublisherCompensationWhereInput
+}
+
+/**
+ * Transaction.publisherCompensationDebt
+ */
+export type Transaction$publisherCompensationDebtArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PublisherCompensation
+   */
+  select?: Prisma.PublisherCompensationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PublisherCompensation
+   */
+  omit?: Prisma.PublisherCompensationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PublisherCompensationInclude<ExtArgs> | null
+  where?: Prisma.PublisherCompensationWhereInput
 }
 
 /**

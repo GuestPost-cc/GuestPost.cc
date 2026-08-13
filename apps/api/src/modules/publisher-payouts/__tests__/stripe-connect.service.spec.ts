@@ -663,11 +663,19 @@ describe("StripeConnectService", () => {
       }),
       { stripeAccount: "acct_1" },
     )
-    expect(encryption.encrypt).toHaveBeenCalledWith({
-      destinationManagedBy: "stripe",
-    })
+    expect(encryption.encrypt).toHaveBeenCalledWith(
+      { destinationManagedBy: "stripe" },
+      expect.objectContaining({
+        kind: "payout-method-details",
+        id: expect.any(String),
+        publisherId: "pub-1",
+        type: "stripe_connect",
+      }),
+    )
+    const encryptionContext = encryption.encrypt.mock.calls[0][1]
     expect(prisma.payoutMethod.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        id: encryptionContext.id,
         type: "stripe_connect",
         details: "encrypted-provider-marker",
         providerAccountId: "local-account-1",

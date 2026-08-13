@@ -60,12 +60,7 @@ type StaffRole = "SUPER_ADMIN" | "OPERATIONS" | "FINANCE"
 type ChannelFilter = "all" | "PUBLISHER" | "PLATFORM"
 
 const PAGE_SIZE = 20
-const CLOSED_STATUSES = new Set([
-  "SETTLED",
-  "COMPLETED",
-  "CANCELLED",
-  "REFUNDED",
-])
+const CLOSED_STATUSES = new Set(["COMPLETED", "CANCELLED", "REFUNDED"])
 const ACTIVE_SETTLEMENT_STATUSES = new Set([
   "PENDING",
   "UNDER_REVIEW",
@@ -285,7 +280,6 @@ function nextStep(order: AdminOrderResponse, role: StaffRole) {
     PUBLISHED: "Awaiting verification",
     VERIFIED: "Ready for delivery",
     DELIVERED: "Review or settlement window",
-    SETTLED: "Settlement complete",
     COMPLETED: "Order complete",
     CANCELLED: "Order cancelled",
     REFUNDED: "Refund complete",

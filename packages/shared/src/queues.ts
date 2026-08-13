@@ -70,6 +70,7 @@ export const QUEUE_JOBS = {
   [QUEUES.RECONCILIATION]: {
     RUN: "reconciliation-run",
     PAYMENT_DISPUTE_INBOX: "payment-dispute-inbox",
+    DEPOSIT_CREDIT_RECOVERY: "deposit-credit-recovery",
   },
   [QUEUES.SETTLEMENT]: {
     // Phase 7.3 — the only job on this queue. Repeatable; jobId

@@ -13,6 +13,7 @@ import { createLogger } from "@guestpost/shared/dist/observability/structured-lo
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
+import { processDepositCreditRecovery } from "./deposit-credit-recovery.processor"
 import { processPaymentDisputeInbox } from "./payment-dispute.processor"
 
 const logger = createLogger("worker.reconciliation")
@@ -156,6 +157,9 @@ export function createReconciliationWorker() {
         case "payment-dispute-inbox":
           assertFinanceOperationAllowed("recovery")
           return processPaymentDisputeInbox(Number(job.data?.limit) || 100)
+        case "deposit-credit-recovery":
+          assertFinanceOperationAllowed("recovery")
+          return processDepositCreditRecovery(Number(job.data?.limit) || 25)
         default:
           logger.warn("unknown job name", { jobName: job.name })
       }

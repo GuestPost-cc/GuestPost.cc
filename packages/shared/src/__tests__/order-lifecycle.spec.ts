@@ -20,7 +20,6 @@ const ALL_ORDER_STATUSES: OrderStatus[] = [
   "PUBLISHED",
   "VERIFIED",
   "DELIVERED",
-  "SETTLED",
   "COMPLETED",
   "CANCELLED",
   "REFUNDED",

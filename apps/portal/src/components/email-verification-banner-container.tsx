@@ -1,5 +1,6 @@
 "use client"
 
+import { resolveApiOrigin } from "@guestpost/api-client"
 import { EmailVerificationBanner } from "@guestpost/ui"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -11,14 +12,10 @@ import { useAuth } from "../lib/auth"
 const COOLDOWN_MS = 60_000
 
 function getBaseUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL
-  if (envUrl) return envUrl
-  if (typeof window !== "undefined") {
-    const host = window.location.hostname
-    if (host !== "localhost" && host !== "127.0.0.1")
-      return `http://${host}:4000`
-  }
-  return "http://localhost:4000"
+  return resolveApiOrigin({
+    configuredUrl: process.env.NEXT_PUBLIC_API_URL,
+    nodeEnv: process.env.NODE_ENV,
+  })
 }
 
 // Phase 7.10 — Portal-app wiring around @guestpost/ui's

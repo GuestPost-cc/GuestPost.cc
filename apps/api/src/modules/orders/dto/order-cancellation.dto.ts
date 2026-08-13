@@ -3,14 +3,38 @@ import {
   CancellationResolution,
   CancellationResponsibility,
 } from "@guestpost/database"
+import { Transform, Type } from "class-transformer"
 import {
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
   Min,
+  MinLength,
+  ValidateNested,
 } from "class-validator"
+
+export class PublisherCompensationDecisionDto {
+  @IsNumber(
+    { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
+    {
+      message:
+        "Publisher compensation must be an exact amount with at most two decimal places",
+    },
+  )
+  @Min(0)
+  amount!: number
+
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(20, {
+    message: "Publisher compensation reason must be at least 20 characters",
+  })
+  @MaxLength(2000)
+  reason!: string
+}
 
 export class CancelOrderDto {
   @IsEnum(CancellationReasonCode)
@@ -72,4 +96,12 @@ export class ForceCancelOrderDto extends CancelOrderDto {
 
   @IsEnum(CancellationResponsibility)
   responsibility: CancellationResponsibility
+
+  // Required by the service for post-publication publisher orders unless the
+  // publisher is responsible. The lifecycle/state check belongs inside the
+  // locked transaction, so DTO validation cannot decide conditionally here.
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PublisherCompensationDecisionDto)
+  publisherCompensation?: PublisherCompensationDecisionDto
 }

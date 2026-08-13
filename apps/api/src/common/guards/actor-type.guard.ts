@@ -6,27 +6,33 @@ import {
   Injectable,
 } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
+import { CurrentAuthorityService } from "../../modules/auth/current-authority.service"
 import { ACTOR_TYPE_KEY } from "../decorators/actor-type.decorator"
 
 @Injectable()
 export class ActorTypeGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly authorities: CurrentAuthorityService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredTypes = this.reflector.getAllAndOverride<UserType[]>(
       ACTOR_TYPE_KEY,
       [context.getHandler(), context.getClass()],
     )
     if (!requiredTypes) return true
 
-    const { user } = context.switchToHttp().getRequest()
+    const request = context.switchToHttp().getRequest()
+    const { user } = request
     if (!user) {
       throw new ForbiddenException("Authentication required")
     }
 
-    if (!requiredTypes.includes(user.userType)) {
+    const authority = await this.authorities.resolveRequest(request)
+    if (!requiredTypes.includes(authority.userType)) {
       throw new ForbiddenException(
-        `This action requires ${requiredTypes.join(" or ")} role. Current type: ${user.userType}`,
+        `This action requires ${requiredTypes.join(" or ")} role. Current type: ${authority.userType}`,
       )
     }
 

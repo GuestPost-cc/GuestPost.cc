@@ -49,7 +49,7 @@ Publisher lifecycle endpoints (all version-via-status-guarded, audit-logged):
 
 `packages/shared/src/briefs/index.ts` exports a Zod registry keyed on `ServiceType` (8 schemas: GUEST_POST / NICHE_EDIT / EDITORIAL_LINK / OUTREACH_LINK / LOCAL_CITATION / FOUNDATION_LINK / BLOG_ARTICLE / SEO_CONTENT). `validateBrief(serviceType, payload)` returns the parsed brief; throws `ZodError` (translated to 400 with field path) or `UnknownServiceTypeError`. Snapshotted onto `Order.briefData` (JSONB); legacy `Order.title` + `Order.instructions` remain as denormalized mirrors for older renderers.
 
-Portal `<BriefForm serviceType={…}>` ([apps/portal/src/components/BriefForm.tsx](apps/portal/src/components/BriefForm.tsx)) renders per-service field configs (text/textarea/url/number/select/tags/address).
+Portal `<BriefForm serviceType={…}>` (`apps/portal/src/components/BriefForm.tsx`) renders per-service field configs (text/textarea/url/number/select/tags/address).
 
 ## Ownership attribution
 

@@ -12,7 +12,7 @@ describe("RefundService", () => {
   const baseOrder = {
     id: "order-1",
     organizationId: "org-1",
-    status: "DELIVERED",
+    status: "ACCEPTED",
     paymentStatus: "PAID",
     amount: new Decimal(100),
     currency: "USD",
@@ -56,6 +56,10 @@ describe("RefundService", () => {
         findUnique: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn().mockResolvedValue({}),
+      },
+      publisherCompensation: {
+        create: jest.fn().mockResolvedValue({ id: "compensation-1" }),
+        findUnique: jest.fn().mockResolvedValue(null),
       },
       publisher: {
         findUnique: jest.fn().mockResolvedValue({
@@ -291,6 +295,7 @@ describe("RefundService", () => {
       currency: "USD",
       walletId: "wallet-1",
       reference: "refund-command-1",
+      description: "Refund for order order-1: retry",
     })
     prismaMock.order.findUniqueOrThrow.mockResolvedValue({
       ...baseOrder,
@@ -346,7 +351,7 @@ describe("RefundService", () => {
 
     const result = await service.refundOrder(
       "order-1",
-      "retry",
+      "original reason",
       "customer-user-1",
       "refund-command-1",
       { responsibility: "SYSTEM" },
@@ -370,7 +375,7 @@ describe("RefundService", () => {
     await expect(
       service.refundOrder(
         "order-1",
-        "retry",
+        "original reason",
         "customer-user-1",
         "refund-command-1",
         { responsibility: "SYSTEM" },
@@ -388,7 +393,7 @@ describe("RefundService", () => {
     await expect(
       service.refundOrder(
         "order-1",
-        "retry",
+        "original reason",
         "customer-user-1",
         "refund-command-1",
         { responsibility: "SYSTEM" },
@@ -409,7 +414,7 @@ describe("RefundService", () => {
     await expect(
       service.refundOrder(
         "order-1",
-        "retry",
+        "original reason",
         "customer-user-1",
         "refund-command-1",
         { responsibility: "SYSTEM" },
@@ -425,7 +430,7 @@ describe("RefundService", () => {
     await expect(
       service.refundOrder(
         "order-1",
-        "retry",
+        "original reason",
         "customer-user-1",
         "refund-command-1",
         { responsibility: "SYSTEM" },
@@ -532,6 +537,9 @@ describe("RefundService", () => {
                 : null
             },
           },
+          publisherCompensation: {
+            findUnique: jest.fn().mockResolvedValue(null),
+          },
         }
         try {
           return await operation(tx)
@@ -563,7 +571,7 @@ describe("RefundService", () => {
       ),
       concurrentService.refundOrder(
         "order-1",
-        "timeout replay",
+        "timeout",
         "admin-1",
         "refund-command-concurrent",
         { responsibility: "SYSTEM" },
@@ -574,6 +582,40 @@ describe("RefundService", () => {
     expect(results[1].status).toBe("REFUNDED")
     expect(refundCreates).toBe(1)
     expect(concurrentCommunications.record).toHaveBeenCalledTimes(2)
+  })
+
+  it("rejects an idempotent replay with changed refund instructions", async () => {
+    prismaMock.transaction.findFirst.mockResolvedValue({
+      id: "refund-tx-existing",
+      orderId: "order-1",
+      type: "REFUND",
+      amount: new Decimal(100),
+      currency: "USD",
+      walletId: "wallet-1",
+      reference: "refund-command-1",
+      description: "Refund for order order-1: original reason",
+    })
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+      ...baseOrder,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "SYSTEM",
+    })
+
+    await expect(
+      service.refundOrder(
+        "order-1",
+        "changed reason",
+        "admin-1",
+        "refund-command-1",
+        { responsibility: "SYSTEM" },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "REFUND_IDEMPOTENCY_INTENT_MISMATCH",
+      }),
+    })
+    expect(communicationsMock.record).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -793,6 +835,132 @@ describe("RefundService", () => {
         }),
       }),
     )
+  })
+
+  it("fails closed when a non-publisher post-publication refund omits compensation", async () => {
+    prismaMock.order.findUnique.mockResolvedValue({
+      ...baseOrder,
+      status: "DELIVERED",
+    })
+
+    await expect(
+      service.refundOrder("order-1", "platform failure", "admin-1", undefined, {
+        responsibility: "PLATFORM",
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "PUBLISHER_COMPENSATION_DECISION_REQUIRED",
+      }),
+    })
+    expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+  })
+
+  it("records exact post-publication compensation with the refund atomically", async () => {
+    prismaMock.order.findUnique.mockResolvedValue({
+      ...baseOrder,
+      status: "DELIVERED",
+    })
+    prismaMock.transaction.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({
+        id:
+          data.type === "REFUND"
+            ? "refund-tx-1"
+            : data.type === "PUBLISHER_COMPENSATION"
+              ? "compensation-tx-1"
+              : "debt-tx-1",
+      }),
+    )
+
+    await service.refundOrder(
+      "order-1",
+      "verified platform failure",
+      "admin-1",
+      "refund-with-compensation",
+      {
+        responsibility: "PLATFORM",
+        publisherCompensation: {
+          amount: 80,
+          reason:
+            "Publisher completed verified publication work before the platform failure.",
+        },
+      },
+    )
+
+    expect(prismaMock.publisherBalance.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        publisherId: "pub-1",
+        currency: "USD",
+        withdrawableBalance: new Decimal(80),
+        lifetimeEarnings: new Decimal(80),
+      }),
+    })
+    expect(prismaMock.publisherCompensation.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        orderId: "order-1",
+        publisherId: "pub-1",
+        refundTransactionId: "refund-tx-1",
+        compensationTransactionId: "compensation-tx-1",
+        disposition: "EXACT_AMOUNT",
+        amount: new Decimal(80),
+        responsibility: "PLATFORM",
+        effectiveOrderStatus: "DELIVERED",
+      }),
+    })
+  })
+
+  it("rejects a replay that changes the publisher compensation disposition", async () => {
+    const existingRefund = {
+      id: "refund-tx-existing",
+      orderId: "order-1",
+      type: "REFUND",
+      amount: new Decimal(100),
+      currency: "USD",
+      walletId: "wallet-1",
+      reference: "refund-command-1",
+      description: "Refund for order order-1: platform failure",
+    }
+    prismaMock.transaction.findFirst.mockResolvedValue(existingRefund)
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+      ...baseOrder,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "PLATFORM",
+    })
+    prismaMock.publisherCompensation.findUnique.mockResolvedValue({
+      id: "compensation-1",
+      orderId: "order-1",
+      refundTransactionId: existingRefund.id,
+      publisherId: "pub-1",
+      disposition: "EXACT_AMOUNT",
+      amount: new Decimal(80),
+      currency: "USD",
+      responsibility: "PLATFORM",
+      reason:
+        "Publisher completed verified publication work before the platform failure.",
+      effectiveOrderStatus: "DELIVERED",
+    })
+
+    await expect(
+      service.refundOrder(
+        "order-1",
+        "platform failure",
+        "admin-1",
+        "refund-command-1",
+        {
+          responsibility: "PLATFORM",
+          publisherCompensation: {
+            amount: 60,
+            reason:
+              "Publisher completed verified publication work before the platform failure.",
+          },
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "REFUND_IDEMPOTENCY_INTENT_MISMATCH",
+      }),
+    })
   })
 
   it("refuses unpaid orders", async () => {

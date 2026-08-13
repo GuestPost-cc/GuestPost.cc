@@ -163,7 +163,6 @@ enum OrderStatus {
   PUBLISHED
   VERIFIED
   DELIVERED
-  SETTLED
   COMPLETED
   CANCELLED
   REFUNDED
@@ -201,6 +200,11 @@ enum CancellationResponsibility {
   SHARED
   SYSTEM
   UNDETERMINED
+}
+
+enum PublisherCompensationDisposition {
+  NONE
+  EXACT_AMOUNT
 }
 
 enum CancellationReasonCode {
@@ -275,6 +279,22 @@ enum PaymentProviderEventStatus {
   QUARANTINED
 }
 
+// Authenticated provider-retrieval catch-up for paid deposits whose webhook
+// delivery never reached the canonical wallet-credit finalizer.
+enum DepositCreditRecoveryStatus {
+  PENDING
+  PROCESSING
+  FAILED
+  PROCESSED
+  CLOSED_UNPAID
+  SUPERSEDED
+  QUARANTINED
+}
+
+enum DepositCreditEvidenceSource {
+  AUTHENTICATED_PROVIDER_RETRIEVAL
+}
+
 // Provider-neutral customer-funding dispute lifecycle. OPEN may transition
 // exactly once to WON or LOST; terminal states never transition back.
 enum PaymentDisputeStatus {
@@ -314,7 +334,10 @@ enum OrderEventType {
   ORDER_CANCELLED
   REFUND_ISSUED
   SETTLEMENT_CREATED
-  SETTLED
+  PLATFORM_REVENUE_RECOGNIZED
+  SETTLEMENT_CUSTOMER_APPROVED
+  SETTLEMENT_RETURNED_TO_REVIEW
+  SETTLEMENT_RELEASED
   REFUNDED
   VERIFICATION_ESCALATED
   AUTO_ACCEPTED
@@ -323,6 +346,7 @@ enum OrderEventType {
   CANCELLATION_RESPONDED
   CANCELLATION_RESOLVED
   ORDER_DECLINED
+  PUBLISHER_COMPENSATION_RECORDED
 }
 
 enum SettlementStatus {
@@ -559,6 +583,7 @@ model User {
   suspendedBy                   User?                         @relation("UserSuspensionsIssued", fields: [suspendedByUserId], references: [id], onDelete: SetNull)
   suspensionsIssued             User[]                        @relation("UserSuspensionsIssued")
   websiteImportBatches          WebsiteImportBatch[]
+  publisherCompensationsDecided PublisherCompensation[]       @relation("PublisherCompensationDecider")
 
   @@index([userType, banned])
   @@index([suspendedByUserId])
@@ -778,6 +803,7 @@ model Publisher {
   tickets              Ticket[]                   @relation("TicketPublisher")
   providerAccounts     PublisherProviderAccount[]
   websiteImportBatches WebsiteImportBatch[]
+  compensations        PublisherCompensation[]
 
   @@index([organizationId])
 }
@@ -1113,6 +1139,7 @@ model Order {
   deliveryVersions       OrderDeliveryVersion[]        @relation("OrderDeliveryVersions")
   fulfillmentAssignments FulfillmentAssignment[]
   fraudFlags             DeliveryFraudFlag[]
+  publisherCompensation  PublisherCompensation?
   fraudHolds             DeliveryFraudHold[]
   fraudFlagResolutions   DeliveryFraudFlagResolution[]
   tickets                Ticket[]
@@ -1175,18 +1202,21 @@ model OrderItem {
 }
 
 model OrderEvent {
-  id        String         @id @default(cuid())
-  orderId   String
-  eventType OrderEventType
-  actorId   String?
-  message   String?
-  metadata  Json?
-  createdAt DateTime       @default(now())
+  id           String         @id @default(cuid())
+  orderId      String
+  settlementId String?
+  eventType    OrderEventType
+  actorId      String?
+  message      String?
+  metadata     Json?
+  createdAt    DateTime       @default(now())
 
-  order Order @relation(fields: [orderId], references: [id])
-  actor User? @relation(fields: [actorId], references: [id])
+  order      Order       @relation(fields: [orderId], references: [id])
+  settlement Settlement? @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  actor      User?       @relation(fields: [actorId], references: [id])
 
   @@index([orderId, createdAt])
+  @@index([settlementId])
   @@index([actorId])
 }
 
@@ -1266,6 +1296,37 @@ model OrderCancellationRequest {
   @@index([createdAt])
 }
 
+// Explicit financial disposition for a post-publication publisher order that
+// is refunded to the customer. A NONE row is evidence too: publisher pay must
+// never be inferred from the absence of a Settlement or skipped code branch.
+model PublisherCompensation {
+  id                         String                           @id @default(cuid())
+  orderId                    String                           @unique
+  publisherId                String
+  refundTransactionId        String                           @unique
+  compensationTransactionId  String?                          @unique
+  debtRepaymentTransactionId String?                          @unique
+  disposition                PublisherCompensationDisposition
+  amount                     Decimal
+  currency                   String                           @default("USD") @db.VarChar(3)
+  responsibility             CancellationResponsibility
+  reason                     String                           @db.VarChar(2000)
+  // String evidence deliberately survives future lifecycle-enum cleanup.
+  effectiveOrderStatus       String                           @db.VarChar(32)
+  decidedByUserId            String
+  createdAt                  DateTime                         @default(now())
+
+  order                    Order        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  publisher                Publisher    @relation(fields: [publisherId], references: [id], onDelete: Restrict)
+  refundTransaction        Transaction  @relation("PublisherCompensationRefund", fields: [refundTransactionId], references: [id], onDelete: Restrict)
+  compensationTransaction  Transaction? @relation("PublisherCompensationCredit", fields: [compensationTransactionId], references: [id], onDelete: Restrict)
+  debtRepaymentTransaction Transaction? @relation("PublisherCompensationDebt", fields: [debtRepaymentTransactionId], references: [id], onDelete: Restrict)
+  decidedBy                User         @relation("PublisherCompensationDecider", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([publisherId, createdAt])
+  @@index([decidedByUserId])
+}
+
 model Settlement {
   id                 String                  @id @default(cuid())
   orderId            String
@@ -1299,6 +1360,7 @@ model Settlement {
   publisher             Publisher              @relation(fields: [publisherId], references: [id])
   approvals             SettlementApproval[]
   transactions          Transaction[]
+  events                OrderEvent[]
   listingService        ListingService?        @relation(fields: [listingServiceId], references: [id])
   withdrawalAllocations WithdrawalAllocation[]
 
@@ -1469,7 +1531,7 @@ model DeliveryVerificationEvidence {
   checkedAt          DateTime @default(now())
   createdAt          DateTime @default(now())
 
-  deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id])
+  deliveryVersion OrderDeliveryVersion         @relation(fields: [deliveryVersionId], references: [id])
   fraudResolution DeliveryFraudFlagResolution?
 
   @@index([deliveryVersionId])
@@ -1544,10 +1606,10 @@ model DeliveryFraudFlagResolution {
   evidence          Json
   createdAt         DateTime                    @default(now())
 
-  fraudFlag       DeliveryFraudFlag    @relation(fields: [fraudFlagId], references: [id], onDelete: Restrict)
-  order           Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id], onDelete: Restrict)
-  resolvedBy      User?                @relation("DeliveryFraudResolver", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
+  fraudFlag            DeliveryFraudFlag             @relation(fields: [fraudFlagId], references: [id], onDelete: Restrict)
+  order                Order                         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  deliveryVersion      OrderDeliveryVersion          @relation(fields: [deliveryVersionId], references: [id], onDelete: Restrict)
+  resolvedBy           User?                         @relation("DeliveryFraudResolver", fields: [resolvedByUserId], references: [id], onDelete: Restrict)
   verificationEvidence DeliveryVerificationEvidence? @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
@@ -1649,13 +1711,14 @@ model Withdrawal {
 }
 
 model PayoutMethod {
-  id                         String   @id @default(cuid())
+  // Writers allocate the ID before encryption because v2 AAD authenticates it.
+  id                         String   @id
   publisherId                String
   type                       String // bank_transfer, paypal, wise
   label                      String
-  details                    Json // AES-256-GCM encrypted via PayoutEncryptionService
+  details                    Json // AES-256-GCM p2 envelope; AAD binds id/publisherId/type
   displayDetails             Json? // Non-sensitive display fields (bank name, last4) — unencrypted, safe for list endpoints
-  encryptionKeyVersion       Int      @default(0)
+  encryptionKeyVersion       Int // Envelope format; DB guard requires explicit v2 on insert
   isDefault                  Boolean  @default(false)
   isActive                   Boolean  @default(true)
   nonterminalWithdrawalCount Int      @default(0)
@@ -1704,7 +1767,7 @@ model PayoutProvider {
   id                         String   @id @default(cuid())
   name                       String   @unique // "manual", "wise", "stripe_connect"
   displayName                String
-  // DB CHECK: non-empty provider config must be AES-256-GCM ciphertext.
+  // DB CHECK: non-empty config is a p2 envelope; AAD binds provider id/name.
   // Exactly {} is allowed when credentials come from process environment.
   config                     Json
   configEncryptionKeyVersion Int      @default(0)
@@ -2067,8 +2130,10 @@ enum TransactionType {
   WITHDRAWAL_REVERSAL
   SETTLEMENT_RELEASE
   SETTLEMENT_CLAWBACK
+  PUBLISHER_COMPENSATION
   DEBT_REPAYMENT
   RESERVATION
+  RELEASE
   // Chargeback lost at the bank — money left the platform permanently.
   // Included in wallet reconciliation sums (unlike RESERVATION).
   CHARGEBACK
@@ -2101,15 +2166,18 @@ model Transaction {
   settlementId String?
   createdAt    DateTime        @default(now())
 
-  wallet                     Wallet?                @relation(fields: [walletId], references: [id])
-  order                      Order?                 @relation(fields: [orderId], references: [id])
-  publisher                  Publisher?             @relation(fields: [publisherId], references: [id])
-  settlement                 Settlement?            @relation(fields: [settlementId], references: [id])
-  depositAttempt             DepositAttempt?
-  withdrawalAllocations      WithdrawalAllocation[]
-  originatingPaymentDisputes PaymentDispute[]       @relation("PaymentDisputeDepositTransaction")
-  paymentDisputeHold         PaymentDispute?        @relation("PaymentDisputeHoldTransaction")
-  paymentDisputeResolution   PaymentDispute?        @relation("PaymentDisputeResolutionTransaction")
+  wallet                      Wallet?                @relation(fields: [walletId], references: [id])
+  order                       Order?                 @relation(fields: [orderId], references: [id])
+  publisher                   Publisher?             @relation(fields: [publisherId], references: [id])
+  settlement                  Settlement?            @relation(fields: [settlementId], references: [id])
+  depositAttempt              DepositAttempt?
+  withdrawalAllocations       WithdrawalAllocation[]
+  originatingPaymentDisputes  PaymentDispute[]       @relation("PaymentDisputeDepositTransaction")
+  paymentDisputeHold          PaymentDispute?        @relation("PaymentDisputeHoldTransaction")
+  paymentDisputeResolution    PaymentDispute?        @relation("PaymentDisputeResolutionTransaction")
+  publisherCompensationRefund PublisherCompensation? @relation("PublisherCompensationRefund")
+  publisherCompensationCredit PublisherCompensation? @relation("PublisherCompensationCredit")
+  publisherCompensationDebt   PublisherCompensation? @relation("PublisherCompensationDebt")
 
   @@unique([reference])
   @@index([walletId])
@@ -2152,16 +2220,96 @@ model DepositAttempt {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
-  wallet            Wallet                 @relation(fields: [walletId], references: [id])
-  organization      Organization?          @relation(fields: [organizationId], references: [id])
-  ledgerTransaction Transaction?           @relation(fields: [ledgerTransactionId], references: [id])
+  wallet            Wallet                  @relation(fields: [walletId], references: [id])
+  organization      Organization?           @relation(fields: [organizationId], references: [id])
+  ledgerTransaction Transaction?            @relation(fields: [ledgerTransactionId], references: [id])
   providerEvents    PaymentProviderEvent[]
   paymentDisputes   PaymentDispute[]
+  creditRecovery    DepositCreditRecovery?
+  creditEvidence    DepositCreditEvidence[]
 
   @@unique([walletId, idempotencyKey])
   @@index([organizationId, status])
   @@index([provider, providerPaymentId])
   @@index([createdAt])
+}
+
+// One fenced, retryable recovery aggregate per Stripe Checkout attempt. The
+// customer status endpoint never writes this row; only the background recovery
+// lane owns its lease and terminal disposition.
+model DepositCreditRecovery {
+  id               String                      @id @default(cuid())
+  depositAttemptId String                      @unique
+  provider         String                      @default("stripe") @db.VarChar(32)
+  status           DepositCreditRecoveryStatus @default(PENDING)
+  attempts         Int                         @default(0)
+  availableAt      DateTime                    @default(now())
+  lockedAt         DateTime?
+  processedAt      DateTime?
+  evidenceId       String?                     @unique
+  lastError        String?                     @db.VarChar(100)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  depositAttempt DepositAttempt          @relation(fields: [depositAttemptId], references: [id], onDelete: Restrict)
+  evidence       DepositCreditEvidence?  @relation("SelectedDepositCreditEvidence", fields: [evidenceId], references: [id], onDelete: Restrict)
+  observations   DepositCreditEvidence[] @relation("DepositCreditRecoveryObservations")
+
+  @@index([status, availableAt, createdAt])
+}
+
+// Append-only, bounded facts returned by authenticated Stripe retrieval.
+// This is deliberately not a PaymentProviderEvent: retrieval has no webhook
+// envelope or signature and must never masquerade as one.
+model DepositCreditEvidence {
+  id                         String                      @id @default(cuid())
+  recoveryId                 String
+  depositAttemptId           String
+  source                     DepositCreditEvidenceSource @default(AUTHENTICATED_PROVIDER_RETRIEVAL)
+  provider                   String                      @default("stripe") @db.VarChar(32)
+  providerSessionId          String                      @db.VarChar(191)
+  providerPaymentId          String?                     @db.VarChar(191)
+  providerChargeId           String?                     @db.VarChar(191)
+  clientReferenceId          String?                     @db.VarChar(191)
+  checkoutStatus             String?                     @db.VarChar(64)
+  checkoutPaymentStatus      String?                     @db.VarChar(64)
+  checkoutMode               String?                     @db.VarChar(32)
+  checkoutAmountTotalMinor   BigInt?
+  checkoutCurrency           String?                     @db.VarChar(3)
+  checkoutLivemode           Boolean
+  checkoutMetadataAttemptId  String?                     @db.VarChar(191)
+  checkoutMetadataReference  String?                     @db.VarChar(32)
+  checkoutMetadataWalletId   String?                     @db.VarChar(191)
+  checkoutMetadataUserId     String?                     @db.VarChar(191)
+  checkoutMetadataOrgId      String?                     @db.VarChar(191)
+  paymentIntentStatus        String?                     @db.VarChar(64)
+  paymentIntentAmountMinor   BigInt?
+  paymentIntentReceivedMinor BigInt?
+  paymentIntentCurrency      String?                     @db.VarChar(3)
+  paymentIntentLivemode      Boolean?
+  paymentMetadataAttemptId   String?                     @db.VarChar(191)
+  paymentMetadataReference   String?                     @db.VarChar(32)
+  paymentMetadataWalletId    String?                     @db.VarChar(191)
+  chargePaid                 Boolean?
+  chargeCaptured             Boolean?
+  chargeRefunded             Boolean?
+  chargeAmountMinor          BigInt?
+  chargeAmountCapturedMinor  BigInt?
+  chargeCurrency             String?                     @db.VarChar(3)
+  chargeLivemode             Boolean?
+  evidenceFingerprint        String                      @db.VarChar(64)
+  claimAttempt               Int
+  claimLockedAt              DateTime
+  retrievedAt                DateTime
+  createdAt                  DateTime                    @default(now())
+
+  recovery           DepositCreditRecovery  @relation("DepositCreditRecoveryObservations", fields: [recoveryId], references: [id], onDelete: Restrict)
+  depositAttempt     DepositAttempt         @relation(fields: [depositAttemptId], references: [id], onDelete: Restrict)
+  selectedByRecovery DepositCreditRecovery? @relation("SelectedDepositCreditEvidence")
+
+  @@unique([recoveryId, claimAttempt, evidenceFingerprint])
+  @@index([depositAttemptId, retrievedAt])
+  @@index([provider, providerSessionId])
 }
 
 model PaymentProviderEvent {

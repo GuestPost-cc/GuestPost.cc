@@ -19,10 +19,40 @@ describe("AdminService — order detail", () => {
     prisma.order.findFirst.mockResolvedValue({
       id: "order-completed",
       status: "COMPLETED",
+      fulfillmentChannel: "PUBLISHER",
+      createdAt: new Date("2026-07-13T19:00:00.000Z"),
+      website: {
+        id: "website-1",
+        ownershipType: "PUBLISHER",
+      },
+      activeDeliveryVersion: {
+        publishedUrl: "https://publisher.example/article",
+        verificationStatus: "VERIFIED",
+        fraudFlags: [],
+        evidence: [],
+      },
       settlements: [
         {
           id: "settlement-1",
+          orderId: "order-completed",
+          publisherId: "publisher-1",
+          publisherAmount: "90.00",
+          currency: "USD",
           status: "RELEASED",
+          settledAt: customerApprovedAt,
+          transactions: [
+            {
+              type: "SETTLEMENT_RELEASE",
+              settlementId: "settlement-1",
+              orderId: "order-completed",
+              publisherId: "publisher-1",
+              amount: "90.00",
+              currency: "USD",
+              walletId: null,
+              provider: null,
+              providerRef: null,
+            },
+          ],
           approvals: [
             {
               id: "approval-customer",
@@ -39,6 +69,17 @@ describe("AdminService — order detail", () => {
               approvedAt: systemApprovedAt,
             },
           ],
+        },
+      ],
+      events: [
+        {
+          id: "event-release",
+          orderId: "order-completed",
+          settlementId: "settlement-1",
+          eventType: "SETTLEMENT_RELEASED",
+          message: "Settlement released",
+          metadata: null,
+          createdAt: customerApprovedAt,
         },
       ],
     })
@@ -72,6 +113,76 @@ describe("AdminService — order detail", () => {
         approvedAt: systemApprovedAt,
       }),
     ])
+    expect(result.integrity).toEqual(
+      expect.objectContaining({
+        state: "HEALTHY",
+        checks: expect.arrayContaining([
+          expect.objectContaining({
+            key: "SETTLEMENT_RELEASE_LEDGER",
+            status: "PASS",
+          }),
+          expect.objectContaining({
+            key: "SETTLEMENT_RELEASE_EVENT",
+            status: "PASS",
+          }),
+        ]),
+      }),
+    )
+  })
+
+  it("blocks a completed publisher order whose settlement is not released", async () => {
+    prisma.order.findFirst.mockResolvedValue({
+      id: "order-broken",
+      status: "COMPLETED",
+      fulfillmentChannel: "PUBLISHER",
+      createdAt: new Date("2026-08-12T00:00:00.000Z"),
+      events: [
+        {
+          id: "event-approval",
+          orderId: "order-broken",
+          settlementId: "settlement-broken",
+          eventType: "SETTLEMENT_CUSTOMER_APPROVED",
+          createdAt: new Date("2026-08-12T00:01:00.000Z"),
+        },
+      ],
+      settlements: [
+        {
+          id: "settlement-broken",
+          orderId: "order-broken",
+          publisherId: "publisher-1",
+          publisherAmount: "90.00",
+          currency: "USD",
+          status: "CUSTOMER_APPROVED",
+          settledAt: null,
+          transactions: [],
+          approvals: [],
+        },
+      ],
+      fulfillmentAssignments: [],
+      cancellationRequests: [],
+    })
+
+    const result = await service.getOrder("order-broken", {
+      id: "finance-1",
+      staffRole: "FINANCE",
+    })
+
+    expect(result.integrity).toEqual(
+      expect.objectContaining({
+        state: "BLOCKED",
+        checks: expect.arrayContaining([
+          expect.objectContaining({ key: "FINANCIAL_RECORD", status: "FAIL" }),
+          expect.objectContaining({
+            key: "SETTLEMENT_RELEASE_LEDGER",
+            status: "FAIL",
+          }),
+          expect.objectContaining({
+            key: "SETTLEMENT_RELEASE_EVENT",
+            status: "FAIL",
+          }),
+        ]),
+      }),
+    )
   })
 
   it("returns an explicit Operations projection without financial or contact data", async () => {

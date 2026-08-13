@@ -21,6 +21,7 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { BillingService } from "../../billing/billing.service"
 import { CommunicationsService } from "../../communications/communications.service"
+import { transitionOrderCas } from "../order-transition-cas"
 import { projectExternalOrder } from "../order-visibility"
 import { assertOwnerOrCreator } from "./owner-or-creator"
 
@@ -361,29 +362,22 @@ export class OrderPaymentService {
         }
       }
 
-      // Claim the order BEFORE any money moves. Under concurrent
-      // submit-payment, only one request wins this version-guarded transition;
-      // losers throw here and never touch the wallet. (Previously the wallet
-      // debit happened first, so every parallel request debited and only the
-      // order guard deduped — a double-charge.)
-      const captured = await tx.order.updateMany({
-        where: {
-          id: orderId,
-          version: order.version,
-          status: "DRAFT",
-          paymentStatus: "PENDING",
-        },
-        data: {
-          paymentStatus: "PAID",
-          status: "PAID",
-          version: { increment: 1 },
+      // Claim the complete command BEFORE any money moves. Payment capture and
+      // auto-submission are one externally observable DRAFT -> SUBMITTED CAS,
+      // so one command produces exactly one aggregate-version increment. The
+      // two domain milestones remain separate OrderEvent rows below.
+      const capturedOrder = await transitionOrderCas({
+        db: tx,
+        orderId,
+        expectedVersion: order.version,
+        fromStatus: "DRAFT",
+        toStatus: "SUBMITTED",
+        fromPaymentStatus: "PENDING",
+        toPaymentStatus: "PAID",
+        patch: {
+          submittedAt: new Date(),
         },
       })
-      if (captured.count === 0) {
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
-        )
-      }
 
       // Reserve + capture inside THIS transaction so the debit commits or rolls
       // back atomically with the order claim above.
@@ -408,14 +402,16 @@ export class OrderPaymentService {
           eventType: "PAYMENT_CAPTURED",
           actorId: userId,
           message: `Payment captured — order submitted`,
-          metadata: { capturedAmount: amount.toFixed(2) },
+          metadata: {
+            capturedAmount: amount.toFixed(2),
+            aggregateVersion: capturedOrder.version,
+            milestoneSequence: 1,
+            fromStatus: "DRAFT",
+            toStatus: "SUBMITTED",
+            fromPaymentStatus: "PENDING",
+            toPaymentStatus: "PAID",
+          },
         },
-      })
-
-      // Auto-submit
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: "SUBMITTED", submittedAt: new Date() },
       })
 
       await tx.orderEvent.create({
@@ -424,6 +420,13 @@ export class OrderPaymentService {
           eventType: "ORDER_SUBMITTED",
           actorId: userId,
           message: `Order submitted after payment capture`,
+          metadata: {
+            aggregateVersion: capturedOrder.version,
+            milestoneSequence: 2,
+            fromStatus: "DRAFT",
+            toStatus: "SUBMITTED",
+            command: "SUBMIT_PAYMENT",
+          },
         },
       })
 
@@ -441,6 +444,11 @@ export class OrderPaymentService {
             amount: amount.toFixed(2),
             from: "DRAFT",
             to: "SUBMITTED",
+            fromVersion: order.version,
+            toVersion: capturedOrder.version,
+            fromPaymentStatus: "PENDING",
+            toPaymentStatus: "PAID",
+            milestones: ["PAYMENT_CAPTURED", "ORDER_SUBMITTED"],
           },
           userId,
           organizationId: userOrgId,
@@ -568,7 +576,7 @@ export class OrderPaymentService {
 
       return {
         kind: "CAPTURED" as const,
-        order: await tx.order.findUnique({ where: { id: orderId } }),
+        order: capturedOrder,
         communicationEventIds,
       }
     })

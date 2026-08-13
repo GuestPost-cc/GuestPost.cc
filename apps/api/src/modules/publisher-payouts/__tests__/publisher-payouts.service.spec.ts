@@ -265,13 +265,23 @@ describe("PublisherPayoutsService", () => {
         expect.any(Function),
         { isolationLevel: "Serializable" },
       )
-      expect(encryptionMock.encrypt).toHaveBeenCalledWith(validInput.details)
+      expect(encryptionMock.encrypt).toHaveBeenCalledWith(
+        validInput.details,
+        expect.objectContaining({
+          kind: "payout-method-details",
+          id: expect.any(String),
+          publisherId: "pub-1",
+          type: "bank_transfer",
+        }),
+      )
+      const encryptionContext = encryptionMock.encrypt.mock.calls[0][1]
       expect(prismaMock.payoutMethod.updateMany).toHaveBeenCalledWith({
         where: { publisherId: "pub-1", isDefault: true },
         data: { isDefault: false },
       })
       expect(prismaMock.payoutMethod.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
+          id: encryptionContext.id,
           publisherId: "pub-1",
           details: "encrypted-data",
           isDefault: true,

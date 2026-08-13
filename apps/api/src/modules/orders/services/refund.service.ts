@@ -1,6 +1,7 @@
 import {
   financialDocumentSnapshotSchema,
   formatFinancialDocumentNumber,
+  isPostPublicationPublisherOrder,
   isSupportedMoneyCurrency,
   normalizeFinancialMoney,
   notificationDedupKey,
@@ -34,6 +35,16 @@ import { QueueService } from "../../queues/queue.service"
 
 export interface RefundOptions {
   responsibility: FinalRefundResponsibility
+  publisherCompensation?: PublisherCompensationDecision
+}
+
+export interface PublisherCompensationDecision {
+  amount?: number
+  reason?: string
+  // A DISPUTED order temporarily hides the fulfillment milestone that decides
+  // whether publisher work has already been performed. Callers resolving a
+  // dispute pass its immutable previousStatus through this field.
+  effectiveOrderStatus?: string
 }
 
 export interface RefundTransactionResult {
@@ -48,6 +59,14 @@ const FINAL_REFUND_RESPONSIBILITIES = new Set<FinalRefundResponsibility>([
   "SHARED",
   "SYSTEM",
 ])
+
+interface ResolvedPublisherCompensation {
+  publisherId: string
+  amount: Decimal
+  reason: string
+  effectiveOrderStatus: string
+  responsibility: FinalRefundResponsibility
+}
 
 /**
  * Single refund path for captured payments. Every approved refund flow
@@ -87,6 +106,247 @@ export class RefundService {
               : "Publisher balance is not denominated in canonical USD",
       })
     }
+  }
+
+  private resolvePublisherCompensation(
+    order: any,
+    activeSettlement: any | null,
+    responsibility: FinalRefundResponsibility,
+    input?: PublisherCompensationDecision,
+  ): ResolvedPublisherCompensation | null {
+    const effectiveOrderStatus = input?.effectiveOrderStatus ?? order.status
+    const postPublication = isPostPublicationPublisherOrder({
+      fulfillmentChannel: order.fulfillmentChannel,
+      websiteOwnershipType: order.website?.ownershipType,
+      effectiveOrderStatus,
+      hasSettlement: Boolean(activeSettlement),
+    })
+
+    if (!postPublication) {
+      if (input?.amount != null && new Decimal(input.amount).greaterThan(0)) {
+        throw new BadRequestException({
+          code: "PUBLISHER_COMPENSATION_NOT_APPLICABLE",
+          message:
+            "Publisher compensation is only valid for post-publication publisher orders",
+        })
+      }
+      return null
+    }
+
+    const publisherId =
+      activeSettlement?.publisherId ?? order.website?.publisherId ?? null
+    if (!publisherId) {
+      throw new ConflictException({
+        code: "PUBLISHER_COMPENSATION_PUBLISHER_MISSING",
+        message:
+          "Post-publication refund has no authoritative publisher identity",
+      })
+    }
+
+    // Publisher-attributed failure explicitly means no platform-funded
+    // compensation. Persist that NONE decision instead of inferring it from a
+    // missing settlement or a skipped branch.
+    if (responsibility === "PUBLISHER") {
+      if (input?.amount != null && !new Decimal(input.amount).isZero()) {
+        throw new BadRequestException({
+          code: "PUBLISHER_COMPENSATION_RESPONSIBILITY_CONFLICT",
+          message:
+            "A publisher-attributed refund cannot also credit publisher compensation",
+        })
+      }
+      return {
+        publisherId,
+        amount: new Decimal(0),
+        reason:
+          input?.reason?.trim() ||
+          "Publisher-attributed refund; publisher compensation is not payable.",
+        effectiveOrderStatus,
+        responsibility,
+      }
+    }
+
+    const compensationReason = input?.reason?.trim()
+    if (input?.amount == null || !compensationReason) {
+      throw new ConflictException({
+        code: "PUBLISHER_COMPENSATION_DECISION_REQUIRED",
+        message:
+          "Post-publication refund requires an explicit publisher compensation amount and reason",
+      })
+    }
+    if (compensationReason.length < 20 || compensationReason.length > 2000) {
+      throw new BadRequestException({
+        code: "PUBLISHER_COMPENSATION_REASON_INVALID",
+        message:
+          "Publisher compensation reason must be between 20 and 2000 characters",
+      })
+    }
+
+    const amount = new Decimal(input.amount)
+    if (
+      !amount.isFinite() ||
+      amount.isNegative() ||
+      !amount.mul(100).isInteger()
+    ) {
+      throw new BadRequestException({
+        code: "PUBLISHER_COMPENSATION_AMOUNT_INVALID",
+        message:
+          "Publisher compensation must be a non-negative USD amount with at most two decimal places",
+      })
+    }
+    const maximum = activeSettlement
+      ? new Decimal(activeSettlement.publisherAmount)
+      : new Decimal(order.amount ?? 0)
+    if (amount.greaterThan(maximum)) {
+      throw new BadRequestException({
+        code: "PUBLISHER_COMPENSATION_AMOUNT_EXCEEDS_CONTRACT",
+        message:
+          "Publisher compensation cannot exceed the authoritative publisher amount or order gross amount",
+      })
+    }
+
+    return {
+      publisherId,
+      amount,
+      reason: compensationReason,
+      effectiveOrderStatus,
+      responsibility,
+    }
+  }
+
+  private async recordPublisherCompensation(
+    tx: any,
+    order: any,
+    refundTransactionId: string,
+    actorUserId: string,
+    plan: ResolvedPublisherCompensation,
+  ) {
+    const reference = `publisher-compensation:${order.id}`
+    const debtReference = `publisher-compensation-debt:${order.id}`
+    let compensationTransactionId: string | null = null
+    let debtRepaymentTransactionId: string | null = null
+    let debtApplied = new Decimal(0)
+
+    if (plan.amount.greaterThan(0)) {
+      const balance = await lockPublisherBalanceForUpdate(tx, plan.publisherId)
+      if (balance)
+        this.assertCanonicalUsd(balance.currency, "publisher balance")
+      const debt = new Decimal(balance?.debtBalance ?? 0)
+      debtApplied = Decimal.min(debt, plan.amount)
+      const withdrawableCredit = plan.amount.minus(debtApplied)
+
+      if (balance) {
+        const updated = await tx.publisherBalance.updateMany({
+          where: {
+            publisherId: plan.publisherId,
+            version: balance.version,
+          },
+          data: {
+            currency: USD_CURRENCY,
+            withdrawableBalance: { increment: withdrawableCredit },
+            debtBalance: { decrement: debtApplied },
+            lifetimeEarnings: { increment: plan.amount },
+            version: { increment: 1 },
+          },
+        })
+        if (updated.count !== 1) {
+          throw new ConflictException(
+            "Publisher balance changed while compensation was recorded. Retry.",
+          )
+        }
+        checkPublisherBalanceInvariant(
+          {
+            ...balance,
+            withdrawableBalance: new Decimal(balance.withdrawableBalance).plus(
+              withdrawableCredit,
+            ),
+            debtBalance: debt.minus(debtApplied),
+            lifetimeEarnings: new Decimal(balance.lifetimeEarnings).plus(
+              plan.amount,
+            ),
+          },
+          this.logger,
+          "recordPublisherCompensation",
+        )
+      } else {
+        await tx.publisherBalance.create({
+          data: {
+            publisherId: plan.publisherId,
+            currency: USD_CURRENCY,
+            withdrawableBalance: plan.amount,
+            lifetimeEarnings: plan.amount,
+          },
+        })
+      }
+
+      const compensationTransaction = await tx.transaction.create({
+        data: {
+          amount: plan.amount,
+          type: "PUBLISHER_COMPENSATION",
+          currency: USD_CURRENCY,
+          orderId: order.id,
+          publisherId: plan.publisherId,
+          reference,
+          description: `Publisher compensation of ${plan.amount.toFixed(2)} USD for refunded order ${order.id}`,
+        },
+      })
+      compensationTransactionId = compensationTransaction.id
+
+      if (debtApplied.greaterThan(0)) {
+        const debtTransaction = await tx.transaction.create({
+          data: {
+            amount: debtApplied.negated(),
+            type: "DEBT_REPAYMENT",
+            currency: USD_CURRENCY,
+            orderId: order.id,
+            publisherId: plan.publisherId,
+            reference: debtReference,
+            description: `Debt repayment of ${debtApplied.toFixed(2)} USD netted from publisher compensation`,
+          },
+        })
+        debtRepaymentTransactionId = debtTransaction.id
+      }
+    }
+
+    const compensation = await tx.publisherCompensation.create({
+      data: {
+        orderId: order.id,
+        publisherId: plan.publisherId,
+        refundTransactionId,
+        compensationTransactionId,
+        debtRepaymentTransactionId,
+        disposition: plan.amount.isZero() ? "NONE" : "EXACT_AMOUNT",
+        amount: plan.amount,
+        currency: USD_CURRENCY,
+        responsibility: plan.responsibility,
+        reason: plan.reason,
+        effectiveOrderStatus: plan.effectiveOrderStatus,
+        decidedByUserId: actorUserId,
+      },
+    })
+
+    await tx.orderEvent.create({
+      data: {
+        orderId: order.id,
+        eventType: "PUBLISHER_COMPENSATION_RECORDED",
+        actorId: actorUserId,
+        message: plan.amount.isZero()
+          ? "Publisher compensation explicitly resolved as none"
+          : `Publisher compensation recorded: ${plan.amount.toFixed(2)} USD`,
+        metadata: {
+          publisherCompensationId: compensation.id,
+          refundTransactionId,
+          publisherId: plan.publisherId,
+          amount: plan.amount.toFixed(2),
+          currency: USD_CURRENCY,
+          responsibility: plan.responsibility,
+          effectiveOrderStatus: plan.effectiveOrderStatus,
+          compensationTransactionId,
+          debtRepaymentTransactionId,
+          debtApplied: debtApplied.toFixed(2),
+        },
+      },
+    })
+    return compensation
   }
 
   private async assertExistingRefundEvidence(
@@ -168,6 +428,92 @@ export class RefundService {
     this.assertCanonicalUsd(order.currency, "order")
     this.assertCanonicalUsd(wallet.currency, "wallet")
     return responsibility
+  }
+
+  /**
+   * An idempotency key identifies one immutable refund command, not merely any
+   * refund for the same order. Replays therefore have to match the original
+   * attribution, explanation, and publisher-pay disposition exactly. Without
+   * this check a caller could receive a successful response for materially
+   * different instructions that were never applied.
+   */
+  private async assertExactRefundReplayIntent(
+    tx: any,
+    order: any,
+    refund: any,
+    input: {
+      reason: string
+      responsibility: FinalRefundResponsibility
+      publisherCompensation?: PublisherCompensationDecision
+    },
+  ): Promise<void> {
+    const mismatch = () =>
+      new ConflictException({
+        code: "REFUND_IDEMPOTENCY_INTENT_MISMATCH",
+        message:
+          "Idempotency key was already used with different refund instructions",
+      })
+
+    if (
+      order.refundResponsibility !== input.responsibility ||
+      refund.description !== `Refund for order ${order.id}: ${input.reason}`
+    ) {
+      throw mismatch()
+    }
+
+    const persisted = await tx.publisherCompensation.findUnique({
+      where: { refundTransactionId: refund.id },
+    })
+    if (!persisted) {
+      // Historical refunds predate explicit publisher-compensation evidence.
+      // They may be replayed only when the caller is not trying to introduce a
+      // new disposition after the financial command has already committed.
+      if (
+        input.publisherCompensation?.amount != null ||
+        input.publisherCompensation?.reason != null ||
+        input.publisherCompensation?.effectiveOrderStatus != null
+      ) {
+        throw mismatch()
+      }
+      return
+    }
+
+    const amount = new Decimal(persisted.amount ?? 0)
+    const supplied = input.publisherCompensation
+    if (
+      persisted.orderId !== order.id ||
+      persisted.refundTransactionId !== refund.id ||
+      persisted.responsibility !== input.responsibility ||
+      persisted.currency !== USD_CURRENCY ||
+      amount.isZero() !== (persisted.disposition === "NONE") ||
+      !amount.isZero() !== (persisted.disposition === "EXACT_AMOUNT")
+    ) {
+      throw new ConflictException(
+        "Publisher compensation does not match completed refund evidence",
+      )
+    }
+
+    if (input.responsibility !== "PUBLISHER" && !supplied) {
+      throw mismatch()
+    }
+    if (
+      supplied?.amount != null &&
+      !new Decimal(supplied.amount).equals(amount)
+    ) {
+      throw mismatch()
+    }
+    if (
+      supplied?.reason != null &&
+      supplied.reason.trim() !== persisted.reason
+    ) {
+      throw mismatch()
+    }
+    if (
+      supplied?.effectiveOrderStatus != null &&
+      supplied.effectiveOrderStatus !== persisted.effectiveOrderStatus
+    ) {
+      throw mismatch()
+    }
   }
 
   private async assertLegacyRefundDocument(
@@ -452,6 +798,16 @@ export class RefundService {
               lockedRefund,
               idempotencyKey,
             )
+            await this.assertExactRefundReplayIntent(
+              tx,
+              refundedOrder,
+              lockedRefund,
+              {
+                reason,
+                responsibility: options.responsibility,
+                publisherCompensation: options.publisherCompensation,
+              },
+            )
             await this.recordRefundCommunications(tx, {
               order: refundedOrder,
               actorUserId: userId,
@@ -471,6 +827,7 @@ export class RefundService {
       where: { id: orderId },
       include: {
         website: { select: { ownershipType: true, publisherId: true } },
+        dispute: { select: { previousStatus: true } },
       },
     })
     if (!order) throw new NotFoundException("Order not found")
@@ -500,6 +857,7 @@ export class RefundService {
           where: { id: orderId },
           include: {
             website: { select: { ownershipType: true, publisherId: true } },
+            dispute: { select: { previousStatus: true } },
           },
         })
         if (!lockedOrder) throw new NotFoundException("Order not found")
@@ -510,6 +868,15 @@ export class RefundService {
           userId,
           idempotencyKey,
           responsibility,
+          options.publisherCompensation
+            ? {
+                ...options.publisherCompensation,
+                effectiveOrderStatus:
+                  options.publisherCompensation.effectiveOrderStatus ??
+                  lockedOrder.dispute?.previousStatus ??
+                  lockedOrder.status,
+              }
+            : undefined,
         )
       },
     )
@@ -577,6 +944,7 @@ export class RefundService {
     userId: string,
     idempotencyKey: string | undefined,
     responsibility: FinalRefundResponsibility,
+    publisherCompensation?: PublisherCompensationDecision,
   ): Promise<RefundTransactionResult> {
     this.assertCanonicalUsd(order.currency, "order")
     // Duplicate guard
@@ -604,6 +972,11 @@ export class RefundService {
           existing,
           idempotencyKey,
         )
+        await this.assertExactRefundReplayIntent(tx, refundedOrder, existing, {
+          reason,
+          responsibility,
+          publisherCompensation,
+        })
         await this.recordRefundCommunications(tx, {
           order: refundedOrder,
           actorUserId: userId,
@@ -675,6 +1048,7 @@ export class RefundService {
       (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
     const isPlatformOrder = channel === "PLATFORM"
     let cancelledSettlementId: string | null = null
+    let publisherCompensationPlan: ResolvedPublisherCompensation | null = null
 
     if (isPlatformOrder) {
       // Platform order: reverse PlatformRevenue. The row is never deleted —
@@ -688,6 +1062,12 @@ export class RefundService {
       const activeSettlement = await tx.settlement.findFirst({
         where: { orderId: order.id, status: { not: "CANCELLED" } },
       })
+      publisherCompensationPlan = this.resolvePublisherCompensation(
+        order,
+        activeSettlement,
+        responsibility,
+        publisherCompensation,
+      )
       if (activeSettlement && activeSettlement.status !== "RELEASED") {
         const cancelled = await tx.settlement.updateMany({
           where: {
@@ -741,10 +1121,13 @@ export class RefundService {
           checkPublisherBalanceInvariant(
             {
               ...balance,
-              withdrawableBalance:
-                Number(balance.withdrawableBalance) - Number(clawedNow),
-              debtBalance: Number(balance.debtBalance ?? 0) + Number(newDebt),
-              lifetimeEarnings: Number(balance.lifetimeEarnings) - Number(owed),
+              withdrawableBalance: new Decimal(
+                balance.withdrawableBalance,
+              ).minus(clawedNow),
+              debtBalance: new Decimal(balance.debtBalance ?? 0).plus(newDebt),
+              lifetimeEarnings: new Decimal(
+                balance.lifetimeEarnings ?? 0,
+              ).minus(owed),
             },
             this.logger,
             "refundOrder/clawback",
@@ -877,6 +1260,15 @@ export class RefundService {
         description: `Refund for order ${order.id}: ${reason}`,
       },
     })
+    const publisherCompensationRecord = publisherCompensationPlan
+      ? await this.recordPublisherCompensation(
+          tx,
+          order,
+          refundTransaction.id,
+          userId,
+          publisherCompensationPlan,
+        )
+      : null
 
     await tx.orderEvent.create({
       data: {
@@ -890,6 +1282,7 @@ export class RefundService {
           responsibility,
           settlementCancelled: cancelledSettlementId,
           refundTransactionId: refundTransaction.id,
+          publisherCompensationId: publisherCompensationRecord?.id ?? null,
         },
       },
     })
@@ -907,6 +1300,7 @@ export class RefundService {
           reason,
           responsibility,
           refundTransactionId: refundTransaction.id,
+          publisherCompensationId: publisherCompensationRecord?.id ?? null,
           ...orderEventMetadata(order),
         },
         userId,

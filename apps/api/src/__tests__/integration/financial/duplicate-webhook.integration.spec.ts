@@ -47,7 +47,14 @@ describe("[INTEGRATION] Financial — duplicate webhook idempotency", () => {
         "Duplicate test refund",
         ctx.customer.user.id,
         idempotencyKey,
-        { responsibility: "SYSTEM" },
+        {
+          responsibility: "SYSTEM",
+          publisherCompensation: {
+            amount: 80,
+            reason:
+              "Publisher completed the delivery before this system-attributed refund.",
+          },
+        },
       )
       expect(first.status).toBe(OrderStatus.REFUNDED)
 
@@ -57,7 +64,14 @@ describe("[INTEGRATION] Financial — duplicate webhook idempotency", () => {
         "Duplicate test refund",
         ctx.customer.user.id,
         idempotencyKey,
-        { responsibility: "SYSTEM" },
+        {
+          responsibility: "SYSTEM",
+          publisherCompensation: {
+            amount: 80,
+            reason:
+              "Publisher completed the delivery before this system-attributed refund.",
+          },
+        },
       )
       expect(second.status).toBe(OrderStatus.REFUNDED)
 
@@ -67,9 +81,10 @@ describe("[INTEGRATION] Financial — duplicate webhook idempotency", () => {
         settlementStatus: SettlementStatus.CANCELLED,
         orderStatus: OrderStatus.REFUNDED,
         walletAvailableBalance: 100,
-        publisherWithdrawableBalance: 0,
-        transactionCount: 5,
-        transactionSum: 100,
+        publisherWithdrawableBalance: 80,
+        publisherLifetimeEarnings: 80,
+        transactionCount: 6,
+        transactionSum: 180,
       })
 
       // Verify only 1 REFUND transaction exists

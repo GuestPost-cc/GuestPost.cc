@@ -25,7 +25,6 @@ export const DISPUTE_CANCELLATION_STATUSES = [
   "PUBLISHED",
   "VERIFIED",
   "DELIVERED",
-  "SETTLED",
   "COMPLETED",
 ] as const
 

@@ -14,3 +14,6 @@ node_modules
 !/src/prisma/models/EmailSuppression.ts
 !/src/prisma/models/BillingProfile.ts
 !/src/prisma/models/FinancialDocument.ts
+!/src/prisma/models/PublisherCompensation.ts
+!/src/prisma/models/DepositCreditRecovery.ts
+!/src/prisma/models/DepositCreditEvidence.ts

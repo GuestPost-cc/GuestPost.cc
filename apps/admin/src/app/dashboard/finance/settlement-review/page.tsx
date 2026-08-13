@@ -51,26 +51,42 @@ const REVIEWABLE_STATUSES = [
   "ADMIN_APPROVED",
 ] as const
 
-// Per-settlement delivery evidence + computed settlement eligibility. Finance
-// sees exactly why a settlement is (in)eligible before releasing.
-function DeliveryRow({ orderId }: { orderId: string }) {
-  const { data: deliveries = [], isLoading } = useQuery({
+// Delivery evidence remains visible, but eligibility comes from the canonical
+// server evaluator. The eventual mutation repeats it under the Order lock.
+function DeliveryRow({
+  settlementId,
+  orderId,
+}: {
+  settlementId: string
+  orderId: string
+}) {
+  const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery({
     queryKey: ["settlement-deliveries", orderId],
     queryFn: () => api.admin.listDeliveries(orderId),
   })
-  if (isLoading) return <Skeleton className="h-16 w-full" />
+  const eligibility = useQuery({
+    queryKey: ["settlement-eligibility", settlementId],
+    queryFn: () => api.admin.getSettlementEligibility(settlementId),
+  })
+  if (deliveriesLoading || eligibility.isLoading)
+    return <Skeleton className="h-16 w-full" />
   const active =
-    deliveries.find((d: any) => !d.supersededByVersion) ?? deliveries[0]
+    deliveries.find(
+      (delivery: any) => delivery.id === eligibility.data?.activeDelivery?.id,
+    ) ?? deliveries.find((delivery: any) => !delivery.supersededByVersion)
+  const blockers = eligibility.data?.blockers ?? []
   if (!active)
     return (
-      <p className="text-sm text-muted-foreground p-3">
-        No delivery submitted.
-      </p>
+      <div className="space-y-2 p-3">
+        <Badge variant="destructive">Settlement blocked</Badge>
+        <p className="text-sm text-muted-foreground">
+          {eligibility.error
+            ? "Eligibility could not be loaded. The release action remains blocked."
+            : (blockers[0]?.message ?? "No active delivery submitted.")}
+        </p>
+      </div>
     )
 
-  const verified =
-    active.verificationStatus === "VERIFIED" ||
-    ["APPROVED", "OVERRIDDEN"].includes(active.interventionStatus)
   const fraud = deliveries.some((d: any) =>
     d.fraudFlags?.some((flag: any) => !flag.resolution),
   )
@@ -87,8 +103,10 @@ function DeliveryRow({ orderId }: { orderId: string }) {
           <Badge variant="outline">{active.interventionStatus}</Badge>
         )}
         {fraud && <Badge variant="destructive">FRAUD FLAGGED</Badge>}
-        <Badge variant={verified && !fraud ? "success" : "destructive"}>
-          {verified && !fraud ? "Settlement Eligible" : "Settlement Blocked"}
+        <Badge variant={eligibility.data?.eligible ? "success" : "destructive"}>
+          {eligibility.data?.eligible
+            ? "Settlement eligible"
+            : "Settlement blocked"}
         </Badge>
       </div>
       <a
@@ -106,6 +124,22 @@ function DeliveryRow({ orderId }: { orderId: string }) {
           <span>Target {active.evidence[0].targetUrlMatched ? "✓" : "✗"}</span>
           <span>Anchor {active.evidence[0].anchorFound ? "✓" : "✗"}</span>
         </div>
+      )}
+      {eligibility.error ? (
+        <p className="text-xs text-destructive">
+          Eligibility could not be loaded. The release action remains blocked.
+        </p>
+      ) : blockers.length > 0 ? (
+        <ul className="space-y-1 text-xs text-destructive">
+          {blockers.map((blocker) => (
+            <li key={blocker.code}>{blocker.message}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Advisory snapshot; the server rechecks eligibility under lock at the
+          money mutation.
+        </p>
       )}
     </div>
   )
@@ -205,7 +239,10 @@ export default function SettlementReviewPage() {
                     {expanded === s.id && (
                       <TableRow>
                         <TableCell colSpan={6}>
-                          <DeliveryRow orderId={s.orderId} />
+                          <DeliveryRow
+                            settlementId={s.id}
+                            orderId={s.orderId}
+                          />
                         </TableCell>
                       </TableRow>
                     )}

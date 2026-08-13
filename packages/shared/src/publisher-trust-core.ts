@@ -105,7 +105,7 @@ export async function recomputePublisherTrustCore(
     prisma.order.count({
       where: {
         website: { publisherId },
-        status: { in: ["DELIVERED", "SETTLED", "COMPLETED"] },
+        status: { in: ["DELIVERED", "COMPLETED"] },
       },
     }),
     prisma.orderDispute.count({

@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: security
 project: guestpost-platform
-updated: 2026-06-11
+updated: 2026-08-12
 ---
 
 # Security
@@ -29,10 +29,16 @@ updated: 2026-06-11
 ## Guards
 
 - `AuthGuard` (global) — validates session
-- `ActorTypeGuard` — domain isolation (CUSTOMER / PUBLISHER / STAFF)
-- `MemberRolesGuard` / `StaffRolesGuard` — role enforcement
-- `OrderOwnershipGuard` — resource ownership validation
-- `PermissionsGuard` — sensitive permission checks (uncached)
+- `CurrentAuthorityGuard` (global, after `AuthGuard`) — resolves User,
+  ActiveContext, active customer/publisher membership, StaffMembership role,
+  and staff permissions from PostgreSQL once per request
+- The 30-second auth-context cache is presentation-only. `ActorTypeGuard`,
+  `MemberRolesGuard`, `StaffRolesGuard`, `OrderOwnershipGuard`, and
+  `PermissionsGuard` consume the fresh request authority and never authorize
+  from cached tenant/role/permission fields.
+- Generic support read/reply is customer/publisher-only; staff use the guarded
+  admin surface. Generic settlement detail is customer-only; staff use the
+  guarded admin settlement surface.
 
 ## Channel Security
 
@@ -46,5 +52,5 @@ updated: 2026-06-11
 - No first-membership-wins — all context from ActiveContext table
 - SUPER_ADMIN does not bypass `SENSITIVE_PERMISSIONS` — `FINANCIAL_DATA_DECRYPT` must be explicitly granted
 - Stripe webhook dummy mode removed — all envs require real Stripe keys
-- All critical statuses (PAID, ACCEPTED, VERIFIED, SETTLED, COMPLETED, REFUNDED) are system-only
+- All critical statuses (PAID, ACCEPTED, VERIFIED, COMPLETED, REFUNDED) are system-only
 - Business-action endpoints replace generic status transitions (prevents unauthorized transitions)

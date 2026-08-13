@@ -4,6 +4,7 @@
 // Hard-required vars cause exit(1) on startup. Optional vars warn once.
 
 import {
+  classifyStripeKeyMode,
   financialDocumentIssuerFromEnv,
   resolveFinanceRuntimeMode,
 } from "@guestpost/shared"
@@ -128,6 +129,51 @@ export function validateEnv(): void {
         missing: missingProd,
       })
       process.exit(1)
+    }
+    const workerMode = (process.env.WORKER_MODE ?? "all").trim()
+    const workerTask = process.env.WORKER_TASK?.trim()
+    const requiresDepositRecoveryKey =
+      workerMode === "all" ||
+      workerMode === "on-demand" ||
+      (workerMode === "scheduled" &&
+        (workerTask === "deposit-credit-recovery" ||
+          workerTask === "maintenance-dispatch"))
+    if (
+      requiresDepositRecoveryKey &&
+      !process.env.STRIPE_DEPOSIT_RECOVERY_KEY?.trim()
+    ) {
+      logger.error(
+        "FATAL: authenticated deposit recovery requires STRIPE_DEPOSIT_RECOVERY_KEY",
+      )
+      process.exit(1)
+    }
+    if (process.env.STRIPE_DEPOSIT_RECOVERY_KEY?.trim()) {
+      const recoveryKey = process.env.STRIPE_DEPOSIT_RECOVERY_KEY.trim()
+      const recoveryKeyMode = classifyStripeKeyMode(recoveryKey)
+      if (recoveryKeyMode === "none" || recoveryKeyMode === "invalid") {
+        logger.error(
+          "FATAL: STRIPE_DEPOSIT_RECOVERY_KEY must be a valid restricted Stripe key",
+        )
+        process.exit(1)
+      }
+      if (
+        !recoveryKey.startsWith("rk_test_") &&
+        !recoveryKey.startsWith("rk_live_")
+      ) {
+        logger.error(
+          "FATAL: STRIPE_DEPOSIT_RECOVERY_KEY must use a least-privilege rk_* credential",
+        )
+        process.exit(1)
+      }
+      if (
+        process.env.STRIPE_SECRET_KEY?.trim() &&
+        recoveryKey === process.env.STRIPE_SECRET_KEY.trim()
+      ) {
+        logger.error(
+          "FATAL: deposit retrieval must use a distinct least-privilege Stripe key",
+        )
+        process.exit(1)
+      }
     }
 
     try {

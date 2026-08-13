@@ -604,8 +604,8 @@ export class CommandCenterService {
         },
         {
           key: "COMPLETE",
-          label: "Settled & completed",
-          count: sumLifecycleCounts(lifecycleCounts, ["SETTLED", "COMPLETED"]),
+          label: "Completed",
+          count: sumLifecycleCounts(lifecycleCounts, ["COMPLETED"]),
         },
         {
           key: "EXCEPTION",

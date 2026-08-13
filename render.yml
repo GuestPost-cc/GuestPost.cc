@@ -50,6 +50,10 @@ services:
         sync: false
       - key: PAYOUT_ENCRYPTION_KEY
         sync: false
+      - key: PAYOUT_ENCRYPTION_KEYS
+        sync: false
+      - key: PAYOUT_ENCRYPTION_ACTIVE_KEY_ID
+        sync: false
       - key: INTEGRATION_ENCRYPTION_KEY
         sync: false
       # Financial releases start fail-closed. A reviewed cutover changes these
@@ -114,6 +118,11 @@ services:
       # money movement stays disabled until the migration, webhook, and
       # sandbox-certification gates in docs/STRIPE_STAGING_RUNBOOK.md pass.
       - key: STRIPE_SECRET_KEY
+        sync: false
+      # Distinct least-privilege read credential for worker-side authenticated
+      # deposit recovery. Configure the same value on the Northflank worker;
+      # never reuse STRIPE_SECRET_KEY.
+      - key: STRIPE_DEPOSIT_RECOVERY_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false

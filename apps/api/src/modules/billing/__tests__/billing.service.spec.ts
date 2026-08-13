@@ -56,6 +56,7 @@ describe("BillingService", () => {
       depositAttempt: {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -1744,6 +1745,10 @@ describe("BillingService", () => {
       })
       prismaMock.paymentProviderEvent.findUnique.mockResolvedValue({
         id: "inbox-stale-checkout",
+        provider: "stripe",
+        eventType: "checkout.session.completed",
+        objectId: "cs_stale_checkout",
+        livemode: false,
         status: "PROCESSING",
         attempts: 2,
         lockedAt: new Date("2026-07-29T00:20:00.000Z"),
@@ -1757,10 +1762,20 @@ describe("BillingService", () => {
           {
             id: "cs_stale_checkout",
             payment_intent: "pi_stale_checkout",
+            client_reference_id: "attempt-stale-checkout",
+            status: "complete",
             amount_total: 1000,
             currency: "usd",
             payment_status: "paid",
-            metadata: { depositAttemptId: "attempt-stale-checkout" },
+            mode: "payment",
+            livemode: false,
+            metadata: {
+              depositAttemptId: "attempt-stale-checkout",
+              publicReference: "DP-STALE-CHECKOUT",
+              walletId: "wallet-1",
+              userId: "customer-1",
+              organizationId: "org-1",
+            },
           },
           "inbox-stale-checkout",
           {

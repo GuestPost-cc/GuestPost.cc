@@ -123,7 +123,7 @@ describe("OrderPaymentService", () => {
   })
 
   describe("submitPayment", () => {
-    it("transitions DRAFT order to PAID+SUBMITTED in one transaction", async () => {
+    it("commits payment as one DRAFT-to-SUBMITTED version step with two lifecycle events", async () => {
       prismaMock.$transaction.mockImplementation(async (cb: any) => {
         prismaMock.order.findFirst.mockResolvedValue(mockOrder)
         prismaMock.wallet.findFirst.mockResolvedValue(mockWallet)
@@ -133,7 +133,7 @@ describe("OrderPaymentService", () => {
         )
         prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
         prismaMock.order.updateMany.mockResolvedValue({ count: 1 }) // captured
-        prismaMock.order.findUnique.mockResolvedValue({
+        prismaMock.order.findUniqueOrThrow.mockResolvedValue({
           ...mockOrder,
           paymentStatus: "PAID",
           status: "SUBMITTED",
@@ -160,25 +160,57 @@ describe("OrderPaymentService", () => {
         { id: "user-1", organizationId: "org-1" },
         expect.anything(),
       )
-      expect(prismaMock.order.updateMany).toHaveBeenCalledWith(
+      expect(prismaMock.order.updateMany).toHaveBeenCalledTimes(1)
+      expect(prismaMock.order.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "order-1",
+          version: 1,
+          status: "DRAFT",
+          paymentStatus: "PENDING",
+        },
+        data: {
+          paymentStatus: "PAID",
+          status: "SUBMITTED",
+          submittedAt: expect.any(Date),
+          version: { increment: 1 },
+        },
+      })
+      expect(prismaMock.order.update).not.toHaveBeenCalled()
+      expect(prismaMock.orderEvent.create).toHaveBeenCalledTimes(2)
+      expect(prismaMock.orderEvent.create).toHaveBeenNthCalledWith(
+        1,
         expect.objectContaining({
           data: expect.objectContaining({
-            paymentStatus: "PAID",
-            status: "PAID",
+            eventType: "PAYMENT_CAPTURED",
+            metadata: expect.objectContaining({
+              aggregateVersion: 2,
+              milestoneSequence: 1,
+            }),
           }),
         }),
       )
-      expect(prismaMock.order.update).toHaveBeenCalledWith(
+      expect(prismaMock.orderEvent.create).toHaveBeenNthCalledWith(
+        2,
         expect.objectContaining({
           data: expect.objectContaining({
-            status: "SUBMITTED",
-            submittedAt: expect.any(Date),
+            eventType: "ORDER_SUBMITTED",
+            metadata: expect.objectContaining({
+              aggregateVersion: 2,
+              milestoneSequence: 2,
+            }),
           }),
         }),
       )
       expect(result.status).toBe("SUBMITTED")
       expect(auditMock.log).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "PAYMENT_CAPTURED" }),
+        expect.objectContaining({
+          action: "PAYMENT_CAPTURED",
+          metadata: expect.objectContaining({
+            fromVersion: 1,
+            toVersion: 2,
+            milestones: ["PAYMENT_CAPTURED", "ORDER_SUBMITTED"],
+          }),
+        }),
         expect.anything(), // tx — audit runs inside the payment transaction
       )
     })
@@ -212,7 +244,7 @@ describe("OrderPaymentService", () => {
         )
         prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
         prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.order.findUnique.mockResolvedValue({
+        prismaMock.order.findUniqueOrThrow.mockResolvedValue({
           ...mockOrder,
           paymentStatus: "PAID",
           status: "SUBMITTED",
@@ -237,16 +269,37 @@ describe("OrderPaymentService", () => {
       )
     })
 
-    it("rejects non-DRAFT orders", async () => {
+    it.each([
+      {
+        label: "already-submitted order",
+        status: "SUBMITTED",
+        paymentStatus: "PAID",
+      },
+      {
+        label: "legacy intermediate PAID order",
+        status: "PAID",
+        paymentStatus: "PAID",
+      },
+      {
+        label: "inconsistent paid DRAFT order",
+        status: "DRAFT",
+        paymentStatus: "PAID",
+      },
+    ])("rejects a $label without side effects", async (state) => {
       prismaMock.$transaction.mockImplementation(async (cb: any) => {
         prismaMock.order.findFirst.mockResolvedValue({
           ...mockOrder,
-          status: "SUBMITTED",
+          status: state.status,
+          paymentStatus: state.paymentStatus,
         })
         return cb(prismaMock)
       })
 
       await expect(submitReviewedPayment()).rejects.toThrow(BadRequestException)
+      expect(prismaMock.wallet.findFirst).not.toHaveBeenCalled()
+      expect(prismaMock.order.updateMany).not.toHaveBeenCalled()
+      expect(billingMock.reserve).not.toHaveBeenCalled()
+      expect(prismaMock.orderEvent.create).not.toHaveBeenCalled()
     })
 
     it("rejects an invalid persisted amount as changed checkout evidence", async () => {
@@ -305,6 +358,9 @@ describe("OrderPaymentService", () => {
       })
 
       await expect(submitReviewedPayment()).rejects.toThrow(ConflictException)
+      expect(billingMock.reserve).not.toHaveBeenCalled()
+      expect(billingMock.payFromReserved).not.toHaveBeenCalled()
+      expect(prismaMock.orderEvent.create).not.toHaveBeenCalled()
     })
 
     it("rejects a non-USD order as changed checkout evidence before wallet access", async () => {
@@ -513,7 +569,7 @@ describe("OrderPaymentService", () => {
         )
         prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
         prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.order.findUnique.mockResolvedValue({
+        prismaMock.order.findUniqueOrThrow.mockResolvedValue({
           ...mockOrder,
           paymentStatus: "PAID",
           status: "SUBMITTED",

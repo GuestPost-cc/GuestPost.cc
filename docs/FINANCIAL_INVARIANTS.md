@@ -186,8 +186,10 @@ method, but it never reactivates a method that its owner disabled.
 Settlement financial identity, review policy, and reporting snapshots are
 immutable after creation. A release commits only with one exact
 `SETTLEMENT_RELEASE` ledger row whose settlement, order, publisher, amount, and
-currency match; that evidence is append-only. A released settlement without
-that pair cannot commit, including through direct SQL.
+currency match and one `SETTLEMENT_RELEASED` order event whose relational
+settlement and order identities match. Both facts are append-only. A released
+settlement without that exact triple cannot commit, including through direct
+SQL.
 
 A captured Order (`PAID`, including a later `REFUNDED` payment state) has
 exactly one append-only `PURCHASE` row. That row is negative,
@@ -269,7 +271,12 @@ reservedBalance >= 0
 - Reserved funds remain a customer liability but cannot be spent.
 - Moving available to reserved does not create or destroy customer liability.
 - Capture consumes the specific reservation it owns.
-- Release returns that specific reservation to available.
+- Cancellation release returns that specific reservation to available and
+  appends one positive `RELEASE` ledger row. At commit, that row must remain
+  bound to one exact negative order `RESERVATION`, the organization wallet, the
+  terminal `CANCELLED`/payment-`PENDING` order, and one `ORDER_CANCELLED` event.
+  Deferred database guards run from every side of this evidence chain, so a
+  later order, event, reservation, or release rewrite fails closed.
 - A shared reserved bucket must never be consumed without a domain record
   proving which reservation owns the amount.
 - Every new available-balance spend enters through `BillingService.reserve`.
@@ -401,13 +408,20 @@ delivery processes them after recovery is enabled. Unsupported signed event
 types require no money facts and are atomically terminalized as `IGNORED`;
 they must not remain permanently `PENDING`.
 
-The implemented Stripe deposit path has no independent authenticated
-Checkout/PaymentIntent catch-up worker. Today, only a fresh
-signature-verified Stripe delivery can supply the missing completion facts
-after this crash gap. Authenticated provider retrieval remains a valid future
-evidence source only after a separately reviewed implementation persists,
-matches, and reconciles the same immutable facts; operators must not assume
-that recovery path exists now.
+The authenticated deposit-recovery worker runs every five minutes for aged,
+attached, non-credit-backed Stripe attempts. Retrieval evidence is a separate
+append-only aggregate and never masquerades as a signed provider event. The
+worker retrieves Checkout, PaymentIntent, and Charge with a distinct
+least-privilege credential, persists only bounded normalized facts, then enters
+the same serializable finalizer as the webhook. Exact attempt/wallet/amount/
+currency/mode/metadata/provider links are mandatory. A concurrent webhook and
+poll may produce only one wallet increment and one `DEPOSIT` row; the loser
+must prove that exact ledger graph before terminalizing its own authority.
+The authenticated Charge must also be undisputed with zero refunded minor
+units. An exact paid result may revive only the pre-credit `EXPIRED` state;
+otherwise late-settling paid funds would remain uncredited. Contradictions
+quarantine without money movement. The customer GET cannot
+create recovery state or invoke provider retrieval.
 
 ## 8. Payment disputes and risk holds
 
@@ -519,7 +533,9 @@ the Order row and independently rejects an ineligible Settlement insert or
 release. A conditional update that loses after the first financial write must
 throw so the entire transaction rolls back; returning “skipped” would commit a
 partial release. One settlement can own at most one `SETTLEMENT_RELEASE` ledger
-row.
+row and at most one relational `SETTLEMENT_RELEASED` event. Customer approval
+and return-to-review use their own event types and cannot satisfy release
+integrity.
 
 Publisher attribution is relational and cannot be caller-selected:
 `Order.websiteId -> Website.publisherId` is canonical. Once any Order
@@ -635,7 +651,7 @@ limit is the immutable
 `Order.revisionRoundsSnapshot` captured at create time; mutable marketplace
 terms are never consulted for an in-flight order. A pre-final delivery re-verification
 atomically clears any old manual intervention before moving back to a pending
-state. Once an order is `DELIVERED`, `SETTLED`, `COMPLETED`, `CANCELLED`, or
+state. Once an order is `DELIVERED`, `COMPLETED`, `CANCELLED`, or
 `REFUNDED`, manual rejection, re-verification, and negative verification
 override cannot rewrite the delivery evidence that authorized or concluded its
 financial lifecycle.

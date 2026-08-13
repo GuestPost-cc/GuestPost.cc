@@ -2,6 +2,7 @@ import { CancellationResponsibility } from "@guestpost/database"
 import {
   ACTIVE_CANCELLATION_REQUEST_STATUSES,
   decideOrderCancellation,
+  isPostPublicationPublisherOrder,
   orderEventMetadata,
   runLockedOrderSerializableTransaction,
 } from "@guestpost/shared"
@@ -18,6 +19,8 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
+import type { PublisherCompensationDecisionDto } from "../dto/order-cancellation.dto"
+import { transitionOrderCas } from "../order-transition-cas"
 import { RefundService } from "./refund.service"
 
 @Injectable()
@@ -62,10 +65,17 @@ export class OrderDisputeService {
                 title: true,
                 amount: true,
                 status: true,
+                fulfillmentChannel: true,
                 organizationId: true,
                 customer: { select: { id: true, name: true, email: true } },
                 website: {
                   select: { domain: true, url: true, ownershipType: true },
+                },
+                settlements: {
+                  where: { status: { not: "CANCELLED" } },
+                  orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                  take: 1,
+                  select: { publisherAmount: true, currency: true },
                 },
               },
             },
@@ -97,8 +107,26 @@ export class OrderDisputeService {
               title: d.order.title,
               amount: d.order.amount != null ? Number(d.order.amount) : null,
               status: d.order.status,
+              fulfillmentChannel: d.order.fulfillmentChannel,
               customer: d.order.customer,
               website: d.order.website,
+              publisherCompensationPolicy: (() => {
+                const settlement = d.order.settlements?.[0] ?? null
+                const required = isPostPublicationPublisherOrder({
+                  fulfillmentChannel: d.order.fulfillmentChannel,
+                  websiteOwnershipType: d.order.website?.ownershipType,
+                  effectiveOrderStatus: d.previousStatus,
+                  hasSettlement: Boolean(settlement),
+                })
+                return {
+                  required,
+                  maximumAmount: required
+                    ? Number(settlement?.publisherAmount ?? d.order.amount ?? 0)
+                    : 0,
+                  currency: settlement?.currency ?? "USD",
+                  effectiveOrderStatus: d.previousStatus,
+                }
+              })(),
             }
           : null,
       })),
@@ -160,23 +188,6 @@ export class OrderDisputeService {
     )
   }
 
-  private async transitionOrder(
-    db: any,
-    orderId: string,
-    fromVersion: number,
-    data: any,
-  ) {
-    const r = await db.order.updateMany({
-      where: { id: orderId, version: fromVersion },
-      data: { ...data, version: { increment: 1 } },
-    })
-    if (r.count === 0) {
-      throw new ConflictException(
-        "Order was modified by another request. Retry.",
-      )
-    }
-  }
-
   async openDispute(
     orderId: string,
     organizationId: string,
@@ -228,6 +239,81 @@ export class OrderDisputeService {
         this.prisma,
         orderId,
         async (tx: any) => {
+          const membership = await tx.membership.findUnique({
+            where: {
+              userId_organizationId: { userId, organizationId },
+            },
+            select: {
+              role: true,
+              status: true,
+              user: { select: { banned: true, userType: true } },
+            },
+          })
+          if (
+            membership?.status !== "ACTIVE" ||
+            membership?.user.banned ||
+            membership?.user.userType !== "CUSTOMER"
+          ) {
+            throw new ForbiddenException(
+              "Customer authority changed; retry the dispute command",
+            )
+          }
+          // Narrow after the fail-closed check above; do not let a nullable
+          // ORM result flow into the transactional ownership decision.
+          const currentMembership = membership
+
+          const lockedOrder = await tx.order.findFirst({
+            where: {
+              id: orderId,
+              organizationId,
+              version: order.version,
+              status: order.status,
+            },
+            include: {
+              website: { select: { ownershipType: true, publisherId: true } },
+              cancellationRequests: {
+                where: {
+                  status: { in: [...ACTIVE_CANCELLATION_REQUEST_STATUSES] },
+                },
+                select: { id: true },
+                take: 1,
+              },
+              dispute: { select: { id: true } },
+            },
+          })
+          if (!lockedOrder) throw new NotFoundException("Order not found")
+          const customerCanOpen =
+            currentMembership.role === "OWNER" ||
+            lockedOrder.customerId === userId
+          if (!customerCanOpen) {
+            throw new ForbiddenException(
+              "Only the organization owner or original order creator can open a dispute",
+            )
+          }
+          const lockedChannel =
+            lockedOrder.fulfillmentChannel ??
+            (lockedOrder.website?.ownershipType === "PLATFORM"
+              ? "PLATFORM"
+              : "PUBLISHER")
+          const lockedDecision = decideOrderCancellation({
+            status: lockedOrder.status,
+            paymentStatus: lockedOrder.paymentStatus,
+            fulfillmentChannel: lockedChannel,
+            actor: "CUSTOMER",
+            hasActiveRequest: lockedOrder.cancellationRequests.length > 0,
+            hasActiveDispute: Boolean(lockedOrder.dispute),
+            fulfillmentDueAt: lockedOrder.fulfillmentDueAt,
+            warrantyEndsAt: lockedOrder.warrantyEndsAt,
+          })
+          if (lockedDecision.action !== "OPEN_DISPUTE") {
+            throw new BadRequestException(lockedDecision.message)
+          }
+          if (lockedOrder.dispute) {
+            throw new ConflictException(
+              "This order already has a dispute record; reopen it through support instead of creating a duplicate",
+            )
+          }
+
           const created = await tx.orderDispute.create({
             data: {
               orderId,
@@ -235,11 +321,15 @@ export class OrderDisputeService {
               reason,
               status: "OPEN",
               // RESTORE/REJECT resolutions return the order to exactly this status
-              previousStatus: order.status as any,
+              previousStatus: lockedOrder.status as any,
             },
           })
-          await this.transitionOrder(tx, orderId, order.version, {
-            status: "DISPUTED",
+          await transitionOrderCas({
+            db: tx,
+            orderId,
+            expectedVersion: lockedOrder.version,
+            fromStatus: lockedOrder.status,
+            toStatus: "DISPUTED",
           })
           await tx.orderEvent.create({
             data: {
@@ -256,7 +346,7 @@ export class OrderDisputeService {
               entityType: "Order",
               entityId: orderId,
               metadata: {
-                ...orderEventMetadata(order),
+                ...orderEventMetadata(lockedOrder),
                 disputeId: created.id,
                 reason,
               },
@@ -273,7 +363,7 @@ export class OrderDisputeService {
                   tx,
                 )),
                 ...(await this.communications.publisherRecipients(
-                  order.website?.publisherId,
+                  lockedOrder.website?.publisherId,
                   false,
                   tx,
                 )),
@@ -370,6 +460,7 @@ export class OrderDisputeService {
     resolution: string,
     action: "RESTORE" | "REFUND" | "REJECT",
     responsibility?: CancellationResponsibility,
+    publisherCompensation?: PublisherCompensationDecisionDto,
   ) {
     if (
       action === "REFUND" &&
@@ -435,11 +526,19 @@ export class OrderDisputeService {
             userId,
             `dispute-refund:${disputeId}`,
             responsibility as FinalRefundResponsibility,
+            {
+              ...publisherCompensation,
+              effectiveOrderStatus: dispute.previousStatus ?? order.status,
+            },
           )
           refundTransactionId = refunded.refundTransactionId
         } else {
-          await this.transitionOrder(tx, order.id, order.version, {
-            status: restoreStatus as any,
+          await transitionOrderCas({
+            db: tx,
+            orderId: order.id,
+            expectedVersion: order.version,
+            fromStatus: order.status,
+            toStatus: restoreStatus,
           })
         }
 

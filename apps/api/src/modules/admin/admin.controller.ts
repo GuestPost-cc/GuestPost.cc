@@ -570,6 +570,7 @@ export class AdminController {
       body.resolution,
       body.action,
       body.responsibility,
+      body.publisherCompensation,
     )
   }
 
@@ -768,6 +769,14 @@ export class AdminController {
       s,
       statuses as SettlementStatus[],
     )
+  }
+
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Get("settlements/:id/eligibility")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
+  getSettlementEligibility(@Param("id") id: string) {
+    return this.settlements.getSettlementEligibility(id)
   }
 
   @StaffRoles("SUPER_ADMIN", "FINANCE")

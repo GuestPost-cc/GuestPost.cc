@@ -101,7 +101,7 @@ describe("evaluateSettlementEligibility", () => {
 
   it("eligible: delivered + verified active + no dispute/revision/fraud", () => {
     const r = evaluateSettlementEligibility(snapshotFor())
-    expect(r).toEqual({ eligible: true, reasons: [] })
+    expect(r).toEqual({ eligible: true, reasons: [], blockers: [] })
   })
   it("blocks when order not DELIVERED", () => {
     const r = evaluateSettlementEligibility(

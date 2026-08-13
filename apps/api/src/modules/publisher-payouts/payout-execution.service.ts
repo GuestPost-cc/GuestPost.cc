@@ -25,7 +25,11 @@ import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-m
 import { PrismaService } from "../../common/prisma.service"
 import { lockPublisherBalanceForUpdate } from "../../common/publisher-balance-lock"
 import { AuditService } from "../audit/audit.service"
-import { PayoutEncryptionService } from "./payout-encryption.service"
+import {
+  PayoutEncryptionService,
+  payoutMethodEncryptionContext,
+  payoutProviderEncryptionContext,
+} from "./payout-encryption.service"
 import { currentPayoutMethodRuntime } from "./payout-method-runtime"
 import { PayoutProviderService } from "./payout-provider.service"
 import { decodePayoutProviderConfig } from "./payout-provider-config"
@@ -924,6 +928,7 @@ export class PayoutExecutionService {
         recipientDetails = this.encryption.decrypt(
           payoutMethod.details,
           payoutMethod.encryptionKeyVersion,
+          payoutMethodEncryptionContext(payoutMethod),
         )
       }
       if (
@@ -937,7 +942,12 @@ export class PayoutExecutionService {
       const providerConfig = decodePayoutProviderConfig(
         fresh.provider.config,
         fresh.provider.configEncryptionKeyVersion,
-        (ciphertext, version) => this.encryption.decrypt(ciphertext, version),
+        (ciphertext, version) =>
+          this.encryption.decrypt(
+            ciphertext,
+            version,
+            payoutProviderEncryptionContext(fresh.provider),
+          ),
       )
 
       const claimedVersion = fresh.version + 1
@@ -1433,6 +1443,7 @@ export class PayoutExecutionService {
         recipientDetails = this.encryption.decrypt(
           currentPayoutMethod.details,
           currentPayoutMethod.encryptionKeyVersion,
+          payoutMethodEncryptionContext(currentPayoutMethod),
         )
       }
       const recipientFingerprint = sha256(recipientDetails)

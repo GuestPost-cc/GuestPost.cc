@@ -235,7 +235,7 @@ export class OrderFulfillmentAssignmentService {
     }
     if (view === "history") {
       return {
-        status: { in: ["SETTLED", "COMPLETED"] },
+        status: "COMPLETED",
         fulfillmentAssignments: {
           some: {
             status: "DELIVERED",
@@ -278,7 +278,7 @@ export class OrderFulfillmentAssignmentService {
     const delivered = [...assignmentByOrder.values()].filter(
       (assignment) =>
         assignment.status === "DELIVERED" &&
-        ["DELIVERED", "SETTLED", "COMPLETED"].includes(assignment.order.status),
+        ["DELIVERED", "COMPLETED"].includes(assignment.order.status),
     )
     const salesByCurrency: Record<string, number> = {}
     if (!isOperations) {

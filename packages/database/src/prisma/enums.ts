@@ -220,7 +220,6 @@ export const OrderStatus = {
   PUBLISHED: 'PUBLISHED',
   VERIFIED: 'VERIFIED',
   DELIVERED: 'DELIVERED',
-  SETTLED: 'SETTLED',
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
   REFUNDED: 'REFUNDED',
@@ -273,6 +272,14 @@ export const CancellationResponsibility = {
 } as const
 
 export type CancellationResponsibility = (typeof CancellationResponsibility)[keyof typeof CancellationResponsibility]
+
+
+export const PublisherCompensationDisposition = {
+  NONE: 'NONE',
+  EXACT_AMOUNT: 'EXACT_AMOUNT'
+} as const
+
+export type PublisherCompensationDisposition = (typeof PublisherCompensationDisposition)[keyof typeof PublisherCompensationDisposition]
 
 
 export const CancellationReasonCode = {
@@ -358,6 +365,26 @@ export const PaymentProviderEventStatus = {
 export type PaymentProviderEventStatus = (typeof PaymentProviderEventStatus)[keyof typeof PaymentProviderEventStatus]
 
 
+export const DepositCreditRecoveryStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  FAILED: 'FAILED',
+  PROCESSED: 'PROCESSED',
+  CLOSED_UNPAID: 'CLOSED_UNPAID',
+  SUPERSEDED: 'SUPERSEDED',
+  QUARANTINED: 'QUARANTINED'
+} as const
+
+export type DepositCreditRecoveryStatus = (typeof DepositCreditRecoveryStatus)[keyof typeof DepositCreditRecoveryStatus]
+
+
+export const DepositCreditEvidenceSource = {
+  AUTHENTICATED_PROVIDER_RETRIEVAL: 'AUTHENTICATED_PROVIDER_RETRIEVAL'
+} as const
+
+export type DepositCreditEvidenceSource = (typeof DepositCreditEvidenceSource)[keyof typeof DepositCreditEvidenceSource]
+
+
 export const PaymentDisputeStatus = {
   OPEN: 'OPEN',
   WON: 'WON',
@@ -401,7 +428,10 @@ export const OrderEventType = {
   ORDER_CANCELLED: 'ORDER_CANCELLED',
   REFUND_ISSUED: 'REFUND_ISSUED',
   SETTLEMENT_CREATED: 'SETTLEMENT_CREATED',
-  SETTLED: 'SETTLED',
+  PLATFORM_REVENUE_RECOGNIZED: 'PLATFORM_REVENUE_RECOGNIZED',
+  SETTLEMENT_CUSTOMER_APPROVED: 'SETTLEMENT_CUSTOMER_APPROVED',
+  SETTLEMENT_RETURNED_TO_REVIEW: 'SETTLEMENT_RETURNED_TO_REVIEW',
+  SETTLEMENT_RELEASED: 'SETTLEMENT_RELEASED',
   REFUNDED: 'REFUNDED',
   VERIFICATION_ESCALATED: 'VERIFICATION_ESCALATED',
   AUTO_ACCEPTED: 'AUTO_ACCEPTED',
@@ -409,7 +439,8 @@ export const OrderEventType = {
   CANCELLATION_REQUESTED: 'CANCELLATION_REQUESTED',
   CANCELLATION_RESPONDED: 'CANCELLATION_RESPONDED',
   CANCELLATION_RESOLVED: 'CANCELLATION_RESOLVED',
-  ORDER_DECLINED: 'ORDER_DECLINED'
+  ORDER_DECLINED: 'ORDER_DECLINED',
+  PUBLISHER_COMPENSATION_RECORDED: 'PUBLISHER_COMPENSATION_RECORDED'
 } as const
 
 export type OrderEventType = (typeof OrderEventType)[keyof typeof OrderEventType]
@@ -819,8 +850,10 @@ export const TransactionType = {
   WITHDRAWAL_REVERSAL: 'WITHDRAWAL_REVERSAL',
   SETTLEMENT_RELEASE: 'SETTLEMENT_RELEASE',
   SETTLEMENT_CLAWBACK: 'SETTLEMENT_CLAWBACK',
+  PUBLISHER_COMPENSATION: 'PUBLISHER_COMPENSATION',
   DEBT_REPAYMENT: 'DEBT_REPAYMENT',
   RESERVATION: 'RESERVATION',
+  RELEASE: 'RELEASE',
   CHARGEBACK: 'CHARGEBACK'
 } as const
 

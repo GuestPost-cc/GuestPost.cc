@@ -93,6 +93,56 @@ describe("CsrfMiddleware", () => {
     ).toThrow(ForbiddenException)
   })
 
+  it.each([
+    undefined,
+    "null",
+    "not-an-origin",
+  ])("rejects a cookie mutation when Origin/Referer is %s", (origin) => {
+    expect(() =>
+      middleware.use(
+        request({
+          headers: {
+            cookie: "__Secure-guestpost.session_token=signed",
+            ...(origin === undefined ? {} : { origin }),
+            "x-csrf-protection": "1",
+          },
+        }),
+        response,
+        next,
+      ),
+    ).toThrow(ForbiddenException)
+  })
+
+  it("accepts a trusted Referer fallback for compatible clients", () => {
+    middleware.use(
+      request({
+        headers: {
+          cookie: "__Secure-guestpost.session_token=signed",
+          referer: "https://app.example.com/orders/123",
+          "x-csrf-protection": "1",
+        },
+      }),
+      response,
+      next,
+    )
+    expect(next).toHaveBeenCalledTimes(1)
+  })
+
+  it("allows missing Fetch Metadata only when the primary defenses pass", () => {
+    middleware.use(
+      request({
+        headers: {
+          cookie: "__Secure-guestpost.session_token=signed",
+          origin: "https://app.example.com",
+          "x-csrf-protection": "1",
+        },
+      }),
+      response,
+      next,
+    )
+    expect(next).toHaveBeenCalledTimes(1)
+  })
+
   it("does not treat a bearer header as a CSRF bypass", () => {
     expect(() =>
       middleware.use(

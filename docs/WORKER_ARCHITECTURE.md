@@ -265,16 +265,22 @@ Lane-specific:
 - Scheduled dispatcher: the union of credentials needed by enabled maintenance
   tasks; the combined `maintenance-dispatch` catalog runs communication-outbox
   recovery, so it uses the same reviewed capture/live SMTP and allowlist policy
-  as realtime. A dedicated non-email scheduled task may use `disabled`. Never
-  include payout method decryption keys.
+  as realtime. It also runs `deposit-credit-recovery` every five minutes and
+  therefore requires the distinct read-only `STRIPE_DEPOSIT_RECOVERY_KEY`.
+  A dedicated non-email scheduled task may use `disabled`. Never include payout
+  method decryption keys.
 - API: `WORKER_ON_DEMAND_TRIGGER_URL` and
   `WORKER_ON_DEMAND_TRIGGER_TOKEN` for immediate burst processing
 
 The integration worker package is loaded lazily only in `on-demand` and legacy
 `all` modes. This is a security boundary, not just a startup optimization:
 `realtime` and `scheduled` must boot without `INTEGRATION_ENCRYPTION_KEY` or
-Google OAuth credentials. CI has a lane-boundary contract test to prevent a
-future eager import from silently broadening those workloads' secret access.
+Google OAuth credentials. The side-effect-free runtime plan is the canonical
+lane manifest: behavioral bootstrap tests assert each mode's exact factories
+and capabilities, partial-construction cleanup, scheduled completion, and
+TERM handling. CI retains one narrow static check that forbids an eager
+integration-worker import from silently broadening those workloads' secret
+access.
 
 Do not reuse database, Redis, queue-signing, webhook, encryption, or Northflank
 trigger credentials. Put each in Northflank secret storage and rotate them

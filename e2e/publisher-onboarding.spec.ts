@@ -7,31 +7,38 @@
  * conversion step is no longer part of the signup flow.
  */
 import { expect, test } from "@playwright/test"
+import { fixtureEmail } from "./support/fixture-identity"
 
-const PUBLISHER = process.env.E2E_PUBLISHER_URL ?? "http://localhost:3002"
-
-test("publisher can sign up and land in the publisher dashboard as a converted account", async ({
+test("publisher signup provisions an account and opens the publisher workspace", async ({
   page,
-}) => {
-  const email = `e2e-pub-${Date.now()}@test.local`
+}, testInfo) => {
+  const email = fixtureEmail(testInfo, "publisher")
 
-  await page.goto(PUBLISHER)
-  await page.getByRole("button", { name: "Sign up" }).click()
-  await page.getByPlaceholder("Full name").fill("E2E Publisher")
-  await page.getByPlaceholder("Email").fill(email)
-  await page.getByPlaceholder("Password").fill("E2EPublisher123!")
-  await page.getByRole("button", { name: "Create Account" }).click()
+  await page.goto("/signup")
+  await page.getByRole("checkbox", { name: /Terms of Service/ }).check()
+  await page.getByLabel("Full name").fill("E2E Publisher")
+  await page.getByLabel("Email address").fill(email)
+  await page.getByLabel("Password").fill("E2EPublisher123!")
+  await page.getByRole("button", { name: "Create publisher account" }).click()
 
-  // Conversion happened during signup — the publisher shell renders
-  await expect(page.getByRole("link", { name: "Listings" })).toBeVisible({
+  // Birth-time provisioning happened during signup — the publisher shell renders.
+  const navigation = page.getByRole("navigation", {
+    name: "Publisher navigation",
+  })
+  await expect(navigation.getByRole("link", { name: "Listings" })).toBeVisible({
     timeout: 20_000,
   })
-  await expect(page.getByRole("link", { name: "Withdrawals" })).toBeVisible()
+  await expect(
+    navigation.getByRole("link", { name: "Withdrawals" }),
+  ).toBeVisible()
 
-  // Listings page loads with its empty state (a publisher entity exists —
-  // otherwise this API call would 403/500)
-  await page.goto(`${PUBLISHER}/dashboard/listings`)
-  await expect(page.getByText(/no listings yet/i)).toBeVisible({
+  // Listings loads its true empty state. A missing publisher projection would
+  // instead make this request fail authorization.
+  await page.goto("/dashboard/listings")
+  await expect(
+    page.getByRole("heading", { name: "No listings match" }),
+  ).toBeVisible({
     timeout: 15_000,
   })
+  await expect(page.getByRole("link", { name: "Enlist website" })).toBeVisible()
 })

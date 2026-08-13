@@ -1,5 +1,6 @@
 "use client"
 
+import { resolveApiOrigin } from "@guestpost/api-client"
 import {
   signIn as signInTransport,
   signOut as signOutTransport,
@@ -58,16 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const getBaseUrl = useCallback(() => {
-    const envUrl = process.env.NEXT_PUBLIC_API_URL
-    if (envUrl) return envUrl
-    if (typeof window !== "undefined") {
-      const host = window.location.hostname
-      if (host !== "localhost" && host !== "127.0.0.1")
-        return `http://${host}:4000`
-    }
-    return "http://localhost:4000"
-  }, [])
+  const getBaseUrl = useCallback(
+    () =>
+      resolveApiOrigin({
+        configuredUrl: process.env.NEXT_PUBLIC_API_URL,
+        nodeEnv: process.env.NODE_ENV,
+      }),
+    [],
+  )
 
   const refresh = useCallback(async () => {
     try {

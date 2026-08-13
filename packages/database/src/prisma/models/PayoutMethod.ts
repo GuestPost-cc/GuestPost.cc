@@ -379,12 +379,12 @@ export type PayoutMethodScalarWhereWithAggregatesInput = {
 }
 
 export type PayoutMethodCreateInput = {
-  id?: string
+  id: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number
@@ -397,13 +397,13 @@ export type PayoutMethodCreateInput = {
 }
 
 export type PayoutMethodUncheckedCreateInput = {
-  id?: string
+  id: string
   publisherId: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number
@@ -451,13 +451,13 @@ export type PayoutMethodUncheckedUpdateInput = {
 }
 
 export type PayoutMethodCreateManyInput = {
-  id?: string
+  id: string
   publisherId: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number
@@ -664,12 +664,12 @@ export type PayoutMethodUncheckedUpdateOneWithoutProviderAccountNestedInput = {
 }
 
 export type PayoutMethodCreateWithoutPublisherInput = {
-  id?: string
+  id: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number
@@ -681,12 +681,12 @@ export type PayoutMethodCreateWithoutPublisherInput = {
 }
 
 export type PayoutMethodUncheckedCreateWithoutPublisherInput = {
-  id?: string
+  id: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number
@@ -744,12 +744,12 @@ export type PayoutMethodScalarWhereInput = {
 }
 
 export type PayoutMethodCreateWithoutWithdrawalsInput = {
-  id?: string
+  id: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number
@@ -761,13 +761,13 @@ export type PayoutMethodCreateWithoutWithdrawalsInput = {
 }
 
 export type PayoutMethodUncheckedCreateWithoutWithdrawalsInput = {
-  id?: string
+  id: string
   publisherId: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number
@@ -828,12 +828,12 @@ export type PayoutMethodUncheckedUpdateWithoutWithdrawalsInput = {
 }
 
 export type PayoutMethodCreateWithoutProviderAccountInput = {
-  id?: string
+  id: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number
@@ -845,13 +845,13 @@ export type PayoutMethodCreateWithoutProviderAccountInput = {
 }
 
 export type PayoutMethodUncheckedCreateWithoutProviderAccountInput = {
-  id?: string
+  id: string
   publisherId: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number
@@ -912,12 +912,12 @@ export type PayoutMethodUncheckedUpdateWithoutProviderAccountInput = {
 }
 
 export type PayoutMethodCreateManyPublisherInput = {
-  id?: string
+  id: string
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
   displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  encryptionKeyVersion?: number
+  encryptionKeyVersion: number
   isDefault?: boolean
   isActive?: boolean
   nonterminalWithdrawalCount?: number

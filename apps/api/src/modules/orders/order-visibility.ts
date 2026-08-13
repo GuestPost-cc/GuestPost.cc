@@ -23,7 +23,9 @@ const PUBLIC_EVENT_TYPES = new Set([
   "ORDER_CANCELLED",
   "REFUND_ISSUED",
   "SETTLEMENT_CREATED",
-  "SETTLED",
+  "SETTLEMENT_CUSTOMER_APPROVED",
+  "SETTLEMENT_RETURNED_TO_REVIEW",
+  "SETTLEMENT_RELEASED",
   "REFUNDED",
   "VERIFICATION_ESCALATED",
   "AUTO_ACCEPTED",
@@ -53,10 +55,20 @@ const FINANCIAL_EVENT_MESSAGES: Record<
     PUBLISHER: "Publisher settlement created",
     OPERATIONS: "Order settlement created",
   },
-  SETTLED: {
-    CUSTOMER: "Order settlement completed",
-    PUBLISHER: "Publisher settlement completed",
-    OPERATIONS: "Order settlement completed",
+  SETTLEMENT_CUSTOMER_APPROVED: {
+    CUSTOMER: "Order settlement customer-approved",
+    PUBLISHER: "Publisher settlement customer-approved",
+    OPERATIONS: "Order settlement customer-approved",
+  },
+  SETTLEMENT_RETURNED_TO_REVIEW: {
+    CUSTOMER: "Order settlement returned to review",
+    PUBLISHER: "Publisher settlement returned to review",
+    OPERATIONS: "Order settlement returned to review",
+  },
+  SETTLEMENT_RELEASED: {
+    CUSTOMER: "Order settlement funds released",
+    PUBLISHER: "Publisher settlement funds released",
+    OPERATIONS: "Order settlement funds released",
   },
   REFUND_ISSUED: {
     CUSTOMER: "Order refund processed",

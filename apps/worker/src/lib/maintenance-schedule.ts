@@ -10,6 +10,7 @@ export const MAINTENANCE_TASK_NAMES = [
   "communication-outbox",
   "payout-reconcile",
   "payment-dispute-inbox",
+  "deposit-credit-recovery",
   "delivery-verification-dispatch",
   "settlement-auto-approve",
   "settlement-auto-release",
@@ -32,6 +33,7 @@ const MAINTENANCE_FINANCE_OPERATION: Record<
   "communication-outbox": "read",
   "payout-reconcile": "recovery",
   "payment-dispute-inbox": "recovery",
+  "deposit-credit-recovery": "recovery",
   "delivery-verification-dispatch": "new_liability",
   "settlement-auto-approve": "operator_decision",
   "settlement-auto-release": "new_liability",
@@ -78,6 +80,9 @@ export function maintenanceTasksDueAt(now: Date): MaintenanceTaskName[] {
   // A failed opening event leaves disputed funds spendable until its hold is
   // applied. Drain every dispatcher slot (five minutes).
   tasks.push("payment-dispute-inbox")
+  // Authenticated retrieval closes the gap where a paid Checkout webhook was
+  // never durably acknowledged by the API.
+  tasks.push("deposit-credit-recovery")
   // Recover delivery rows committed while Redis was unavailable. The sweep
   // itself is bounded and deterministic, so every dispatcher slot is safe.
   tasks.push("delivery-verification-dispatch")

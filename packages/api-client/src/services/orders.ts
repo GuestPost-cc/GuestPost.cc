@@ -279,6 +279,11 @@ export interface CancellationMutationData {
   idempotencyKey?: string
 }
 
+export interface PublisherCompensationDecisionInput {
+  amount: number
+  reason: string
+}
+
 export type CancellationRequestStatus =
   | "REQUESTED"
   | "UNDER_REVIEW"

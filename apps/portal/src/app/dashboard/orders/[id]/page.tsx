@@ -106,7 +106,6 @@ const statusConfig: Record<
   PUBLISHED: { icon: Check, description: "Content published" },
   VERIFIED: { icon: ShieldCheck, description: "Content verified" },
   DELIVERED: { icon: CheckCircle, description: "Order delivered" },
-  SETTLED: { icon: CheckCircle, description: "Settlement processed" },
   COMPLETED: { icon: CheckCircle, description: "Order completed" },
   CANCELLED: { icon: XCircle, description: "Order cancelled" },
   REFUNDED: { icon: RefreshCw, description: "Refund issued" },
@@ -432,14 +431,9 @@ export default function OrderDetailPage({
     queryFn: () => api.orders.deliveryProof(resolvedParams.id),
     enabled:
       !!order &&
-      [
-        "PUBLISHED",
-        "VERIFIED",
-        "DELIVERED",
-        "SETTLED",
-        "COMPLETED",
-        "DISPUTED",
-      ].includes(order.status),
+      ["PUBLISHED", "VERIFIED", "DELIVERED", "COMPLETED", "DISPUTED"].includes(
+        order.status,
+      ),
   })
 
   // Phase 7.9 #29 — lifted from OrderSupportPanel (now deleted). Shared
@@ -457,7 +451,7 @@ export default function OrderDetailPage({
   })
 
   const reviewable =
-    !!order && ["DELIVERED", "SETTLED", "COMPLETED"].includes(order.status)
+    !!order && ["DELIVERED", "COMPLETED"].includes(order.status)
   const { data: existingReview } = useQuery<any>({
     queryKey: ["order-review", resolvedParams.id],
     queryFn: () => api.orders.getReview(resolvedParams.id),

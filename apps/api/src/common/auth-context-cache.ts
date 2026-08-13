@@ -4,8 +4,9 @@
 //
 // Projection freshness: any mutation that changes what the guard would resolve
 // (context switch, membership/role change, ban) must call invalidate(userId).
-// Security-sensitive MemberRolesGuard/StaffRolesGuard authorization is always
-// re-read from PostgreSQL; this cache is never the authority for those grants.
+// CurrentAuthorityGuard resolves user type, active tenant, memberships, roles
+// and permissions from PostgreSQL on every protected request. This cache is a
+// presentation projection only and is never authorization authority.
 //
 // Cross-pod invalidation (M-1): when invalidateAuthContext is called, it
 // publishes a message to Redis. Every pod's subscriber receives it and evicts

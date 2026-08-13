@@ -80,11 +80,17 @@ Every newly accepted Stripe `PaymentProviderEvent` has immutable non-null
 `livemode`; historical rows without that fact cannot authorize a new money
 transition. Shared key classification supports both `sk_test_`/`sk_live_` and
 least-privilege `rk_test_`/`rk_live_`. Credential and event modes must match.
-Checkout-success recovery currently requires fresh signed Stripe redelivery;
-the normalized inbox alone cannot authorize a credit. In locked finance mode,
-the API persists the inbox row as `PENDING` but returns 503 so Stripe keeps
-redelivering; it acknowledges only after a recovery-capable mode can consume
-the fresh signed body.
+Checkout-success recovery does not trust the normalized webhook inbox alone.
+A five-minute worker independently retrieves the fixed Checkout Session,
+PaymentIntent, and Charge with `STRIPE_DEPOSIT_RECOVERY_KEY`, persists bounded
+append-only `DepositCreditEvidence`, and enters the same serializable finalizer
+as signed webhooks. Retrieval is explicitly not a webhook/signature. Exact
+attempt, wallet, amount, currency, mode, provider IDs, and session/PaymentIntent
+metadata are mandatory; contradictions quarantine and webhook/poll races
+converge on one wallet increment and one ledger row. Customer status GET is
+read-only. Retrieval also rejects disputed or partially refunded Charges, and
+exact paid authority may recover the pre-credit `EXPIRED` state so late
+provider settlement cannot strand customer funds.
 
 ## Payment disputes
 

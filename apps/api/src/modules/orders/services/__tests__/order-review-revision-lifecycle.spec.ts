@@ -105,7 +105,6 @@ describe("OrderReviewService revision lifecycle", () => {
 
   it.each([
     "DELIVERED",
-    "SETTLED",
     "COMPLETED",
     "CANCELLED",
     "REFUNDED",

@@ -422,7 +422,8 @@ export async function runSettlementAutoRelease(
           await tx.orderEvent.create({
             data: {
               orderId: settlement.orderId,
-              eventType: "SETTLED",
+              settlementId: settlement.id,
+              eventType: "SETTLEMENT_RELEASED",
               actorId: null,
               message: `Settlement auto-released — ${publisherAmountText} added to publisher balance`,
               metadata: {

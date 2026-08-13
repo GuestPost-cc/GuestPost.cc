@@ -11,9 +11,11 @@ import {
   WebsiteVerificationStatus,
 } from "@guestpost/database"
 import {
+  evaluateSettlementReleaseEvidence,
   getOrderLifecycleStage,
   getOrderLifecycleStageIndex,
   isOrderLifecycleException,
+  isPostPublicationPublisherOrder,
   platformFeePercentToBasisPoints,
   QUEUES,
   runSerializableTransactionWithRetry,
@@ -179,7 +181,6 @@ function buildOrderIntegrityReport(
     "PUBLISHED",
     "VERIFIED",
     "DELIVERED",
-    "SETTLED",
     "COMPLETED",
   ].includes(order.status)
   checks.push(
@@ -216,13 +217,21 @@ function buildOrderIntegrityReport(
             },
   )
 
-  const financiallyFinal = ["DELIVERED", "SETTLED", "COMPLETED"].includes(
-    order.status,
-  )
+  const financiallyFinal = ["DELIVERED", "COMPLETED"].includes(order.status)
   const activeSettlements = (order.settlements ?? []).filter(
     (settlement: any) => settlement.status !== "CANCELLED",
   )
   const latestSettlement = activeSettlements[0]
+  const completedPublisherRelease =
+    !platformChannel &&
+    order.status === "COMPLETED" &&
+    activeSettlements.length === 1
+      ? evaluateSettlementReleaseEvidence({
+          settlement: latestSettlement,
+          transactions: latestSettlement.transactions ?? [],
+          events: order.events ?? [],
+        })
+      : null
   const platformGross = financialUnits(order.platformRevenue?.amount)
   const platformSplit =
     financialUnits(order.platformRevenue?.platformFee) != null &&
@@ -293,21 +302,86 @@ function buildOrderIntegrityReport(
               message:
                 "The publisher route has multiple active settlement records.",
             }
-          : latestSettlement
+          : latestSettlement &&
+              (order.status !== "COMPLETED" ||
+                completedPublisherRelease?.stateValid)
             ? {
                 key: "FINANCIAL_RECORD",
                 label: "Financial record",
                 status: "PASS",
                 message:
-                  "A publisher settlement record is linked to this order.",
+                  order.status === "COMPLETED"
+                    ? "The publisher settlement is released with a release timestamp."
+                    : "A publisher settlement record is linked to this delivered order.",
               }
             : {
                 key: "FINANCIAL_RECORD",
                 label: "Financial record",
                 status: "FAIL",
                 message:
-                  "The final publisher route is missing its settlement record.",
+                  order.status === "COMPLETED" && latestSettlement
+                    ? "The completed publisher order does not have a released settlement with a release timestamp."
+                    : "The final publisher route is missing its settlement record.",
               },
+  )
+
+  const releaseCheckNotApplicable =
+    platformChannel || order.status !== "COMPLETED"
+  checks.push(
+    releaseCheckNotApplicable
+      ? {
+          key: "SETTLEMENT_RELEASE_LEDGER",
+          label: "Settlement release ledger",
+          status: "NOT_APPLICABLE",
+          message:
+            "Exact publisher release-ledger evidence is required only for completed publisher orders.",
+        }
+      : completedPublisherRelease?.ledgerValid
+        ? {
+            key: "SETTLEMENT_RELEASE_LEDGER",
+            label: "Settlement release ledger",
+            status: "PASS",
+            message:
+              "Exactly one release ledger row matches the settlement identity and amount.",
+          }
+        : {
+            key: "SETTLEMENT_RELEASE_LEDGER",
+            label: "Settlement release ledger",
+            status: "FAIL",
+            message:
+              completedPublisherRelease?.issues.find((issue) =>
+                issue.code.startsWith("SETTLEMENT_RELEASE_LEDGER_"),
+              )?.message ??
+              "The completed publisher order lacks one exact release ledger row.",
+          },
+  )
+  checks.push(
+    releaseCheckNotApplicable
+      ? {
+          key: "SETTLEMENT_RELEASE_EVENT",
+          label: "Settlement release event",
+          status: "NOT_APPLICABLE",
+          message:
+            "Exact publisher release-event evidence is required only for completed publisher orders.",
+        }
+      : completedPublisherRelease?.eventValid
+        ? {
+            key: "SETTLEMENT_RELEASE_EVENT",
+            label: "Settlement release event",
+            status: "PASS",
+            message:
+              "Exactly one release event is bound to the settlement and order.",
+          }
+        : {
+            key: "SETTLEMENT_RELEASE_EVENT",
+            label: "Settlement release event",
+            status: "FAIL",
+            message:
+              completedPublisherRelease?.issues.find((issue) =>
+                issue.code.startsWith("SETTLEMENT_RELEASE_EVENT_"),
+              )?.message ??
+              "The completed publisher order lacks one exact release event.",
+          },
   )
 
   const latestEvent = order.events?.[0]
@@ -320,8 +394,7 @@ function buildOrderIntegrityReport(
     PUBLISHED: "PUBLICATION_MARKED",
     VERIFIED: "VERIFIED_AUTO",
     DELIVERED: "DELIVERY_CONFIRMED",
-    SETTLED: "SETTLED",
-    COMPLETED: "SETTLED",
+    COMPLETED: platformChannel ? "AUTO_ACCEPTED" : "SETTLEMENT_RELEASED",
     CANCELLED: "ORDER_CANCELLED",
     REFUNDED: "REFUNDED",
     DISPUTED: "DISPUTE_OPENED",
@@ -331,7 +404,7 @@ function buildOrderIntegrityReport(
     order.status === "COMPLETED"
       ? platformChannel
         ? ["DELIVERY_CONFIRMED", "AUTO_ACCEPTED"]
-        : ["SETTLED", "AUTO_ACCEPTED"]
+        : ["SETTLEMENT_RELEASED"]
       : order.status === "VERIFIED"
         ? ["VERIFIED_AUTO", "VERIFIED_MANUAL"]
         : order.status === "REFUNDED"
@@ -795,9 +868,7 @@ export class AdminService {
       const delivered = uniqueAssignments.filter(
         (assignment) =>
           assignment.status === "DELIVERED" &&
-          ["DELIVERED", "SETTLED", "COMPLETED"].includes(
-            assignment.order.status,
-          ),
+          ["DELIVERED", "COMPLETED"].includes(assignment.order.status),
       )
       const salesByCurrency: Record<string, number> = {}
       for (const assignment of delivered) {
@@ -1489,7 +1560,7 @@ export class AdminService {
       {
         fulfillmentDueAt: { lt: new Date() },
         status: {
-          notIn: ["SETTLED", "COMPLETED", "CANCELLED", "REFUNDED"],
+          notIn: ["COMPLETED", "CANCELLED", "REFUNDED"],
         },
       },
     ]
@@ -1533,13 +1604,13 @@ export class AdminService {
     if (focus === "active") {
       return {
         status: {
-          notIn: ["SETTLED", "COMPLETED", "CANCELLED", "REFUNDED"],
+          notIn: ["COMPLETED", "CANCELLED", "REFUNDED"],
         },
       }
     }
     if (focus === "completed") {
       return {
-        status: { in: ["SETTLED", "COMPLETED", "CANCELLED", "REFUNDED"] },
+        status: { in: ["COMPLETED", "CANCELLED", "REFUNDED"] },
       }
     }
     return null
@@ -1823,9 +1894,24 @@ export class AdminService {
           },
         },
         settlements: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           include: {
             approvals: true,
             publisher: { select: { id: true, name: true, tier: true } },
+            transactions: {
+              where: { type: "SETTLEMENT_RELEASE" },
+              select: {
+                type: true,
+                settlementId: true,
+                orderId: true,
+                publisherId: true,
+                amount: true,
+                currency: true,
+                walletId: true,
+                provider: true,
+                providerRef: true,
+              },
+            },
           },
         },
         dispute: true,
@@ -1928,6 +2014,19 @@ export class AdminService {
       activeAssignment,
       platformChannel,
     )
+    const activeSettlement = (order.settlements ?? []).find(
+      (settlement) => settlement.status !== "CANCELLED",
+    )
+    const effectiveRefundStatus =
+      order.status === "DISPUTED"
+        ? (order.dispute?.previousStatus ?? order.status)
+        : order.status
+    const publisherCompensationRequired = isPostPublicationPublisherOrder({
+      fulfillmentChannel: order.fulfillmentChannel,
+      websiteOwnershipType: order.website?.ownershipType,
+      effectiveOrderStatus: effectiveRefundStatus,
+      hasSettlement: Boolean(activeSettlement),
+    })
 
     return {
       id: order.id,
@@ -1950,6 +2049,16 @@ export class AdminService {
       deliveryAcceptedMethod: order.deliveryAcceptedMethod,
       lifecycle: integrity.lifecycle,
       integrity: { state: integrity.state, checks: integrity.checks },
+      ...(canViewFinancials && {
+        publisherCompensationPolicy: {
+          required: publisherCompensationRequired,
+          maximumAmount: publisherCompensationRequired
+            ? (activeSettlement?.publisherAmount ?? order.amount ?? 0)
+            : 0,
+          currency: activeSettlement?.currency ?? order.currency,
+          effectiveOrderStatus: effectiveRefundStatus,
+        },
+      }),
       organization: order.organization
         ? {
             id: order.organization.id,
@@ -2032,7 +2141,10 @@ export class AdminService {
             "PAYMENT_SUBMITTED",
             "PAYMENT_CAPTURED",
             "SETTLEMENT_CREATED",
-            "SETTLED",
+            "PLATFORM_REVENUE_RECOGNIZED",
+            "SETTLEMENT_CUSTOMER_APPROVED",
+            "SETTLEMENT_RETURNED_TO_REVIEW",
+            "SETTLEMENT_RELEASED",
             "REFUND_ISSUED",
             "REFUNDED",
           ].includes(event.eventType)
@@ -2103,7 +2215,11 @@ export class AdminService {
           }))
         : [],
       dispute: order.dispute
-        ? { id: order.dispute.id, status: order.dispute.status }
+        ? {
+            id: order.dispute.id,
+            status: order.dispute.status,
+            previousStatus: order.dispute.previousStatus,
+          }
         : null,
       cancellation: order.cancellationRequests?.[0] ?? null,
       activeAssignment: activeAssignment

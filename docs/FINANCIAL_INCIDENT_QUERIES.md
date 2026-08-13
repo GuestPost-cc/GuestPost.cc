@@ -752,15 +752,49 @@ ORDER BY e."receivedAt";
 ```
 
 Every row requires action. Dispute rows may be recovered by the five-minute
-durable worker from immutable normalized facts. Checkout-success rows require
-a fresh signature-verified Stripe redelivery; the current system has no
-independent authenticated Checkout/PaymentIntent catch-up processor. Local
-inbox state alone cannot authorize a wallet credit. Do not manually change
-status to `PROCESSED` or synthesize a credit from a success redirect.
+durable worker from immutable normalized facts. Checkout-success inbox rows
+still cannot authorize a credit by themselves, but aged attached attempts are
+independently checked by `deposit-credit-recovery`, which persists typed
+authenticated Checkout/PaymentIntent/Charge evidence outside the webhook
+inbox. Do not manually change either aggregate to `PROCESSED` or synthesize a
+credit from a success redirect.
 `attempts` and `lockedAt` together are the current fencing token: after
 recovery, evidence from an older pair cannot authorize failure, quarantine, or
 completion. Preserve both values in incident notes and compare them again
 after every recovery attempt.
+
+Authenticated retrieval aggregates requiring action:
+
+```sql
+SELECT
+  r.id,
+  r."depositAttemptId",
+  r.status,
+  r.attempts,
+  r."availableAt",
+  r."lockedAt",
+  r."processedAt",
+  r."evidenceId",
+  r."lastError",
+  a.status AS attempt_status,
+  a."providerSessionId",
+  a."providerPaymentId",
+  a."providerChargeId",
+  a."ledgerTransactionId"
+FROM "DepositCreditRecovery" r
+JOIN "DepositAttempt" a ON a.id = r."depositAttemptId"
+WHERE r.status = 'QUARANTINED'
+   OR (r.status = 'PROCESSING'
+       AND r."lockedAt" < now() - interval '15 minutes')
+   OR (r.status = 'FAILED' AND r."availableAt" < now() - interval '30 minutes')
+ORDER BY r."createdAt";
+```
+
+For a selected evidence row, verify its `claimAttempt` and `claimLockedAt`
+equal the recovery claim that terminalized it, then compare every normalized
+Checkout/PaymentIntent/Charge fact to the provider console and the immutable
+attempt/ledger graph. Evidence rows are append-only. Do not update/delete them,
+copy them between recoveries, or retry by reusing an old claim fence.
 
 Processed deposit-success evidence must also match exactly:
 

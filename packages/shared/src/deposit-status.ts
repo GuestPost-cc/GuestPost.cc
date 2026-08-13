@@ -26,15 +26,16 @@ export function isWalletCreditBackedDepositStatus(
   )
 }
 
-// These are the only pre-credit states from which a signed, paid provider
-// event may create the wallet credit. EXPIRED is deliberately excluded: a
-// late payment for an expired attempt requires reviewed recovery instead of
-// silently reviving a terminal command.
+// These are the only pre-credit states from which exact authoritative paid
+// evidence may create the wallet credit. EXPIRED is included because provider
+// settlement can win a race with local session expiry or arrive later through
+// authenticated recovery; refusing that proof would strand paid funds.
 export const CREDITABLE_PRE_CREDIT_DEPOSIT_STATUSES = [
   "CREATED",
   "PENDING_CUSTOMER_ACTION",
   "PROCESSING",
   "FAILED",
+  "EXPIRED",
 ] as const
 
 export type CreditablePreCreditDepositStatus =

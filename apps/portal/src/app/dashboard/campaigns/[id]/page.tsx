@@ -120,7 +120,7 @@ export default function CampaignDetailPage({
 
   const activeOrders = campaignOrders.filter(
     (order: OrderResponse) =>
-      !["COMPLETED", "CANCELLED", "REFUNDED", "SETTLED"].includes(order.status),
+      !["COMPLETED", "CANCELLED", "REFUNDED"].includes(order.status),
   ).length
   const completedOrders = campaignOrders.filter(
     (order: OrderResponse) => order.status === "COMPLETED",

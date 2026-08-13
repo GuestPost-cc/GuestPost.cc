@@ -19,6 +19,7 @@ import {
   isWalletCreditBackedDepositStatus,
   WALLET_CREDIT_BACKED_DEPOSIT_STATUSES,
 } from "./deposit-status"
+import { evaluateSettlementReleaseEvidence } from "./settlement-release-evidence"
 
 type AnyPrisma = any
 
@@ -61,6 +62,9 @@ export enum ReconciliationCode {
   SETTLEMENT_DUPLICATE_RELEASE = "SETTLEMENT_DUPLICATE_RELEASE",
   SETTLEMENT_ORDER_COMPLETED_NONE = "SETTLEMENT_ORDER_COMPLETED_NONE",
   SETTLEMENT_ORDER_COMPLETED_MULTI = "SETTLEMENT_ORDER_COMPLETED_MULTI",
+  SETTLEMENT_ORDER_COMPLETED_NOT_RELEASED = "SETTLEMENT_ORDER_COMPLETED_NOT_RELEASED",
+  SETTLEMENT_ORDER_COMPLETED_RELEASE_LEDGER_INVALID = "SETTLEMENT_ORDER_COMPLETED_RELEASE_LEDGER_INVALID",
+  SETTLEMENT_ORDER_COMPLETED_RELEASE_EVENT_INVALID = "SETTLEMENT_ORDER_COMPLETED_RELEASE_EVENT_INVALID",
   SETTLEMENT_ORPHAN = "SETTLEMENT_ORPHAN",
   SETTLEMENT_MISSING_ORDER = "SETTLEMENT_MISSING_ORDER",
   SETTLEMENT_MISSING_PUBLISHER = "SETTLEMENT_MISSING_PUBLISHER",
@@ -70,11 +74,15 @@ export enum ReconciliationCode {
   PAYMENT_ORDER_PAID_NO_TX = "PAYMENT_ORDER_PAID_NO_TX",
   PAYMENT_DUPLICATE = "PAYMENT_DUPLICATE",
   PAYMENT_AMOUNT_MISMATCH = "PAYMENT_AMOUNT_MISMATCH",
+  PAYMENT_RESERVATION_RELEASE_MISSING = "PAYMENT_RESERVATION_RELEASE_MISSING",
+  PAYMENT_RESERVATION_RELEASE_INVALID = "PAYMENT_RESERVATION_RELEASE_INVALID",
   REFUND_NO_TRANSACTION = "REFUND_NO_TRANSACTION",
   REFUND_ORPHAN_TX = "REFUND_ORPHAN_TX",
   REFUND_DUPLICATE = "REFUND_DUPLICATE",
   REFUND_PARTIAL = "REFUND_PARTIAL",
   REFUND_SETTLEMENT_NOT_REVERSED = "REFUND_SETTLEMENT_NOT_REVERSED",
+  REFUND_PUBLISHER_COMPENSATION_MISSING = "REFUND_PUBLISHER_COMPENSATION_MISSING",
+  REFUND_PUBLISHER_COMPENSATION_INVALID = "REFUND_PUBLISHER_COMPENSATION_INVALID",
   ORDER_DELIVERED_NO_SETTLEMENT = "ORDER_DELIVERED_NO_SETTLEMENT",
   ORDER_PAID_NO_SETTLEMENT = "ORDER_PAID_NO_SETTLEMENT",
   ORDER_VERIFIED_NO_SETTLEMENT = "ORDER_VERIFIED_NO_SETTLEMENT",
@@ -157,6 +165,7 @@ export interface DriftRow {
     duplicateCount?: number
     transactionId?: string
     settlementId?: string
+    publisherCompensationId?: string
     orderId?: string
     publisherId?: string
     walletId?: string
@@ -1381,7 +1390,11 @@ async function checkWallets(
 
   const expectedByWallet = new Map<string, bigint>()
   for (const s of sums) {
-    if (s.type === "RESERVATION" || !s.walletId) continue
+    // RESERVATION and RELEASE are bucket transfers between available and
+    // reserved funds. They are append-only subledger evidence but do not alter
+    // the wallet's combined cash balance.
+    if (s.type === "RESERVATION" || s.type === "RELEASE" || !s.walletId)
+      continue
     const current = expectedByWallet.get(s.walletId) ?? 0n
     expectedByWallet.set(s.walletId, current + toScaled(s._sum.amount ?? 0))
   }
@@ -1421,6 +1434,7 @@ async function checkPublisherBalances(
 ): Promise<DriftRow[]> {
   const LEDGER_TYPES = [
     "SETTLEMENT_RELEASE",
+    "PUBLISHER_COMPENSATION",
     "DEBT_REPAYMENT",
     "SETTLEMENT_CLAWBACK",
     "WITHDRAWAL",
@@ -1654,12 +1668,14 @@ async function checkSettlementDrift(
       },
       _sum: { amount: true },
     })
-    const releasedByPublisher = new Map<string, bigint>(
-      releaseSettlements.map((s: any) => [
-        s.publisherId as string,
-        toScaled(s.publisherAmount),
-      ]),
-    )
+    const releasedByPublisher = new Map<string, bigint>()
+    for (const settlement of releaseSettlements) {
+      releasedByPublisher.set(
+        settlement.publisherId,
+        (releasedByPublisher.get(settlement.publisherId) ?? 0n) +
+          toScaled(settlement.publisherAmount),
+      )
+    }
     const creditedByPublisher = new Map<string, bigint>()
     for (const t of releaseTxSums) {
       if (t.publisherId) {
@@ -1697,11 +1713,12 @@ async function checkSettlementDrift(
 
   // ── 3c. Completeness ─────────────────────────────────────────────────────
 
-  // Completed publisher orders require exactly one active settlement.
+  // Completed publisher orders require exactly one active, released settlement
+  // plus its exact release ledger and relational release event.
   // Platform-handled orders intentionally have no publisher settlement and
   // instead require one unreversed PlatformRevenue record.
   const completedOrders = await prisma.order.findMany({
-    where: { status: { in: ["SETTLED", "COMPLETED"] } },
+    where: { status: "COMPLETED" },
     select: {
       id: true,
       status: true,
@@ -1710,7 +1727,37 @@ async function checkSettlementDrift(
       website: { select: { ownershipType: true } },
       settlements: {
         where: { status: { not: "CANCELLED" } },
-        select: { id: true },
+        select: {
+          id: true,
+          orderId: true,
+          publisherId: true,
+          publisherAmount: true,
+          currency: true,
+          status: true,
+          settledAt: true,
+          transactions: {
+            where: { type: "SETTLEMENT_RELEASE" },
+            select: {
+              type: true,
+              settlementId: true,
+              orderId: true,
+              publisherId: true,
+              amount: true,
+              currency: true,
+              walletId: true,
+              provider: true,
+              providerRef: true,
+            },
+          },
+          events: {
+            where: { eventType: "SETTLEMENT_RELEASED" },
+            select: {
+              eventType: true,
+              settlementId: true,
+              orderId: true,
+            },
+          },
+        },
       },
       platformRevenue: {
         select: {
@@ -1839,6 +1886,63 @@ async function checkSettlementDrift(
           action: { type: "order", id: o.id },
         }),
       )
+    } else {
+      const settlement = o.settlements[0]
+      const releaseEvidence = evaluateSettlementReleaseEvidence({
+        settlement,
+        transactions: settlement.transactions ?? [],
+        events: settlement.events ?? [],
+      })
+      if (!releaseEvidence.stateValid) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.SETTLEMENT,
+            group: SettlementIntegrityGroup.COMPLETENESS,
+            code: ReconciliationCode.SETTLEMENT_ORDER_COMPLETED_NOT_RELEASED,
+            entityId: o.id,
+            entityType: "Order",
+            message: `Completed publisher order ${o.id.slice(0, 8)} does not have a released settlement with a release timestamp`,
+            metadata: {
+              orderId: o.id,
+              settlementId: settlement.id,
+              expectedStatus: "RELEASED",
+              actualStatus: settlement.status,
+            },
+            action: { type: "order", id: o.id },
+          }),
+        )
+      }
+      if (!releaseEvidence.ledgerValid) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.SETTLEMENT,
+            group: SettlementIntegrityGroup.SYNC,
+            code: ReconciliationCode.SETTLEMENT_ORDER_COMPLETED_RELEASE_LEDGER_INVALID,
+            entityId: o.id,
+            entityType: "Order",
+            message: `Completed publisher order ${o.id.slice(0, 8)} lacks one exact settlement release ledger row`,
+            metadata: { orderId: o.id, settlementId: settlement.id },
+            action: { type: "order", id: o.id },
+          }),
+        )
+      }
+      if (!releaseEvidence.eventValid) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.SETTLEMENT,
+            group: SettlementIntegrityGroup.COMPLETENESS,
+            code: ReconciliationCode.SETTLEMENT_ORDER_COMPLETED_RELEASE_EVENT_INVALID,
+            entityId: o.id,
+            entityType: "Order",
+            message: `Completed publisher order ${o.id.slice(0, 8)} lacks one exact settlement release event`,
+            metadata: { orderId: o.id, settlementId: settlement.id },
+            action: { type: "order", id: o.id },
+          }),
+        )
+      }
     }
   }
 
@@ -1887,23 +1991,67 @@ async function checkOrderPaymentReconciliation(
 ): Promise<DriftRow[]> {
   const drift: DriftRow[] = []
 
-  const [purchaseTxs, paidOrders] = await Promise.all([
-    prisma.transaction.findMany({
-      where: { type: "PURCHASE" as any },
-      select: {
-        id: true,
-        amount: true,
-        walletId: true,
-        orderId: true,
-      },
-    }),
-    prisma.order.findMany({
-      where: { paymentStatus: "PAID" },
-      select: { id: true, amount: true },
-    }),
-  ])
+  const [purchaseTxs, paidOrders, cancelledReservationOrders] =
+    await Promise.all([
+      prisma.transaction.findMany({
+        where: { type: "PURCHASE" as any },
+        select: {
+          id: true,
+          amount: true,
+          walletId: true,
+          orderId: true,
+        },
+      }),
+      prisma.order.findMany({
+        where: { paymentStatus: "PAID" },
+        select: { id: true, amount: true },
+      }),
+      prisma.order.findMany({
+        where: {
+          status: "CANCELLED",
+          paymentStatus: "PENDING",
+          transactions: {
+            some: { type: { in: ["RESERVATION", "RELEASE"] as any } },
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+          paymentStatus: true,
+          amount: true,
+          currency: true,
+          organizationId: true,
+          transactions: {
+            where: {
+              type: { in: ["RESERVATION", "PURCHASE", "RELEASE"] as any },
+            },
+            select: {
+              id: true,
+              type: true,
+              amount: true,
+              currency: true,
+              reference: true,
+              walletId: true,
+              publisherId: true,
+              settlementId: true,
+              provider: true,
+              providerRef: true,
+              wallet: { select: { organizationId: true } },
+            },
+          },
+          events: {
+            where: { eventType: "ORDER_CANCELLED" },
+            select: { metadata: true },
+          },
+        },
+      }),
+    ])
   stats.checkedTransactions += purchaseTxs.length
-  stats.checkedOrders += paidOrders.length
+  stats.checkedOrders += paidOrders.length + cancelledReservationOrders.length
+  stats.checkedTransactions += cancelledReservationOrders.reduce(
+    (count: number, order: any) => count + (order.transactions?.length ?? 0),
+    0,
+  )
 
   const paidOrderIds = new Set(paidOrders.map((o: any) => o.id))
 
@@ -2020,6 +2168,95 @@ async function checkOrderPaymentReconciliation(
     }
   }
 
+  for (const order of cancelledReservationOrders) {
+    // Defensive for mocked/legacy clients: the database query above is the
+    // authoritative scope, but never manufacture a finding from a row that
+    // does not actually carry the requested terminal state.
+    if (order.status !== "CANCELLED" || order.paymentStatus !== "PENDING") {
+      continue
+    }
+    const transactions = order.transactions ?? []
+    const reservations = transactions.filter(
+      (entry: any) => entry.type === "RESERVATION",
+    )
+    const purchases = transactions.filter(
+      (entry: any) => entry.type === "PURCHASE",
+    )
+    const releases = transactions.filter(
+      (entry: any) => entry.type === "RELEASE",
+    )
+    const expected = toScaled(order.amount ?? 0)
+    const reservation = reservations[0]
+    const release = releases[0]
+    const commonIdentityValid = (entry: any) =>
+      entry?.walletId &&
+      entry.currency === "USD" &&
+      entry.wallet?.organizationId === order.organizationId &&
+      entry.publisherId == null &&
+      entry.settlementId == null &&
+      entry.provider == null &&
+      entry.providerRef == null
+    const reservationValid =
+      reservations.length === 1 &&
+      purchases.length === 0 &&
+      commonIdentityValid(reservation) &&
+      toScaled(reservation.amount) === -expected
+    const releaseMissing = releases.length === 0
+    const releaseValid =
+      releases.length === 1 &&
+      commonIdentityValid(release) &&
+      release.walletId === reservation?.walletId &&
+      release.reference === `reservation-release:${order.id}` &&
+      toScaled(release.amount) === expected
+    const matchingEvents = (order.events ?? []).filter(
+      (event: any) =>
+        event.metadata?.reservationReleaseTransactionId === release?.id,
+    )
+
+    if (reservationValid && releaseMissing) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_RESERVATION_RELEASE_MISSING,
+          entityId: order.id,
+          entityType: "Order",
+          amount: fromScaled(expected),
+          message: `Cancelled order ${order.id.slice(0, 8)} has a reservation but no release ledger row`,
+          metadata: {
+            orderId: order.id,
+            transactionId: reservation.id,
+            walletId: reservation.walletId,
+          },
+          action: { type: "order", id: order.id },
+        }),
+      )
+    } else if (
+      !reservationValid ||
+      !releaseValid ||
+      matchingEvents.length !== 1
+    ) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.PAYMENT_RESERVATION_RELEASE_INVALID,
+          entityId: order.id,
+          entityType: "Order",
+          amount: fromScaled(expected),
+          message: `Cancelled order ${order.id.slice(0, 8)} has invalid reservation-release evidence`,
+          metadata: {
+            orderId: order.id,
+            transactionId: release?.id ?? reservation?.id,
+            walletId: release?.walletId ?? reservation?.walletId,
+            duplicateCount: releases.length,
+          },
+          action: { type: "order", id: order.id },
+        }),
+      )
+    }
+  }
+
   return drift
 }
 
@@ -2037,9 +2274,52 @@ async function checkRefundReconciliation(
       select: {
         id: true,
         amount: true,
+        fulfillmentChannel: true,
+        website: { select: { ownershipType: true, publisherId: true } },
+        dispute: { select: { previousStatus: true } },
         settlements: {
-          where: { status: "RELEASED" },
-          select: { id: true },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          select: {
+            id: true,
+            publisherId: true,
+            publisherAmount: true,
+            status: true,
+          },
+        },
+        publisherCompensation: {
+          select: {
+            id: true,
+            publisherId: true,
+            refundTransactionId: true,
+            compensationTransactionId: true,
+            debtRepaymentTransactionId: true,
+            disposition: true,
+            amount: true,
+            currency: true,
+            responsibility: true,
+            reason: true,
+            effectiveOrderStatus: true,
+            compensationTransaction: {
+              select: {
+                id: true,
+                type: true,
+                orderId: true,
+                publisherId: true,
+                amount: true,
+                currency: true,
+              },
+            },
+            debtRepaymentTransaction: {
+              select: {
+                id: true,
+                type: true,
+                orderId: true,
+                publisherId: true,
+                amount: true,
+                currency: true,
+              },
+            },
+          },
         },
       },
     }),
@@ -2052,7 +2332,10 @@ async function checkRefundReconciliation(
   stats.checkedTransactions += refundTxs.length
 
   const refundedOrderIds = new Set(refundedOrders.map((o: any) => o.id))
-  const refundTxsByOrder = new Map<string, { count: number; sum: bigint }>()
+  const refundTxsByOrder = new Map<
+    string,
+    { count: number; sum: bigint; ids: Set<string> }
+  >()
   const orphanRefundTxs: any[] = []
 
   for (const tx of refundTxs) {
@@ -2060,9 +2343,14 @@ async function checkRefundReconciliation(
       orphanRefundTxs.push(tx)
       continue
     }
-    const entry = refundTxsByOrder.get(tx.orderId) ?? { count: 0, sum: 0n }
+    const entry = refundTxsByOrder.get(tx.orderId) ?? {
+      count: 0,
+      sum: 0n,
+      ids: new Set<string>(),
+    }
     entry.count++
     entry.sum += toScaled(tx.amount)
+    entry.ids.add(tx.id)
     refundTxsByOrder.set(tx.orderId, entry)
   }
 
@@ -2078,6 +2366,107 @@ async function checkRefundReconciliation(
           entityType: "Order",
           message: `Order ${o.id.slice(0, 8)} is REFUNDED but has no REFUND transaction`,
           metadata: { orderId: o.id },
+          action: { type: "order", id: o.id },
+        }),
+      )
+    }
+  }
+
+  // A post-publication publisher refund must carry an explicit disposition,
+  // including NONE. Validate the aggregate and every linked ledger fact so a
+  // projection bug cannot silently over/understate publisher liability.
+  for (const o of refundedOrders) {
+    const effectiveStatus =
+      o.dispute?.previousStatus ?? o.publisherCompensation?.effectiveOrderStatus
+    const publisherOrder =
+      o.fulfillmentChannel === "PUBLISHER" ||
+      (o.fulfillmentChannel == null && o.website?.ownershipType === "PUBLISHER")
+    const postPublication =
+      publisherOrder &&
+      (["PUBLISHED", "VERIFIED", "DELIVERED", "COMPLETED"].includes(
+        String(effectiveStatus ?? ""),
+      ) ||
+        o.settlements.length > 0)
+    if (!postPublication) continue
+
+    const compensation = o.publisherCompensation
+    const refundEntry = refundTxsByOrder.get(o.id)
+    if (!compensation) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.REFUND,
+          code: ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_MISSING,
+          entityId: o.id,
+          entityType: "Order",
+          message: `Post-publication publisher refund ${o.id.slice(0, 8)} has no explicit compensation disposition`,
+          metadata: { orderId: o.id },
+          action: { type: "order", id: o.id },
+        }),
+      )
+      continue
+    }
+
+    const amount = toScaled(compensation.amount)
+    const credit = compensation.compensationTransaction
+    const debt = compensation.debtRepaymentTransaction
+    const authoritativeSettlement = o.settlements[0]
+    const publisherId =
+      authoritativeSettlement?.publisherId ?? o.website?.publisherId
+    const maximum = authoritativeSettlement
+      ? toScaled(authoritativeSettlement.publisherAmount)
+      : toScaled(o.amount)
+    const validCredit =
+      amount > 0n &&
+      compensation.disposition === "EXACT_AMOUNT" &&
+      credit?.id === compensation.compensationTransactionId &&
+      credit.type === "PUBLISHER_COMPENSATION" &&
+      credit.orderId === o.id &&
+      credit.publisherId === compensation.publisherId &&
+      credit.currency === compensation.currency &&
+      toScaled(credit.amount) === amount
+    const validDebt =
+      (!compensation.debtRepaymentTransactionId && !debt) ||
+      (debt?.id === compensation.debtRepaymentTransactionId &&
+        debt.type === "DEBT_REPAYMENT" &&
+        debt.orderId === o.id &&
+        debt.publisherId === compensation.publisherId &&
+        debt.currency === compensation.currency &&
+        toScaled(debt.amount) < 0n &&
+        -toScaled(debt.amount) <= amount)
+    const validNone =
+      amount === 0n &&
+      compensation.disposition === "NONE" &&
+      !compensation.compensationTransactionId &&
+      !compensation.debtRepaymentTransactionId &&
+      !credit &&
+      !debt
+    if (
+      compensation.currency !== "USD" ||
+      !refundEntry?.ids.has(compensation.refundTransactionId) ||
+      refundEntry?.count !== 1 ||
+      compensation.publisherId !== publisherId ||
+      amount < 0n ||
+      amount > maximum ||
+      compensation.reason.trim().length < 20 ||
+      compensation.responsibility === "UNDETERMINED" ||
+      (compensation.responsibility === "PUBLISHER" && !validNone) ||
+      (!validNone && !validCredit) ||
+      !validDebt
+    ) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.REFUND,
+          code: ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_INVALID,
+          entityId: compensation.id,
+          entityType: "PublisherCompensation",
+          amount: fromScaled(amount),
+          message: `Publisher compensation for refund ${o.id.slice(0, 8)} does not match its terminal order and ledger evidence`,
+          metadata: {
+            orderId: o.id,
+            publisherCompensationId: compensation.id,
+          },
           action: { type: "order", id: o.id },
         }),
       )
@@ -2164,8 +2553,11 @@ async function checkRefundReconciliation(
 
   // REFUNDED order with active RELEASED settlement
   for (const o of refundedOrders) {
-    if (o.settlements.length > 0) {
-      for (const s of o.settlements) {
+    const releasedSettlements = o.settlements.filter(
+      (settlement: any) => settlement.status === "RELEASED",
+    )
+    if (releasedSettlements.length > 0) {
+      for (const s of releasedSettlements) {
         drift.push(
           makeRow({
             severity: "critical",
@@ -2236,7 +2628,7 @@ async function checkStuckFinancialOrders(
   const paidNoSettlement = await prisma.order.findMany({
     where: {
       paymentStatus: "PAID",
-      status: { notIn: ["SETTLED", "COMPLETED", "CANCELLED", "REFUNDED"] },
+      status: { notIn: ["COMPLETED", "CANCELLED", "REFUNDED"] },
       updatedAt: { lt: cutoff },
       settlements: { none: { status: { not: "CANCELLED" } } },
     },

@@ -41,16 +41,13 @@ updated: 2026-08-11
 - The operational review, smoke, monitoring, rollback, and exception process
   is documented in `docs/DEPENDENCY_POLICY.md`.
 
-## Audit Status (41 findings)
+## Audit tracking
 
-| Status | Count | Findings |
-|--------|-------|----------|
-| Closed | 38 | A-1–A-4, B-1–B-3, C-1–C-3, D-1–D-2, E-1–E-2, F-1–F-5, G-1–G-4, H-1–H-3, M-1–M-3, Z-1–Z-6, #23 |
-| Partial | 1 | #22 (zero-value settlement semantics) |
-| Deferred | 1 | #24 (timestamptz — scheduled pre-GA; operationally correct under UTC-only model) |
-| Open | 1 | #25 (soft-delete) |
-
-Open/partial items require architectural design discussion.
+Historical audits use different finding IDs and closure baselines. Their
+snapshots remain in `Views/audits/`, but they are not current project status.
+`Work/backlog.md` is the canonical open-work register and `Work/risks.md` is
+the canonical launch-risk register. Never combine or extrapolate counts across
+historical audit batches.
 
 ## Sprint History
 
@@ -191,9 +188,10 @@ Open/partial items require architectural design discussion.
   commit in one database transaction.
 - `docs/FINANCIAL_INVARIANTS.md` is the canonical money-path contract. Customer
   wallets are closed-loop; the former internal-only wallet withdrawal route is
-  retired. Stripe checkout-success recovery currently depends on fresh signed
-  webhook redelivery because the normalized inbox cannot independently replay
-  a credit and no authenticated provider catch-up worker exists.
+  retired. Stripe checkout-success recovery uses a fenced authenticated
+  provider-retrieval aggregate with append-only evidence and the same
+  serializable wallet-credit finalizer as signed webhooks; the customer status
+  read remains side-effect free.
 - Stripe chargebacks use durable provider-neutral `PaymentDispute` cases.
   Deposit provider identity is never reused for holds; case-owned
   hold/shortfall/resolution evidence, inbox state, wallet movement, ledger, and

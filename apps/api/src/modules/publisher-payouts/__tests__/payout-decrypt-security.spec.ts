@@ -1,3 +1,4 @@
+import { createCipheriv, randomBytes, scryptSync } from "node:crypto"
 import {
   ConflictException,
   ForbiddenException,
@@ -5,7 +6,12 @@ import {
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { PermissionsGuard } from "../../../common/guards/permissions.guard"
-import { PayoutEncryptionService } from "../payout-encryption.service"
+import {
+  PayoutEncryptionService,
+  payoutMethodEncryptionContext,
+  payoutProviderEncryptionContext,
+} from "../payout-encryption.service"
+import { StaticPayoutEncryptionKeyProvider } from "../payout-encryption-key-provider"
 import { PayoutExecutionService } from "../payout-execution.service"
 import { PublisherPayoutsService } from "../publisher-payouts.service"
 
@@ -16,31 +22,42 @@ const SECRET_DETAILS = {
 }
 
 function makeContext(user: any, requiredPermissions?: string[]) {
+  const request = { user }
   const reflector = {
     getAllAndOverride: jest.fn().mockReturnValue(requiredPermissions),
   }
   const context = {
     getHandler: jest.fn(),
     getClass: jest.fn(),
-    switchToHttp: () => ({ getRequest: () => ({ user }) }),
+    switchToHttp: () => ({ getRequest: () => request }),
   }
-  return { reflector, context }
+  return { reflector, context, request }
 }
 
 describe("PermissionsGuard — FINANCIAL_DATA_DECRYPT", () => {
-  let prismaMock: any
+  let authorities: { resolveRequest: jest.Mock }
+
+  const staffAuthority = (
+    staffRole: string | null,
+    staffPermissions: string[] = [],
+  ) => ({
+    id: "staff-user",
+    userType: "STAFF",
+    staffRole,
+    staffPermissions,
+  })
 
   beforeEach(() => {
-    prismaMock = { staffMembership: { findUnique: jest.fn() } }
+    authorities = { resolveRequest: jest.fn() }
   })
 
   it("denies SUPER_ADMIN without an explicit FINANCIAL_DATA_DECRYPT grant", async () => {
-    prismaMock.staffMembership.findUnique.mockResolvedValue({ permissions: [] })
+    authorities.resolveRequest.mockResolvedValue(staffAuthority("SUPER_ADMIN"))
     const { reflector, context } = makeContext(
       { id: "u1", staffRole: "SUPER_ADMIN" },
       ["FINANCIAL_DATA_DECRYPT"],
     )
-    const guard = new PermissionsGuard(reflector as any, prismaMock)
+    const guard = new PermissionsGuard(reflector as any, authorities as any)
 
     await expect(guard.canActivate(context as any)).rejects.toThrow(
       ForbiddenException,
@@ -48,51 +65,70 @@ describe("PermissionsGuard — FINANCIAL_DATA_DECRYPT", () => {
   })
 
   it("allows SUPER_ADMIN with an explicit FINANCIAL_DATA_DECRYPT grant", async () => {
-    prismaMock.staffMembership.findUnique.mockResolvedValue({
-      permissions: ["FINANCIAL_DATA_DECRYPT"],
-    })
+    authorities.resolveRequest.mockResolvedValue(
+      staffAuthority("SUPER_ADMIN", ["FINANCIAL_DATA_DECRYPT"]),
+    )
     const { reflector, context } = makeContext(
       { id: "u1", staffRole: "SUPER_ADMIN" },
       ["FINANCIAL_DATA_DECRYPT"],
     )
-    const guard = new PermissionsGuard(reflector as any, prismaMock)
+    const guard = new PermissionsGuard(reflector as any, authorities as any)
 
     await expect(guard.canActivate(context as any)).resolves.toBe(true)
   })
 
   it("still lets SUPER_ADMIN bypass non-sensitive permissions", async () => {
+    authorities.resolveRequest.mockResolvedValue(staffAuthority("SUPER_ADMIN"))
     const { reflector, context } = makeContext(
       { id: "u1", staffRole: "SUPER_ADMIN" },
       ["SOME_ORDINARY_PERMISSION"],
     )
-    const guard = new PermissionsGuard(reflector as any, prismaMock)
+    const guard = new PermissionsGuard(reflector as any, authorities as any)
 
     await expect(guard.canActivate(context as any)).resolves.toBe(true)
-    expect(prismaMock.staffMembership.findUnique).not.toHaveBeenCalled()
+    expect(authorities.resolveRequest).toHaveBeenCalledTimes(1)
   })
 
   it("allows FINANCE staff with an explicit grant", async () => {
-    prismaMock.staffMembership.findUnique.mockResolvedValue({
-      permissions: ["FINANCIAL_DATA_DECRYPT"],
-    })
+    authorities.resolveRequest.mockResolvedValue(
+      staffAuthority("FINANCE", ["FINANCIAL_DATA_DECRYPT"]),
+    )
     const { reflector, context } = makeContext(
       { id: "u2", staffRole: "FINANCE" },
       ["FINANCIAL_DATA_DECRYPT"],
     )
-    const guard = new PermissionsGuard(reflector as any, prismaMock)
+    const guard = new PermissionsGuard(reflector as any, authorities as any)
 
     await expect(guard.canActivate(context as any)).resolves.toBe(true)
   })
 
+  it("denies a cached decrypt grant after durable permission removal", async () => {
+    authorities.resolveRequest.mockResolvedValue(staffAuthority("FINANCE"))
+    const { reflector, context } = makeContext(
+      {
+        id: "u2",
+        userType: "STAFF",
+        staffRole: "FINANCE",
+        staffPermissions: ["FINANCIAL_DATA_DECRYPT"],
+      },
+      ["FINANCIAL_DATA_DECRYPT"],
+    )
+    const guard = new PermissionsGuard(reflector as any, authorities as any)
+
+    await expect(guard.canActivate(context as any)).rejects.toThrow(
+      ForbiddenException,
+    )
+  })
+
   it("denies FINANCE staff without the grant", async () => {
-    prismaMock.staffMembership.findUnique.mockResolvedValue({
-      permissions: ["SOMETHING_ELSE"],
-    })
+    authorities.resolveRequest.mockResolvedValue(
+      staffAuthority("FINANCE", ["SOMETHING_ELSE"]),
+    )
     const { reflector, context } = makeContext(
       { id: "u2", staffRole: "FINANCE" },
       ["FINANCIAL_DATA_DECRYPT"],
     )
-    const guard = new PermissionsGuard(reflector as any, prismaMock)
+    const guard = new PermissionsGuard(reflector as any, authorities as any)
 
     await expect(guard.canActivate(context as any)).rejects.toThrow(
       ForbiddenException,
@@ -100,12 +136,12 @@ describe("PermissionsGuard — FINANCIAL_DATA_DECRYPT", () => {
   })
 
   it("denies users with no staff membership", async () => {
-    prismaMock.staffMembership.findUnique.mockResolvedValue(null)
+    authorities.resolveRequest.mockResolvedValue(staffAuthority(null))
     const { reflector, context } = makeContext(
       { id: "u3", staffRole: "OPERATIONS" },
       ["FINANCIAL_DATA_DECRYPT"],
     )
-    const guard = new PermissionsGuard(reflector as any, prismaMock)
+    const guard = new PermissionsGuard(reflector as any, authorities as any)
 
     await expect(guard.canActivate(context as any)).rejects.toThrow(
       ForbiddenException,
@@ -114,7 +150,7 @@ describe("PermissionsGuard — FINANCIAL_DATA_DECRYPT", () => {
 
   it("denies unauthenticated requests", async () => {
     const { reflector, context } = makeContext(null, ["FINANCIAL_DATA_DECRYPT"])
-    const guard = new PermissionsGuard(reflector as any, prismaMock)
+    const guard = new PermissionsGuard(reflector as any, authorities as any)
 
     await expect(guard.canActivate(context as any)).rejects.toThrow(
       ForbiddenException,
@@ -124,75 +160,204 @@ describe("PermissionsGuard — FINANCIAL_DATA_DECRYPT", () => {
 
 describe("PayoutEncryptionService", () => {
   const ORIGINAL_ENV = { ...process.env }
+  const METHOD_CONTEXT = payoutMethodEncryptionContext({
+    id: "method-1",
+    publisherId: "publisher-1",
+    type: "bank_transfer",
+  })
+
+  function provider(
+    activeKeyId = "active-2026-08",
+    keys: Record<string, string> = { "active-2026-08": "a".repeat(64) },
+    legacyKey = "f".repeat(64),
+  ) {
+    return new StaticPayoutEncryptionKeyProvider({
+      activeKeyId,
+      keys,
+      legacyKey,
+    })
+  }
+
+  function clearPayoutKeyEnv() {
+    delete process.env.PAYOUT_ENCRYPTION_KEYS
+    delete process.env.PAYOUT_ENCRYPTION_ACTIVE_KEY_ID
+    delete process.env.PAYOUT_ENCRYPTION_KEY
+  }
 
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }
   })
 
-  it("fails startup in production when PAYOUT_ENCRYPTION_KEY is missing", () => {
+  it("fails closed outside tests when the v2 keyring is missing", () => {
     process.env.NODE_ENV = "production"
+    clearPayoutKeyEnv()
+    expect(() => new PayoutEncryptionService()).toThrow(
+      /PAYOUT_ENCRYPTION_KEYS/,
+    )
+
+    process.env.NODE_ENV = "development"
+    expect(() => new PayoutEncryptionService()).toThrow(
+      /PAYOUT_ENCRYPTION_KEYS/,
+    )
+  })
+
+  it("does not treat the legacy key as authority to create v2 writes", () => {
+    process.env.NODE_ENV = "production"
+    clearPayoutKeyEnv()
+    process.env.PAYOUT_ENCRYPTION_KEY = "f".repeat(64)
+    expect(() => new PayoutEncryptionService()).toThrow(
+      /PAYOUT_ENCRYPTION_KEYS/,
+    )
+  })
+
+  it("rejects malformed, duplicate, and unbounded configured keyrings", () => {
+    process.env.NODE_ENV = "production"
+    process.env.PAYOUT_ENCRYPTION_KEYS = "not-json"
+    process.env.PAYOUT_ENCRYPTION_ACTIVE_KEY_ID = "active"
     delete process.env.PAYOUT_ENCRYPTION_KEY
-    expect(() => new PayoutEncryptionService()).toThrow(/PAYOUT_ENCRYPTION_KEY/)
+    expect(() => new PayoutEncryptionService()).toThrow(/valid JSON/)
+
+    expect(
+      () =>
+        new StaticPayoutEncryptionKeyProvider({
+          activeKeyId: "a",
+          keys: { a: "1".repeat(64), b: "1".repeat(64) },
+        }),
+    ).toThrow(/duplicate/)
+
+    const tooMany = Object.fromEntries(
+      Array.from({ length: 17 }, (_, index) => [
+        `key-${index}`,
+        index.toString(16).padStart(64, "0"),
+      ]),
+    )
+    expect(
+      () =>
+        new StaticPayoutEncryptionKeyProvider({
+          activeKeyId: "key-0",
+          keys: tooMany,
+        }),
+    ).toThrow(/between 1 and 16/)
   })
 
-  it("fails startup in production when the key is too short", () => {
+  it("rejects malformed legacy material and an active ID outside the keyring", () => {
     process.env.NODE_ENV = "production"
-    process.env.PAYOUT_ENCRYPTION_KEY = "abcd1234"
-    expect(() => new PayoutEncryptionService()).toThrow(/PAYOUT_ENCRYPTION_KEY/)
-  })
+    process.env.PAYOUT_ENCRYPTION_KEYS = JSON.stringify({
+      active: "a".repeat(64),
+    })
+    process.env.PAYOUT_ENCRYPTION_ACTIVE_KEY_ID = "missing"
+    delete process.env.PAYOUT_ENCRYPTION_KEY
+    expect(() => new PayoutEncryptionService()).toThrow(/not in the keyring/)
 
-  it("fails startup when a configured 64-character key contains non-hex data", () => {
-    process.env.NODE_ENV = "test"
-    process.env.PAYOUT_ENCRYPTION_KEY = `${"a".repeat(63)}z`
+    process.env.PAYOUT_ENCRYPTION_ACTIVE_KEY_ID = "active"
+    process.env.PAYOUT_ENCRYPTION_KEY = "too-short"
     expect(() => new PayoutEncryptionService()).toThrow(
       /exactly 64 hexadecimal characters/,
     )
   })
 
-  it("fails startup instead of truncating a configured key longer than 64 characters", () => {
+  it("permits the deterministic fallback only in the isolated test runtime", () => {
     process.env.NODE_ENV = "test"
-    process.env.PAYOUT_ENCRYPTION_KEY = "a".repeat(66)
-    expect(() => new PayoutEncryptionService()).toThrow(
-      /exactly 64 hexadecimal characters/,
-    )
-  })
-
-  it("falls back to a dev key outside production", () => {
-    process.env.NODE_ENV = "test"
-    delete process.env.PAYOUT_ENCRYPTION_KEY
+    clearPayoutKeyEnv()
     expect(() => new PayoutEncryptionService()).not.toThrow()
+
+    delete process.env.JEST_WORKER_ID
+    expect(() => new PayoutEncryptionService()).toThrow()
+
+    process.env.NODE_ENV = "development"
+    expect(() => new PayoutEncryptionService()).toThrow()
   })
 
-  it("round-trips encrypt/decrypt with a real key", () => {
-    process.env.NODE_ENV = "test"
-    process.env.PAYOUT_ENCRYPTION_KEY = "a".repeat(64)
-    const svc = new PayoutEncryptionService()
-    const { ciphertext, version } = svc.encrypt(SECRET_DETAILS)
-    expect(version).toBe(1)
+  it("writes a v2 envelope with opaque key identity and context-bound AAD", () => {
+    const svc = new PayoutEncryptionService(provider())
+    const { ciphertext, version, keyId } = svc.encrypt(
+      SECRET_DETAILS,
+      METHOD_CONTEXT,
+    )
+    expect(version).toBe(2)
+    expect(keyId).toBe("active-2026-08")
+    expect(ciphertext).toMatch(/^p2:active-2026-08:/)
     expect(ciphertext).not.toContain("DE89")
-    expect(svc.decrypt(ciphertext, version)).toEqual(SECRET_DETAILS)
+    expect(svc.decrypt(ciphertext, version, METHOD_CONTEXT)).toEqual(
+      SECRET_DETAILS,
+    )
+    expect(() => svc.decrypt(ciphertext, version)).toThrow(/context/)
   })
 
-  it("decrypts old-version records after key version bump (rotation safety)", () => {
-    process.env.NODE_ENV = "test"
-    process.env.PAYOUT_ENCRYPTION_KEY = "b".repeat(64)
-    const svc = new PayoutEncryptionService()
-    const v1 = svc.encrypt(SECRET_DETAILS, 1)
-    const v2 = svc.encrypt(SECRET_DETAILS, 2)
-    expect(svc.decrypt(v1.ciphertext, 1)).toEqual(SECRET_DETAILS)
-    expect(svc.decrypt(v2.ciphertext, 2)).toEqual(SECRET_DETAILS)
-    // Cross-version decrypt must fail (different derived keys)
-    expect(() => svc.decrypt(v1.ciphertext, 2)).toThrow()
+  it("rejects ciphertext transplanted between payout identities", () => {
+    const svc = new PayoutEncryptionService(provider())
+    const encrypted = svc.encrypt(SECRET_DETAILS, METHOD_CONTEXT)
+
+    expect(() =>
+      svc.decrypt(
+        encrypted.ciphertext,
+        encrypted.version,
+        payoutMethodEncryptionContext({
+          id: "method-2",
+          publisherId: "publisher-1",
+          type: "bank_transfer",
+        }),
+      ),
+    ).toThrow()
+    expect(() =>
+      svc.decrypt(
+        encrypted.ciphertext,
+        encrypted.version,
+        payoutProviderEncryptionContext({ id: "provider-1", name: "wise" }),
+      ),
+    ).toThrow()
   })
 
-  it("rejects tampered ciphertext (GCM auth)", () => {
-    process.env.NODE_ENV = "test"
-    process.env.PAYOUT_ENCRYPTION_KEY = "c".repeat(64)
-    const svc = new PayoutEncryptionService()
-    const { ciphertext, version } = svc.encrypt(SECRET_DETAILS)
-    const raw = Buffer.from(ciphertext, "base64")
+  it("keeps inactive key IDs decrypt-only while new writes use the active ID", () => {
+    const oldService = new PayoutEncryptionService(
+      provider("old-key", { "old-key": "b".repeat(64) }),
+    )
+    const oldCiphertext = oldService.encrypt(SECRET_DETAILS, METHOD_CONTEXT)
+    const rotated = new PayoutEncryptionService(
+      provider("new-key", {
+        "old-key": "b".repeat(64),
+        "new-key": "c".repeat(64),
+      }),
+    )
+
+    expect(
+      rotated.decrypt(oldCiphertext.ciphertext, 2, METHOD_CONTEXT),
+    ).toEqual(SECRET_DETAILS)
+    expect(rotated.encrypt(SECRET_DETAILS, METHOD_CONTEXT).keyId).toBe(
+      "new-key",
+    )
+  })
+
+  it("retains legacy v0/v1 reads without permitting legacy new writes", () => {
+    const legacyHex = "f".repeat(64)
+    const svc = new PayoutEncryptionService(
+      provider(undefined, undefined, legacyHex),
+    )
+    const v0 = encryptLegacy(SECRET_DETAILS, legacyHex, 0)
+    const v1 = encryptLegacy(SECRET_DETAILS, legacyHex, 1)
+
+    expect(svc.decrypt(v0, 0)).toEqual(SECRET_DETAILS)
+    expect(svc.decrypt(v1, 1)).toEqual(SECRET_DETAILS)
+    expect(() => svc.decrypt(v1, 0)).toThrow()
+    expect(svc.encrypt(SECRET_DETAILS, METHOD_CONTEXT).version).toBe(2)
+  })
+
+  it("rejects tampered ciphertext and envelope relabeling", () => {
+    const svc = new PayoutEncryptionService(provider())
+    const { ciphertext, version } = svc.encrypt(SECRET_DETAILS, METHOD_CONTEXT)
+    const [prefix, keyId, encoded] = ciphertext.split(":")
+    const raw = Buffer.from(encoded, "base64")
     raw[raw.length - 1] ^= 0xff
-    expect(() => svc.decrypt(raw.toString("base64"), version)).toThrow()
+    expect(() =>
+      svc.decrypt(
+        `${prefix}:${keyId}:${raw.toString("base64")}`,
+        version,
+        METHOD_CONTEXT,
+      ),
+    ).toThrow()
+    expect(() => svc.decrypt(ciphertext, 1, METHOD_CONTEXT)).toThrow(
+      /does not match/,
+    )
   })
 
   it("masks sensitive fields", () => {
@@ -218,6 +383,22 @@ describe("PayoutEncryptionService", () => {
     expect(JSON.stringify(display)).not.toContain("DE89370400440532013000")
   })
 })
+
+function encryptLegacy(
+  plaintext: Record<string, unknown>,
+  legacyHex: string,
+  version: 0 | 1,
+): string {
+  const master = Buffer.from(legacyHex, "hex")
+  const key = version === 0 ? master : scryptSync(master, "payout-key-v1", 32)
+  const iv = randomBytes(12)
+  const cipher = createCipheriv("aes-256-gcm", key, iv)
+  const encrypted = Buffer.concat([
+    cipher.update(JSON.stringify(plaintext), "utf8"),
+    cipher.final(),
+  ])
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64")
+}
 
 describe("PublisherPayoutsService — decrypt access path", () => {
   let service: PublisherPayoutsService
@@ -270,6 +451,7 @@ describe("PublisherPayoutsService — decrypt access path", () => {
     prismaMock.payoutMethod.findUnique.mockResolvedValue({
       id: "pm-1",
       publisherId: "pub-1",
+      type: "bank_transfer",
       details: "ciphertext",
       encryptionKeyVersion: 1,
       publisher: { organizationId: "org-1" },

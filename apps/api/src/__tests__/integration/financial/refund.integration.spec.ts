@@ -51,13 +51,21 @@ describe("[INTEGRATION] Financial — full refund after settlement release", () 
         "Integration test refund",
         ctx.customer.user.id,
         idempotencyKey,
-        { responsibility: "SYSTEM" },
+        {
+          responsibility: "SYSTEM",
+          publisherCompensation: {
+            amount: 80,
+            reason:
+              "Publisher completed the contracted delivery before the system-attributed refund.",
+          },
+        },
       )
       expect(refundedOrder.status).toBe(OrderStatus.REFUNDED)
 
       // ── 3. Assert financial invariants ──
       // Wallet: 0 after PURCHASE capture + 100 refund credit = 100
-      // Publisher: withdrawable 80 → 0 (all clawed back), lifetime earnings 80 → 0
+      // Publisher: original settlement is clawed back, then the explicit
+      // system-funded compensation restores the reviewed 80 liability.
       // Settlement: RELEASED → CANCELLED
       // Order: COMPLETED → REFUNDED
       await expectFinancialState(ctx, {
@@ -65,10 +73,10 @@ describe("[INTEGRATION] Financial — full refund after settlement release", () 
         settlementStatus: SettlementStatus.CANCELLED,
         orderStatus: OrderStatus.REFUNDED,
         walletAvailableBalance: 100,
-        publisherWithdrawableBalance: 0,
-        publisherLifetimeEarnings: 0,
-        transactionCount: 5,
-        transactionSum: 100,
+        publisherWithdrawableBalance: 80,
+        publisherLifetimeEarnings: 80,
+        transactionCount: 6,
+        transactionSum: 180,
       })
 
       // Verify the order-specific accounting chain. The deposit funds the
@@ -83,11 +91,24 @@ describe("[INTEGRATION] Financial — full refund after settlement release", () 
         TransactionType.SETTLEMENT_RELEASE,
         TransactionType.SETTLEMENT_CLAWBACK,
         TransactionType.REFUND,
+        TransactionType.PUBLISHER_COMPENSATION,
       ])
       expect(Number(txnTypes[0].amount)).toBe(-100)
       expect(Number(txnTypes[1].amount)).toBe(80)
       expect(Number(txnTypes[2].amount)).toBe(-80)
       expect(Number(txnTypes[3].amount)).toBe(100)
+      expect(Number(txnTypes[4].amount)).toBe(80)
+
+      const compensation = await prisma.publisherCompensation.findUnique({
+        where: { orderId: ctx.order.id },
+      })
+      expect(compensation).toMatchObject({
+        publisherId: ctx.publisher.publisher.id,
+        disposition: "EXACT_AMOUNT",
+        responsibility: "SYSTEM",
+        effectiveOrderStatus: "COMPLETED",
+      })
+      expect(Number(compensation?.amount)).toBe(80)
     } finally {
       await cleanup()
     }

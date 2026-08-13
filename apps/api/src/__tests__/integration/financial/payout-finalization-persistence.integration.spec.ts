@@ -4,6 +4,11 @@ import {
   isRetryablePrismaTransactionError,
   prismaTransactionRetryDelayMs,
 } from "@guestpost/shared/dist/prisma-transaction-retry"
+import {
+  PayoutEncryptionService,
+  payoutMethodEncryptionContext,
+} from "../../../modules/publisher-payouts/payout-encryption.service"
+import { StaticPayoutEncryptionKeyProvider } from "../../../modules/publisher-payouts/payout-encryption-key-provider"
 import { makeOrganization, makePublisher, makeUser } from "../factories"
 import { createTestDatabase, type TestDatabase } from "../helpers/test-db"
 
@@ -26,6 +31,23 @@ interface PayoutFixture {
   providerAccountExternalId: string | null
   publicReference: string
   amount: number
+}
+
+const payoutEncryption = new PayoutEncryptionService(
+  new StaticPayoutEncryptionKeyProvider({
+    activeKeyId: "integration-v2",
+    keys: { "integration-v2": "a".repeat(64) },
+  }),
+)
+
+function encryptedPayoutMethod(
+  identity: { id: string; publisherId: string; type: string },
+  marker: string,
+) {
+  return payoutEncryption.encrypt(
+    { integrationFixture: marker },
+    payoutMethodEncryptionContext(identity),
+  )
 }
 
 describe("[INTEGRATION] Financial — canonical payout completion persistence", () => {
@@ -162,16 +184,25 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
             },
           })
         : null
+    const payoutMethodId = crypto.randomUUID()
+    const payoutMethodType =
+      providerName === "stripe_connect" ? "stripe_connect" : "bank_transfer"
+    const encryptedDetails = encryptedPayoutMethod(
+      {
+        id: payoutMethodId,
+        publisherId: publisher.id,
+        type: payoutMethodType,
+      },
+      suffix,
+    )
     const payoutMethod = await prisma.payoutMethod.create({
       data: {
+        id: payoutMethodId,
         publisherId: publisher.id,
-        type:
-          providerName === "stripe_connect"
-            ? "stripe_connect"
-            : "bank_transfer",
+        type: payoutMethodType,
         label: `Integration ${suffix}`,
-        details: { ciphertext: `integration-${suffix}` },
-        encryptionKeyVersion: 1,
+        details: encryptedDetails.ciphertext,
+        encryptionKeyVersion: encryptedDetails.version,
         isActive: true,
         providerAccountId: providerAccount?.id ?? null,
       },
@@ -691,13 +722,23 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
         isActive: true,
       },
     })
+    const methodId = crypto.randomUUID()
+    const encryptedDetails = encryptedPayoutMethod(
+      {
+        id: methodId,
+        publisherId: publisher.id,
+        type: "stripe_connect",
+      },
+      suffix,
+    )
     const method = await prisma.payoutMethod.create({
       data: {
+        id: methodId,
         publisherId: publisher.id,
         type: "stripe_connect",
         label: "Reservation race destination",
-        details: { ciphertext: `integration-${suffix}` },
-        encryptionKeyVersion: 1,
+        details: encryptedDetails.ciphertext,
+        encryptionKeyVersion: encryptedDetails.version,
         isActive: true,
         providerAccountId: account.id,
       },
@@ -3144,13 +3185,19 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       },
       update: { isActive: true },
     })
+    const methodId = crypto.randomUUID()
+    const encryptedDetails = encryptedPayoutMethod(
+      { id: methodId, publisherId: publisher.id, type: "wise" },
+      suffix,
+    )
     const method = await prisma.payoutMethod.create({
       data: {
+        id: methodId,
         publisherId: publisher.id,
         type: "wise",
         label: `Historical Wise ${suffix}`,
-        details: { ciphertext: `wise-${suffix}` },
-        encryptionKeyVersion: 1,
+        details: encryptedDetails.ciphertext,
+        encryptionKeyVersion: encryptedDetails.version,
         isActive: true,
       },
     })
@@ -3511,13 +3558,23 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
       }),
     })
 
+    const unusedId = crypto.randomUUID()
+    const unusedEncryptedDetails = encryptedPayoutMethod(
+      {
+        id: unusedId,
+        publisherId: fixture.publisherId,
+        type: "bank_transfer",
+      },
+      `unused-${unusedId}`,
+    )
     const unused = await prisma.payoutMethod.create({
       data: {
+        id: unusedId,
         publisherId: fixture.publisherId,
         type: "bank_transfer",
         label: "Unused audited method",
-        details: { ciphertext: `unused-${crypto.randomUUID()}` },
-        encryptionKeyVersion: 1,
+        details: unusedEncryptedDetails.ciphertext,
+        encryptionKeyVersion: unusedEncryptedDetails.version,
       },
     })
     await expect(

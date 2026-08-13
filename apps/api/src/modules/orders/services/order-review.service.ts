@@ -32,6 +32,7 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
+import { transitionOrderCas } from "../order-transition-cas"
 import {
   deliveryFraudReviewRequiredForCustomer,
   recordCustomerDeliveryFraudBlock,
@@ -67,7 +68,7 @@ export class OrderReviewService {
       include: { website: { select: { publisherId: true } } },
     })
     if (!order) throw new NotFoundException("Order not found")
-    if (!["DELIVERED", "SETTLED", "COMPLETED"].includes(order.status)) {
+    if (!["DELIVERED", "COMPLETED"].includes(order.status)) {
       throw new BadRequestException(
         "You can review an order once it is delivered",
       )
@@ -239,29 +240,6 @@ export class OrderReviewService {
     return this.prisma.orderReview.findUnique({ where: { orderId } })
   }
 
-  private async transition(
-    orderId: string,
-    fromVersion: number,
-    data: any,
-    expectedStatus?: string,
-    prisma: any = this.prisma,
-  ) {
-    const r = await prisma.order.updateMany({
-      where: {
-        id: orderId,
-        version: fromVersion,
-        ...(expectedStatus ? { status: expectedStatus as any } : {}),
-      },
-      data: { ...data, version: { increment: 1 } },
-    })
-    if (r.count === 0) {
-      throw new ConflictException(
-        "Order was modified by another request. Retry.",
-      )
-    }
-    return prisma.order.findUniqueOrThrow({ where: { id: orderId } })
-  }
-
   async approveContent(
     orderId: string,
     organizationId: string,
@@ -314,13 +292,13 @@ export class OrderReviewService {
           })
         }
 
-        const fresh = await this.transition(
+        const fresh = await transitionOrderCas({
+          db: tx,
           orderId,
-          order.version,
-          { status: "APPROVED" },
-          "CUSTOMER_REVIEW",
-          tx,
-        )
+          expectedVersion: order.version,
+          fromStatus: "CUSTOMER_REVIEW",
+          toStatus: "APPROVED",
+        })
         const activeRevision = activeRevisions[0]
         if (activeRevision) {
           const closed = await tx.revision.updateMany({
@@ -506,16 +484,16 @@ export class OrderReviewService {
           )
         }
 
-        const fresh = await this.transition(
+        const fresh = await transitionOrderCas({
+          db: tx,
           orderId,
-          order.version,
-          {
-            status: "CONTENT_REQUESTED",
+          expectedVersion: order.version,
+          fromStatus: "CUSTOMER_REVIEW",
+          toStatus: "CONTENT_REQUESTED",
+          patch: {
             revisionCount: { increment: 1 },
           },
-          "CUSTOMER_REVIEW",
-          tx,
-        )
+        })
         await tx.revision.create({
           data: { orderId, notes: normalizedNotes, status: "REQUESTED" },
         })

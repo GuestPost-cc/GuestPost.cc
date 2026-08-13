@@ -3,12 +3,7 @@
 // shared so customer portal, publisher, and admin lists rank identically.
 
 // Fully closed — money settled or order ended. These sink to the bottom.
-export const TERMINAL_ORDER_STATUSES = [
-  "SETTLED",
-  "COMPLETED",
-  "CANCELLED",
-  "REFUNDED",
-]
+export const TERMINAL_ORDER_STATUSES = ["COMPLETED", "CANCELLED", "REFUNDED"]
 
 // Needs a human now — surfaced at the very top regardless of recency.
 export const ATTENTION_ORDER_STATUSES = ["DISPUTED", "PENDING_PAYMENT"]

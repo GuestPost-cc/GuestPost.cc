@@ -368,6 +368,7 @@ export type SettlementWhereInput = {
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
   approvals?: Prisma.SettlementApprovalListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
+  events?: Prisma.OrderEventListRelationFilter
   listingService?: Prisma.XOR<Prisma.ListingServiceNullableScalarRelationFilter, Prisma.ListingServiceWhereInput> | null
   withdrawalAllocations?: Prisma.WithdrawalAllocationListRelationFilter
 }
@@ -398,6 +399,7 @@ export type SettlementOrderByWithRelationInput = {
   publisher?: Prisma.PublisherOrderByWithRelationInput
   approvals?: Prisma.SettlementApprovalOrderByRelationAggregateInput
   transactions?: Prisma.TransactionOrderByRelationAggregateInput
+  events?: Prisma.OrderEventOrderByRelationAggregateInput
   listingService?: Prisma.ListingServiceOrderByWithRelationInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationOrderByRelationAggregateInput
 }
@@ -431,6 +433,7 @@ export type SettlementWhereUniqueInput = Prisma.AtLeast<{
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
   approvals?: Prisma.SettlementApprovalListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
+  events?: Prisma.OrderEventListRelationFilter
   listingService?: Prisma.XOR<Prisma.ListingServiceNullableScalarRelationFilter, Prisma.ListingServiceWhereInput> | null
   withdrawalAllocations?: Prisma.WithdrawalAllocationListRelationFilter
 }, "id">
@@ -514,6 +517,7 @@ export type SettlementCreateInput = {
   publisher: Prisma.PublisherCreateNestedOneWithoutSettlementsInput
   approvals?: Prisma.SettlementApprovalCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutSettlementInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutSettlementsInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSettlementInput
 }
@@ -542,6 +546,7 @@ export type SettlementUncheckedCreateInput = {
   updatedAt?: Date | string
   approvals?: Prisma.SettlementApprovalUncheckedCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutSettlementInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSettlementInput
 }
 
@@ -568,6 +573,7 @@ export type SettlementUpdateInput = {
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutSettlementsNestedInput
   approvals?: Prisma.SettlementApprovalUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutSettlementNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutSettlementsNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSettlementNestedInput
 }
@@ -596,6 +602,7 @@ export type SettlementUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvals?: Prisma.SettlementApprovalUncheckedUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutSettlementNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSettlementNestedInput
 }
 
@@ -676,6 +683,11 @@ export type SettlementListRelationFilter = {
 
 export type SettlementOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
+}
+
+export type SettlementNullableScalarRelationFilter = {
+  is?: Prisma.SettlementWhereInput | null
+  isNot?: Prisma.SettlementWhereInput | null
 }
 
 export type SettlementCountOrderByAggregateInput = {
@@ -773,11 +785,6 @@ export type SettlementScalarRelationFilter = {
   isNot?: Prisma.SettlementWhereInput
 }
 
-export type SettlementNullableScalarRelationFilter = {
-  is?: Prisma.SettlementWhereInput | null
-  isNot?: Prisma.SettlementWhereInput | null
-}
-
 export type SettlementCreateNestedManyWithoutPublisherInput = {
   create?: Prisma.XOR<Prisma.SettlementCreateWithoutPublisherInput, Prisma.SettlementUncheckedCreateWithoutPublisherInput> | Prisma.SettlementCreateWithoutPublisherInput[] | Prisma.SettlementUncheckedCreateWithoutPublisherInput[]
   connectOrCreate?: Prisma.SettlementCreateOrConnectWithoutPublisherInput | Prisma.SettlementCreateOrConnectWithoutPublisherInput[]
@@ -860,6 +867,22 @@ export type SettlementUncheckedUpdateManyWithoutOrderNestedInput = {
   update?: Prisma.SettlementUpdateWithWhereUniqueWithoutOrderInput | Prisma.SettlementUpdateWithWhereUniqueWithoutOrderInput[]
   updateMany?: Prisma.SettlementUpdateManyWithWhereWithoutOrderInput | Prisma.SettlementUpdateManyWithWhereWithoutOrderInput[]
   deleteMany?: Prisma.SettlementScalarWhereInput | Prisma.SettlementScalarWhereInput[]
+}
+
+export type SettlementCreateNestedOneWithoutEventsInput = {
+  create?: Prisma.XOR<Prisma.SettlementCreateWithoutEventsInput, Prisma.SettlementUncheckedCreateWithoutEventsInput>
+  connectOrCreate?: Prisma.SettlementCreateOrConnectWithoutEventsInput
+  connect?: Prisma.SettlementWhereUniqueInput
+}
+
+export type SettlementUpdateOneWithoutEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.SettlementCreateWithoutEventsInput, Prisma.SettlementUncheckedCreateWithoutEventsInput>
+  connectOrCreate?: Prisma.SettlementCreateOrConnectWithoutEventsInput
+  upsert?: Prisma.SettlementUpsertWithoutEventsInput
+  disconnect?: Prisma.SettlementWhereInput | boolean
+  delete?: Prisma.SettlementWhereInput | boolean
+  connect?: Prisma.SettlementWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.SettlementUpdateToOneWithWhereWithoutEventsInput, Prisma.SettlementUpdateWithoutEventsInput>, Prisma.SettlementUncheckedUpdateWithoutEventsInput>
 }
 
 export type EnumSettlementStatusFieldUpdateOperationsInput = {
@@ -988,6 +1011,7 @@ export type SettlementCreateWithoutPublisherInput = {
   order: Prisma.OrderCreateNestedOneWithoutSettlementsInput
   approvals?: Prisma.SettlementApprovalCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutSettlementInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutSettlementsInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSettlementInput
 }
@@ -1015,6 +1039,7 @@ export type SettlementUncheckedCreateWithoutPublisherInput = {
   updatedAt?: Date | string
   approvals?: Prisma.SettlementApprovalUncheckedCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutSettlementInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSettlementInput
 }
 
@@ -1093,6 +1118,7 @@ export type SettlementCreateWithoutOrderInput = {
   publisher: Prisma.PublisherCreateNestedOneWithoutSettlementsInput
   approvals?: Prisma.SettlementApprovalCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutSettlementInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutSettlementsInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSettlementInput
 }
@@ -1120,6 +1146,7 @@ export type SettlementUncheckedCreateWithoutOrderInput = {
   updatedAt?: Date | string
   approvals?: Prisma.SettlementApprovalUncheckedCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutSettlementInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSettlementInput
 }
 
@@ -1149,6 +1176,130 @@ export type SettlementUpdateManyWithWhereWithoutOrderInput = {
   data: Prisma.XOR<Prisma.SettlementUpdateManyMutationInput, Prisma.SettlementUncheckedUpdateManyWithoutOrderInput>
 }
 
+export type SettlementCreateWithoutEventsInput = {
+  id?: string
+  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: string
+  platformFee?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFeeBps?: number | null
+  feePolicyVersion?: string | null
+  status?: $Enums.SettlementStatus
+  reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
+  settledAt?: Date | string | null
+  version?: number
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  order: Prisma.OrderCreateNestedOneWithoutSettlementsInput
+  publisher: Prisma.PublisherCreateNestedOneWithoutSettlementsInput
+  approvals?: Prisma.SettlementApprovalCreateNestedManyWithoutSettlementInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutSettlementInput
+  listingService?: Prisma.ListingServiceCreateNestedOneWithoutSettlementsInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSettlementInput
+}
+
+export type SettlementUncheckedCreateWithoutEventsInput = {
+  id?: string
+  orderId: string
+  publisherId: string
+  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: string
+  platformFee?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFeeBps?: number | null
+  feePolicyVersion?: string | null
+  status?: $Enums.SettlementStatus
+  reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
+  settledAt?: Date | string | null
+  version?: number
+  listingServiceId?: string | null
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  approvals?: Prisma.SettlementApprovalUncheckedCreateNestedManyWithoutSettlementInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutSettlementInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSettlementInput
+}
+
+export type SettlementCreateOrConnectWithoutEventsInput = {
+  where: Prisma.SettlementWhereUniqueInput
+  create: Prisma.XOR<Prisma.SettlementCreateWithoutEventsInput, Prisma.SettlementUncheckedCreateWithoutEventsInput>
+}
+
+export type SettlementUpsertWithoutEventsInput = {
+  update: Prisma.XOR<Prisma.SettlementUpdateWithoutEventsInput, Prisma.SettlementUncheckedUpdateWithoutEventsInput>
+  create: Prisma.XOR<Prisma.SettlementCreateWithoutEventsInput, Prisma.SettlementUncheckedCreateWithoutEventsInput>
+  where?: Prisma.SettlementWhereInput
+}
+
+export type SettlementUpdateToOneWithWhereWithoutEventsInput = {
+  where?: Prisma.SettlementWhereInput
+  data: Prisma.XOR<Prisma.SettlementUpdateWithoutEventsInput, Prisma.SettlementUncheckedUpdateWithoutEventsInput>
+}
+
+export type SettlementUpdateWithoutEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  platformFee?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFeeBps?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  feePolicyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
+  reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
+  settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  order?: Prisma.OrderUpdateOneRequiredWithoutSettlementsNestedInput
+  publisher?: Prisma.PublisherUpdateOneRequiredWithoutSettlementsNestedInput
+  approvals?: Prisma.SettlementApprovalUpdateManyWithoutSettlementNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutSettlementNestedInput
+  listingService?: Prisma.ListingServiceUpdateOneWithoutSettlementsNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSettlementNestedInput
+}
+
+export type SettlementUncheckedUpdateWithoutEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  publisherId?: Prisma.StringFieldUpdateOperationsInput | string
+  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  platformFee?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFeeBps?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  feePolicyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
+  reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
+  settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  approvals?: Prisma.SettlementApprovalUncheckedUpdateManyWithoutSettlementNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutSettlementNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSettlementNestedInput
+}
+
 export type SettlementCreateWithoutApprovalsInput = {
   id?: string
   grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -1171,6 +1322,7 @@ export type SettlementCreateWithoutApprovalsInput = {
   order: Prisma.OrderCreateNestedOneWithoutSettlementsInput
   publisher: Prisma.PublisherCreateNestedOneWithoutSettlementsInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutSettlementInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutSettlementsInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSettlementInput
 }
@@ -1198,6 +1350,7 @@ export type SettlementUncheckedCreateWithoutApprovalsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutSettlementInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSettlementInput
 }
 
@@ -1239,6 +1392,7 @@ export type SettlementUpdateWithoutApprovalsInput = {
   order?: Prisma.OrderUpdateOneRequiredWithoutSettlementsNestedInput
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutSettlementsNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutSettlementNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutSettlementsNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSettlementNestedInput
 }
@@ -1266,6 +1420,7 @@ export type SettlementUncheckedUpdateWithoutApprovalsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutSettlementNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSettlementNestedInput
 }
 
@@ -1292,6 +1447,7 @@ export type SettlementCreateWithoutWithdrawalAllocationsInput = {
   publisher: Prisma.PublisherCreateNestedOneWithoutSettlementsInput
   approvals?: Prisma.SettlementApprovalCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutSettlementInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutSettlementsInput
 }
 
@@ -1319,6 +1475,7 @@ export type SettlementUncheckedCreateWithoutWithdrawalAllocationsInput = {
   updatedAt?: Date | string
   approvals?: Prisma.SettlementApprovalUncheckedCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutSettlementInput
 }
 
 export type SettlementCreateOrConnectWithoutWithdrawalAllocationsInput = {
@@ -1360,6 +1517,7 @@ export type SettlementUpdateWithoutWithdrawalAllocationsInput = {
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutSettlementsNestedInput
   approvals?: Prisma.SettlementApprovalUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutSettlementNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutSettlementsNestedInput
 }
 
@@ -1387,6 +1545,7 @@ export type SettlementUncheckedUpdateWithoutWithdrawalAllocationsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvals?: Prisma.SettlementApprovalUncheckedUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutSettlementNestedInput
 }
 
 export type SettlementCreateWithoutTransactionsInput = {
@@ -1411,6 +1570,7 @@ export type SettlementCreateWithoutTransactionsInput = {
   order: Prisma.OrderCreateNestedOneWithoutSettlementsInput
   publisher: Prisma.PublisherCreateNestedOneWithoutSettlementsInput
   approvals?: Prisma.SettlementApprovalCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutSettlementInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutSettlementsInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSettlementInput
 }
@@ -1438,6 +1598,7 @@ export type SettlementUncheckedCreateWithoutTransactionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   approvals?: Prisma.SettlementApprovalUncheckedCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutSettlementInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSettlementInput
 }
 
@@ -1479,6 +1640,7 @@ export type SettlementUpdateWithoutTransactionsInput = {
   order?: Prisma.OrderUpdateOneRequiredWithoutSettlementsNestedInput
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutSettlementsNestedInput
   approvals?: Prisma.SettlementApprovalUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutSettlementNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutSettlementsNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSettlementNestedInput
 }
@@ -1506,6 +1668,7 @@ export type SettlementUncheckedUpdateWithoutTransactionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvals?: Prisma.SettlementApprovalUncheckedUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutSettlementNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSettlementNestedInput
 }
 
@@ -1532,6 +1695,7 @@ export type SettlementCreateWithoutListingServiceInput = {
   publisher: Prisma.PublisherCreateNestedOneWithoutSettlementsInput
   approvals?: Prisma.SettlementApprovalCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutSettlementInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutSettlementInput
 }
 
@@ -1558,6 +1722,7 @@ export type SettlementUncheckedCreateWithoutListingServiceInput = {
   updatedAt?: Date | string
   approvals?: Prisma.SettlementApprovalUncheckedCreateNestedManyWithoutSettlementInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutSettlementInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutSettlementInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutSettlementInput
 }
 
@@ -1632,6 +1797,7 @@ export type SettlementUpdateWithoutPublisherInput = {
   order?: Prisma.OrderUpdateOneRequiredWithoutSettlementsNestedInput
   approvals?: Prisma.SettlementApprovalUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutSettlementNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutSettlementsNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSettlementNestedInput
 }
@@ -1659,6 +1825,7 @@ export type SettlementUncheckedUpdateWithoutPublisherInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvals?: Prisma.SettlementApprovalUncheckedUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutSettlementNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSettlementNestedInput
 }
 
@@ -1730,6 +1897,7 @@ export type SettlementUpdateWithoutOrderInput = {
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutSettlementsNestedInput
   approvals?: Prisma.SettlementApprovalUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutSettlementNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutSettlementsNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSettlementNestedInput
 }
@@ -1757,6 +1925,7 @@ export type SettlementUncheckedUpdateWithoutOrderInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvals?: Prisma.SettlementApprovalUncheckedUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutSettlementNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSettlementNestedInput
 }
 
@@ -1829,6 +1998,7 @@ export type SettlementUpdateWithoutListingServiceInput = {
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutSettlementsNestedInput
   approvals?: Prisma.SettlementApprovalUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutSettlementNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutSettlementNestedInput
 }
 
@@ -1855,6 +2025,7 @@ export type SettlementUncheckedUpdateWithoutListingServiceInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvals?: Prisma.SettlementApprovalUncheckedUpdateManyWithoutSettlementNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutSettlementNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutSettlementNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutSettlementNestedInput
 }
 
@@ -1889,12 +2060,14 @@ export type SettlementUncheckedUpdateManyWithoutListingServiceInput = {
 export type SettlementCountOutputType = {
   approvals: number
   transactions: number
+  events: number
   withdrawalAllocations: number
 }
 
 export type SettlementCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   approvals?: boolean | SettlementCountOutputTypeCountApprovalsArgs
   transactions?: boolean | SettlementCountOutputTypeCountTransactionsArgs
+  events?: boolean | SettlementCountOutputTypeCountEventsArgs
   withdrawalAllocations?: boolean | SettlementCountOutputTypeCountWithdrawalAllocationsArgs
 }
 
@@ -1920,6 +2093,13 @@ export type SettlementCountOutputTypeCountApprovalsArgs<ExtArgs extends runtime.
  */
 export type SettlementCountOutputTypeCountTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.TransactionWhereInput
+}
+
+/**
+ * SettlementCountOutputType without action
+ */
+export type SettlementCountOutputTypeCountEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OrderEventWhereInput
 }
 
 /**
@@ -1956,6 +2136,7 @@ export type SettlementSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   approvals?: boolean | Prisma.Settlement$approvalsArgs<ExtArgs>
   transactions?: boolean | Prisma.Settlement$transactionsArgs<ExtArgs>
+  events?: boolean | Prisma.Settlement$eventsArgs<ExtArgs>
   listingService?: boolean | Prisma.Settlement$listingServiceArgs<ExtArgs>
   withdrawalAllocations?: boolean | Prisma.Settlement$withdrawalAllocationsArgs<ExtArgs>
   _count?: boolean | Prisma.SettlementCountOutputTypeDefaultArgs<ExtArgs>
@@ -2045,6 +2226,7 @@ export type SettlementInclude<ExtArgs extends runtime.Types.Extensions.InternalA
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   approvals?: boolean | Prisma.Settlement$approvalsArgs<ExtArgs>
   transactions?: boolean | Prisma.Settlement$transactionsArgs<ExtArgs>
+  events?: boolean | Prisma.Settlement$eventsArgs<ExtArgs>
   listingService?: boolean | Prisma.Settlement$listingServiceArgs<ExtArgs>
   withdrawalAllocations?: boolean | Prisma.Settlement$withdrawalAllocationsArgs<ExtArgs>
   _count?: boolean | Prisma.SettlementCountOutputTypeDefaultArgs<ExtArgs>
@@ -2067,6 +2249,7 @@ export type $SettlementPayload<ExtArgs extends runtime.Types.Extensions.Internal
     publisher: Prisma.$PublisherPayload<ExtArgs>
     approvals: Prisma.$SettlementApprovalPayload<ExtArgs>[]
     transactions: Prisma.$TransactionPayload<ExtArgs>[]
+    events: Prisma.$OrderEventPayload<ExtArgs>[]
     listingService: Prisma.$ListingServicePayload<ExtArgs> | null
     withdrawalAllocations: Prisma.$WithdrawalAllocationPayload<ExtArgs>[]
   }
@@ -2490,6 +2673,7 @@ export interface Prisma__SettlementClient<T, Null = never, ExtArgs extends runti
   publisher<T extends Prisma.PublisherDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PublisherDefaultArgs<ExtArgs>>): Prisma.Prisma__PublisherClient<runtime.Types.Result.GetResult<Prisma.$PublisherPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   approvals<T extends Prisma.Settlement$approvalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Settlement$approvalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SettlementApprovalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   transactions<T extends Prisma.Settlement$transactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Settlement$transactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  events<T extends Prisma.Settlement$eventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Settlement$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   listingService<T extends Prisma.Settlement$listingServiceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Settlement$listingServiceArgs<ExtArgs>>): Prisma.Prisma__ListingServiceClient<runtime.Types.Result.GetResult<Prisma.$ListingServicePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   withdrawalAllocations<T extends Prisma.Settlement$withdrawalAllocationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Settlement$withdrawalAllocationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WithdrawalAllocationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -2988,6 +3172,30 @@ export type Settlement$transactionsArgs<ExtArgs extends runtime.Types.Extensions
   take?: number
   skip?: number
   distinct?: Prisma.TransactionScalarFieldEnum | Prisma.TransactionScalarFieldEnum[]
+}
+
+/**
+ * Settlement.events
+ */
+export type Settlement$eventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OrderEvent
+   */
+  select?: Prisma.OrderEventSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OrderEvent
+   */
+  omit?: Prisma.OrderEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrderEventInclude<ExtArgs> | null
+  where?: Prisma.OrderEventWhereInput
+  orderBy?: Prisma.OrderEventOrderByWithRelationInput | Prisma.OrderEventOrderByWithRelationInput[]
+  cursor?: Prisma.OrderEventWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.OrderEventScalarFieldEnum | Prisma.OrderEventScalarFieldEnum[]
 }
 
 /**

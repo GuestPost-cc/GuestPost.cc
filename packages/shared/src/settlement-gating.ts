@@ -22,6 +22,26 @@ import { lockOrderAggregate } from "./order-aggregate-lock"
 export interface SettlementEligibility {
   eligible: boolean
   reasons: string[]
+  blockers: SettlementEligibilityBlocker[]
+}
+
+export type SettlementEligibilityBlockerCode =
+  | "ORDER_STATUS"
+  | "ORDER_CURRENCY"
+  | "ORDER_PAYMENT_STATUS"
+  | "ACTIVE_DELIVERY_MISSING"
+  | "ACTIVE_DELIVERY_ORDER_MISMATCH"
+  | "ACTIVE_DELIVERY_SUPERSEDED"
+  | "ACTIVE_DELIVERY_REJECTED"
+  | "ACTIVE_DELIVERY_UNVERIFIED"
+  | "ACTIVE_DISPUTE"
+  | "ACTIVE_REVISION"
+  | "ACTIVE_CANCELLATION"
+  | "UNRESOLVED_FRAUD"
+
+export interface SettlementEligibilityBlocker {
+  code: SettlementEligibilityBlockerCode
+  message: string
 }
 
 export interface SettlementEligibilitySnapshot {
@@ -52,30 +72,46 @@ const SETTLEMENT_SAFE_DISPUTE_STATUSES = [
 export function evaluateSettlementEligibility(
   snapshot: SettlementEligibilitySnapshot,
 ): SettlementEligibility {
-  const reasons: string[] = []
+  const blockers: SettlementEligibilityBlocker[] = []
+  const block = (code: SettlementEligibilityBlockerCode, message: string) => {
+    blockers.push({ code, message })
+  }
 
   if (snapshot.orderStatus !== "DELIVERED") {
-    reasons.push(`Order status is ${snapshot.orderStatus}, expected DELIVERED`)
+    block(
+      "ORDER_STATUS",
+      `Order status is ${snapshot.orderStatus}, expected DELIVERED`,
+    )
   }
 
   if (snapshot.orderCurrency !== "USD") {
-    reasons.push(`Order currency is ${snapshot.orderCurrency}, expected USD`)
+    block(
+      "ORDER_CURRENCY",
+      `Order currency is ${snapshot.orderCurrency}, expected USD`,
+    )
   }
 
   if (snapshot.orderPaymentStatus !== "PAID") {
-    reasons.push(
+    block(
+      "ORDER_PAYMENT_STATUS",
       `Order payment status is ${snapshot.orderPaymentStatus}, expected PAID`,
     )
   }
 
   if (!snapshot.activeDeliveryVersionId) {
-    reasons.push("No active delivery version")
+    block("ACTIVE_DELIVERY_MISSING", "No active delivery version")
   } else {
     if (!snapshot.activeDeliveryMatchesOrder) {
-      reasons.push("Active delivery version does not belong to the order")
+      block(
+        "ACTIVE_DELIVERY_ORDER_MISMATCH",
+        "Active delivery version does not belong to the order",
+      )
     }
     if (!snapshot.activeDeliveryIsCurrent) {
-      reasons.push("Active delivery version is superseded")
+      block(
+        "ACTIVE_DELIVERY_SUPERSEDED",
+        "Active delivery version is superseded",
+      )
     }
     const explicitlyRejected =
       snapshot.activeDeliveryInterventionStatus === "REJECTED"
@@ -87,33 +123,42 @@ export function evaluateSettlementEligibility(
       snapshot.activeDeliveryInterventionStatus === "APPROVED" ||
       snapshot.activeDeliveryInterventionStatus === "OVERRIDDEN"
     if (explicitlyRejected) {
-      reasons.push("Active delivery was explicitly rejected")
+      block(
+        "ACTIVE_DELIVERY_REJECTED",
+        "Active delivery was explicitly rejected",
+      )
     } else if (!verified && !manuallyApproved) {
-      reasons.push(
+      block(
+        "ACTIVE_DELIVERY_UNVERIFIED",
         `Active delivery is ${snapshot.activeDeliveryVerificationStatus} and not manually approved`,
       )
     }
   }
 
   if (snapshot.hasActiveDispute) {
-    reasons.push("Order has an active dispute")
+    block("ACTIVE_DISPUTE", "Order has an active dispute")
   }
 
   if (snapshot.hasActiveRevision) {
-    reasons.push("Order has an active revision in progress")
+    block("ACTIVE_REVISION", "Order has an active revision in progress")
   }
 
   if (snapshot.hasActiveCancellationRequest) {
-    reasons.push("Order has an active cancellation request")
+    block("ACTIVE_CANCELLATION", "Order has an active cancellation request")
   }
 
   if (snapshot.fraudFlagCount > 0) {
-    reasons.push(
+    block(
+      "UNRESOLVED_FRAUD",
       `Order has ${snapshot.fraudFlagCount} unresolved fraud flag(s)`,
     )
   }
 
-  return { eligible: reasons.length === 0, reasons }
+  return {
+    eligible: blockers.length === 0,
+    reasons: blockers.map((blocker) => blocker.message),
+    blockers,
+  }
 }
 
 /**

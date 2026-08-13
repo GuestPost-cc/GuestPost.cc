@@ -2,172 +2,119 @@ import { ForbiddenException } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
 import { StaffRolesGuard } from "../staff-roles.guard"
 
+const staffAuthority = (staffRole: string | null) => ({
+  id: "staff-1",
+  userType: "STAFF",
+  role: "SEO_SPECIALIST",
+  emailVerified: true,
+  organizationId: null,
+  publisherId: null,
+  publisherOrganizationId: null,
+  customerRole: null,
+  memberRole: null,
+  publisherRole: null,
+  staffRole,
+  staffPermissions: [],
+})
+
 describe("StaffRolesGuard", () => {
   let guard: StaffRolesGuard
   let reflector: Reflector
-  let prisma: any
+  let authorities: { resolveRequest: jest.Mock }
 
   beforeEach(() => {
     reflector = new Reflector()
-    prisma = {
-      staffMembership: { findUnique: jest.fn() },
+    authorities = { resolveRequest: jest.fn() }
+    guard = new StaffRolesGuard(reflector, authorities as any)
+  })
+
+  const mockContext = (user?: any) => {
+    const request = { user }
+    return {
+      request,
+      context: {
+        getHandler: () => ({}),
+        getClass: () => ({}),
+        switchToHttp: () => ({ getRequest: () => request }),
+      } as any,
     }
-    guard = new StaffRolesGuard(reflector, prisma)
+  }
+
+  it.each([
+    undefined,
+    [],
+  ])("denies missing or empty @StaffRoles metadata (%p)", async (required) => {
+    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(required)
+    const { context } = mockContext({ id: "staff-1" })
+
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
+    expect(authorities.resolveRequest).not.toHaveBeenCalled()
   })
 
-  const mockContext = (user?: any) =>
-    ({
-      getHandler: () => ({}),
-      getClass: () => ({}),
-      switchToHttp: () => ({
-        getRequest: () => ({ user }),
-      }),
-    }) as any
-
-  // Phase 6.7 — fail-closed: a route guarded by StaffRolesGuard but missing
-  // @StaffRoles metadata is REFUSED, not allowed. The two tests below cover
-  // both fail-closed branches in staff-roles.guard.ts:34–39 (undefined metadata
-  // + empty array). admin-rbac-coverage.spec.ts asserts the positive side
-  // (every AdminController handler declares @StaffRoles); these assert the
-  // guard's actual response to a missing/empty declaration.
-  it("DENIES access when no @StaffRoles metadata is declared (fail-closed)", async () => {
-    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(undefined)
-    await expect(
-      guard.canActivate(
-        mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" }),
-      ),
-    ).rejects.toThrow(ForbiddenException)
-  })
-
-  it("DENIES access when an empty roles array is declared (fail-closed)", async () => {
-    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue([])
-    await expect(
-      guard.canActivate(
-        mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" }),
-      ),
-    ).rejects.toThrow(ForbiddenException)
-  })
-
-  it("allows SUPER_ADMIN access from the durable membership", async () => {
-    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    prisma.staffMembership.findUnique.mockResolvedValue({
-      role: "SUPER_ADMIN",
-      user: { banned: false, userType: "STAFF" },
-    })
-    await expect(
-      guard.canActivate(
-        mockContext({ id: "staff-1", userType: "STAFF", staffRole: "FINANCE" }),
-      ),
-    ).resolves.toBe(true)
-  })
-
-  it("allows FINANCE access when FINANCE is required", async () => {
-    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["FINANCE"])
-    prisma.staffMembership.findUnique.mockResolvedValue({
-      role: "FINANCE",
-      user: { banned: false, userType: "STAFF" },
-    })
-    await expect(
-      guard.canActivate(mockContext({ id: "staff-1", userType: "STAFF" })),
-    ).resolves.toBe(true)
-  })
-
-  it("allows OPERATIONS access when OPERATIONS is required", async () => {
-    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["OPERATIONS"])
-    prisma.staffMembership.findUnique.mockResolvedValue({
-      role: "OPERATIONS",
-      user: { banned: false, userType: "STAFF" },
-    })
-    await expect(
-      guard.canActivate(mockContext({ id: "staff-1", userType: "STAFF" })),
-    ).resolves.toBe(true)
-  })
-
-  it("denies CUSTOMER user", async () => {
-    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    await expect(
-      guard.canActivate(mockContext({ userType: "CUSTOMER" })),
-    ).rejects.toThrow(ForbiddenException)
-  })
-
-  it("denies user with no durable staff membership", async () => {
-    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    prisma.staffMembership.findUnique.mockResolvedValue(null)
-    await expect(
-      guard.canActivate(
-        mockContext({
-          id: "staff-1",
-          userType: "STAFF",
-          staffRole: "SUPER_ADMIN",
-        }),
-      ),
-    ).rejects.toThrow(ForbiddenException)
-  })
-
-  it("denies a stale cached SUPER_ADMIN after durable demotion", async () => {
-    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    prisma.staffMembership.findUnique.mockResolvedValue({
-      role: "OPERATIONS",
-      user: { banned: false, userType: "STAFF" },
-    })
-    await expect(
-      guard.canActivate(
-        mockContext({
-          id: "staff-1",
-          userType: "STAFF",
-          staffRole: "SUPER_ADMIN",
-        }),
-      ),
-    ).rejects.toThrow(ForbiddenException)
-  })
-
-  it("denies a stale cached role after the durable user is banned", async () => {
-    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    prisma.staffMembership.findUnique.mockResolvedValue({
-      role: "SUPER_ADMIN",
-      user: { banned: true, userType: "STAFF" },
+  it.each([
+    "SUPER_ADMIN",
+    "FINANCE",
+    "OPERATIONS",
+  ])("allows a fresh %s membership when required", async (role) => {
+    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue([role])
+    authorities.resolveRequest.mockResolvedValue(staffAuthority(role))
+    const { context, request } = mockContext({
+      id: "staff-1",
+      userType: "STAFF",
+      staffRole: "STALE",
     })
 
-    await expect(
-      guard.canActivate(
-        mockContext({
-          id: "staff-1",
-          userType: "STAFF",
-          staffRole: "SUPER_ADMIN",
-        }),
-      ),
-    ).rejects.toThrow(ForbiddenException)
+    await expect(guard.canActivate(context)).resolves.toBe(true)
+    expect(authorities.resolveRequest).toHaveBeenCalledWith(request)
   })
 
-  it("denies a stale STAFF projection after the durable user type changes", async () => {
+  it("denies a stale SUPER_ADMIN projection after durable demotion", async () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    prisma.staffMembership.findUnique.mockResolvedValue({
-      role: "SUPER_ADMIN",
-      user: { banned: false, userType: "CUSTOMER" },
+    authorities.resolveRequest.mockResolvedValue(staffAuthority("OPERATIONS"))
+    const { context } = mockContext({
+      id: "staff-1",
+      userType: "STAFF",
+      staffRole: "SUPER_ADMIN",
     })
 
-    await expect(
-      guard.canActivate(
-        mockContext({
-          id: "staff-1",
-          userType: "STAFF",
-          staffRole: "SUPER_ADMIN",
-        }),
-      ),
-    ).rejects.toThrow(ForbiddenException)
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
   })
 
-  it("throws when user is null", async () => {
+  it("denies a stale role after durable membership deletion", async () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    await expect(guard.canActivate(mockContext(null))).rejects.toThrow(
-      ForbiddenException,
-    )
+    authorities.resolveRequest.mockResolvedValue(staffAuthority(null))
+    const { context } = mockContext({
+      id: "staff-1",
+      userType: "STAFF",
+      staffRole: "SUPER_ADMIN",
+    })
+
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
   })
 
-  it("throws when user is undefined", async () => {
+  it("denies when the durable actor type is no longer STAFF", async () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    await expect(guard.canActivate(mockContext(undefined))).rejects.toThrow(
-      ForbiddenException,
-    )
+    authorities.resolveRequest.mockResolvedValue({
+      ...staffAuthority(null),
+      userType: "CUSTOMER",
+      organizationId: "organization-1",
+      customerRole: "OWNER",
+      memberRole: "OWNER",
+    })
+    const { context } = mockContext({
+      id: "staff-1",
+      userType: "STAFF",
+      staffRole: "SUPER_ADMIN",
+    })
+
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
+  })
+
+  it("denies when no authenticated user is attached", async () => {
+    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
+    const { context } = mockContext(undefined)
+
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
+    expect(authorities.resolveRequest).not.toHaveBeenCalled()
   })
 })

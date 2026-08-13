@@ -34,7 +34,7 @@ export const CUSTOMER_ORDER_STAGE_GROUPS = [
   {
     key: "delivered",
     label: "Delivered",
-    statuses: ["DELIVERED", "SETTLED"],
+    statuses: ["DELIVERED"],
   },
   {
     key: "completed",
@@ -69,7 +69,6 @@ export const CUSTOMER_RESULT_STATUSES: OrderStatus[] = [
   "PUBLISHED",
   "VERIFIED",
   "DELIVERED",
-  "SETTLED",
   "COMPLETED",
 ]
 
@@ -77,7 +76,6 @@ const CLOSED_STATUSES = new Set<OrderStatus>([
   "COMPLETED",
   "CANCELLED",
   "REFUNDED",
-  "SETTLED",
 ])
 
 export function customerCanMutateOrder(
@@ -135,7 +133,7 @@ export function getCustomerNextAction(
     return { label: "Await publication", tone: "neutral" as const }
   if (order.status === "PUBLISHED")
     return { label: "Track verification", tone: "neutral" as const }
-  if (["DELIVERED", "SETTLED"].includes(order.status))
+  if (order.status === "DELIVERED")
     return { label: "View delivery", tone: "primary" as const }
   if (order.status === "COMPLETED")
     return { label: "View result", tone: "primary" as const }

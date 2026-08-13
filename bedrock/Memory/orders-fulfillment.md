@@ -2,20 +2,43 @@
 note_type: domain-memory
 domain: orders-fulfillment
 project: guestpost-platform
-updated: 2026-08-03
+updated: 2026-08-12
 ---
 
 # Orders & Fulfillment
 
 ## Order Lifecycle
 
-Full lifecycle state machine (`OrderStatus` enum, 18 states):
+Full lifecycle state machine (`OrderStatus` enum, 17 states):
 
 ```
-DRAFT → SUBMITTED → ACCEPTED → CONTENT_CREATION → CONTENT_READY → CUSTOMER_REVIEW → APPROVED → PUBLISHED → VERIFIED → DELIVERED → SETTLED → COMPLETED
+DRAFT → PENDING_PAYMENT → PAID → SUBMITTED → ACCEPTED → CONTENT_REQUESTED → CONTENT_CREATION → CONTENT_READY → CUSTOMER_REVIEW → APPROVED → PUBLISHED → VERIFIED → DELIVERED → COMPLETED
 ```
 
 Cancellation/dispute paths branch off at various states.
+Publisher settlement review does not add an Order state: the order remains
+`DELIVERED` until one exact `Settlement.RELEASED` state, release ledger row,
+and relational release event commit with the transition to `COMPLETED`.
+
+Canonical wallet payment is one externally observable aggregate command:
+`DRAFT`/payment `PENDING` becomes `SUBMITTED`/payment `PAID` through one
+status-and-version CAS. The same transaction retains separate
+`PAYMENT_CAPTURED` and `ORDER_SUBMITTED` milestones, both bound to the resulting
+aggregate version with explicit sequence metadata. Aggregate versions count
+commands, not event rows; `PAID` remains a compatibility/recovery order status
+rather than a separately committed intermediate state of this command.
+
+Cancelling an unpaid order releases only its exact negative order-reservation
+ledger fact and appends one positive `RELEASE` bucket-transfer row. Deferred
+database assertions are attached to the transaction, order, and cancellation
+event sides of the chain; the terminal `CANCELLED`/payment-`PENDING` state and
+its evidence cannot be rewritten independently later.
+
+API lifecycle writers use the typed, API-local `transitionOrderCas` helper.
+It requires exact from/to statuses, owns the single version increment, and
+only permits a narrow lifecycle patch. Identity, immutable order-contract,
+settlement-fence, and delivery-evidence mutations require their specialized
+domain CAS predicates rather than this helper.
 
 ## Publisher Workbench
 
@@ -60,7 +83,7 @@ Cancellation/dispute paths branch off at various states.
 - Campaign lists expose an authoritative server-side `orderCount`. Campaign
   detail and Reports page through all matching order pages before computing
   totals or exports. Result reporting consistently includes PUBLISHED,
-  VERIFIED, DELIVERED, SETTLED, and COMPLETED.
+  VERIFIED, DELIVERED, and COMPLETED.
 - Support tickets linked to an order are prioritized when waiting on the
   customer, and ticket forms warn users never to send passwords, API keys,
   complete card details, or other credentials. The unsupported priority input
@@ -194,7 +217,7 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 ## Key Rules
 
 - One website per order (enforced in createOrder/addOrderItem)
-- Critical statuses (PAID, ACCEPTED, VERIFIED, SETTLED, COMPLETED, REFUNDED) are system-only
+- Critical statuses (PAID, ACCEPTED, VERIFIED, COMPLETED, REFUNDED) are system-only
 - `forceCancel` delegates refund to `RefundService`
 - `confirmDelivery`/settlement non-atomic fixed to single transaction
 

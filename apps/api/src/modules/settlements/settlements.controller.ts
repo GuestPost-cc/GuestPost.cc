@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Param,
   Post,
@@ -9,7 +8,7 @@ import {
   UseGuards,
 } from "@nestjs/common"
 import { ActorType } from "../../common/decorators/actor-type.decorator"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { CurrentAuthority } from "../../common/decorators/current-authority.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { RequireOrderOwnership } from "../../common/decorators/order-ownership.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
@@ -30,7 +29,7 @@ export class SettlementsController {
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER", "MEMBER")
   @RequireOrderOwnership()
-  customerApprove(@Param("id") id: string, @CurrentUser() user: any) {
+  customerApprove(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.settlements.customerApprove(
       id,
       user.id,
@@ -47,9 +46,14 @@ export class SettlementsController {
   adminApprove(
     @Param("id") id: string,
     @Body() body: SettlementReasonDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
-    return this.settlements.adminApprove(id, body.reason, user.id, user.role)
+    return this.settlements.adminApprove(
+      id,
+      body.reason,
+      user.id,
+      user.staffRole,
+    )
   }
 
   // SUPER_ADMIN can force-approve both sides
@@ -59,9 +63,14 @@ export class SettlementsController {
   forceApprove(
     @Param("id") id: string,
     @Body() body: SettlementReasonDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
-    return this.settlements.forceApprove(id, body.reason, user.id, user.role)
+    return this.settlements.forceApprove(
+      id,
+      body.reason,
+      user.id,
+      user.staffRole,
+    )
   }
 
   @Post(":id/cancel")
@@ -70,7 +79,7 @@ export class SettlementsController {
   cancel(
     @Param("id") id: string,
     @Body() body: SettlementReasonDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.settlements.cancelSettlement(id, user.id, body.reason)
   }
@@ -81,7 +90,7 @@ export class SettlementsController {
   returnToReview(
     @Param("id") id: string,
     @Body() body: SettlementReasonDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: any,
   ) {
     return this.settlements.returnToReview(id, user.id, body.reason)
   }
@@ -96,18 +105,13 @@ export class SettlementsController {
     return this.settlements.listSettlements(undefined, t, s)
   }
 
-  // Staff see any settlement; customers only settlements of their own organization
+  // Customers see settlements of their current organization. Staff use the
+  // dedicated /admin settlement surface with StaffRolesGuard.
   @Get(":id")
-  @UseGuards(ActorTypeGuard)
-  @ActorType("STAFF", "CUSTOMER")
-  get(@Param("id") id: string, @CurrentUser() user: any) {
-    if (user.userType === "STAFF") {
-      const allowed = ["SUPER_ADMIN", "FINANCE"]
-      if (!user.staffRole || !allowed.includes(user.staffRole)) {
-        throw new ForbiddenException("Insufficient staff permissions")
-      }
-      return this.settlements.getSettlement(id)
-    }
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
+  get(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.settlements.getSettlement(id, user.organizationId)
   }
 }

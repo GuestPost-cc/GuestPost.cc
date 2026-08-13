@@ -1,70 +1,26 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { test } from "node:test"
+import test from "node:test"
+import {
+  createSourceFile,
+  isImportDeclaration,
+  isStringLiteral,
+  ScriptTarget,
+} from "typescript"
 
-const source = readFileSync(resolve(__dirname, "../src/index.ts"), "utf8")
+// This is deliberately a narrow static boundary, not a runtime-lane contract.
+// Runtime composition is covered behaviorally in worker-runtime.spec.ts. A
+// top-level integration import would still construct secret-dependent adapters
+// before a lane is selected, so keep that single forbidden-import assertion.
+test("the worker entrypoint does not statically import integration workers", () => {
+  const source = readFileSync(resolve(__dirname, "../src/index.ts"), "utf8")
+  const syntax = createSourceFile("index.ts", source, ScriptTarget.Latest, true)
+  const staticImports = syntax.statements
+    .filter(isImportDeclaration)
+    .map((declaration) => declaration.moduleSpecifier)
+    .filter(isStringLiteral)
+    .map((specifier) => specifier.text)
 
-test("integration workers are loaded only by lanes that consume their queues", () => {
-  const imports = source.slice(0, source.indexOf("const REALTIME_WORKERS"))
-  assert.doesNotMatch(imports, /@guestpost\/integrations\/workers/)
-
-  const loader = source.slice(
-    source.indexOf("async function createIntegrationWorkers"),
-    source.indexOf("const ON_DEMAND_QUEUES"),
-  )
-  assert.match(loader, /await import\(\s*"@guestpost\/integrations\/workers"/)
-
-  const all = source.slice(
-    source.indexOf('if (mode === "all")'),
-    source.indexOf('if (mode === "realtime")'),
-  )
-  assert.match(all, /await createIntegrationWorkers\(\)/)
-
-  const realtime = source.slice(
-    source.indexOf('if (mode === "realtime")'),
-    source.indexOf('if (mode === "on-demand")'),
-  )
-  assert.doesNotMatch(realtime, /createIntegrationWorkers/)
-
-  const onDemand = source.slice(
-    source.indexOf('if (mode === "on-demand")'),
-    source.indexOf("const taskName = process.env.WORKER_TASK"),
-  )
-  assert.match(onDemand, /await createIntegrationWorkers\(\)/)
-
-  const scheduled = source.slice(
-    source.indexOf("const taskName = process.env.WORKER_TASK"),
-    source.indexOf("bootstrap().catch"),
-  )
-  assert.doesNotMatch(scheduled, /createIntegrationWorkers/)
-})
-
-test("object storage is required only by lanes that can consume delivery evidence", () => {
-  const all = source.slice(
-    source.indexOf('if (mode === "all")'),
-    source.indexOf('if (mode === "realtime")'),
-  )
-  assert.match(all, /await assertObjectStorageReadiness\(\)/)
-
-  const realtime = source.slice(
-    source.indexOf('if (mode === "realtime")'),
-    source.indexOf('if (mode === "on-demand")'),
-  )
-  assert.match(realtime, /await assertObjectStorageReadiness\(\)/)
-
-  const onDemand = source.slice(
-    source.indexOf('if (mode === "on-demand")'),
-    source.indexOf("const taskName = process.env.WORKER_TASK"),
-  )
-  assert.doesNotMatch(onDemand, /assertObjectStorageReadiness/)
-
-  const scheduledRunner = source.slice(
-    source.indexOf("async function runScheduledTask"),
-    source.indexOf("function isMaintenanceTaskDisabled"),
-  )
-  assert.match(
-    scheduledRunner,
-    /if \(task\.queue === QUEUES\.DELIVERY_VERIFICATION\) \{\s*await assertObjectStorageReadiness\(\)/,
-  )
+  assert.equal(staticImports.includes("@guestpost/integrations/workers"), false)
 })

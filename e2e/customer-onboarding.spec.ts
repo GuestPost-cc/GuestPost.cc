@@ -1,38 +1,39 @@
 /**
- * Customer journey: signup → org-creation gate → dashboard with wallet.
- * Creates a throwaway account per run — no seed coupling.
+ * Customer journey: signup → authenticated org gate → verification policy.
+ * Creates a run-scoped throwaway account — no privileged seed coupling.
  */
 import { expect, test } from "@playwright/test"
+import { fixtureEmail } from "./support/fixture-identity"
 
-const PORTAL = process.env.E2E_PORTAL_URL ?? "http://localhost:3001"
-
-test("customer can sign up, create an organization, and reach a funded-ready dashboard", async ({
+test("customer signup reaches the organization gate and enforces email verification", async ({
   page,
-}) => {
-  const email = `e2e-cust-${Date.now()}@test.local`
+}, testInfo) => {
+  const email = fixtureEmail(testInfo, "customer")
 
-  await page.goto(PORTAL)
-  await page.getByRole("button", { name: "Sign up" }).click()
-  await page.getByPlaceholder("Full name").fill("E2E Customer")
-  await page.getByPlaceholder("Email").fill(email)
-  await page.getByPlaceholder("Password").fill("E2ECustomer123!")
-  await page.getByRole("button", { name: "Create Account" }).click()
+  await page.goto("/signup")
+  await page.getByRole("checkbox", { name: /Terms of Service/ }).check()
+  await page.getByLabel("Full name").fill("E2E Customer")
+  await page.getByLabel("Email address").fill(email)
+  await page.getByLabel("Password").fill("E2ECustomer123!")
+  await page.getByRole("button", { name: "Create customer account" }).click()
 
   // Fresh customers hit the org-creation gate before any dashboard content
   await expect(page.getByText("Create your organization")).toBeVisible({
     timeout: 20_000,
   })
-  await page.getByLabel("Organization name").fill("E2E Test Org")
+
+  // A new account is intentionally unverified. Prove the real authorization
+  // boundary rather than bypassing it with a privileged seed: organization
+  // creation is a mutation and must remain blocked until email verification.
+  await page.getByLabel("Organization name").fill("E2E Test Organization")
+  const createResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/identity/organizations"),
+  )
   await page.getByRole("button", { name: "Create organization" }).click()
-
-  // Gate clears into the real dashboard shell
-  await expect(page.getByRole("link", { name: "Campaigns" })).toBeVisible({
-    timeout: 20_000,
-  })
-
-  // Money actions are reachable: billing page renders the wallet (not a 403 error state)
-  await page.goto(`${PORTAL}/dashboard/billing`)
-  await expect(page.getByText(/available balance/i).first()).toBeVisible({
-    timeout: 15_000,
-  })
+  const response = await createResponse
+  expect(response.status()).toBe(403)
+  expect(JSON.stringify(await response.json())).toContain("EMAIL_NOT_VERIFIED")
+  await expect(page.getByText("Create your organization")).toBeVisible()
 })

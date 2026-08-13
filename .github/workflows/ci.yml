@@ -163,4 +163,85 @@ jobs:
         run: pnpm --filter @guestpost/ui test:coverage
 
       - name: Build all production targets
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
         run: pnpm build
+
+      - name: Start isolated object storage
+        env:
+          MINIO_BUCKET: guestpost-ci
+          MINIO_ROOT_USER: guestpost-ci
+          MINIO_ROOT_PASSWORD: ci-only-minio-password-0123456789
+        run: |
+          docker run --detach --rm --name guestpost-ci-minio \
+            --publish 9000:9000 \
+            --env MINIO_ROOT_USER \
+            --env MINIO_ROOT_PASSWORD \
+            --env MINIO_BUCKET \
+            minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e \
+            server /data
+
+          for attempt in {1..45}; do
+            if curl --fail --silent http://localhost:9000/minio/health/live >/dev/null; then
+              break
+            fi
+            if [[ "${attempt}" -eq 45 ]]; then
+              docker logs guestpost-ci-minio
+              exit 1
+            fi
+            sleep 1
+          done
+
+          docker exec guestpost-ci-minio sh -eu -c '
+            mc_config_dir=$(mktemp -d)
+            trap '\''rm -rf -- "${mc_config_dir}"'\'' EXIT
+            mc --config-dir "${mc_config_dir}" alias set \
+              guestpost-ci http://127.0.0.1:9000 \
+              "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null
+            mc --config-dir "${mc_config_dir}" mb --ignore-existing \
+              "guestpost-ci/${MINIO_BUCKET}" >/dev/null
+            printf "GuestPost CI evidence storage readiness\n" | \
+              mc --config-dir "${mc_config_dir}" pipe \
+                "guestpost-ci/${MINIO_BUCKET}/.guestpost/evidence-storage-ready-v1" \
+                >/dev/null
+            mc --config-dir "${mc_config_dir}" stat \
+              "guestpost-ci/${MINIO_BUCKET}/.guestpost/evidence-storage-ready-v1" \
+              >/dev/null
+          '
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end browser tests
+        env:
+          E2E_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          BETTER_AUTH_URL: http://localhost:4000
+          TRUSTED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003
+          CORS_ORIGIN: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          OBJECT_STORAGE_PROVIDER: minio
+          MINIO_ENDPOINT: localhost:9000
+          MINIO_BUCKET: guestpost-ci
+          MINIO_ACCESS_KEY: guestpost-ci
+          MINIO_SECRET_KEY: ci-only-minio-password-0123456789
+          PAYOUT_ENCRYPTION_KEYS: '{"ci-e2e":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}'
+          PAYOUT_ENCRYPTION_ACTIVE_KEY_ID: ci-e2e
+        run: pnpm test:e2e
+
+      - name: Upload Playwright failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/playwright/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop isolated object storage
+        if: always()
+        run: |
+          if docker container inspect guestpost-ci-minio >/dev/null 2>&1; then
+            docker stop guestpost-ci-minio >/dev/null
+          fi

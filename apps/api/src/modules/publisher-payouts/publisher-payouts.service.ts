@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { Prisma, type WithdrawalStatus } from "@guestpost/database"
 import {
   type CommunicationEventType,
@@ -36,7 +37,10 @@ import { CommunicationsService } from "../communications/communications.service"
 import { QueueService } from "../queues/queue.service"
 import type { CompleteManualWithdrawalDto } from "./dto/complete-manual-withdrawal.dto"
 import type { CreatePayoutMethodDto } from "./dto/create-payout-method.dto"
-import { PayoutEncryptionService } from "./payout-encryption.service"
+import {
+  PayoutEncryptionService,
+  payoutMethodEncryptionContext,
+} from "./payout-encryption.service"
 import { PayoutExecutionService } from "./payout-execution.service"
 import { normalizePayoutMethodInput } from "./payout-method-input"
 import { currentPayoutMethodRuntime } from "./payout-method-runtime"
@@ -147,7 +151,10 @@ export class PublisherPayoutsService {
     })
   }
 
-  async getBalance(publisherId: string) {
+  async getBalance(publisherId: string, userId?: string) {
+    // Publisher HTTP callers pass userId so this service independently proves
+    // the current publisher-owner grant. Internal finance callers may omit it.
+    if (userId) await this.assertPublisherMember(userId, publisherId)
     const balance = await this.prisma.publisherBalance.findUnique({
       where: { publisherId },
     })
@@ -242,7 +249,15 @@ export class PublisherPayoutsService {
         )
       }
 
-      const { ciphertext, version } = this.encryption.encrypt(input.details)
+      const methodId = randomUUID()
+      const { ciphertext, version } = this.encryption.encrypt(
+        input.details,
+        payoutMethodEncryptionContext({
+          id: methodId,
+          publisherId,
+          type: input.type,
+        }),
+      )
       const displayDetails = this.encryption.extractDisplayDetails(
         input.details,
         input.type,
@@ -256,6 +271,7 @@ export class PublisherPayoutsService {
       }
       const method = await tx.payoutMethod.create({
         data: {
+          id: methodId,
           publisherId,
           type: input.type,
           label: input.label,
@@ -435,6 +451,7 @@ export class PublisherPayoutsService {
       const details = this.encryption.decrypt(
         method.details as unknown as string,
         method.encryptionKeyVersion,
+        payoutMethodEncryptionContext(method),
       )
 
       await this.audit.log(
@@ -737,8 +754,13 @@ export class PublisherPayoutsService {
       const transactions = await tx.transaction.findMany({
         where: {
           publisherId,
-          settlementId: { not: null },
-          type: { in: ["SETTLEMENT_RELEASE", "DEBT_REPAYMENT"] },
+          type: {
+            in: [
+              "SETTLEMENT_RELEASE",
+              "PUBLISHER_COMPENSATION",
+              "DEBT_REPAYMENT",
+            ],
+          },
           ...(balance.allocationCutoverAt
             ? { createdAt: { gte: balance.allocationCutoverAt } }
             : {}),
@@ -746,6 +768,14 @@ export class PublisherPayoutsService {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         include: {
           settlement: { select: { serviceType: true, orderId: true } },
+          publisherCompensationCredit: {
+            select: {
+              id: true,
+              orderId: true,
+              order: { select: { type: true } },
+            },
+          },
+          publisherCompensationDebt: { select: { id: true } },
           withdrawalAllocations: {
             where: { releasedAt: null },
             select: { amount: true },
@@ -761,39 +791,59 @@ export class PublisherPayoutsService {
             "Publisher liability contains a non-USD source; Finance reconciliation is required",
         })
       }
-      const debtBySettlement = new Map<string, Decimal>()
+      const debtBySource = new Map<string, Decimal>()
       for (const row of transactions) {
-        if (row.type !== "DEBT_REPAYMENT" || !row.settlementId) continue
-        debtBySettlement.set(
-          row.settlementId,
-          (debtBySettlement.get(row.settlementId) ?? new Decimal(0)).plus(
-            row.amount,
-          ),
+        if (row.type !== "DEBT_REPAYMENT") continue
+        const sourceKey = row.settlementId
+          ? `settlement:${row.settlementId}`
+          : row.publisherCompensationDebt?.id
+            ? `compensation:${row.publisherCompensationDebt.id}`
+            : null
+        if (!sourceKey) continue
+        debtBySource.set(
+          sourceKey,
+          (debtBySource.get(sourceKey) ?? new Decimal(0)).plus(row.amount),
         )
       }
       for (const row of transactions) {
         if (remaining.lessThanOrEqualTo(0)) break
-        if (row.type !== "SETTLEMENT_RELEASE" || !row.settlementId) continue
+        const settlementSource =
+          row.type === "SETTLEMENT_RELEASE" && row.settlementId
+        const compensationSource =
+          row.type === "PUBLISHER_COMPENSATION" &&
+          row.publisherCompensationCredit
+        if (!settlementSource && !compensationSource) continue
+        const sourceKey = settlementSource
+          ? `settlement:${row.settlementId}`
+          : `compensation:${row.publisherCompensationCredit.id}`
         const allocated = row.withdrawalAllocations.reduce(
           (sum: Decimal, item: any) => sum.plus(item.amount),
           new Decimal(0),
         )
         const sourceAvailable = new Decimal(row.amount)
-          .plus(debtBySettlement.get(row.settlementId) ?? 0)
+          .plus(debtBySource.get(sourceKey) ?? 0)
           .minus(allocated)
         if (sourceAvailable.lessThanOrEqualTo(0)) continue
         const use = Decimal.min(sourceAvailable, remaining)
         await tx.withdrawalAllocation.create({
           data: {
             withdrawalId,
-            sourceType: "SETTLEMENT_RELEASE",
+            sourceType: settlementSource
+              ? "SETTLEMENT_RELEASE"
+              : "PUBLISHER_COMPENSATION",
             sourceTransactionId: row.id,
-            settlementId: row.settlementId,
-            orderId: row.settlement?.orderId ?? row.orderId,
+            settlementId: settlementSource ? row.settlementId : null,
+            orderId:
+              row.settlement?.orderId ??
+              row.publisherCompensationCredit?.orderId ??
+              row.orderId,
             amount: use,
             currency: USD_CURRENCY,
             sequence: sequence++,
-            serviceType: row.settlement?.serviceType ?? null,
+            serviceType:
+              row.settlement?.serviceType ??
+              row.publisherCompensationCredit?.order?.type ??
+              null,
           },
         })
         remaining = remaining.minus(use)
@@ -1934,7 +1984,13 @@ export class PublisherPayoutsService {
     take = 50,
     skip = 0,
     statuses?: WithdrawalStatus[],
+    userId?: string,
   ) {
+    // The generic method also serves guarded admin inventory. A publisher-
+    // scoped caller supplies userId and is re-authorized here.
+    if (publisherId && userId) {
+      await this.assertPublisherMember(userId, publisherId)
+    }
     const where: Prisma.WithdrawalWhereInput = {
       ...(publisherId ? { publisherId } : {}),
       ...(statuses?.length ? { status: { in: statuses } } : {}),

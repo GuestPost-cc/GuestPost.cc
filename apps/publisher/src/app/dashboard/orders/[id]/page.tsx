@@ -89,7 +89,6 @@ const statusConfig: Record<
   PUBLISHED: { icon: Check, description: "Content published" },
   VERIFIED: { icon: ShieldCheck, description: "Content verified" },
   DELIVERED: { icon: CheckCircle, description: "Order delivered" },
-  SETTLED: { icon: CheckCircle, description: "Settlement processed" },
   COMPLETED: { icon: CheckCircle, description: "Order completed" },
   CANCELLED: { icon: XCircle, description: "Order cancelled" },
   REFUNDED: { icon: RefreshCw, description: "Refund issued" },
@@ -106,7 +105,6 @@ const eventLabels: Record<string, string> = {
   VERIFIED: "Verified",
   UNDER_REVIEW: "Sent for review",
   DELIVERED: "Delivered",
-  SETTLED: "Settlement processed",
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
   REFUNDED: "Refunded",
@@ -140,7 +138,6 @@ const eventIcons = {
   VERIFIED: CheckCircle,
   UNDER_REVIEW: Clock,
   DELIVERED: CheckCircle,
-  SETTLED: CheckCircle,
   COMPLETED: CheckCircle,
   CANCELLED: XCircle,
   REFUNDED: RefreshCw,
@@ -384,14 +381,9 @@ export default function OrderDetailPage() {
     queryFn: () => api.orders.deliveryProof(orderId),
     enabled:
       !!order &&
-      [
-        "PUBLISHED",
-        "VERIFIED",
-        "DELIVERED",
-        "SETTLED",
-        "COMPLETED",
-        "DISPUTED",
-      ].includes(order.status),
+      ["PUBLISHED", "VERIFIED", "DELIVERED", "COMPLETED", "DISPUTED"].includes(
+        order.status,
+      ),
   })
 
   const { data: events = [] } = useQuery({

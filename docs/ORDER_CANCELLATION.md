@@ -20,6 +20,10 @@ service in `apps/api/src/modules/orders/services/order-cancellation.service.ts`.
    publisher trust.
 8. Version guards and database uniqueness constraints make repeated and
    concurrent requests deterministic.
+9. An unpaid-order reservation release is an atomic bucket transfer plus an
+   append-only `RELEASE` ledger fact. Database constraints bind the release to
+   its exact source reservation, wallet, cancelled order, and cancellation
+   event; later rewrites of any linked evidence are rejected.
 
 ## Decision Matrix
 
@@ -28,7 +32,7 @@ service in `apps/api/src/modules/orders/services/order-cancellation.service.ts`.
 | `DRAFT`, legacy `PENDING_PAYMENT` | Cancel now; release any reservation | Not applicable | Stale Ops assignment is cancelled |
 | `PAID`, `SUBMITTED` | Cancel now; full wallet refund | Decline; full wallet refund | Operations declines; full wallet refund |
 | `ACCEPTED` through `APPROVED` | Request cancellation | Request cancellation | Operations requests cancellation |
-| `PUBLISHED` through `SETTLED` | Open dispute | Respond through dispute/support | Respond through dispute/support |
+| `PUBLISHED` through `DELIVERED` | Open dispute | Respond through dispute/support | Respond through dispute/support |
 | `COMPLETED` | Open dispute only inside a configured warranty window | Respond through dispute/support | Respond through dispute/support |
 | `CANCELLED`, `REFUNDED`, `DISPUTED` | No new cancellation action | No new cancellation action | No new cancellation action |
 

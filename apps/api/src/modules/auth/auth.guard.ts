@@ -41,6 +41,7 @@ export class AuthGuard implements CanActivate {
     })
 
     if (!session) throw new UnauthorizedException()
+    request.authenticatedUserId = session.user.id
 
     // Better Auth reads this field from the user row on every session lookup.
     // Check it before the derived-context cache so a suspension performed by
@@ -75,9 +76,9 @@ export class AuthGuard implements CanActivate {
       }
     }
 
-    // Session is verified above on every request; the derived context (user
-    // row, active org/publisher, roles) is cached briefly. Mutations that
-    // change it call invalidateAuthContext().
+    // Session is verified above on every request; this derived context is a
+    // presentation projection only. CurrentAuthorityGuard replaces every
+    // grant-bearing field from PostgreSQL before protected handlers execute.
     const cached = getCachedAuthContext(session.user.id)
     if (cached) {
       // Phase 7.8 #25 — verification gate runs on the cache-hit path too;

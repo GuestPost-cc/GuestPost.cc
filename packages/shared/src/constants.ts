@@ -12,7 +12,6 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   PUBLISHED: "Published",
   VERIFIED: "Verified",
   DELIVERED: "Delivered",
-  SETTLED: "Settled",
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
   REFUNDED: "Refunded",
