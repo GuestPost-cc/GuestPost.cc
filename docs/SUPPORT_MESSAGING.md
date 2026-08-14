@@ -43,7 +43,12 @@ support inbox. During active fulfillment, an order-linked ticket remains
 read-only until the order itself is claimed. After fulfillment ends, the latest
 active Operations owner is retained when possible; an otherwise unassigned
 ticket may be claimed independently without creating or changing a fulfillment
-assignment.
+assignment. Super Admin may reassign or unassign that same independently owned
+ticket without rewriting fulfillment history. Claim and reassignment consume
+one locked eligibility rule: the order must be post-fulfillment with no active
+assignment. A `DISPUTED` order qualifies only while its current dispute is
+`OPEN` or `UNDER_REVIEW` and its recorded previous status is post-fulfillment;
+missing, resolved, or pre-fulfillment dispute context fails closed.
 
 Operations demotion and suspension fail while any assigned ticket is not
 `CLOSED`; `RESOLVED` remains blocking because it can be reopened. Historical
@@ -102,9 +107,15 @@ ordered `messages` collection, so the initial request uses the same sender and
 accessibility treatment as every reply.
 
 `capabilities` is returned with each ticket and drives the visible controls:
-reply, close, reopen, internal note, claim, allowed visibilities, allowed
-statuses, and a read-only reason. Capabilities improve the user experience but
-are not authorization; the mutation always rechecks policy.
+reply, close, reopen, internal note, claim, reassignment, allowed visibilities,
+allowed statuses, and a read-only reason. Super Admin reassignment uses an
+active-Operations picker, a required reason, and an explicit confirmation; an
+unassign action is supported when work must return to the eligible queue.
+The command also requires the owner observed when the dialog opened. If another
+administrator changes ownership first, the locked compare-and-set fails with a
+conflict before target lookup, ticket mutation, audit, or outbox creation.
+Capabilities improve the user experience but are not authorization; the
+mutation always rechecks policy and target authority under lock.
 
 ## Status behavior
 
@@ -166,7 +177,7 @@ inbox, or perturb its cursor.
 | `POST /admin/support/tickets/:id/messages` | Authorized staff | Public reply or internal note |
 | `PATCH /admin/support/tickets/:id/status` | Authorized staff | Staff status transition |
 | `PATCH /admin/support/tickets/:id/claim` | Operations | Claim a general or eligible post-fulfillment unassigned Platform ticket |
-| `PATCH /support/tickets/:id/reassign` | Super Admin | Validated reassignment |
+| `PATCH /support/tickets/:id/reassign` | Super Admin | Reassign or unassign a general or eligible post-fulfillment Platform ticket with a required reason |
 
 Use `supportKeys` from `@guestpost/api-client` for list, detail, and order-scoped
 cache invalidation. Do not introduce dashboard-local copies of the support DTOs

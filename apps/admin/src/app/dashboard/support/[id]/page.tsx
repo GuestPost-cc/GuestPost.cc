@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  type AdminOpsStaffResponse,
   type StaffTicketDetail,
   supportKeys,
   type TicketMessageDto,
@@ -13,7 +14,14 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   FulfillmentChannelBadge,
+  Label,
   mergeSupportConversationPages,
   Select,
   SelectContent,
@@ -23,10 +31,12 @@ import {
   Skeleton,
   SupportComposer,
   SupportConversation,
+  Textarea,
 } from "@guestpost/ui"
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
@@ -36,6 +46,7 @@ import {
   ExternalLink,
   Info,
   RefreshCw,
+  UserRoundCog,
 } from "lucide-react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
@@ -46,6 +57,30 @@ import {
   AdminPageHeader,
 } from "../../../../components/admin-workspace"
 import { api } from "../../../../lib/api"
+
+const UNASSIGNED_OWNER_VALUE = "__unassigned__"
+const UNSAFE_REASSIGNMENT_CHARACTERS =
+  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u061c\u200b\u200e\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/u
+
+interface ReassignmentDraft {
+  initialOwnerId: string | null | undefined
+  initialOwnerName: string
+  selectedOwnerId: string | null | undefined
+  reason: string
+}
+
+function normalizeReassignmentReason(value: string): string {
+  return value.normalize("NFC").replace(/\r\n?/g, "\n").trim()
+}
+
+function operationsMemberName(member: AdminOpsStaffResponse): string {
+  return member.name?.trim() || member.email
+}
+
+function operationsMemberLabel(member: AdminOpsStaffResponse): string {
+  const name = member.name?.trim()
+  return name ? `${name} (${member.email})` : member.email
+}
 
 function statusLabel(status: string): string {
   return status.replaceAll("_", " ").toLowerCase()
@@ -67,6 +102,8 @@ export default function AdminTicketDetailPage() {
   const [replyContent, setReplyContent] = useState("")
   const [visibility, setVisibility] =
     useState<TicketMessageVisibility>("PUBLIC")
+  const [reassignmentDraft, setReassignmentDraft] =
+    useState<ReassignmentDraft | null>(null)
   const replyIntentId = useRef<string | null>(null)
   const detailKey = supportKeys.detail("admin", ticketId)
   const listKey = supportKeys.lists("admin")
@@ -83,6 +120,15 @@ export default function AdminTicketDetailPage() {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.messagePage?.nextCursor ?? null,
     enabled: Boolean(ticketId),
+  })
+
+  const canLoadAssignmentCandidates = Boolean(
+    reassignmentDraft && ticketQuery.data?.pages[0]?.capabilities.canReassign,
+  )
+  const assignmentCandidatesQuery = useQuery({
+    queryKey: ["admin", "operations-staff"],
+    queryFn: () => api.admin.listOpsStaff(),
+    enabled: canLoadAssignmentCandidates,
   })
 
   const statusMutation = useMutation({
@@ -110,6 +156,49 @@ export default function AdminTicketDetailPage() {
     },
     onError: (error: Error) =>
       toast.error(error.message || "The ticket could not be claimed"),
+  })
+
+  const reassignMutation = useMutation({
+    mutationFn: (input: {
+      assignedToUserId: string | null
+      expectedAssignedToUserId: string | null
+      reason: string
+      orderId: string | null
+    }) =>
+      api.admin.reassignTicket(ticketId, {
+        assignedToUserId: input.assignedToUserId,
+        expectedAssignedToUserId: input.expectedAssignedToUserId,
+        reason: input.reason,
+      }),
+    onSuccess: async (_, input) => {
+      setReassignmentDraft(null)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: detailKey }),
+        // This prefix includes the inbox and every order-scoped support panel.
+        queryClient.invalidateQueries({ queryKey: listKey }),
+        ...(input.orderId
+          ? [
+              queryClient.invalidateQueries({
+                queryKey: ["admin", "order", input.orderId],
+              }),
+            ]
+          : []),
+      ])
+      toast.success(
+        input.assignedToUserId
+          ? "Ticket reassigned"
+          : "Ticket returned to the shared queue",
+      )
+    },
+    onError: (error: Error) => {
+      // A concurrent assignment or staff deactivation is expected to fail
+      // closed server-side. Refresh both snapshots before allowing a retry.
+      void Promise.all([
+        ticketQuery.refetch(),
+        assignmentCandidatesQuery.refetch(),
+      ])
+      toast.error(error.message || "The ticket could not be reassigned")
+    },
   })
 
   const replyMutation = useMutation({
@@ -190,6 +279,97 @@ export default function AdminTicketDetailPage() {
   const readOnlyReason =
     ticket.capabilities.readOnlyReason ??
     (canWrite ? null : "This ticket is read-only for your current assignment.")
+  const currentOwnerId = ticket.assignedTo ? ticket.assignedTo.userId : null
+  const assignmentCandidates = assignmentCandidatesQuery.data ?? []
+  const candidateIds = new Set(
+    assignmentCandidates.map((candidate) => candidate.id),
+  )
+  const selectedCandidate = assignmentCandidates.find(
+    (candidate) => candidate.id === reassignmentDraft?.selectedOwnerId,
+  )
+  const normalizedReassignmentReason = normalizeReassignmentReason(
+    reassignmentDraft?.reason ?? "",
+  )
+  const reasonHasUnsafeCharacters = UNSAFE_REASSIGNMENT_CHARACTERS.test(
+    normalizedReassignmentReason,
+  )
+  const reasonIsValid =
+    normalizedReassignmentReason.length >= 10 &&
+    normalizedReassignmentReason.length <= 2_000 &&
+    !reasonHasUnsafeCharacters
+  const ownerChanged = Boolean(
+    reassignmentDraft &&
+      reassignmentDraft.selectedOwnerId !== reassignmentDraft.initialOwnerId,
+  )
+  const currentOwnerProjectionIncomplete = Boolean(
+    reassignmentDraft && ticket.assignedTo && !ticket.assignedTo.userId,
+  )
+  const ticketAssignmentChanged = Boolean(
+    reassignmentDraft && currentOwnerId !== reassignmentDraft.initialOwnerId,
+  )
+  const selectedOwnerIsStale = Boolean(
+    reassignmentDraft &&
+      assignmentCandidatesQuery.isSuccess &&
+      reassignmentDraft.selectedOwnerId &&
+      !candidateIds.has(reassignmentDraft.selectedOwnerId),
+  )
+  const reassignmentIsBlocked =
+    !reassignmentDraft ||
+    !ticket.capabilities.canReassign ||
+    currentOwnerProjectionIncomplete ||
+    ticketAssignmentChanged ||
+    reassignmentDraft.selectedOwnerId === undefined ||
+    !ownerChanged ||
+    !reasonIsValid ||
+    assignmentCandidatesQuery.isLoading ||
+    assignmentCandidatesQuery.isFetching ||
+    assignmentCandidatesQuery.isError ||
+    selectedOwnerIsStale ||
+    reassignMutation.isPending
+
+  const openReassignmentDialog = () => {
+    const initialOwnerId = ticket.assignedTo ? ticket.assignedTo.userId : null
+    setReassignmentDraft({
+      initialOwnerId,
+      initialOwnerName: ticket.assignedTo?.displayName ?? "Shared Ops queue",
+      selectedOwnerId: initialOwnerId,
+      reason: "",
+    })
+    reassignMutation.reset()
+  }
+
+  const closeReassignmentDialog = () => {
+    if (reassignMutation.isPending) return
+    setReassignmentDraft(null)
+    reassignMutation.reset()
+  }
+
+  const submitReassignment = () => {
+    if (
+      reassignmentIsBlocked ||
+      !reassignmentDraft ||
+      reassignmentDraft.selectedOwnerId === undefined ||
+      reassignmentDraft.initialOwnerId === undefined
+    ) {
+      return
+    }
+    reassignMutation.mutate({
+      assignedToUserId: reassignmentDraft.selectedOwnerId,
+      expectedAssignedToUserId: reassignmentDraft.initialOwnerId,
+      reason: normalizedReassignmentReason,
+      orderId: ticket.order?.id ?? null,
+    })
+  }
+
+  const selectedOwnerName =
+    reassignmentDraft?.selectedOwnerId === null
+      ? "Shared Ops queue"
+      : selectedCandidate
+        ? operationsMemberName(selectedCandidate)
+        : reassignmentDraft?.selectedOwnerId ===
+            reassignmentDraft?.initialOwnerId
+          ? reassignmentDraft?.initialOwnerName
+          : "Unavailable Operations staff"
 
   return (
     <AdminPage className="max-w-5xl">
@@ -200,6 +380,16 @@ export default function AdminTicketDetailPage() {
         icon={Info}
         actions={
           <div className="flex flex-wrap gap-2">
+            {ticket.capabilities.canReassign && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={openReassignmentDialog}
+              >
+                <UserRoundCog className="mr-2 h-4 w-4" aria-hidden="true" />
+                Reassign ticket
+              </Button>
+            )}
             {ticketQuery.data?.pages[0]?.capabilities.canClaim && (
               <Button
                 size="sm"
@@ -393,6 +583,317 @@ export default function AdminTicketDetailPage() {
           />
         </CardContent>
       </Card>
+
+      <Dialog
+        open={Boolean(reassignmentDraft)}
+        onOpenChange={(open) => {
+          if (!open) closeReassignmentDialog()
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Confirm ticket reassignment</DialogTitle>
+            <DialogDescription>
+              Change the Operations owner for this support conversation. For an
+              order-linked ticket, this does not change the order&apos;s
+              fulfillment assignment.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Current owner
+                </p>
+                <p
+                  dir="auto"
+                  className="mt-1 truncate text-sm font-medium [unicode-bidi:plaintext]"
+                >
+                  {reassignmentDraft?.initialOwnerName}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  New owner
+                </p>
+                <p
+                  dir="auto"
+                  className="mt-1 truncate text-sm font-medium [unicode-bidi:plaintext]"
+                  aria-live="polite"
+                >
+                  {selectedOwnerName}
+                </p>
+              </div>
+            </div>
+
+            {!ticket.capabilities.canReassign && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/5 p-3"
+              >
+                <p className="text-sm font-medium">
+                  Reassignment is no longer available
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  The server capability changed while this dialog was open.
+                  Close and refresh the ticket before taking another action.
+                </p>
+              </div>
+            )}
+
+            {(currentOwnerProjectionIncomplete || ticketAssignmentChanged) && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/5 p-3"
+              >
+                <p className="text-sm font-medium">
+                  Assignment information changed
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {currentOwnerProjectionIncomplete
+                    ? "The current owner identifier is unavailable, so this action is blocked."
+                    : "Another staff member changed this ticket while you were reviewing it."}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => {
+                    closeReassignmentDialog()
+                    void ticketQuery.refetch()
+                  }}
+                >
+                  Close and reload
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="support-assignee">New Operations owner</Label>
+                <span className="text-xs text-muted-foreground">
+                  Active Operations staff only
+                </span>
+              </div>
+
+              {assignmentCandidatesQuery.isLoading && (
+                <div className="space-y-2" aria-busy="true">
+                  <Skeleton className="h-10 w-full" />
+                  <span className="sr-only">
+                    Loading Operations assignment candidates
+                  </span>
+                </div>
+              )}
+
+              {assignmentCandidatesQuery.isError && (
+                <div
+                  role="alert"
+                  className="rounded-md border border-destructive/30 bg-destructive/5 p-3"
+                >
+                  <p className="text-sm font-medium">
+                    Could not load Operations staff
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {(assignmentCandidatesQuery.error as Error).message ||
+                      "The assignment candidates are unavailable."}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => assignmentCandidatesQuery.refetch()}
+                    disabled={assignmentCandidatesQuery.isFetching}
+                  >
+                    {assignmentCandidatesQuery.isFetching
+                      ? "Retrying…"
+                      : "Retry"}
+                  </Button>
+                </div>
+              )}
+
+              {assignmentCandidatesQuery.isSuccess && reassignmentDraft && (
+                <>
+                  <Select
+                    value={
+                      reassignmentDraft.selectedOwnerId === null
+                        ? UNASSIGNED_OWNER_VALUE
+                        : reassignmentDraft.selectedOwnerId
+                    }
+                    onValueChange={(value) => {
+                      setReassignmentDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              selectedOwnerId:
+                                value === UNASSIGNED_OWNER_VALUE ? null : value,
+                            }
+                          : current,
+                      )
+                      reassignMutation.reset()
+                    }}
+                    disabled={
+                      reassignMutation.isPending ||
+                      assignmentCandidatesQuery.isFetching
+                    }
+                  >
+                    <SelectTrigger id="support-assignee" className="w-full">
+                      <SelectValue placeholder="Choose an owner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assignmentCandidates.map((candidate) => (
+                        <SelectItem key={candidate.id} value={candidate.id}>
+                          <span dir="auto" className="[unicode-bidi:plaintext]">
+                            {operationsMemberLabel(candidate)}
+                          </span>
+                        </SelectItem>
+                      ))}
+                      {reassignmentDraft.selectedOwnerId &&
+                        !candidateIds.has(
+                          reassignmentDraft.selectedOwnerId,
+                        ) && (
+                          <SelectItem
+                            value={reassignmentDraft.selectedOwnerId}
+                            disabled
+                          >
+                            {selectedOwnerName} (no longer active)
+                          </SelectItem>
+                        )}
+                      <SelectItem value={UNASSIGNED_OWNER_VALUE}>
+                        Shared Ops queue (unassigned)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {assignmentCandidates.length === 0 && (
+                    <div className="rounded-md border border-dashed p-3">
+                      <p className="text-sm font-medium">
+                        No active Operations staff are available
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        You can only return this ticket to the shared queue.
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedOwnerIsStale && (
+                    <div
+                      role="alert"
+                      className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3"
+                    >
+                      <p className="text-sm font-medium">
+                        The selected owner is no longer active
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Choose another active operator or the shared queue.
+                      </p>
+                    </div>
+                  )}
+
+                  {assignmentCandidatesQuery.isFetching && (
+                    <p className="text-xs text-muted-foreground" role="status">
+                      Refreshing assignment candidates…
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="support-reassignment-reason">
+                  Reason for audit log
+                </Label>
+                <span className="text-xs text-muted-foreground">
+                  Required · {normalizedReassignmentReason.length}/2000
+                </span>
+              </div>
+              <Textarea
+                id="support-reassignment-reason"
+                value={reassignmentDraft?.reason ?? ""}
+                onChange={(event) => {
+                  const reason = event.target.value
+                  setReassignmentDraft((current) =>
+                    current ? { ...current, reason } : current,
+                  )
+                  reassignMutation.reset()
+                }}
+                placeholder="Explain the operational reason for changing this owner."
+                maxLength={2_000}
+                rows={4}
+                disabled={reassignMutation.isPending}
+                aria-invalid={
+                  Boolean(reassignmentDraft?.reason) && !reasonIsValid
+                }
+                aria-describedby="support-reassignment-reason-help"
+                className="[unicode-bidi:plaintext]"
+              />
+              <p
+                id="support-reassignment-reason-help"
+                className={
+                  reassignmentDraft?.reason && !reasonIsValid
+                    ? "text-xs text-destructive"
+                    : "text-xs text-muted-foreground"
+                }
+              >
+                {reasonHasUnsafeCharacters
+                  ? "Remove invisible or unsupported control characters."
+                  : normalizedReassignmentReason.length > 0 &&
+                      normalizedReassignmentReason.length < 10
+                    ? "Use at least 10 characters so the audit reason is meaningful."
+                    : "Use 10–2000 characters. Leading and trailing whitespace is removed."}
+              </p>
+            </div>
+
+            {reassignMutation.isError && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/5 p-3"
+              >
+                <p className="text-sm font-medium">Assignment not saved</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {(reassignMutation.error as Error).message ||
+                    "The ticket could not be reassigned."}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={submitReassignment}
+                  disabled={reassignmentIsBlocked}
+                >
+                  Retry reassignment
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeReassignmentDialog}
+              disabled={reassignMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={submitReassignment}
+              disabled={reassignmentIsBlocked}
+            >
+              {reassignMutation.isPending
+                ? "Reassigning…"
+                : ownerChanged
+                  ? "Confirm reassignment"
+                  : "Choose a different owner"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminPage>
   )
 }

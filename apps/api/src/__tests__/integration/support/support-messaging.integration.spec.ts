@@ -661,6 +661,229 @@ describe("[INTEGRATION] Support and fulfillment assignment serialization", () =>
     }
   }, 30_000)
 
+  it("reassigns terminal order support for offboarding and serializes target demotion", async () => {
+    const { app, prisma, cleanup } = await createTestApp()
+    try {
+      const organization = await makeOrganization(prisma)
+      const customer = await makeUser(prisma, { userType: "CUSTOMER" })
+      await addCustomerMembership(prisma, customer.id, organization.id)
+      const previousOwner = await addStaff(
+        prisma,
+        "OPERATIONS",
+        "Terminal ticket previous owner",
+      )
+      const nextOwner = await addStaff(
+        prisma,
+        "OPERATIONS",
+        "Terminal ticket next owner",
+      )
+      const concurrentTarget = await addStaff(
+        prisma,
+        "OPERATIONS",
+        "First concurrent reassignment target",
+      )
+      const competingTarget = await addStaff(
+        prisma,
+        "OPERATIONS",
+        "Second concurrent reassignment target",
+      )
+      const demotionTarget = await addStaff(
+        prisma,
+        "OPERATIONS",
+        "Concurrent demotion target",
+      )
+      const administrator = await addStaff(
+        prisma,
+        "SUPER_ADMIN",
+        "First administrator",
+      )
+      const competingAdministrator = await addStaff(
+        prisma,
+        "SUPER_ADMIN",
+        "Second administrator",
+      )
+      const website = await makeWebsite(prisma, { ownershipType: "PLATFORM" })
+      const order = await prisma.order.create({
+        data: {
+          type: "GUEST_POST",
+          status: "COMPLETED",
+          organizationId: organization.id,
+          customerId: customer.id,
+          websiteId: website.id,
+          fulfillmentChannel: "PLATFORM",
+          amount: 100,
+          currency: "USD",
+          title: `Terminal support order ${crypto.randomUUID()}`,
+          paymentStatus: "PENDING",
+        },
+      })
+      const deliveredAssignment = await prisma.fulfillmentAssignment.create({
+        data: {
+          orderId: order.id,
+          assignedToUserId: previousOwner.id,
+          assignedByUserId: administrator.id,
+          status: "DELIVERED",
+          completedAt: new Date(),
+        },
+      })
+      const ticket = await prisma.ticket.create({
+        data: {
+          subject: "Terminal order support needs a safe handoff",
+          description:
+            "This non-closed conversation must not block Operations offboarding.",
+          status: "OPEN",
+          userId: customer.id,
+          organizationId: organization.id,
+          orderId: order.id,
+          fulfillmentChannel: "PLATFORM",
+          assignedToUserId: previousOwner.id,
+        },
+      })
+
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { AdminService } = require("../../../modules/admin/admin.service")
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const {
+        SupportService,
+      } = require("../../../modules/support/support.service")
+      const administration: any = app.get(AdminService)
+      const support: any = app.get(SupportService)
+      const administratorActor = {
+        userId: administrator.id,
+        kind: "STAFF",
+        staffRole: "SUPER_ADMIN",
+      }
+      const competingAdministratorActor = {
+        userId: competingAdministrator.id,
+        kind: "STAFF",
+        staffRole: "SUPER_ADMIN",
+      }
+
+      await expect(
+        administration.updateStaffRole(previousOwner.id, "FINANCE", {
+          id: administrator.id,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException)
+
+      await support.reassignTicket(
+        ticket.id,
+        {
+          assignedToUserId: nextOwner.id,
+          expectedAssignedToUserId: previousOwner.id,
+          reason: "Transfer the support conversation before staff offboarding.",
+        },
+        administratorActor,
+      )
+      await expect(
+        administration.updateStaffRole(previousOwner.id, "FINANCE", {
+          id: administrator.id,
+        }),
+      ).resolves.toMatchObject({ role: "FINANCE" })
+      expect(
+        await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }),
+      ).toMatchObject({ assignedToUserId: nextOwner.id })
+      expect(
+        await prisma.fulfillmentAssignment.findUniqueOrThrow({
+          where: { id: deliveredAssignment.id },
+        }),
+      ).toMatchObject({
+        assignedToUserId: previousOwner.id,
+        status: "DELIVERED",
+      })
+
+      const [firstReassignment, secondReassignment] = await Promise.allSettled([
+        support.reassignTicket(
+          ticket.id,
+          {
+            assignedToUserId: concurrentTarget.id,
+            expectedAssignedToUserId: nextOwner.id,
+            reason: "First administrator transfers the same displayed owner.",
+          },
+          administratorActor,
+        ),
+        support.reassignTicket(
+          ticket.id,
+          {
+            assignedToUserId: competingTarget.id,
+            expectedAssignedToUserId: nextOwner.id,
+            reason: "Second administrator transfers the same displayed owner.",
+          },
+          competingAdministratorActor,
+        ),
+      ])
+      expect(
+        [firstReassignment, secondReassignment].filter(
+          (result) => result.status === "fulfilled",
+        ),
+      ).toHaveLength(1)
+      expect(
+        [firstReassignment, secondReassignment].filter(
+          (result) => result.status === "rejected",
+        ),
+      ).toHaveLength(1)
+
+      const raceWinnerId =
+        firstReassignment.status === "fulfilled"
+          ? concurrentTarget.id
+          : competingTarget.id
+      expect(
+        await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }),
+      ).toMatchObject({ assignedToUserId: raceWinnerId })
+      expect(
+        await prisma.auditLog.count({
+          where: {
+            action: "TICKET_REASSIGNED",
+            entityType: "Ticket",
+            entityId: ticket.id,
+          },
+        }),
+      ).toBe(2)
+
+      const [reassignment, demotion] = await Promise.allSettled([
+        support.reassignTicket(
+          ticket.id,
+          {
+            assignedToUserId: demotionTarget.id,
+            expectedAssignedToUserId: raceWinnerId,
+            reason:
+              "Exercise target offboarding against a concurrent terminal handoff.",
+          },
+          administratorActor,
+        ),
+        administration.updateStaffRole(demotionTarget.id, "FINANCE", {
+          id: administrator.id,
+        }),
+      ])
+      expect(
+        reassignment.status === "fulfilled" || demotion.status === "fulfilled",
+      ).toBe(true)
+
+      const [targetMembership, currentTicket, assignmentAfterRace] =
+        await Promise.all([
+          prisma.staffMembership.findUniqueOrThrow({
+            where: { userId: demotionTarget.id },
+          }),
+          prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }),
+          prisma.fulfillmentAssignment.findUniqueOrThrow({
+            where: { id: deliveredAssignment.id },
+          }),
+        ])
+      if (targetMembership.role === "OPERATIONS") {
+        expect(reassignment.status).toBe("fulfilled")
+        expect(currentTicket.assignedToUserId).toBe(demotionTarget.id)
+      } else {
+        expect(demotion.status).toBe("fulfilled")
+        expect(currentTicket.assignedToUserId).toBe(raceWinnerId)
+      }
+      expect(assignmentAfterRace).toMatchObject({
+        assignedToUserId: previousOwner.id,
+        status: "DELIVERED",
+      })
+    } finally {
+      await cleanup()
+    }
+  }, 30_000)
+
   it("serializes Operations demotion against a CLOSED-ticket reopen without orphaning ownership", async () => {
     const { app, prisma, cleanup } = await createTestApp()
     try {

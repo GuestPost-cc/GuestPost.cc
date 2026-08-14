@@ -77,7 +77,12 @@ const POST_FULFILLMENT_SUPPORT_ORDER_STATUSES = [
   "COMPLETED",
   "CANCELLED",
   "REFUNDED",
-  "DISPUTED",
+] as const
+const POST_FULFILLMENT_DISPUTE_PREVIOUS_STATUSES = [
+  "PUBLISHED",
+  "VERIFIED",
+  "DELIVERED",
+  "COMPLETED",
 ] as const
 const MESSAGE_PAGE_LIMIT = 200
 const UNSAFE_SUPPORT_CONTROL_CHARACTERS =
@@ -97,6 +102,7 @@ export interface TicketCapabilitiesDto {
   canReopen: boolean
   canPostInternal: boolean
   canClaim: boolean
+  canReassign: boolean
   allowedVisibilities: Visibility[]
   allowedStatuses: TicketStatus[]
   readOnlyReason: string | null
@@ -719,6 +725,9 @@ export class SupportService {
                   type: true,
                   fulfillmentChannel: true,
                   website: { select: { ownershipType: true } },
+                  dispute: {
+                    select: { status: true, previousStatus: true },
+                  },
                   fulfillmentAssignments: {
                     where: {
                       status: {
@@ -811,6 +820,7 @@ export class SupportService {
                 type: true,
                 fulfillmentChannel: true,
                 website: { select: { ownershipType: true } },
+                dispute: { select: { status: true, previousStatus: true } },
                 fulfillmentAssignments: {
                   where: {
                     status: {
@@ -1017,14 +1027,18 @@ export class SupportService {
     return this.transitionStatus(ticketId, status, actor, true)
   }
 
-  // ── Admin reassignment of a general Platform-support ticket ─────────────
-  // Order-linked ownership is authoritative on FulfillmentAssignment and is
-  // synchronized by OrderFulfillmentAssignmentService. It cannot be changed
-  // independently here, and publisher participants are never reassigned onto
-  // an existing historical conversation.
+  // ── Admin reassignment of a Platform-support ticket ─────────────────────
+  // Active/claimable order ownership remains authoritative on
+  // FulfillmentAssignment. Once fulfillment is irreversibly past that stage,
+  // Super Admin may reassign only the support conversation so Operations
+  // offboarding cannot dead-end. This command never mutates fulfillment.
   async reassignTicket(
     ticketId: string,
-    body: { assignedToUserId: string | null; reason: string },
+    body: {
+      assignedToUserId: string | null
+      expectedAssignedToUserId: string | null
+      reason: string
+    },
     staff: SupportActor,
   ) {
     if (staff.kind !== "STAFF" || staff.staffRole !== "SUPER_ADMIN") {
@@ -1038,18 +1052,27 @@ export class SupportService {
     const committed = await runSerializableTransactionWithRetry(
       this.prisma,
       async (tx: any) => {
-        const ticket = await this.lockTicket(tx, ticketId)
-        if (!ticket) throw new NotFoundException("Ticket not found")
+        const { ticket, order } = await this.lockTicketOwnershipContext(
+          tx,
+          ticketId,
+        )
         await this.assertActorAuthorityInTransaction(tx, staff)
-        if (ticket.orderId) {
-          throw new ConflictException(
-            "Order-linked ticket ownership follows the order assignment",
-          )
-        }
         if (!isOperationsPlatformSupportTicket(ticket)) {
           throw new ConflictException(
-            "Only general Platform-support tickets can be reassigned here",
+            "Only clean Platform-support tickets can be reassigned here",
           )
+        }
+        if (!this.canManageOrderTicketIndependently(ticket, order)) {
+          throw new ConflictException(
+            "Active or claimable order-linked tickets must be reassigned through fulfillment assignment",
+          )
+        }
+        if (ticket.assignedToUserId !== body.expectedAssignedToUserId) {
+          throw new ConflictException({
+            code: "TICKET_ASSIGNMENT_CHANGED",
+            message:
+              "Ticket assignment changed. Refresh the ticket before reassigning it.",
+          })
         }
         if (ticket.assignedToUserId === body.assignedToUserId) {
           throw new ConflictException("Ticket already has that assignment")
@@ -1061,10 +1084,16 @@ export class SupportService {
             where: { userId: body.assignedToUserId },
             select: {
               role: true,
-              user: { select: { name: true, banned: true } },
+              user: {
+                select: { name: true, banned: true, userType: true },
+              },
             },
           })
-          if (target?.role !== "OPERATIONS" || target.user.banned) {
+          if (
+            target?.role !== "OPERATIONS" ||
+            target.user.banned ||
+            target.user.userType !== "STAFF"
+          ) {
             throw new BadRequestException({
               code: "INVALID_OWNER",
               message:
@@ -1096,6 +1125,17 @@ export class SupportService {
             metadata: {
               fromAssignedToUserId: ticket.assignedToUserId,
               toAssignedToUserId: body.assignedToUserId,
+              ownershipMode: ticket.orderId
+                ? "POST_FULFILLMENT_TICKET_ONLY"
+                : "GENERAL_SUPPORT",
+              orderId: ticket.orderId,
+              orderStatus: order?.status ?? null,
+              effectiveOrderStatus:
+                order?.status === "DISPUTED"
+                  ? (order.dispute?.previousStatus ?? null)
+                  : (order?.status ?? null),
+              disputeStatus: order?.dispute?.status ?? null,
+              disputePreviousStatus: order?.dispute?.previousStatus ?? null,
               reason,
               systemEventId: systemEvent.id,
             },
@@ -1113,7 +1153,7 @@ export class SupportService {
           "INTERNAL",
           systemEvent.id,
         )
-        return { updated, fanOut, targetName }
+        return { updated, fanOut, targetName, order }
       },
     )
     await this.dispatchTicketFanOut(committed.fanOut)
@@ -1125,7 +1165,10 @@ export class SupportService {
             userId: body.assignedToUserId,
           }
         : null,
-      capabilities: this.buildCapabilities(staff, committed.updated),
+      capabilities: this.buildCapabilities(staff, {
+        ...committed.updated,
+        order: committed.order,
+      }),
     }
   }
 
@@ -1140,46 +1183,10 @@ export class SupportService {
     const committed = await runSerializableTransactionWithRetry(
       this.prisma,
       async (tx: any) => {
-        // Discover the immutable link without locking Ticket, then acquire the
-        // canonical Order -> Ticket lock order shared by fulfillment
-        // assignment. Re-check the link after Ticket is locked.
-        const ticketHint = await tx.ticket.findUnique({
-          where: { id: ticketId },
-          select: { orderId: true },
-        })
-        if (!ticketHint) throw new NotFoundException("Ticket not found")
-
-        let orderContext: any = null
-        if (ticketHint.orderId) {
-          await tx.$queryRaw`SELECT "id" FROM public."Order" WHERE "id" = ${ticketHint.orderId} FOR UPDATE`
-          orderContext = await tx.order.findUnique({
-            where: { id: ticketHint.orderId },
-            select: {
-              id: true,
-              status: true,
-              fulfillmentChannel: true,
-              website: { select: { ownershipType: true } },
-              fulfillmentAssignments: {
-                where: {
-                  status: {
-                    in: [...ACTIVE_FULFILLMENT_ASSIGNMENT_STATUSES],
-                  },
-                },
-                select: { id: true },
-                take: 1,
-              },
-            },
-          })
-          if (!orderContext) throw new NotFoundException("Ticket not found")
-        }
-
-        const ticket = await this.lockTicket(tx, ticketId)
-        if (!ticket) throw new NotFoundException("Ticket not found")
-        if (ticket.orderId !== ticketHint.orderId) {
-          throw new ConflictException(
-            "Ticket routing changed while it was being claimed. Refresh and retry.",
-          )
-        }
+        const { ticket, order } = await this.lockTicketOwnershipContext(
+          tx,
+          ticketId,
+        )
         await this.assertActorAuthorityInTransaction(tx, actor)
         if (!isOperationsPlatformSupportTicket(ticket)) {
           throw new ConflictException(
@@ -1189,25 +1196,10 @@ export class SupportService {
         if (ticket.assignedToUserId) {
           throw new ConflictException("Ticket is already assigned")
         }
-        if (ticket.orderId) {
-          const authoritativeChannel =
-            orderContext.fulfillmentChannel ??
-            (orderContext.website?.ownershipType === "PLATFORM"
-              ? "PLATFORM"
-              : "PUBLISHER")
-          const postFulfillment =
-            POST_FULFILLMENT_SUPPORT_ORDER_STATUSES.includes(
-              orderContext.status as (typeof POST_FULFILLMENT_SUPPORT_ORDER_STATUSES)[number],
-            )
-          if (
-            authoritativeChannel !== "PLATFORM" ||
-            orderContext.fulfillmentAssignments.length > 0 ||
-            !postFulfillment
-          ) {
-            throw new ConflictException(
-              "Claim the linked order before replying to this ticket",
-            )
-          }
+        if (!this.canManageOrderTicketIndependently(ticket, order)) {
+          throw new ConflictException(
+            "Claim the linked order before replying to this ticket",
+          )
         }
 
         const updated = await tx.ticket.update({
@@ -1272,6 +1264,78 @@ export class SupportService {
   }
 
   /**
+   * Lock a ticket for an ownership command using the repository-wide
+   * Order -> Ticket order. The initial ticket read discovers the immutable
+   * order link only; every routing fact is re-read after the locks are held.
+   */
+  private async lockTicketOwnershipContext(tx: any, ticketId: string) {
+    const ticketHint = await tx.ticket.findUnique({
+      where: { id: ticketId },
+      select: { orderId: true },
+    })
+    if (!ticketHint) throw new NotFoundException("Ticket not found")
+
+    let order: any = null
+    if (ticketHint.orderId) {
+      await tx.$queryRaw`SELECT "id" FROM public."Order" WHERE "id" = ${ticketHint.orderId} FOR UPDATE`
+      order = await tx.order.findUnique({
+        where: { id: ticketHint.orderId },
+        select: {
+          id: true,
+          status: true,
+          fulfillmentChannel: true,
+          website: { select: { ownershipType: true } },
+          dispute: { select: { status: true, previousStatus: true } },
+          fulfillmentAssignments: {
+            where: {
+              status: { in: [...ACTIVE_FULFILLMENT_ASSIGNMENT_STATUSES] },
+            },
+            select: { id: true },
+            take: 1,
+          },
+        },
+      })
+      if (!order) throw new NotFoundException("Ticket not found")
+    }
+
+    const ticket = await this.lockTicket(tx, ticketId)
+    if (!ticket) throw new NotFoundException("Ticket not found")
+    if (ticket.orderId !== ticketHint.orderId) {
+      throw new ConflictException(
+        "Ticket routing changed during the ownership command. Refresh and retry.",
+      )
+    }
+    return { ticket, order }
+  }
+
+  private canManageOrderTicketIndependently(ticket: any, order: any): boolean {
+    if (!ticket.orderId) return true
+    if (!order) return false
+    const authoritativeChannel =
+      order.fulfillmentChannel ??
+      (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    if (
+      authoritativeChannel !== "PLATFORM" ||
+      !Array.isArray(order.fulfillmentAssignments) ||
+      order.fulfillmentAssignments.length > 0
+    ) {
+      return false
+    }
+    if (order.status === "DISPUTED") {
+      return (
+        ["OPEN", "UNDER_REVIEW"].includes(order.dispute?.status) &&
+        POST_FULFILLMENT_DISPUTE_PREVIOUS_STATUSES.includes(
+          order.dispute
+            ?.previousStatus as (typeof POST_FULFILLMENT_DISPUTE_PREVIOUS_STATUSES)[number],
+        )
+      )
+    }
+    return POST_FULFILLMENT_SUPPORT_ORDER_STATUSES.includes(
+      order.status as (typeof POST_FULFILLMENT_SUPPORT_ORDER_STATUSES)[number],
+    )
+  }
+
+  /**
    * Resolve the order-derived support owner while the caller holds the Order
    * row lock. An active assignment is always authoritative. After fulfillment,
    * the latest DELIVERED assignment remains the safest continuity owner.
@@ -1302,9 +1366,14 @@ export class SupportService {
 
     const owner = await tx.staffMembership.findUnique({
       where: { userId: candidate.assignedToUserId },
-      select: { role: true, user: { select: { banned: true } } },
+      select: {
+        role: true,
+        user: { select: { banned: true, userType: true } },
+      },
     })
-    return owner?.role === "OPERATIONS" && !owner.user.banned
+    return owner?.role === "OPERATIONS" &&
+      !owner.user.banned &&
+      owner.user.userType === "STAFF"
       ? candidate.assignedToUserId
       : null
   }
@@ -1647,25 +1716,18 @@ export class SupportService {
       actor.staffRole === "OPERATIONS" &&
       cleanPlatformRouting &&
       ticket.assignedToUserId === actor.userId
-    const orderSupportClaimable =
-      !ticket.orderId ||
-      (ticket.order != null &&
-        (ticket.order.fulfillmentChannel ??
-          (ticket.order.website?.ownershipType === "PLATFORM"
-            ? "PLATFORM"
-            : "PUBLISHER")) === "PLATFORM" &&
-        Array.isArray(ticket.order.fulfillmentAssignments) &&
-        ticket.order.fulfillmentAssignments.length === 0 &&
-        POST_FULFILLMENT_SUPPORT_ORDER_STATUSES.includes(
-          ticket.order
-            .status as (typeof POST_FULFILLMENT_SUPPORT_ORDER_STATUSES)[number],
-        ))
+    const orderSupportClaimable = this.canManageOrderTicketIndependently(
+      ticket,
+      ticket.order,
+    )
     const canClaim =
       actor.kind === "STAFF" &&
       actor.staffRole === "OPERATIONS" &&
       cleanPlatformRouting &&
       ticket.assignedToUserId === null &&
       orderSupportClaimable
+    const canReassign =
+      superAdmin && cleanPlatformRouting && orderSupportClaimable
     const publicAuthority =
       customerParticipant ||
       publisherParticipant ||
@@ -1713,6 +1775,7 @@ export class SupportService {
       canReopen: allowedStatuses.includes("OPEN") && terminal,
       canPostInternal,
       canClaim,
+      canReassign,
       allowedVisibilities: [
         ...(canReply ? (["PUBLIC"] as Visibility[]) : []),
         ...(canPostInternal ? (["INTERNAL"] as Visibility[]) : []),

@@ -59,6 +59,8 @@ export interface TicketCapabilities {
   canReopen: boolean
   canPostInternal: boolean
   canClaim: boolean
+  /** Server-authorized ticket-only Operations assignment management. */
+  canReassign: boolean
   allowedVisibilities: TicketMessageVisibility[]
   allowedStatuses: TicketStatus[]
   readOnlyReason: string | null
@@ -183,6 +185,7 @@ export interface TicketStatusMutationResponse {
 
 export interface ReassignTicketInput {
   assignedToUserId: string | null
+  expectedAssignedToUserId: string | null
   reason: string
 }
 

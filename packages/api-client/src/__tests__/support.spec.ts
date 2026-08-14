@@ -1,9 +1,10 @@
 import { HttpClient } from "../client"
-import { AdminService } from "../services/admin"
+import { type AdminOpsStaffResponse, AdminService } from "../services/admin"
 import {
   type StaffTicketDetail,
   SupportService,
   supportKeys,
+  type TicketAssignmentMutationResponse,
   type TicketDetail,
   type TicketMessageDto,
 } from "../services/support"
@@ -14,6 +15,7 @@ const capabilities = {
   canReopen: false,
   canPostInternal: false,
   canClaim: false,
+  canReassign: false,
   allowedVisibilities: ["PUBLIC"],
   allowedStatuses: ["CLOSED"],
   readOnlyReason: null,
@@ -366,5 +368,70 @@ describe("admin support API contract", () => {
     await admin.claimTicket("ticket-1")
 
     expect(patch).toHaveBeenCalledWith("/admin/support/tickets/ticket-1/claim")
+  })
+
+  it("maps assignment and unassignment to the Super Admin support command", async () => {
+    const client = new HttpClient({
+      baseUrl: "https://api.example.test/api/v1",
+    })
+    const admin = new AdminService(client)
+    const response = {
+      id: "ticket-1",
+      assignedTo: null,
+      capabilities: { ...capabilities, canReassign: true },
+    } satisfies TicketAssignmentMutationResponse
+    const patch = jest.spyOn(client, "patch").mockResolvedValue(response)
+
+    await admin.reassignTicket("ticket-1", {
+      assignedToUserId: "operations-user-2",
+      expectedAssignedToUserId: "operations-user-1",
+      reason: "Balance the terminal support workload.",
+    })
+    await admin.reassignTicket("ticket-1", {
+      assignedToUserId: null,
+      expectedAssignedToUserId: "operations-user-2",
+      reason: "Return this ticket to the shared queue.",
+    })
+
+    expect(patch).toHaveBeenNthCalledWith(
+      1,
+      "/support/tickets/ticket-1/reassign",
+      {
+        json: {
+          assignedToUserId: "operations-user-2",
+          expectedAssignedToUserId: "operations-user-1",
+          reason: "Balance the terminal support workload.",
+        },
+      },
+    )
+    expect(patch).toHaveBeenNthCalledWith(
+      2,
+      "/support/tickets/ticket-1/reassign",
+      {
+        json: {
+          assignedToUserId: null,
+          expectedAssignedToUserId: "operations-user-2",
+          reason: "Return this ticket to the shared queue.",
+        },
+      },
+    )
+  })
+
+  it("loads assignment candidates from the active Operations endpoint", async () => {
+    const client = new HttpClient({
+      baseUrl: "https://api.example.test/api/v1",
+    })
+    const admin = new AdminService(client)
+    const candidates = [
+      {
+        id: "operations-user-2",
+        name: "Second operator",
+        email: "operator@example.test",
+      },
+    ] satisfies AdminOpsStaffResponse[]
+    const get = jest.spyOn(client, "get").mockResolvedValueOnce(candidates)
+
+    await expect(admin.listOpsStaff()).resolves.toEqual(candidates)
+    expect(get).toHaveBeenCalledWith("/admin/staff/operations")
   })
 })

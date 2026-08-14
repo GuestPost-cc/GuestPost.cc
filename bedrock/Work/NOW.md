@@ -24,11 +24,16 @@ owns launch risks. Historical PR and rollout diaries were moved to
   shared accessible conversation component instead of inferring alignment.
 - Made public ticket projections least-privilege, filtered internal notes
   before cursor pagination, removed Finance from generic Support, and added
-  fail-closed capability-driven reply/status/claim controls.
+  fail-closed capability-driven reply/status/claim/reassignment controls.
 - Added actor-scoped idempotency for ticket creation and replies, locked
   order-derived customer/publisher/Operations routing, and atomic ticket sync
   when a Platform fulfillment assignment changes. No database migration is
   required.
+- Added reasoned Super Admin reassignment/unassignment for general and eligible
+  post-fulfillment Platform tickets. It shares the claim command's
+  Order-before-Ticket eligibility rule, fails closed on inconsistent dispute
+  state, uses a locked expected-owner compare-and-set to reject stale concurrent
+  decisions, and never rewrites fulfillment assignment history.
 - Staff offboarding now blocks Operations demotion/suspension while active
   fulfillment or any non-closed Support ticket remains assigned. Closed ticket
   ownership is released atomically and counted in the protected offboarding

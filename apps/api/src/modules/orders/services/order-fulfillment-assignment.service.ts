@@ -178,16 +178,26 @@ export class OrderFulfillmentAssignmentService {
   ): Promise<"SUPER_ADMIN" | "OPERATIONS"> {
     const target = await tx.staffMembership.findUnique({
       where: { userId: assignedToUserId },
-      select: { role: true, user: { select: { banned: true } } },
+      select: {
+        role: true,
+        user: { select: { banned: true, userType: true } },
+      },
     })
     const actor =
       assignedByUserId === assignedToUserId
         ? target
         : await tx.staffMembership.findUnique({
             where: { userId: assignedByUserId },
-            select: { role: true, user: { select: { banned: true } } },
+            select: {
+              role: true,
+              user: { select: { banned: true, userType: true } },
+            },
           })
-    if (target?.role !== "OPERATIONS" || target.user.banned) {
+    if (
+      target?.role !== "OPERATIONS" ||
+      target.user.banned ||
+      target.user.userType !== "STAFF"
+    ) {
       throw new BadRequestException(
         "assignedToUserId must reference an active Operations staff member",
       )
@@ -195,6 +205,7 @@ export class OrderFulfillmentAssignmentService {
     if (
       !actor ||
       actor.user.banned ||
+      actor.user.userType !== "STAFF" ||
       (actor.role !== "SUPER_ADMIN" && actor.role !== "OPERATIONS")
     ) {
       throw new ConflictException(
@@ -240,9 +251,16 @@ export class OrderFulfillmentAssignmentService {
   private async assertAssignableOperationsUser(userId: string) {
     const membership = await this.prisma.staffMembership.findUnique({
       where: { userId },
-      select: { role: true, user: { select: { banned: true } } },
+      select: {
+        role: true,
+        user: { select: { banned: true, userType: true } },
+      },
     })
-    if (membership?.role !== "OPERATIONS" || membership.user.banned) {
+    if (
+      membership?.role !== "OPERATIONS" ||
+      membership.user.banned ||
+      membership.user.userType !== "STAFF"
+    ) {
       throw new BadRequestException(
         "assignedToUserId must reference an active Operations staff member",
       )

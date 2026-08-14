@@ -3165,7 +3165,10 @@ export class AdminService {
   // List OPERATIONS staff for the admin reassignment picker.
   async listOperationsStaff() {
     const memberships = await this.prisma.staffMembership.findMany({
-      where: { role: "OPERATIONS", user: { banned: false } },
+      where: {
+        role: "OPERATIONS",
+        user: { banned: false, userType: "STAFF" },
+      },
       include: { user: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: "asc" },
     })

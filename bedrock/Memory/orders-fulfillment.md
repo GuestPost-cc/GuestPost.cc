@@ -135,6 +135,11 @@ At creation, the order locks in immutable references to the customer's pick. The
   through the fulfillment order. After fulfillment ends, the latest delivered
   Operations owner is retained when eligible, and an otherwise unassigned
   ticket may be claimed independently without mutating assignment history.
+  Super Admin may reassign or unassign that independently owned ticket under
+  the same Order-before-Ticket locks. `DISPUTED` qualifies only when the current
+  dispute remains open or under review and its recorded previous status is
+  post-fulfillment; missing, resolved, and pre-fulfillment dispute state fails
+  closed.
 - Support histories use deterministic `(createdAt,id)` keyset pagination. Each
   page is chronological, and an older page is prepended and deduplicated by ID.
 - Public support inboxes use latest-PUBLIC-activity keyset pagination, append

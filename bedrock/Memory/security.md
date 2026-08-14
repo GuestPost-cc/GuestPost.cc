@@ -63,6 +63,15 @@ updated: 2026-08-14
 - Ticket create/reply/status/claim/reassignment re-resolve live authority in
   their serializable locked transaction. A prior list/detail response is never
   accepted as authorization for a later mutation.
+- Terminal order-ticket claim and Super Admin reassignment share one
+  Order-before-Ticket eligibility boundary and never mutate fulfillment
+  history. A disputed order requires a live `OPEN`/`UNDER_REVIEW` dispute with
+  a post-fulfillment previous status; inconsistent or stale dispute projections
+  fail closed. Reassignment revalidates both the Super Admin actor and the
+  active, non-banned Operations target and records the reason in atomic system,
+  audit, and outbox evidence. A required expected-owner precondition is compared
+  under the Ticket lock, so concurrent stale reassignment loses with no writes
+  instead of silently overwriting the first administrator's decision.
 - Operations demotion and suspension use the same serializable staff
   offboarding boundary as fulfillment ownership. Any assigned non-closed
   Support ticket, including `RESOLVED`, blocks authority removal. Historical

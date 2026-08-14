@@ -9,13 +9,22 @@ import {
 
 export class ReassignTicketDto {
   @IsDefined()
-  @ValidateIf((value) => value.assignedToUserId !== null)
+  @ValidateIf((object) => object.assignedToUserId !== null)
   @IsString()
   @MaxLength(100)
   @Matches(/^[a-z0-9_-]+$/iu, {
     message: "assignedToUserId must be a valid identifier",
   })
   assignedToUserId!: string | null
+
+  @IsDefined()
+  @ValidateIf((object) => object.expectedAssignedToUserId !== null)
+  @IsString()
+  @MaxLength(100)
+  @Matches(/^[a-z0-9_-]+$/iu, {
+    message: "expectedAssignedToUserId must be a valid identifier",
+  })
+  expectedAssignedToUserId!: string | null
 
   @IsString()
   @MinLength(10)

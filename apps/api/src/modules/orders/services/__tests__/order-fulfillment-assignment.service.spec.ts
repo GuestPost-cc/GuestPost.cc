@@ -98,8 +98,14 @@ describe("OrderFulfillmentAssignmentService", () => {
 
   it("rejects assignment to Finance or banned Operations staff", async () => {
     prisma.staffMembership.findUnique
-      .mockResolvedValueOnce({ role: "FINANCE", user: { banned: false } })
-      .mockResolvedValueOnce({ role: "OPERATIONS", user: { banned: true } })
+      .mockResolvedValueOnce({
+        role: "FINANCE",
+        user: { banned: false, userType: "STAFF" },
+      })
+      .mockResolvedValueOnce({
+        role: "OPERATIONS",
+        user: { banned: true, userType: "STAFF" },
+      })
 
     await expect(
       service.assign("order-1", "finance-1", "admin-1"),
@@ -110,10 +116,54 @@ describe("OrderFulfillmentAssignmentService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
+  it("rejects an Operations membership attached to a non-staff principal", async () => {
+    prisma.staffMembership.findUnique.mockResolvedValue({
+      role: "OPERATIONS",
+      user: { banned: false, userType: "CUSTOMER" },
+    })
+
+    await expect(
+      service.assign("order-1", "corrupt-ops", "admin-1"),
+    ).rejects.toThrow(BadRequestException)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it("rechecks the assigning actor as a staff principal inside the transaction", async () => {
+    prisma.staffMembership.findUnique.mockResolvedValue({
+      role: "OPERATIONS",
+      user: { banned: false, userType: "STAFF" },
+    })
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
+      order: { updateMany: jest.fn() },
+      staffMembership: {
+        findUnique: jest.fn(async ({ where }: any) =>
+          where.userId === "ops-1"
+            ? {
+                role: "OPERATIONS",
+                user: { banned: false, userType: "STAFF" },
+              }
+            : {
+                role: "SUPER_ADMIN",
+                user: { banned: false, userType: "CUSTOMER" },
+              },
+        ),
+      },
+    }
+    prisma.$transaction.mockImplementation(async (callback: any) =>
+      callback(tx),
+    )
+
+    await expect(service.assign("order-1", "ops-1", "admin-1")).rejects.toThrow(
+      ConflictException,
+    )
+    expect(tx.order.updateMany).not.toHaveBeenCalled()
+  })
+
   it("creates a claim without cancelling another active assignment", async () => {
     prisma.staffMembership.findUnique.mockResolvedValue({
       role: "OPERATIONS",
-      user: { banned: false },
+      user: { banned: false, userType: "STAFF" },
     })
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
@@ -121,7 +171,7 @@ describe("OrderFulfillmentAssignmentService", () => {
       staffMembership: {
         findUnique: jest.fn().mockResolvedValue({
           role: "OPERATIONS",
-          user: { banned: false },
+          user: { banned: false, userType: "STAFF" },
         }),
       },
       ticket: { findMany: jest.fn().mockResolvedValue([]) },
@@ -162,7 +212,7 @@ describe("OrderFulfillmentAssignmentService", () => {
   it("rolls a claim back when the order changed concurrently", async () => {
     prisma.staffMembership.findUnique.mockResolvedValue({
       role: "OPERATIONS",
-      user: { banned: false },
+      user: { banned: false, userType: "STAFF" },
     })
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
@@ -170,7 +220,7 @@ describe("OrderFulfillmentAssignmentService", () => {
       staffMembership: {
         findUnique: jest.fn().mockResolvedValue({
           role: "OPERATIONS",
-          user: { banned: false },
+          user: { banned: false, userType: "STAFF" },
         }),
       },
       fulfillmentAssignment: {
@@ -189,7 +239,7 @@ describe("OrderFulfillmentAssignmentService", () => {
   it("synchronizes an unassigned linked ticket with audit, system event, and outbox", async () => {
     prisma.staffMembership.findUnique.mockResolvedValue({
       role: "OPERATIONS",
-      user: { banned: false },
+      user: { banned: false, userType: "STAFF" },
     })
     communications = {
       record: jest.fn().mockResolvedValue({ eventId: "communication-1" }),
@@ -207,7 +257,7 @@ describe("OrderFulfillmentAssignmentService", () => {
       staffMembership: {
         findUnique: jest.fn().mockResolvedValue({
           role: "OPERATIONS",
-          user: { banned: false },
+          user: { banned: false, userType: "STAFF" },
         }),
       },
       fulfillmentAssignment: {
@@ -275,7 +325,7 @@ describe("OrderFulfillmentAssignmentService", () => {
   it("maps a concurrent claim collision to a clear conflict", async () => {
     prisma.staffMembership.findUnique.mockResolvedValue({
       role: "OPERATIONS",
-      user: { banned: false },
+      user: { banned: false, userType: "STAFF" },
     })
     prisma.$transaction.mockRejectedValue({ code: "P2002" })
 

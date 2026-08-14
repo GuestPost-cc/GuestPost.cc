@@ -12,7 +12,7 @@ describe("Admin Operations staff picker", () => {
     expect(path).toBe("staff/operations")
   })
 
-  it("returns active Operations members in assignment order", async () => {
+  it("returns only active STAFF Operations members in assignment order", async () => {
     const prisma = {
       staffMembership: {
         findMany: jest.fn().mockResolvedValue([
@@ -36,7 +36,10 @@ describe("Admin Operations staff picker", () => {
       },
     ])
     expect(prisma.staffMembership.findMany).toHaveBeenCalledWith({
-      where: { role: "OPERATIONS", user: { banned: false } },
+      where: {
+        role: "OPERATIONS",
+        user: { banned: false, userType: "STAFF" },
+      },
       include: {
         user: { select: { id: true, name: true, email: true } },
       },

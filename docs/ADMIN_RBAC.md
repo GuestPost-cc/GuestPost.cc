@@ -190,8 +190,11 @@ reconciliation issue.
   Operations user may claim a general unassigned Platform ticket. Active-order
   tickets remain read-only until the order itself is claimed; an eligible
   unassigned post-fulfillment ticket can be claimed without changing order
-  assignment history. Force-approval verification reporting is restricted to
-  Super Admin.
+  assignment history. Super Admin may reassign or unassign the same
+  independently owned tickets through an explicit Operations picker and
+  reasoned confirmation. A disputed order is eligible only with a live dispute
+  whose previous status is post-fulfillment; contradictory dispute state fails
+  closed. Force-approval verification reporting is restricted to Super Admin.
 - Access to one role-focused overview endpoint is not implied by access to any
   other overview or to contextual orders, disputes, cancellations, support, or
   financial records.
@@ -210,11 +213,12 @@ reconciliation issue.
 - An Operations member cannot be suspended or moved to another role while they
   own an active fulfillment assignment or any assigned Support ticket that is
   not `CLOSED` (including `RESOLVED`, which can be reopened). Super Admin must
-  reassign or complete that work first. The same serializable offboarding
-  transaction clears the departing owner from historical `CLOSED` tickets and
-  records the released count in the protected audit event, so a later reopen
-  returns to an unassigned queue. Self-suspension, self-demotion, and removal of
-  the last active Super Admin are rejected by the API.
+  reassign, unassign, or complete that work first; post-fulfillment ticket
+  transfer never rewrites fulfillment assignment history. The same serializable
+  offboarding transaction clears the departing owner from historical `CLOSED`
+  tickets and records the released count in the protected audit event, so a
+  later reopen returns to an unassigned queue. Self-suspension, self-demotion,
+  and removal of the last active Super Admin are rejected by the API.
 
 ### Performance metric definitions
 

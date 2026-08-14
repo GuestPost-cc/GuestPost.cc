@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { HEADERS_METADATA } from "@nestjs/common/constants"
+import { validate } from "class-validator"
+import { ReassignTicketDto } from "../dto/reassign-ticket.dto"
 import { SupportController } from "../support.controller"
 import {
   buildActorSnapshot,
@@ -15,6 +17,27 @@ import {
 
 const REQUEST_ID = "00000000-0000-4000-8000-000000000001"
 const MESSAGE_ID = "00000000-0000-4000-8000-000000000002"
+
+describe("reassignment command validation", () => {
+  it("requires an explicit nullable expected owner", async () => {
+    const missingExpectedOwner = Object.assign(new ReassignTicketDto(), {
+      assignedToUserId: "ops-2",
+      reason: "Move this ticket to the next Operations owner.",
+    })
+    const unassignedExpectedOwner = Object.assign(new ReassignTicketDto(), {
+      assignedToUserId: "ops-2",
+      expectedAssignedToUserId: null,
+      reason: "Move this unassigned ticket to an Operations owner.",
+    })
+
+    expect(
+      (await validate(missingExpectedOwner)).some(
+        (error) => error.property === "expectedAssignedToUserId",
+      ),
+    ).toBe(true)
+    await expect(validate(unassignedExpectedOwner)).resolves.toEqual([])
+  })
+})
 
 const customer = (organizationId = "org-1", userId = "customer-1") =>
   ({
@@ -84,6 +107,7 @@ function makeHarness(
     fulfillmentAssignments?: Array<Record<string, any>>
     staffRoles?: Record<string, "SUPER_ADMIN" | "OPERATIONS" | "FINANCE">
     bannedUsers?: string[]
+    userTypes?: Record<string, "CUSTOMER" | "PUBLISHER" | "STAFF">
   } = {},
 ) {
   const ticketRows = new Map<string, any>()
@@ -100,7 +124,13 @@ function makeHarness(
     ...options.staffRoles,
   } as Record<string, "SUPER_ADMIN" | "OPERATIONS" | "FINANCE">
   const banned = new Set(options.bannedUsers ?? [])
-  const order = options.order
+  const resolveUser = (id: string | null) => {
+    const user = userFor(id)
+    return user && options.userTypes?.[user.id]
+      ? { ...user, userType: options.userTypes[user.id] }
+      : user
+  }
+  const order: Record<string, any> | null = options.order
     ? {
         id: "order-1",
         organizationId: "org-1",
@@ -116,7 +146,7 @@ function makeHarness(
 
   const enrich = (row: any) => ({
     ...row,
-    user: userFor(row.userId),
+    user: resolveUser(row.userId),
     organization: {
       id: row.organizationId,
       name: "Example customer",
@@ -126,7 +156,10 @@ function makeHarness(
       ],
     },
     assignedTo: row.assignedToUserId
-      ? { id: row.assignedToUserId, name: userFor(row.assignedToUserId)?.name }
+      ? {
+          id: row.assignedToUserId,
+          name: resolveUser(row.assignedToUserId)?.name,
+        }
       : null,
     assignedPublisher: row.assignedPublisherId
       ? {
@@ -147,6 +180,7 @@ function makeHarness(
           fulfillmentChannel:
             order?.fulfillmentChannel ?? row.fulfillmentChannel,
           website: order?.website ?? { ownershipType: "PLATFORM" },
+          dispute: order?.dispute ?? null,
           fulfillmentAssignments: fulfillmentAssignments.filter((assignment) =>
             ["ASSIGNED", "IN_PROGRESS"].includes(assignment.status),
           ),
@@ -158,7 +192,7 @@ function makeHarness(
     $queryRaw: jest.fn().mockResolvedValue([{ id: ticket.id }]),
     user: {
       findUnique: jest.fn(async ({ where }: any) => {
-        const value = userFor(where.id)
+        const value = resolveUser(where.id)
         return value ? { ...value, banned: banned.has(where.id) } : null
       }),
     },
@@ -185,8 +219,9 @@ function makeHarness(
           ? {
               role,
               user: {
-                name: userFor(where.userId)?.name,
+                name: resolveUser(where.userId)?.name,
                 banned: banned.has(where.userId),
+                userType: resolveUser(where.userId)?.userType,
               },
             }
           : null
@@ -269,7 +304,7 @@ function makeHarness(
           .slice(0, include.messages.take)
           .map((message) => ({
             ...message,
-            user: userFor(message.userId),
+            user: resolveUser(message.userId),
           }))
         return { ...enrich(row), messages: rows }
       }),
@@ -296,7 +331,7 @@ function makeHarness(
     ticketMessage: {
       findUnique: jest.fn(async ({ where }: any) => {
         const row = messageRows.get(where.id)
-        return row ? { ...row, user: userFor(row.userId) } : null
+        return row ? { ...row, user: resolveUser(row.userId) } : null
       }),
       findFirst: jest.fn(
         async ({ where }: any) =>
@@ -320,7 +355,7 @@ function makeHarness(
           ),
           files: null,
           ...data,
-          user: userFor(data.userId),
+          user: resolveUser(data.userId),
         }
         messageRows.set(row.id, row)
         return row
@@ -612,6 +647,290 @@ describe("support participant matrix and safe projection", () => {
       activeAssignment.service.claimTicket("ticket-1", staff("OPERATIONS")),
     ).rejects.toBeInstanceOf(ConflictException)
   })
+
+  it.each([
+    ["PUBLISHED", true],
+    ["COMPLETED", true],
+    ["CANCELLED", true],
+    ["REFUNDED", true],
+    ["APPROVED", false],
+  ])("projects terminal support ownership eligibility for %s", async (status, eligible) => {
+    const harness = makeHarness({
+      ticket: { assignedToUserId: null },
+      order: { status },
+    })
+    await expect(
+      harness.service.getTicket("ticket-1", staff("OPERATIONS")),
+    ).resolves.toMatchObject({ capabilities: { canClaim: eligible } })
+    await expect(
+      harness.service.getTicket("ticket-1", staff("SUPER_ADMIN")),
+    ).resolves.toMatchObject({ capabilities: { canReassign: eligible } })
+  })
+
+  it("reassigns a post-fulfillment order ticket without changing fulfillment ownership", async () => {
+    const harness = makeHarness({
+      order: { status: "COMPLETED" },
+      fulfillmentAssignments: [
+        {
+          id: "delivered-assignment",
+          orderId: "order-1",
+          assignedToUserId: "ops-1",
+          status: "DELIVERED",
+        },
+      ],
+    })
+
+    await expect(
+      harness.service.getTicket("ticket-1", staff("SUPER_ADMIN")),
+    ).resolves.toMatchObject({ capabilities: { canReassign: true } })
+    await expect(
+      harness.service.reassignTicket(
+        "ticket-1",
+        {
+          assignedToUserId: "ops-2",
+          expectedAssignedToUserId: "ops-1",
+          reason: "Move the active conversation before staff offboarding.",
+        },
+        staff("SUPER_ADMIN"),
+      ),
+    ).resolves.toMatchObject({
+      assignedTo: { userId: "ops-2" },
+      capabilities: { canReassign: true },
+    })
+    expect(harness.ticketRows.get("ticket-1")).toMatchObject({
+      assignedToUserId: "ops-2",
+    })
+    expect(harness.prisma.fulfillmentAssignment.create).not.toHaveBeenCalled()
+    expect(
+      harness.prisma.fulfillmentAssignment.updateMany,
+    ).not.toHaveBeenCalled()
+    expect(harness.audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "TICKET_REASSIGNED",
+        metadata: expect.objectContaining({
+          ownershipMode: "POST_FULFILLMENT_TICKET_ONLY",
+          orderId: "order-1",
+          orderStatus: "COMPLETED",
+          fromAssignedToUserId: "ops-1",
+          toAssignedToUserId: "ops-2",
+        }),
+      }),
+      harness.prisma,
+    )
+
+    const lockSql = harness.prisma.$queryRaw.mock.calls.map((call: any[]) =>
+      call[0].join("?"),
+    )
+    const orderLockIndex = lockSql.findIndex((sql: string) =>
+      sql.includes('"Order"'),
+    )
+    const ticketLockIndex = lockSql.findIndex((sql: string) =>
+      sql.includes('"Ticket"'),
+    )
+    expect(orderLockIndex).toBeGreaterThanOrEqual(0)
+    expect(ticketLockIndex).toBeGreaterThan(orderLockIndex)
+  })
+
+  it("rejects a stale expected owner before target validation or writes", async () => {
+    const harness = makeHarness({ order: { status: "COMPLETED" } })
+
+    await expect(
+      harness.service.reassignTicket(
+        "ticket-1",
+        {
+          assignedToUserId: "ops-2",
+          expectedAssignedToUserId: null,
+          reason: "This stale reassignment intent must not overwrite a winner.",
+        },
+        staff("SUPER_ADMIN"),
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "TICKET_ASSIGNMENT_CHANGED" }),
+    })
+
+    expect(harness.ticketRows.get("ticket-1")).toMatchObject({
+      assignedToUserId: "ops-1",
+    })
+    expect(harness.prisma.ticket.update).not.toHaveBeenCalled()
+    expect(harness.prisma.ticketMessage.create).not.toHaveBeenCalled()
+    expect(harness.audit.log).not.toHaveBeenCalled()
+    expect(harness.queue.addJob).not.toHaveBeenCalled()
+    expect(
+      harness.prisma.staffMembership.findUnique.mock.calls.some(
+        ([query]: any[]) => query.where.userId === "ops-2",
+      ),
+    ).toBe(false)
+  })
+
+  it("keeps active or claimable order-ticket reassignment on fulfillment", async () => {
+    const claimable = makeHarness({ order: { status: "APPROVED" } })
+    await expect(
+      claimable.service.getTicket("ticket-1", staff("SUPER_ADMIN")),
+    ).resolves.toMatchObject({ capabilities: { canReassign: false } })
+    await expect(
+      claimable.service.reassignTicket(
+        "ticket-1",
+        {
+          assignedToUserId: "ops-2",
+          expectedAssignedToUserId: "ops-1",
+          reason: "This must use fulfillment assignment instead.",
+        },
+        staff("SUPER_ADMIN"),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException)
+    expect(claimable.prisma.ticket.update).not.toHaveBeenCalled()
+
+    const active = makeHarness({
+      order: { status: "DELIVERED" },
+      fulfillmentAssignments: [
+        {
+          id: "active-assignment",
+          orderId: "order-1",
+          assignedToUserId: "ops-1",
+          status: "IN_PROGRESS",
+        },
+      ],
+    })
+    await expect(
+      active.service.getTicket("ticket-1", staff("SUPER_ADMIN")),
+    ).resolves.toMatchObject({ capabilities: { canReassign: false } })
+    await expect(
+      active.service.reassignTicket(
+        "ticket-1",
+        {
+          assignedToUserId: "ops-2",
+          expectedAssignedToUserId: "ops-1",
+          reason: "Active assignment remains the ownership authority.",
+        },
+        staff("SUPER_ADMIN"),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException)
+    expect(active.prisma.ticket.update).not.toHaveBeenCalled()
+  })
+
+  it("uses the dispute previous status for claim, reassign, and capability eligibility", async () => {
+    const activeDispute = makeHarness({
+      ticket: { assignedToUserId: null },
+      order: {
+        status: "DISPUTED",
+        dispute: { status: "OPEN", previousStatus: "APPROVED" },
+      },
+    })
+    await expect(
+      activeDispute.service.getTicket("ticket-1", staff("OPERATIONS")),
+    ).resolves.toMatchObject({ capabilities: { canClaim: false } })
+    await expect(
+      activeDispute.service.claimTicket("ticket-1", staff("OPERATIONS")),
+    ).rejects.toBeInstanceOf(ConflictException)
+    await expect(
+      activeDispute.service.getTicket("ticket-1", staff("SUPER_ADMIN")),
+    ).resolves.toMatchObject({ capabilities: { canReassign: false } })
+
+    const deliveredDispute = makeHarness({
+      ticket: { assignedToUserId: null },
+      order: {
+        status: "DISPUTED",
+        dispute: { status: "UNDER_REVIEW", previousStatus: "DELIVERED" },
+      },
+    })
+    await expect(
+      deliveredDispute.service.getTicket("ticket-1", staff("OPERATIONS")),
+    ).resolves.toMatchObject({ capabilities: { canClaim: true } })
+    await expect(
+      deliveredDispute.service.getTicket("ticket-1", staff("SUPER_ADMIN")),
+    ).resolves.toMatchObject({ capabilities: { canReassign: true } })
+    await expect(
+      deliveredDispute.service.reassignTicket(
+        "ticket-1",
+        {
+          assignedToUserId: "ops-2",
+          expectedAssignedToUserId: null,
+          reason: "Move the post-delivery dispute conversation safely.",
+        },
+        staff("SUPER_ADMIN"),
+      ),
+    ).resolves.toMatchObject({ assignedTo: { userId: "ops-2" } })
+    expect(deliveredDispute.audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "TICKET_REASSIGNED",
+        metadata: expect.objectContaining({
+          orderStatus: "DISPUTED",
+          effectiveOrderStatus: "DELIVERED",
+          disputeStatus: "UNDER_REVIEW",
+          disputePreviousStatus: "DELIVERED",
+        }),
+      }),
+      deliveredDispute.prisma,
+    )
+  })
+
+  it("fails disputed-order ownership commands closed without a live dispute", async () => {
+    for (const dispute of [
+      null,
+      { status: "OPEN", previousStatus: null },
+      { status: "RESOLVED", previousStatus: "DELIVERED" },
+    ]) {
+      const harness = makeHarness({
+        ticket: { assignedToUserId: null },
+        order: { status: "DISPUTED", dispute },
+      })
+      await expect(
+        harness.service.getTicket("ticket-1", staff("OPERATIONS")),
+      ).resolves.toMatchObject({ capabilities: { canClaim: false } })
+      await expect(
+        harness.service.getTicket("ticket-1", staff("SUPER_ADMIN")),
+      ).resolves.toMatchObject({ capabilities: { canReassign: false } })
+      await expect(
+        harness.service.reassignTicket(
+          "ticket-1",
+          {
+            assignedToUserId: "ops-2",
+            expectedAssignedToUserId: null,
+            reason: "Corrupt dispute state must fail safely without a handoff.",
+          },
+          staff("SUPER_ADMIN"),
+        ),
+      ).rejects.toBeInstanceOf(ConflictException)
+    }
+  })
+
+  it("rechecks the terminal-ticket target as active, non-banned Operations", async () => {
+    const harness = makeHarness({
+      order: { status: "COMPLETED" },
+      staffRoles: { "ops-2": "FINANCE" },
+    })
+    await expect(
+      harness.service.reassignTicket(
+        "ticket-1",
+        {
+          assignedToUserId: "ops-2",
+          expectedAssignedToUserId: "ops-1",
+          reason: "A demoted target must not receive this conversation.",
+        },
+        staff("SUPER_ADMIN"),
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException)
+    expect(harness.prisma.ticket.update).not.toHaveBeenCalled()
+  })
+
+  it("rejects a corrupt Operations membership attached to a non-staff user", async () => {
+    const harness = makeHarness({
+      order: { status: "COMPLETED" },
+      userTypes: { "ops-2": "CUSTOMER" },
+    })
+    await expect(
+      harness.service.reassignTicket(
+        "ticket-1",
+        {
+          assignedToUserId: "ops-2",
+          expectedAssignedToUserId: "ops-1",
+          reason: "A non-staff principal must never receive support authority.",
+        },
+        staff("SUPER_ADMIN"),
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException)
+    expect(harness.prisma.ticket.update).not.toHaveBeenCalled()
+  })
 })
 
 describe("retry safety and lifecycle commands", () => {
@@ -735,6 +1054,34 @@ describe("retry safety and lifecycle commands", () => {
     expect(harness.ticketRows.get(created.id)).toMatchObject({
       fulfillmentChannel: "PLATFORM",
       assignedToUserId: "ops-2",
+      assignedPublisherId: null,
+    })
+  })
+
+  it("leaves delivered support unassigned for a corrupt non-staff Operations owner", async () => {
+    const harness = makeHarness({
+      order: { status: "DELIVERED" },
+      userTypes: { "ops-2": "CUSTOMER" },
+      fulfillmentAssignments: [
+        {
+          id: "delivered-corrupt-owner",
+          orderId: "order-1",
+          assignedToUserId: "ops-2",
+          status: "DELIVERED",
+          assignedAt: new Date("2026-08-14T09:00:00.000Z"),
+        },
+      ],
+    })
+
+    const created = await harness.service.createTicket(customer(), {
+      subject: "Delivered order owner validation",
+      description: "Please route this safely when owner authority is corrupt.",
+      orderId: "order-1",
+      clientRequestId: REQUEST_ID,
+    })
+    expect(harness.ticketRows.get(created.id)).toMatchObject({
+      fulfillmentChannel: "PLATFORM",
+      assignedToUserId: null,
       assignedPublisherId: null,
     })
   })

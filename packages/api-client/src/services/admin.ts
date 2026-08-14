@@ -1996,6 +1996,7 @@ export class AdminService {
       {
         json: {
           assignedToUserId: body.assignedToUserId,
+          expectedAssignedToUserId: body.expectedAssignedToUserId,
           reason: body.reason,
         },
       },
