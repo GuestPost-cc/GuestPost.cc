@@ -18,6 +18,27 @@ owns launch risks. Historical PR and rollout diaries were moved to
 
 ## Implemented in the active batch
 
+- Reworked Support into a server-projected multi-actor conversation. Every
+  message carries an explicit customer/publisher/support/system party, safe
+  display label, and viewer-relative `isSelf`; all three dashboards use the
+  shared accessible conversation component instead of inferring alignment.
+- Made public ticket projections least-privilege, filtered internal notes
+  before cursor pagination, removed Finance from generic Support, and added
+  fail-closed capability-driven reply/status/claim/reassignment controls.
+- Added actor-scoped idempotency for ticket creation and replies, locked
+  order-derived customer/publisher/Operations routing, and atomic ticket sync
+  when a Platform fulfillment assignment changes. No database migration is
+  required.
+- Added reasoned Super Admin reassignment/unassignment for general and eligible
+  post-fulfillment Platform tickets. It shares the claim command's
+  Order-before-Ticket eligibility rule, fails closed on inconsistent dispute
+  state, uses a locked expected-owner compare-and-set to reject stale concurrent
+  decisions, and never rewrites fulfillment assignment history.
+- Staff offboarding now blocks Operations demotion/suspension while active
+  fulfillment or any non-closed Support ticket remains assigned. Closed ticket
+  ownership is released atomically and counted in the protected offboarding
+  audit so historical conversations do not permanently pin a staff account.
+
 - Removed phantom `OrderStatus.SETTLED`; `COMPLETED` is the sole successful
   terminal order status. Settlement approval, return-to-review, and release now
   have distinct relationally bound events.
@@ -72,6 +93,19 @@ owns launch risks. Historical PR and rollout diaries were moved to
 
 ## Validation state
 
+The Support hardening branch has passing repository format, type, lint,
+dependency, health, and production-build gates across the API, shared
+packages, worker, and customer/publisher/admin dashboards. API-client, shared
+UI, Support, Finance, staff-offboarding, fulfillment-assignment, and
+delivery-RBAC suites pass, including the final fail-closed routing regressions.
+Its real PostgreSQL projection, inbox/message pagination, idempotency,
+publisher authorization, assignment races, and offboarding-versus-reopen suite
+is checked in. This workstation has no `psql` client and its Docker daemon is
+unavailable; the disposable PostgreSQL execution therefore remains an
+authoritative CI gate rather than a locally passed check. Browser acceptance
+also remains a deployment gate and must not be represented as passed until
+executed in the configured environment.
+
 The frozen-lockfile install is clean and does not change `pnpm-lock.yaml`.
 Repository type, format, lint, dependency-policy, health, API, worker, shared,
 auth, integrations, API-client, and UI gates pass. PR #100, PR #101, and final
@@ -95,13 +129,19 @@ image safe to restart.
 
 ## Next actions
 
-1. Restore/upgrade Upstash request capacity, then re-authenticate Northflank and
+1. Before merging or deploying the Support batch, require its disposable
+   PostgreSQL integration run to pass, including privacy, idempotency,
+   pagination, assignment/offboarding, and concurrent reassignment cases. Run
+   the documented multi-actor Chromium acceptance for customer, publisher,
+   Operations, and Super Admin messaging/ownership; do not infer that coverage
+   from the onboarding-only browser smoke.
+2. Restore/upgrade Upstash request capacity, then re-authenticate Northflank and
    configure the protected locked-mode environment for `guestpost-worker`,
    `guestpost-on-demand`, and `guestpost-maintenance-dispatch`. Deploy exact SHA
    `512b851`, verify each workload's SHA/mode/environment, canary realtime at one
    replica before scaling, and only then resume schedules one at a time.
-2. Monitor Render readiness and Upstash usage; keep finance, payouts, and new
+3. Monitor Render readiness and Upstash usage; keep finance, payouts, and new
    deposits disabled until the operational/provider gates are explicitly met.
-3. Keep staff governance and managed KMS/HSM as explicit follow-up gates rather
+4. Keep staff governance and managed KMS/HSM as explicit follow-up gates rather
    than silently treating this schema/application cutover as paid-launch
    approval.

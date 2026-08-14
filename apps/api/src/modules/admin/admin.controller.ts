@@ -27,12 +27,14 @@ import {
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
 import { Request, Response } from "express"
+import { CurrentAuthority } from "../../common/decorators/current-authority.decorator"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { Permissions } from "../../common/decorators/permissions.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
 import { PermissionsGuard } from "../../common/guards/permissions.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import type { DurableCurrentAuthority } from "../auth/current-authority.service"
 import {
   ListingServiceInput,
   UpdateListingServiceInput,
@@ -58,7 +60,7 @@ import { PublisherPayoutsService } from "../publisher-payouts/publisher-payouts.
 import { SettlementReasonDto } from "../settlements/dto/settlement-reason.dto"
 import { SettlementsService } from "../settlements/settlements.service"
 import { AddTicketMessageDto } from "../support/dto/add-ticket-message.dto"
-import { SupportActor, SupportService } from "../support/support.service"
+import { type SupportActor, SupportService } from "../support/support.service"
 import { AdminService } from "./admin.service"
 import { CommandCenterService } from "./command-center.service"
 import {
@@ -108,7 +110,7 @@ import { WebsiteVerificationService } from "./website-verification.service"
 // SupportService — this just hands it the role context. customerRole +
 // publisherRole are intentionally left null for staff: they're acting in
 // their staff capacity, not as a member of any org / publisher.
-function staffActor(user: any): SupportActor {
+function staffActor(user: DurableCurrentAuthority): SupportActor {
   return {
     userId: user.id,
     kind: "STAFF",
@@ -162,10 +164,12 @@ const parsePagination = (take?: string, skip?: string) => ({
 //                                verification, and dispute resolution
 //   SUPER_ADMIN only          — website/listing inventory and service edits
 //   ALL THREE                 — contextual order, dispute, cancellation,
-//                                support, and platform-settings reads. These
+//                                and platform-settings reads. These
 //                                may include the minimum customer / publisher
 //                                context needed to complete the work item, but
 //                                do not grant access to a global directory.
+//   SUPER_ADMIN + OPERATIONS  — generic support conversations; Operations is
+//                                limited to its assignment/unassigned queue.
 @Controller("admin")
 @UseGuards(StaffRolesGuard)
 export class AdminController {
@@ -211,10 +215,12 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
   @Header("Pragma", "no-cache")
-  getOperationsWorkbench(@CurrentUser() user: any) {
+  getOperationsWorkbench(@CurrentAuthority() user: DurableCurrentAuthority) {
     return this.operationsWorkbench.getWorkbench({
       id: user.id,
-      staffRole: user.staffRole,
+      // StaffRolesGuard guarantees a live role; the empty fallback preserves
+      // fail-closed behavior if this handler is ever called outside Nest.
+      staffRole: user.staffRole ?? "",
     })
   }
 
@@ -1084,21 +1090,20 @@ export class AdminController {
   }
 
   // ── Support tickets ─────────────────────────────────────────────────────
-  // Phase 6.6: every admin support endpoint delegates to SupportService with
-  // the staff actor. Channel-aware visibility + the reply matrix (Finance is
-  // read-only on PLATFORM tickets but can post internal notes; OPS can only
-  // act on tickets assigned to them) are enforced server-side — there is
-  // no longer a separate admin code path that bypasses the matrix. The
-  // class-level role grant is gone (Phase 6.7) so we declare ALL THREE here;
-  // the matrix slices the visible rows + reply gate per actor.
+  // Generic support conversations are limited to Super Admin and scoped
+  // Operations staff. Finance has no support category/assignment model and
+  // therefore receives no broad conversation access.
   @Get("support/tickets")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   listSupportTickets(
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: DurableCurrentAuthority,
     @Query("status") status?: string,
     @Query("search") search?: string,
     @Query("channel") channel?: string,
     @Query("assignedToUserId") assignedToUserId?: string,
+    @Query("orderId") orderId?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
@@ -1108,39 +1113,56 @@ export class AdminController {
       status,
       search,
       channel: normalizedChannel,
-      assignedToUserId: assignedToUserId as any,
+      assignedToUserId,
+      orderId,
       page: page ? parseInt(page, 10) || 1 : 1,
       limit: limit ? parseInt(limit, 10) || 50 : 50,
     })
   }
 
   @Get("support/tickets/:id")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
-  getSupportTicket(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.support.getTicket(id, staffActor(user))
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  getSupportTicket(
+    @Param("id") id: string,
+    @CurrentAuthority() user: DurableCurrentAuthority,
+    @Query("messageCursor") messageCursor?: string,
+  ) {
+    return this.support.getTicket(id, staffActor(user), { messageCursor })
   }
 
   @Patch("support/tickets/:id/status")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   updateSupportTicketStatus(
     @Param("id") id: string,
     @Body() body: UpdateSupportTicketStatusDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: DurableCurrentAuthority,
   ) {
     return this.support.updateStatus(id, body.status, staffActor(user))
   }
 
   @Post("support/tickets/:id/messages")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   addSupportTicketMessage(
     @Param("id") id: string,
     @Body() body: AddTicketMessageDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: DurableCurrentAuthority,
   ) {
     return this.support.addMessage(id, staffActor(user), {
       content: body.content,
+      clientMessageId: body.clientMessageId,
       visibility: body.visibility,
     })
+  }
+
+  @Patch("support/tickets/:id/claim")
+  @StaffRoles("OPERATIONS")
+  claimSupportTicket(
+    @Param("id") id: string,
+    @CurrentAuthority() user: DurableCurrentAuthority,
+  ) {
+    return this.support.claimTicket(id, staffActor(user))
   }
 
   @Get("marketplace/listings")

@@ -1,7 +1,7 @@
 ---
 note_type: backlog
 project: guestpost-platform
-updated: 2026-08-12
+updated: 2026-08-14
 ---
 
 # Backlog
@@ -48,6 +48,19 @@ not be represented as solved by that change set:
 Until those controls are implemented and evidenced, the public paid-production
 and broad multicountry launch decisions remain **NO-GO** even if the nine code
 fixes in the current hardening set pass CI.
+
+## Support messaging follow-ups (2026-08-14)
+
+- [ ] Add an isolated Playwright fixture with customer, authorized publisher,
+  assigned Operations, and Super Admin sessions, then execute the browser gate
+  recorded in `docs/SUPPORT_MESSAGING.md` and `Work/risks.md`.
+- [ ] Replace the staff Support inbox's bounded offset pagination with the same
+  stable keyset-cursor contract used by external inboxes before queue volume
+  makes deep offsets or concurrent page drift material.
+- [ ] Measure the production Support message access path and, if warranted by
+  query plans or volume, add a reviewed migration for a composite
+  `(ticketId, visibility, createdAt, id)` index; do not add speculative indexes
+  without populated-data rehearsal and write-amplification evidence.
 
 Forward roadmap. `bedrock/Views/audits/platform-audit-2026-06-22.md` is a
 historical snapshot, not current status. Open work in this file is canonical.

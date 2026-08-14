@@ -53,7 +53,7 @@ reconciliation issue.
 | Staff roles and Operations roster | Full management/read | No roster access | No access |
 | Platform websites | Create, view all, manage, reassign | Create and manage assigned sites | No access |
 | Marketplace inventory | Full moderation and platform inventory management | Operational moderation and assigned-inventory management | Read-only listing, publisher, price, service, and metric context; no moderation or inventory mutation |
-| Platform fulfillment queue | View all, claim as break-glass, assign/reassign | Assigned orders plus unassigned claimable orders; claim self | No access |
+| Platform fulfillment queue | View all and assign/reassign to active Operations staff; no self-claim | Assigned orders plus unassigned claimable orders; claim self | No access |
 | Platform delivery | Full break-glass progression | Deliver only with an active assignment to self | Read only where required for a financial work item |
 | Orders, disputes, cancellations | Full | Assigned/claimable fulfillment, assigned-Support orders, and active operational exception contexts | Financial actions and contextual reads |
 | Settlements | Full, including force approval | No settlement list/detail | List/detail, normal approval, cancellation and review |
@@ -61,7 +61,7 @@ reconciliation issue.
 | Revenue and reconciliation | Full | No access | Full read/reconciliation |
 | Publisher tier | Read/update | No access | Read/update |
 | Platform fee | Read/update | Read only | Read/update |
-| Support | Full | Assigned platform listing/order workflow; unassigned platform pool remains read-only until assigned | Publisher replies; platform tickets are read-only except internal notes |
+| Support | Full | Assigned platform listing/order workflow; may claim a general or eligible post-fulfillment unassigned Platform ticket | No access |
 | Domain verification | Full | Operational domain ownership verification | Contextual evidence only when needed for finance work |
 | Delivery verification | Full | Review failed and manual-review deliveries | Contextual evidence only when needed for finance work |
 | Audit logs | Full | No access | No access |
@@ -170,13 +170,8 @@ reconciliation issue.
 - The Finance workbench is a read-only money-operations surface available only
   to Finance and Super Admin. Its exact server-side KPIs and bounded action
   queue cover settlements, withdrawals, payouts, reconciliation, cancellation
-  decisions, disputes, publisher debt, and Support. Support is first within an
-  equal severity band and is guaranteed a place in the bounded queue, while
-  critical financial-integrity failures retain the highest severity.
-- Finance Support obeys the existing role contract: Finance may reply to
-  publisher/general tickets and add internal notes to platform tickets; Super
-  Admin retains full reply capability. The overview never broadens those
-  permissions.
+  decisions, disputes, and publisher debt. Finance has no generic Support
+  list, detail, reply, note, status, count, or workbench payload.
 - Finance activity is selected from a fixed action allowlist and excludes raw
   audit metadata, request/IP details, provider configuration, execution error
   payloads, payout credentials, and decrypted payout data. All financial
@@ -191,9 +186,15 @@ reconciliation issue.
   it uses the existing transactional claim path. Every other item deep-links
   to its existing role-checked workspace. The workbench does not expose emails,
   credentials, audit metadata, raw provider errors, settlements, or revenue.
-- Operations Support opens on the current user assignment by default;
-  unassigned platform tickets remain read-only until assignment. Force-approval
-  verification reporting is restricted to Super Admin.
+- Operations Support opens on the current user assignment by default. An
+  Operations user may claim a general unassigned Platform ticket. Active-order
+  tickets remain read-only until the order itself is claimed; an eligible
+  unassigned post-fulfillment ticket can be claimed without changing order
+  assignment history. Super Admin may reassign or unassign the same
+  independently owned tickets through an explicit Operations picker and
+  reasoned confirmation. A disputed order is eligible only with a live dispute
+  whose previous status is post-fulfillment; contradictory dispute state fails
+  closed. Force-approval verification reporting is restricted to Super Admin.
 - Access to one role-focused overview endpoint is not implied by access to any
   other overview or to contextual orders, disputes, cancellations, support, or
   financial records.
@@ -210,9 +211,14 @@ reconciliation issue.
   without exposing Finance records to Operations or staff directories to
   non-Super Admin roles.
 - An Operations member cannot be suspended or moved to another role while they
-  own an active fulfillment assignment. Super Admin must reassign or complete
-  the work first. Self-suspension, self-demotion, and removal of the last active
-  Super Admin are rejected by the API.
+  own an active fulfillment assignment or any assigned Support ticket that is
+  not `CLOSED` (including `RESOLVED`, which can be reopened). Super Admin must
+  reassign, unassign, or complete that work first; post-fulfillment ticket
+  transfer never rewrites fulfillment assignment history. The same serializable
+  offboarding transaction clears the departing owner from historical `CLOSED`
+  tickets and records the released count in the protected audit event, so a
+  later reopen returns to an unassigned queue. Self-suspension, self-demotion,
+  and removal of the last active Super Admin are rejected by the API.
 
 ### Performance metric definitions
 

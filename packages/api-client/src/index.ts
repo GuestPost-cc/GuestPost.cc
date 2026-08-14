@@ -64,6 +64,7 @@ export type {
   AdminUserResponse,
   AdminWithdrawalResponse,
   DeliveryFraudDisposition,
+  OperationsInboxFilters,
   OperationsInboxOrder,
   OperationsInboxResponse,
   OperationsInboxView,
@@ -139,11 +140,40 @@ export { ReportingService } from "./services/reporting"
 export type { SettlementResponse } from "./services/settlements"
 export { SettlementsService } from "./services/settlements"
 export type {
+  AddTicketMessageInput,
+  CreateSupportTicketInput,
+  CreateSupportTicketResponse,
+  PublicSupportListFilters,
+  PublicTicketStatusMutation,
+  ReassignTicketInput,
+  StaffSupportListFilters,
+  StaffTicketDetail,
+  StaffTicketIdentity,
+  StaffTicketListItem,
+  StaffTicketListResponse,
+  StaffTicketPublisherIdentity,
+  StaffTicketRequester,
+  SupportListFilters,
+  SupportMessageSender,
+  SupportParty,
+  SupportQueryScope,
+  TicketAssignmentMutationResponse,
+  TicketCapabilities,
   TicketDetail,
+  TicketDetailQuery,
   TicketListItem,
+  TicketListPage,
+  TicketMessageActorSnapshot,
+  TicketMessageAuthorEvidence,
   TicketMessageDto,
+  TicketMessagePage,
+  TicketMessageType,
+  TicketMessageVisibility,
+  TicketOrderSummary,
+  TicketParticipantRole,
+  TicketStatusMutationResponse,
 } from "./services/support"
-export { SupportService } from "./services/support"
+export { SupportService, supportKeys } from "./services/support"
 
 import { type ApiClientConfig, HttpClient } from "./client"
 import { AdminService } from "./services/admin"

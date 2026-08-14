@@ -79,6 +79,7 @@ const navGroups: NavGroup[] = [
         href: "/dashboard/support",
         label: "Support",
         icon: HeadphonesIcon,
+        roles: ["SUPER_ADMIN", "OPERATIONS"],
       },
       {
         href: "/dashboard/verification/delivery",

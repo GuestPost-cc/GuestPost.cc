@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: orders-fulfillment
 project: guestpost-platform
-updated: 2026-08-12
+updated: 2026-08-14
 ---
 
 # Orders & Fulfillment
@@ -116,6 +116,36 @@ At creation, the order locks in immutable references to the customer's pick. The
 - `OrderFulfillmentService` (publisher path) reads `order.fulfillmentChannel === "PUBLISHER"` AND `website.publisherId === actor.publisherId` (latter still authoritative for publisher identity).
 - `OrderOperationsService` (platform/Ops path) reads `order.fulfillmentChannel === "PLATFORM"`.
 - Refund / dispute / delivery / settlement all branch off `order.fulfillmentChannel` with a one-line fallback to `website.ownershipType` for pre-Phase-2 legacy orders.
+
+## Order-linked support routing
+
+- Customer order tickets derive organization, fulfillment channel, active
+  Operations assignee, or assigned publisher from the locked Order. Clients do
+  not nominate routing identities.
+- Publishers cannot create general support tickets. They must supply an order
+  currently routed to their publisher on the `PUBLISHER` channel; foreign and
+  Platform orders use the same not-found policy to avoid enumeration.
+- A Platform ticket follows the active `FulfillmentAssignment`. Order claim,
+  reassignment, and ticket creation serialize on the Order row. Assignment and
+  ticket ownership are updated atomically with internal system-event, audit,
+  and outbox evidence; the previous assignee loses read and mutation authority
+  immediately after commit.
+- A general unassigned Platform-support ticket may be claimed by Operations.
+  While fulfillment is active, an order-linked ticket can be claimed only
+  through the fulfillment order. After fulfillment ends, the latest delivered
+  Operations owner is retained when eligible, and an otherwise unassigned
+  ticket may be claimed independently without mutating assignment history.
+  Super Admin may reassign or unassign that independently owned ticket under
+  the same Order-before-Ticket locks. `DISPUTED` qualifies only when the current
+  dispute remains open or under review and its recorded previous status is
+  post-fulfillment; missing, resolved, and pre-fulfillment dispute state fails
+  closed.
+- Support histories use deterministic `(createdAt,id)` keyset pagination. Each
+  page is chronological, and an older page is prepended and deduplicated by ID.
+- Public support inboxes use latest-PUBLIC-activity keyset pagination, append
+  older pages, and deduplicate by ticket ID. Internal notes cannot affect
+  external activity order or cursor boundaries. No schema migration is
+  required for this support contract.
 
 ## PLATFORM auto-assignment
 

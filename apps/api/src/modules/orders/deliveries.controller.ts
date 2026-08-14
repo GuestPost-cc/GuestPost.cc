@@ -126,7 +126,7 @@ export class DeliveriesController {
   }
 
   @Post("orders/:id/claim")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("OPERATIONS")
   claim(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.assignment.claim(id, user.id, user.staffRole)
   }

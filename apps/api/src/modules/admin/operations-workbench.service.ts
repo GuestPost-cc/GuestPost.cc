@@ -2,6 +2,7 @@ import type { Prisma } from "@guestpost/database"
 import { ForbiddenException, Injectable } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { OrderFulfillmentAssignmentService } from "../orders/services/order-fulfillment-assignment.service"
+import { operationsPlatformSupportWhere } from "../support/support-routing"
 
 const ACTIVE_SUPPORT_STATUSES = ["OPEN", "IN_PROGRESS"] as const
 const OPERATIONS_CANCELLATION_STATUSES = [
@@ -110,7 +111,7 @@ export class OperationsWorkbenchService {
     const isOperations = user.staffRole === "OPERATIONS"
     const supportWhere: Prisma.TicketWhereInput = {
       status: { in: [...ACTIVE_SUPPORT_STATUSES] },
-      fulfillmentChannel: "PLATFORM",
+      ...operationsPlatformSupportWhere(),
       ...(isOperations ? { assignedToUserId: user.id } : {}),
     }
     const assignedPlatformWebsite: Prisma.WebsiteWhereInput = {

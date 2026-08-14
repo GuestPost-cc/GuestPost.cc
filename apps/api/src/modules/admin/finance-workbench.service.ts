@@ -18,7 +18,6 @@ const ACTIVE_WITHDRAWAL_STATUSES = [
 ] as const
 const ACTIVE_PAYOUT_STATUSES = ["PENDING", "PROCESSING", "FAILED"] as const
 const ACTIVE_DISPUTE_STATUSES = ["OPEN", "UNDER_REVIEW"] as const
-const ACTIVE_SUPPORT_STATUSES = ["OPEN", "IN_PROGRESS"] as const
 
 const FINANCE_AUDIT_ACTIONS = [
   "SETTLEMENT_ADMIN_APPROVED",
@@ -45,7 +44,6 @@ const FINANCE_AUDIT_ACTIONS = [
 export type FinanceWorkbenchPriority = "CRITICAL" | "HIGH" | "MEDIUM"
 export type FinanceWorkbenchActionType =
   | "RECONCILIATION"
-  | "SUPPORT"
   | "PAYOUT"
   | "WITHDRAWAL"
   | "CANCELLATION"
@@ -71,17 +69,13 @@ const priorityRank: Record<FinanceWorkbenchPriority, number> = {
   MEDIUM: 2,
 }
 
-// Support is deliberately first within a severity band. It prevents an old
-// publisher question from disappearing behind a long list of equally-ranked
-// ledger work while still keeping critical integrity failures at the top.
 const actionTypeRank: Record<FinanceWorkbenchActionType, number> = {
-  SUPPORT: 0,
-  RECONCILIATION: 1,
-  PAYOUT: 2,
-  WITHDRAWAL: 3,
-  CANCELLATION: 4,
-  DISPUTE: 5,
-  SETTLEMENT: 6,
+  RECONCILIATION: 0,
+  PAYOUT: 1,
+  WITHDRAWAL: 2,
+  CANCELLATION: 3,
+  DISPUTE: 4,
+  SETTLEMENT: 5,
 }
 
 export function sortFinanceWorkbenchActions(
@@ -181,7 +175,6 @@ export class FinanceWorkbenchService {
     }
 
     const now = new Date()
-    const supportTarget = new Date(now.getTime() - 24 * 60 * 60 * 1000)
     const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     const reconciliationPromise = this.reconciliation.run().catch(() => {
@@ -206,8 +199,6 @@ export class FinanceWorkbenchService {
       eligibleWithdrawalCount,
       financeCancellationCount,
       activeDisputeCount,
-      supportCount,
-      overdueSupportCount,
       failedWithdrawalCount,
       failedPayoutCount,
       settlementFunds,
@@ -217,7 +208,6 @@ export class FinanceWorkbenchService {
       settlements,
       withdrawals,
       failedExecutions,
-      tickets,
       publisherDebt,
       debtPublishers,
       auditRows,
@@ -253,15 +243,6 @@ export class FinanceWorkbenchService {
       }),
       this.prisma.orderDispute.count({
         where: { status: { in: [...ACTIVE_DISPUTE_STATUSES] } },
-      }),
-      this.prisma.ticket.count({
-        where: { status: { in: [...ACTIVE_SUPPORT_STATUSES] } },
-      }),
-      this.prisma.ticket.count({
-        where: {
-          status: { in: [...ACTIVE_SUPPORT_STATUSES] },
-          updatedAt: { lt: supportTarget },
-        },
       }),
       this.prisma.withdrawal.count({ where: { status: "FAILED" } }),
       this.prisma.payoutExecution.count({ where: { status: "FAILED" } }),
@@ -355,30 +336,6 @@ export class FinanceWorkbenchService {
           },
         },
       }),
-      this.prisma.ticket.findMany({
-        where: { status: { in: [...ACTIVE_SUPPORT_STATUSES] } },
-        orderBy: { updatedAt: "asc" },
-        take: 8,
-        select: {
-          id: true,
-          subject: true,
-          status: true,
-          fulfillmentChannel: true,
-          createdAt: true,
-          updatedAt: true,
-          user: { select: { name: true } },
-          assignedPublisher: { select: { name: true } },
-          order: {
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              amount: true,
-              currency: true,
-            },
-          },
-        },
-      }),
       this.prisma.publisherBalance.aggregate({
         where: { debtBalance: { gt: 0 } },
         _count: { _all: true },
@@ -427,31 +384,6 @@ export class FinanceWorkbenchService {
         deadlineAt: null,
         amount: null,
         currency: null,
-      })
-    }
-
-    for (const ticket of tickets) {
-      const old = olderThan(ticket.updatedAt, 24, now)
-      actions.push({
-        id: ticket.id,
-        type: "SUPPORT",
-        priority: old ? "HIGH" : "MEDIUM",
-        title: ticket.subject,
-        description:
-          ticket.fulfillmentChannel === "PLATFORM"
-            ? "Platform ticket · Finance can add internal notes"
-            : ticket.fulfillmentChannel === "PUBLISHER"
-              ? `Publisher ticket · ${ticket.assignedPublisher?.name ?? ticket.user.name ?? "Reply needed"}`
-              : `General support ticket · ${ticket.user.name ?? "Reply needed"}`,
-        href: `/dashboard/support/${ticket.id}`,
-        createdAt: ticket.createdAt,
-        deadlineAt: null,
-        amount: hasAmount(ticket.order?.amount)
-          ? money(ticket.order?.amount)
-          : null,
-        currency: hasAmount(ticket.order?.amount)
-          ? (ticket.order?.currency ?? null)
-          : null,
       })
     }
 
@@ -567,15 +499,6 @@ export class FinanceWorkbenchService {
 
     const sortedActions = actions.sort(sortFinanceWorkbenchActions)
     const actionQueue = sortedActions.slice(0, 12)
-    const firstSupport = sortedActions.find((item) => item.type === "SUPPORT")
-    if (
-      firstSupport &&
-      !actionQueue.some((item) => item.type === "SUPPORT") &&
-      actionQueue.length === 12
-    ) {
-      actionQueue[actionQueue.length - 1] = firstSupport
-      actionQueue.sort(sortFinanceWorkbenchActions)
-    }
 
     const settlementPipeline = statusRows(
       settlementPipelineRows as any,
@@ -616,7 +539,6 @@ export class FinanceWorkbenchService {
           readySettlementCount +
           eligibleWithdrawalCount +
           financeCancellationCount,
-        activeSupport: supportCount,
         fundsInFlight: sumMoney(
           settlementFunds._sum.publisherAmount,
           withdrawalFunds._sum.amount,
@@ -628,37 +550,6 @@ export class FinanceWorkbenchService {
         netRevenue30d: revenue?.totals.current.netRevenue ?? "0.00",
       },
       actionQueue,
-      support: {
-        active: supportCount,
-        overdue: overdueSupportCount,
-        items: tickets.map((ticket) => ({
-          id: ticket.id,
-          subject: ticket.subject,
-          status: ticket.status,
-          channel: ticket.fulfillmentChannel,
-          replyMode:
-            staffRole !== "SUPER_ADMIN" &&
-            ticket.fulfillmentChannel === "PLATFORM"
-              ? ("INTERNAL_ONLY" as const)
-              : ("PUBLIC_AND_INTERNAL" as const),
-          requesterName: ticket.user.name,
-          publisherName: ticket.assignedPublisher?.name ?? null,
-          order: ticket.order
-            ? {
-                id: ticket.order.id,
-                title: ticket.order.title,
-                status: ticket.order.status,
-                amount: hasAmount(ticket.order.amount)
-                  ? money(ticket.order.amount)
-                  : null,
-                currency: ticket.order.currency,
-              }
-            : null,
-          createdAt: ticket.createdAt,
-          updatedAt: ticket.updatedAt,
-          overdue: olderThan(ticket.updatedAt, 24, now),
-        })),
-      },
       pipeline: {
         settlements: settlementPipeline,
         withdrawals: withdrawalPipeline,

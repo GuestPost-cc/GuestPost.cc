@@ -1,10 +1,12 @@
 "use client"
 
-import type {
-  CancellationReasonCode,
-  OrderResponse,
+import {
+  type CancellationReasonCode,
+  type OrderResponse,
+  supportKeys,
+  type TicketListPage,
 } from "@guestpost/api-client"
-import type { OrderStatus } from "@guestpost/database"
+import type { OrderStatus } from "@guestpost/shared"
 import {
   BriefRenderer,
   Button,
@@ -60,7 +62,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { use, useState } from "react"
+import { use, useRef, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
@@ -394,6 +396,7 @@ export default function OrderDetailPage({
   const [disputeReason, setDisputeReason] = useState("")
   const [supportSubject, setSupportSubject] = useState("")
   const [supportMessage, setSupportMessage] = useState("")
+  const supportIntentId = useRef<string | null>(null)
   const [cancelReason, setCancelReason] = useState<CancellationReasonCode>(
     "CUSTOMER_CHANGED_MIND",
   )
@@ -438,16 +441,16 @@ export default function OrderDetailPage({
 
   // Phase 7.9 #29 — lifted from OrderSupportPanel (now deleted). Shared
   // <SupportPanel> is presentational; parent owns the fetch.
-  const { data: orderTickets = [], isLoading: ticketsLoading } = useQuery<
-    any[]
-  >({
-    queryKey: ["order-tickets", resolvedParams.id],
-    queryFn: async () => {
-      const all = await api.support.listTickets()
-      return ((all ?? []) as any[]).filter(
-        (t: any) => t.order?.id === resolvedParams.id,
-      )
-    },
+  const {
+    data: orderTicketPage,
+    isLoading: ticketsLoading,
+    error: ticketsError,
+    refetch: refetchTickets,
+  } = useQuery<TicketListPage>({
+    queryKey: supportKeys.order("customer", resolvedParams.id),
+    queryFn: () =>
+      api.support.listTickets({ orderId: resolvedParams.id, limit: 100 }),
+    enabled: Boolean(order),
   })
 
   const reviewable =
@@ -546,14 +549,22 @@ export default function OrderDetailPage({
           supportSubject.trim() ||
           `Help with order #${resolvedParams.id.slice(0, 8)}`,
         message: supportMessage.trim(),
+        clientRequestId: (supportIntentId.current ??= crypto.randomUUID()),
         orderId: resolvedParams.id,
       }),
-    onSuccess: (t: any) => {
+    onSuccess: (ticket) => {
+      supportIntentId.current = null
       toast.success("Support ticket created")
       setShowSupportDialog(false)
       setSupportSubject("")
       setSupportMessage("")
-      if (t?.id) router.push(`/dashboard/support/${t.id}`)
+      queryClient.invalidateQueries({
+        queryKey: supportKeys.lists("customer"),
+      })
+      queryClient.invalidateQueries({
+        queryKey: supportKeys.order("customer", resolvedParams.id),
+      })
+      router.push(`/dashboard/support/${ticket.id}`)
     },
     onError: (err: Error) =>
       toast.error(err.message || "Failed to create ticket"),
@@ -1590,66 +1601,132 @@ export default function OrderDetailPage({
       </Dialog>
 
       <SupportPanel
-        tickets={orderTickets}
+        tickets={orderTicketPage?.items}
         isLoading={ticketsLoading}
-        onOpenNew={() => setShowSupportDialog(true)}
+        onOpenNew={ticketsError ? undefined : () => setShowSupportDialog(true)}
         linkHref={(ticketId) => `/dashboard/support/${ticketId}`}
         actorScope="customer"
+        emptyState={
+          ticketsError ? (
+            <div role="alert">
+              <ErrorState
+                title="Order support could not be loaded"
+                description="Support threads are temporarily unavailable. This does not mean the order has no tickets."
+                onRetry={() => refetchTickets()}
+                className="py-6"
+              />
+            </div>
+          ) : undefined
+        }
       />
 
-      <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
+      <Dialog
+        open={showSupportDialog}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && supportMutation.isPending) return
+          if (!nextOpen) {
+            supportIntentId.current = null
+            supportMutation.reset()
+          }
+          setShowSupportDialog(nextOpen)
+        }}
+      >
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Get help with this order</DialogTitle>
-            <DialogDescription>
-              Opens a support ticket linked to order #
-              {resolvedParams.id.slice(0, 8)}. Our team replies in the ticket
-              thread.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <Label htmlFor="support-subject">Subject</Label>
-              <Input
-                id="support-subject"
-                value={supportSubject}
-                onChange={(e) => setSupportSubject(e.target.value)}
-                placeholder={`Help with order #${resolvedParams.id.slice(0, 8)}`}
-                maxLength={200}
-              />
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              supportMutation.mutate()
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Get help with this order</DialogTitle>
+              <DialogDescription>
+                Opens a support ticket linked to order #
+                {resolvedParams.id.slice(0, 8)}. Our team replies in the ticket
+                thread.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-4">
+              <div>
+                <Label htmlFor="support-subject">Subject</Label>
+                <Input
+                  id="support-subject"
+                  value={supportSubject}
+                  onChange={(event) => {
+                    setSupportSubject(event.target.value)
+                    supportIntentId.current = null
+                    if (supportMutation.error) supportMutation.reset()
+                  }}
+                  placeholder={`Help with order #${resolvedParams.id.slice(0, 8)}`}
+                  maxLength={200}
+                  dir="auto"
+                  className="[unicode-bidi:plaintext]"
+                  disabled={supportMutation.isPending}
+                />
+              </div>
+              <div>
+                <Label htmlFor="support-message">How can we help?</Label>
+                <Textarea
+                  id="support-message"
+                  rows={4}
+                  value={supportMessage}
+                  onChange={(event) => {
+                    setSupportMessage(event.target.value)
+                    supportIntentId.current = null
+                    if (supportMutation.error) supportMutation.reset()
+                  }}
+                  placeholder="Describe your issue (at least 10 characters)..."
+                  maxLength={10_000}
+                  disabled={supportMutation.isPending}
+                  dir="auto"
+                  className="[unicode-bidi:plaintext]"
+                />
+                <p className="mt-1 text-right text-xs text-muted-foreground tabular-nums">
+                  {supportMessage.length.toLocaleString()} / 10,000
+                </p>
+              </div>
+              <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100">
+                Never include passwords, API keys, full card numbers, or other
+                sensitive credentials in a support ticket.
+              </p>
+              {order?.fulfillmentChannel === "PUBLISHER" && (
+                <p className="rounded-xl border bg-muted/50 p-3 text-xs text-muted-foreground">
+                  Public messages in this order ticket are visible to your
+                  organization, the publisher fulfilling the order, and
+                  authorized support staff. Use a general Support ticket for an
+                  issue that should not be shared with the publisher.
+                </p>
+              )}
+              {supportMutation.error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {(supportMutation.error as Error).message ||
+                    "The support ticket could not be created."}
+                </p>
+              )}
             </div>
-            <div>
-              <Label htmlFor="support-message">How can we help?</Label>
-              <Textarea
-                id="support-message"
-                rows={4}
-                value={supportMessage}
-                onChange={(e) => setSupportMessage(e.target.value)}
-                placeholder="Describe your issue (at least 10 characters)..."
-                maxLength={5000}
-              />
-            </div>
-            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              Never include passwords, API keys, full card numbers, or other
-              sensitive credentials in a support ticket.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowSupportDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => supportMutation.mutate()}
-              disabled={
-                supportMutation.isPending || supportMessage.trim().length < 10
-              }
-            >
-              {supportMutation.isPending ? "Creating..." : "Create Ticket"}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  supportIntentId.current = null
+                  supportMutation.reset()
+                  setShowSupportDialog(false)
+                }}
+                disabled={supportMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  supportMutation.isPending || supportMessage.trim().length < 10
+                }
+              >
+                {supportMutation.isPending ? "Creating…" : "Create ticket"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

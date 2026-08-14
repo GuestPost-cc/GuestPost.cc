@@ -8,7 +8,7 @@
  * Nest+supertest harness — not jest." Now it ships as a real automated test.
  *
  * Bypasses the HTTP layer entirely — calls OrderFulfillmentAssignmentService
- * .claim(orderId, userId) directly via app.get(Service). No TestAuthGuard
+ * .claim(orderId, userId, "OPERATIONS") directly via app.get(Service). No TestAuthGuard
  * needed for this spec (HTTP-layer integration ships in Phase 7.10.2.1
  * fast-follow alongside auth-forgery).
  *
@@ -64,6 +64,14 @@ describe("[INTEGRATION] Phase 7.14 #23 — FulfillmentAssignment claim race", ()
           role: "OPERATIONS",
         })),
       })
+      const activeOperationsMemberships = await prisma.staffMembership.count({
+        where: {
+          userId: { in: opUsers.map((user) => user.id) },
+          role: "OPERATIONS",
+          user: { banned: false },
+        },
+      })
+      expect(activeOperationsMemberships).toBe(opUsers.length)
       console.timeEnd("[claim-race] seed")
 
       // ── 3. Fire 5 concurrent claim() calls via the service directly ──
@@ -77,7 +85,7 @@ describe("[INTEGRATION] Phase 7.14 #23 — FulfillmentAssignment claim race", ()
 
       console.time("[claim-race] concurrent-claims")
       const results = await Promise.allSettled(
-        opUsers.map((u) => service.claim(order.id, u.id)),
+        opUsers.map((u) => service.claim(order.id, u.id, "OPERATIONS")),
       )
       console.timeEnd("[claim-race] concurrent-claims")
 
@@ -100,18 +108,28 @@ describe("[INTEGRATION] Phase 7.14 #23 — FulfillmentAssignment claim race", ()
       expect(rejected).toHaveLength(4)
       rejected.forEach((r, _i) => {
         expect(r.reason).toBeInstanceOf(ConflictException)
-        expect(r.reason.message).toBe("Order is already assigned")
+        expect([
+          "Order is already assigned",
+          "Order changed while it was being claimed. Refresh and retry.",
+        ]).toContain(r.reason.message)
       })
 
-      // ── 5. Steady-state check: exactly 1 ASSIGNED row for this orderId ──
-      const activeCount = await prisma.fulfillmentAssignment.count({
+      // ── 5. Steady-state check: the sole active row belongs to the winner ──
+      const activeAssignments = await prisma.fulfillmentAssignment.findMany({
         where: {
           orderId: order.id,
           status: { in: ["ASSIGNED", "IN_PROGRESS"] },
         },
       })
-      expect(activeCount).toBe(1)
-      console.log(`[claim-race] activeCount: ${activeCount} (expect 1)`)
+      expect(activeAssignments).toHaveLength(1)
+      const winnerIndex = results.findIndex(
+        (result) => result.status === "fulfilled",
+      )
+      expect(winnerIndex).toBeGreaterThanOrEqual(0)
+      expect(activeAssignments[0].assignedToUserId).toBe(
+        opUsers[winnerIndex].id,
+      )
+      console.log("[claim-race] activeCount: 1 (expect 1)")
     } finally {
       console.time("[claim-race] teardown")
       await cleanup()

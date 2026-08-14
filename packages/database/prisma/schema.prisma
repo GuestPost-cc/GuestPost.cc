@@ -2416,9 +2416,11 @@ model Ticket {
   // Phase 6.5 channel-aware routing. Snapshotted from the linked order at
   // ticket creation; subsequent website/listing edits never re-route an
   // existing ticket (prevents accidental exposure to a new owner).
-  //   - PLATFORM channel: assignedToUserId = Website.managedByUserId at the
-  //     moment the ticket was opened. NULL falls back to the unassigned-Ops
-  //     queue surfaced to every OPERATIONS staffer.
+  //   - PLATFORM channel: assignedToUserId follows the order's locked active
+  //     Operations fulfillment assignment, or the latest eligible delivered
+  //     assignment after fulfillment. NULL falls back to the unassigned-Ops
+  //     queue; eligible terminal-order tickets can be claimed without changing
+  //     fulfillment ownership.
   //   - PUBLISHER channel: assignedPublisherId = Website.publisherId. Reply
   //     access then keys off PublisherMembership rather than a single user.
   fulfillmentChannel  FulfillmentChannel?
@@ -2446,9 +2448,8 @@ model Ticket {
 // Phase 6.6: every ticket message carries a visibility scope. PUBLIC is the
 // historical default and what every existing row gets at migration time;
 // INTERNAL is staff-only — invisible to the ticket's customer and to any
-// publisher member, and used by Finance (who is read-only on PLATFORM tickets)
-// + Admin + Ops as an escape valve to coordinate without writing to the
-// customer-facing thread.
+// publisher member. New support access is limited to Super Admin and scoped
+// Operations staff; the value remains in historical rows for audit continuity.
 enum TicketMessageVisibility {
   PUBLIC
   INTERNAL
@@ -2463,8 +2464,7 @@ enum TicketMessageVisibility {
 // Used for:
 //   - Dispute / refund / settlement investigations ("who said what in what
 //     capacity?")
-//   - Staff QA reviews ("Finance posted on a Platform ticket — that's the
-//     internal-note escape valve in action")
+//   - Staff QA reviews, including historical role-at-write evidence
 //   - Audit log enrichment (TICKET_MESSAGE_ADDED metadata carries this so
 //     reports can group by role without a join through StaffMembership)
 enum TicketParticipantRole {

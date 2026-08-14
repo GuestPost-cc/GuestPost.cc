@@ -1,8 +1,10 @@
 "use client"
 
-import type {
-  AdminOrderDetailResponse,
-  AdminOrderTimelineEvent,
+import {
+  type AdminOrderDetailResponse,
+  type AdminOrderTimelineEvent,
+  type StaffTicketListResponse,
+  supportKeys,
 } from "@guestpost/api-client"
 import type { OrderStatus } from "@guestpost/shared"
 import {
@@ -19,6 +21,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorState,
   getOrderEventPresentation,
   getOrderStatusPresentation,
   Input,
@@ -30,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  SupportPanel,
   Textarea,
   StatusBadge as UIStatusBadge,
 } from "@guestpost/ui"
@@ -314,6 +318,17 @@ export default function OrderDetailPage() {
         : 10_000
     },
     refetchOnWindowFocus: true,
+  })
+
+  const {
+    data: supportTicketPage,
+    isLoading: supportTicketsLoading,
+    error: supportTicketsError,
+    refetch: refetchSupportTickets,
+  } = useQuery<StaffTicketListResponse>({
+    queryKey: supportKeys.list("admin", { orderId: id, page: 1, limit: 100 }),
+    queryFn: () => api.admin.listTickets({ orderId: id, page: 1, limit: 100 }),
+    enabled: Boolean(order && order.access.role !== "FINANCE"),
   })
 
   const refreshOrder = () => {
@@ -1443,6 +1458,29 @@ export default function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      {role !== "FINANCE" && (
+        <SupportPanel
+          tickets={supportTicketPage?.items}
+          isLoading={supportTicketsLoading}
+          linkHref={(ticketId) => `/dashboard/support/${ticketId}`}
+          actorScope="operations"
+          title="Order support"
+          description="Support threads visible in your server-authorized order scope."
+          emptyState={
+            supportTicketsError ? (
+              <div role="alert">
+                <ErrorState
+                  title="Order support could not be loaded"
+                  description="Support threads are temporarily unavailable. This does not mean the order has no tickets."
+                  onRetry={() => refetchSupportTickets()}
+                  className="py-6"
+                />
+              </div>
+            ) : undefined
+          }
+        />
+      )}
 
       {/* ── Cancel / Refund Dialog ────────────────────────────────────────── */}
       <Dialog

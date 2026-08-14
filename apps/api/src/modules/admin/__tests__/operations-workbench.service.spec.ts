@@ -157,7 +157,11 @@ describe("OperationsWorkbenchService", () => {
       expect.objectContaining({
         where: {
           status: { in: ["OPEN", "IN_PROGRESS"] },
-          fulfillmentChannel: "PLATFORM",
+          assignedPublisherId: null,
+          OR: [
+            { fulfillmentChannel: "PLATFORM" },
+            { fulfillmentChannel: null, orderId: null },
+          ],
           assignedToUserId: "ops-1",
         },
         select: expect.not.objectContaining({ user: expect.anything() }),
