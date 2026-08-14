@@ -1,6 +1,7 @@
 "use client"
 
-import type { TicketStatus } from "@guestpost/database"
+import { supportKeys } from "@guestpost/api-client"
+import type { TicketStatus } from "@guestpost/shared"
 import {
   Button,
   Card,
@@ -51,7 +52,6 @@ import { useAuth } from "../../../lib/auth"
 
 export default function AdminSupportPage() {
   const { user } = useAuth()
-  const isFinance = user?.staffRole === "FINANCE"
   const isOperations = user?.staffRole === "OPERATIONS"
 
   const [search, setSearch] = useState("")
@@ -63,19 +63,23 @@ export default function AdminSupportPage() {
   const [page, setPage] = useState(1)
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: [
-      "admin",
-      "tickets",
-      search,
-      statusFilter,
-      channelFilter,
-      assigneeFilter,
+    queryKey: supportKeys.list("admin", {
+      search: search || undefined,
+      status:
+        statusFilter === "all" ? undefined : (statusFilter as TicketStatus),
+      channel:
+        channelFilter === "all"
+          ? undefined
+          : (channelFilter as "PLATFORM" | "PUBLISHER"),
+      assignedToUserId: assigneeFilter === "all" ? undefined : assigneeFilter,
       page,
-    ],
+      limit: 20,
+    }),
     queryFn: () =>
       api.admin.listTickets({
         search: search || undefined,
-        status: statusFilter === "all" ? undefined : statusFilter,
+        status:
+          statusFilter === "all" ? undefined : (statusFilter as TicketStatus),
         channel:
           channelFilter === "all"
             ? undefined
@@ -114,25 +118,15 @@ export default function AdminSupportPage() {
     <AdminPage>
       <AdminPageHeader
         eyebrow={
-          isFinance
-            ? "Finance-scoped inbox"
-            : isOperations
-              ? "Assigned operational inbox"
-              : "Platform support oversight"
+          isOperations
+            ? "Assigned operational inbox"
+            : "Platform support oversight"
         }
-        title={
-          isFinance
-            ? "Finance Support"
-            : isOperations
-              ? "Operations Support"
-              : "Support"
-        }
+        title={isOperations ? "Operations Support" : "Support"}
         description={
-          isFinance
-            ? "Reply to publisher tickets and coordinate internally. Platform tickets remain read-only except for internal notes."
-            : isOperations
-              ? "Work support for platform listings and orders assigned to you; unassigned tickets remain read-only until assigned."
-              : "Monitor and coordinate the customer, publisher, and platform support queues."
+          isOperations
+            ? "Work support for platform orders assigned to you. Claim the related order before responding to an unassigned thread."
+            : "Monitor and coordinate the customer, publisher, and platform support queues."
         }
         icon={HeadphonesIcon}
         actions={
@@ -170,6 +164,7 @@ export default function AdminSupportPage() {
         <div className="relative min-w-0 flex-1 lg:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            aria-label="Search support tickets"
             placeholder="Search tickets..."
             value={search}
             onChange={(e) => {
@@ -186,7 +181,10 @@ export default function AdminSupportPage() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-full bg-background sm:w-44">
+          <SelectTrigger
+            className="w-full bg-background sm:w-44"
+            aria-label="Filter support tickets by status"
+          >
             <SelectValue placeholder="All status" />
           </SelectTrigger>
           <SelectContent>
@@ -207,7 +205,10 @@ export default function AdminSupportPage() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-full bg-background sm:w-44">
+          <SelectTrigger
+            className="w-full bg-background sm:w-44"
+            aria-label="Filter support tickets by channel"
+          >
             <SelectValue placeholder="All channels" />
           </SelectTrigger>
           <SelectContent>
@@ -223,7 +224,10 @@ export default function AdminSupportPage() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-full bg-background sm:w-48">
+          <SelectTrigger
+            className="w-full bg-background sm:w-48"
+            aria-label="Filter support tickets by assignee"
+          >
             <SelectValue placeholder="All assignees" />
           </SelectTrigger>
           <SelectContent>
@@ -254,73 +258,151 @@ export default function AdminSupportPage() {
               }
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Channel</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Assigned</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Messages</TableHead>
-                    <TableHead>Last Updated</TableHead>
-                    <TableHead className="text-right" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tickets.map((t) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-medium max-w-[280px] truncate">
-                        {t.subject}
-                      </TableCell>
-                      <TableCell>
-                        <FulfillmentChannelBadge
-                          channel={t.fulfillmentChannel as any}
+            <>
+              <div className="divide-y md:hidden">
+                {tickets.map((ticket) => {
+                  const presentation = getTicketStatusPresentation(
+                    ticket.status as TicketStatus,
+                  )
+                  const assignee =
+                    ticket.fulfillmentChannel === "PLATFORM"
+                      ? ticket.assignedTo?.displayName
+                      : ticket.assignedPublisher?.displayName
+                  return (
+                    <Link
+                      key={ticket.id}
+                      href={`/dashboard/support/${ticket.id}`}
+                      className="block space-y-3 p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p
+                          dir="auto"
+                          className="min-w-0 break-words font-semibold [overflow-wrap:anywhere] [unicode-bidi:plaintext]"
+                        >
+                          {ticket.subject}
+                        </p>
+                        <ArrowRight
+                          className="mt-1 h-4 w-4 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
                         />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {t.customer.name || t.customer.email}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {t.fulfillmentChannel === "PLATFORM"
-                          ? t.assignedTo?.name || (
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <FulfillmentChannelBadge
+                          channel={ticket.fulfillmentChannel}
+                        />
+                        <StatusBadge variant={presentation.variant}>
+                          {presentation.label}
+                        </StatusBadge>
+                      </div>
+                      <dl className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <dt className="text-muted-foreground">Requester</dt>
+                          <dd className="font-medium">
+                            <bdi>{ticket.requester.displayName}</bdi>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Assigned</dt>
+                          <dd className="font-medium">
+                            <bdi>{assignee ?? "Unassigned"}</bdi>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Messages</dt>
+                          <dd className="font-medium">{ticket.messageCount}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Updated</dt>
+                          <dd className="font-medium">
+                            {formatDistanceToNow(new Date(ticket.updatedAt), {
+                              addSuffix: true,
+                            })}
+                          </dd>
+                        </div>
+                      </dl>
+                    </Link>
+                  )
+                })}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Channel</TableHead>
+                      <TableHead>Requester</TableHead>
+                      <TableHead>Assigned</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Messages</TableHead>
+                      <TableHead>Last Updated</TableHead>
+                      <TableHead className="text-right" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tickets.map((t) => (
+                      <TableRow key={t.id}>
+                        <TableCell className="max-w-[280px] font-medium">
+                          <span
+                            dir="auto"
+                            className="block truncate [unicode-bidi:plaintext]"
+                          >
+                            {t.subject}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <FulfillmentChannelBadge
+                            channel={t.fulfillmentChannel}
+                          />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          <bdi>{t.requester.displayName}</bdi>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {t.fulfillmentChannel === "PLATFORM" ? (
+                            t.assignedTo?.displayName ? (
+                              <bdi>{t.assignedTo.displayName}</bdi>
+                            ) : (
                               <span className="text-amber-600">Unassigned</span>
                             )
-                          : t.assignedPublisher?.name || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const p = getTicketStatusPresentation(
-                            t.status as TicketStatus,
-                          )
-                          return (
-                            <StatusBadge variant={p.variant}>
-                              {p.label}
-                            </StatusBadge>
-                          )
-                        })()}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {t.messageCount}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(t.updatedAt), {
-                          addSuffix: true,
-                        })}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/support/${t.id}`}>
-                            View <ArrowRight className="ml-1 h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                          ) : t.assignedPublisher?.displayName ? (
+                            <bdi>{t.assignedPublisher.displayName}</bdi>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const p = getTicketStatusPresentation(
+                              t.status as TicketStatus,
+                            )
+                            return (
+                              <StatusBadge variant={p.variant}>
+                                {p.label}
+                              </StatusBadge>
+                            )
+                          })()}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {t.messageCount}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDistanceToNow(new Date(t.updatedAt), {
+                            addSuffix: true,
+                          })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/dashboard/support/${t.id}`}>
+                              View <ArrowRight className="ml-1 h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

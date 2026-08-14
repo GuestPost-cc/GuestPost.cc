@@ -134,7 +134,6 @@ describe("DeliveriesController — RBAC coverage", () => {
       "fulfillmentQueue",
       "operationsInbox",
       "operationsOrder",
-      "claim",
       "submitPlatformDelivery",
       "reverify",
     ]
@@ -147,6 +146,13 @@ describe("DeliveriesController — RBAC coverage", () => {
       ).sort()
       expect([method, roles]).toEqual([method, ["OPERATIONS", "SUPER_ADMIN"]])
     }
+  })
+
+  it("keeps self-service fulfillment claim Operations-only", () => {
+    const handler = (DeliveriesController.prototype as any).claim
+    const roles =
+      (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+    expect(roles).toEqual(["OPERATIONS"])
   })
 
   it("cross-staff assignment and reassignment are SUPER_ADMIN-only", () => {

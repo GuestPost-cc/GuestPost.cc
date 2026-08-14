@@ -1,8 +1,10 @@
 "use client"
 
-import type {
-  AdminOrderDetailResponse,
-  AdminOrderTimelineEvent,
+import {
+  type AdminOrderDetailResponse,
+  type AdminOrderTimelineEvent,
+  type StaffTicketListResponse,
+  supportKeys,
 } from "@guestpost/api-client"
 import type { OrderStatus } from "@guestpost/shared"
 import {
@@ -30,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  SupportPanel,
   Textarea,
   StatusBadge as UIStatusBadge,
 } from "@guestpost/ui"
@@ -314,6 +317,12 @@ export default function OrderDetailPage() {
         : 10_000
     },
     refetchOnWindowFocus: true,
+  })
+
+  const supportQuery = useQuery<StaffTicketListResponse>({
+    queryKey: supportKeys.list("admin", { orderId: id, page: 1, limit: 100 }),
+    queryFn: () => api.admin.listTickets({ orderId: id, page: 1, limit: 100 }),
+    enabled: Boolean(order && order.access.role !== "FINANCE"),
   })
 
   const refreshOrder = () => {
@@ -1443,6 +1452,17 @@ export default function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      {role !== "FINANCE" && (
+        <SupportPanel
+          tickets={supportQuery.data?.items}
+          isLoading={supportQuery.isLoading}
+          linkHref={(ticketId) => `/dashboard/support/${ticketId}`}
+          actorScope="operations"
+          title="Order support"
+          description="Support threads visible in your server-authorized order scope."
+        />
+      )}
 
       {/* ── Cancel / Refund Dialog ────────────────────────────────────────── */}
       <Dialog

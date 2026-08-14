@@ -13,6 +13,17 @@ canonical launch-risk register.
 
 ## Current production-hold risk
 
+- **Support still needs one real multi-actor browser acceptance journey.** The
+  service, API-client, and shared UI have focused coverage, and a disposable
+  PostgreSQL suite covers projection privacy, internal-note filtering,
+  idempotent replay, publisher order authorization, and assignment races. The
+  repository does not yet provision customer, publisher, Operations, and Super
+  Admin browser sessions in one isolated Playwright fixture. Before paid
+  launch, prove sender side/label/accessibility, publisher assigned-thread
+  routing, internal-note invisibility after refresh, close/reopen, and
+  ambiguous retry in real browsers; do not substitute mocks or source-string
+  checks for that gate.
+
 - **The schema cutover succeeded, but the worker hard drain missed one workload.**
   All 75 migrations are committed on Neon and exact SHA `512b851` is live on
   Render in finance-locked mode. The final topology audit then found continuous

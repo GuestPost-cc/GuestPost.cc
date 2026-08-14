@@ -1,5 +1,6 @@
 "use client"
 
+import { supportKeys } from "@guestpost/api-client"
 import {
   Button,
   Card,
@@ -17,15 +18,26 @@ import {
   getTicketStatusPresentation,
   Input,
   Label,
+  mergeSupportTicketPages,
   Skeleton,
   StatusBadge,
   Textarea,
 } from "@guestpost/ui"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
-import { LifeBuoy, MessageSquarePlus, RefreshCw } from "lucide-react"
-import { useSearchParams } from "next/navigation"
-import { Suspense, useState } from "react"
+import {
+  ArrowRight,
+  LifeBuoy,
+  MessageSquarePlus,
+  RefreshCw,
+} from "lucide-react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useRef, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 
@@ -41,35 +53,53 @@ function SupportSkeleton() {
 
 function SupportContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const queryClient = useQueryClient()
-  const [open, setOpen] = useState(searchParams.get("new") === "true")
-  const [subject, setSubject] = useState(searchParams.get("subject") ?? "")
-  const [message, setMessage] = useState("")
   const orderId = searchParams.get("orderId") ?? undefined
+  const [open, setOpen] = useState(
+    Boolean(orderId && searchParams.get("new") === "true"),
+  )
+  const [subject, setSubject] = useState(orderId ? "Help with this order" : "")
+  const [message, setMessage] = useState("")
+  const createIntentId = useRef<string | null>(null)
 
-  const ticketsQuery = useQuery({
-    queryKey: ["publisher-support-tickets"],
-    queryFn: () => api.support.listTickets(),
+  const ticketsQuery = useInfiniteQuery({
+    queryKey: supportKeys.list("publisher", { orderId, limit: 50 }),
+    queryFn: ({ pageParam }) =>
+      api.support.listTickets({
+        orderId,
+        cursor: pageParam ?? undefined,
+        limit: 50,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   })
   const createTicket = useMutation({
     mutationFn: () =>
       api.support.createTicket({
         subject: subject.trim(),
         message: message.trim(),
+        clientRequestId: (createIntentId.current ??= crypto.randomUUID()),
         orderId,
       }),
-    onSuccess: () => {
+    onSuccess: (ticket) => {
+      createIntentId.current = null
       toast.success("Support ticket created")
       setOpen(false)
       setSubject("")
       setMessage("")
-      queryClient.invalidateQueries({ queryKey: ["publisher-support-tickets"] })
+      queryClient.invalidateQueries({
+        queryKey: supportKeys.lists("publisher"),
+      })
+      router.push(`/dashboard/support/${ticket.id}`)
     },
     onError: (error: Error) =>
       toast.error(error.message || "Failed to create support ticket"),
   })
 
-  if (ticketsQuery.error) {
+  const tickets = mergeSupportTicketPages(ticketsQuery.data?.pages)
+
+  if (ticketsQuery.error && tickets.length === 0) {
     return (
       <ErrorState
         title="Failed to load support"
@@ -78,8 +108,6 @@ function SupportContent() {
       />
     )
   }
-
-  const tickets = ticketsQuery.data ?? []
 
   return (
     <div className="space-y-6">
@@ -92,8 +120,8 @@ function SupportContent() {
             Get help
           </h1>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-            Open an order-linked request without sharing account or payment
-            credentials.
+            Read and reply to customer order-support threads. New publisher
+            requests must start from the relevant order.
           </p>
         </div>
         <div className="flex gap-2">
@@ -103,21 +131,25 @@ function SupportContent() {
             disabled={ticketsQuery.isFetching}
           >
             <RefreshCw
-              className={`mr-2 h-4 w-4 ${ticketsQuery.isFetching ? "animate-spin" : ""}`}
+              className={`mr-2 h-4 w-4 ${ticketsQuery.isFetching && !ticketsQuery.isFetchingNextPage ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
-          <Button onClick={() => setOpen(true)}>
-            <MessageSquarePlus className="mr-2 h-4 w-4" /> Open ticket
-          </Button>
+          {orderId && (
+            <Button onClick={() => setOpen(true)}>
+              <MessageSquarePlus className="mr-2 h-4 w-4" /> Open order ticket
+            </Button>
+          )}
         </div>
       </div>
 
       <Card className="rounded-2xl shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg">Your support requests</CardTitle>
+          <CardTitle className="text-lg">Assigned support threads</CardTitle>
           <CardDescription>
-            Ticket visibility is scoped to your authenticated publisher account.
+            {tickets.length} loaded customer thread
+            {tickets.length === 1 ? "" : "s"}, limited to orders assigned to
+            your publisher account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -128,13 +160,17 @@ function SupportContent() {
               {tickets.map((ticket) => {
                 const status = getTicketStatusPresentation(ticket.status)
                 return (
-                  <div
+                  <Link
                     key={ticket.id}
-                    className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    href={`/dashboard/support/${ticket.id}`}
+                    className="flex flex-col gap-3 p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold">
+                        <p
+                          dir="auto"
+                          className="truncate text-sm font-semibold [unicode-bidi:plaintext]"
+                        >
                           {ticket.subject}
                         </p>
                         <StatusBadge variant={status.variant}>
@@ -151,7 +187,11 @@ function SupportContent() {
                           : ""}
                       </p>
                     </div>
-                  </div>
+                    <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
+                      View thread
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  </Link>
                 )
               })}
             </div>
@@ -162,67 +202,144 @@ function SupportContent() {
               </div>
               <p className="mt-4 font-semibold">No support requests</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                If an order is blocked, open a ticket from its order workspace.
+                Customer order-support threads assigned to you will appear here.
               </p>
             </div>
+          )}
+          {ticketsQuery.hasNextPage && (
+            <div className="mt-4 flex justify-center border-t pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => ticketsQuery.fetchNextPage()}
+                disabled={ticketsQuery.isFetchingNextPage}
+              >
+                {ticketsQuery.isFetchingNextPage
+                  ? "Loading more…"
+                  : "Load more tickets"}
+              </Button>
+            </div>
+          )}
+          {ticketsQuery.error && tickets.length > 0 && (
+            <p
+              role="alert"
+              className="mt-3 text-center text-sm text-destructive"
+            >
+              {(ticketsQuery.error as Error).message ||
+                "More tickets could not be loaded."}
+            </p>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Open support ticket</DialogTitle>
-            <DialogDescription>
-              Describe the blocker. Never include passwords, API keys, or full
-              payout credentials.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="support-subject">Subject</Label>
-              <Input
-                id="support-subject"
-                value={subject}
-                onChange={(event) => setSubject(event.target.value)}
-                maxLength={160}
-                placeholder="What do you need help with?"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="support-message">Details</Label>
-              <Textarea
-                id="support-message"
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                rows={7}
-                maxLength={5000}
-                placeholder="Include the order context and what is blocking you."
-              />
-            </div>
-            {orderId && (
-              <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-                This request will be linked to order #{orderId.slice(0, 8)}.
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => createTicket.mutate()}
-              disabled={
-                createTicket.isPending ||
-                subject.trim().length < 3 ||
-                message.trim().length < 10
-              }
+      {orderId && (
+        <Dialog
+          open={open}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen && createTicket.isPending) return
+            if (!nextOpen) {
+              createIntentId.current = null
+              createTicket.reset()
+            }
+            setOpen(nextOpen)
+          }}
+        >
+          <DialogContent>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                createTicket.mutate()
+              }}
             >
-              {createTicket.isPending ? "Creating…" : "Create ticket"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <DialogHeader>
+                <DialogTitle>Open order support ticket</DialogTitle>
+                <DialogDescription>
+                  Describe the order blocker. Never include passwords, API keys,
+                  or full payout credentials.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="support-subject">Subject</Label>
+                  <Input
+                    id="support-subject"
+                    value={subject}
+                    onChange={(event) => {
+                      setSubject(event.target.value)
+                      createIntentId.current = null
+                      if (createTicket.error) createTicket.reset()
+                    }}
+                    maxLength={200}
+                    placeholder="What is blocking this order?"
+                    required
+                    dir="auto"
+                    className="[unicode-bidi:plaintext]"
+                    disabled={createTicket.isPending}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="support-message">Details</Label>
+                  <Textarea
+                    id="support-message"
+                    value={message}
+                    onChange={(event) => {
+                      setMessage(event.target.value)
+                      createIntentId.current = null
+                      if (createTicket.error) createTicket.reset()
+                    }}
+                    rows={7}
+                    maxLength={10_000}
+                    placeholder="Include the order context and what is blocking you."
+                    required
+                    dir="auto"
+                    className="[unicode-bidi:plaintext]"
+                    disabled={createTicket.isPending}
+                  />
+                  <p className="text-right text-xs text-muted-foreground tabular-nums">
+                    {message.length.toLocaleString()} / 10,000
+                  </p>
+                </div>
+                <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  This request will be linked to order #{orderId.slice(0, 8)}.
+                  Access and routing are verified by the server. Public messages
+                  are visible to the customer organization and authorized
+                  support staff.
+                </p>
+                {createTicket.error && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {(createTicket.error as Error).message ||
+                      "The support ticket could not be created."}
+                  </p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    createIntentId.current = null
+                    createTicket.reset()
+                    setOpen(false)
+                  }}
+                  disabled={createTicket.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    createTicket.isPending ||
+                    subject.trim().length < 3 ||
+                    message.trim().length < 10
+                  }
+                >
+                  {createTicket.isPending ? "Creating…" : "Create ticket"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

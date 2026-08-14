@@ -18,6 +18,22 @@ owns launch risks. Historical PR and rollout diaries were moved to
 
 ## Implemented in the active batch
 
+- Reworked Support into a server-projected multi-actor conversation. Every
+  message carries an explicit customer/publisher/support/system party, safe
+  display label, and viewer-relative `isSelf`; all three dashboards use the
+  shared accessible conversation component instead of inferring alignment.
+- Made public ticket projections least-privilege, filtered internal notes
+  before cursor pagination, removed Finance from generic Support, and added
+  fail-closed capability-driven reply/status/claim controls.
+- Added actor-scoped idempotency for ticket creation and replies, locked
+  order-derived customer/publisher/Operations routing, and atomic ticket sync
+  when a Platform fulfillment assignment changes. No database migration is
+  required.
+- Staff offboarding now blocks Operations demotion/suspension while active
+  fulfillment or any non-closed Support ticket remains assigned. Closed ticket
+  ownership is released atomically and counted in the protected offboarding
+  audit so historical conversations do not permanently pin a staff account.
+
 - Removed phantom `OrderStatus.SETTLED`; `COMPLETED` is the sole successful
   terminal order status. Settlement approval, return-to-review, and release now
   have distinct relationally bound events.
@@ -71,6 +87,19 @@ owns launch risks. Historical PR and rollout diaries were moved to
   corridor-specific operational gates tracked in `Work/backlog.md`.
 
 ## Validation state
+
+The Support hardening branch has passing repository format, type, lint,
+dependency, health, and production-build gates across the API, shared
+packages, worker, and customer/publisher/admin dashboards. API-client, shared
+UI, Support, Finance, staff-offboarding, fulfillment-assignment, and
+delivery-RBAC suites pass, including the final fail-closed routing regressions.
+Its real PostgreSQL projection, inbox/message pagination, idempotency,
+publisher authorization, assignment races, and offboarding-versus-reopen suite
+is checked in. This workstation has no `psql` client and its Docker daemon is
+unavailable; the disposable PostgreSQL execution therefore remains an
+authoritative CI gate rather than a locally passed check. Browser acceptance
+also remains a deployment gate and must not be represented as passed until
+executed in the configured environment.
 
 The frozen-lockfile install is clean and does not change `pnpm-lock.yaml`.
 Repository type, format, lint, dependency-policy, health, API, worker, shared,

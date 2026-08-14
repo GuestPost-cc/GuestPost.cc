@@ -1,8 +1,10 @@
 "use client"
 
-import type {
-  CancellationReasonCode,
-  OrderResponse,
+import {
+  type CancellationReasonCode,
+  type OrderResponse,
+  supportKeys,
+  type TicketListPage,
 } from "@guestpost/api-client"
 import type { OrderStatus } from "@guestpost/shared"
 import {
@@ -31,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  SupportPanel,
   Textarea,
   StatusBadge as UIStatusBadge,
 } from "@guestpost/ui"
@@ -392,6 +395,13 @@ export default function OrderDetailPage() {
     refetchInterval: 10_000,
     refetchOnWindowFocus: true,
   })
+
+  const { data: orderTicketPage, isLoading: ticketsLoading } =
+    useQuery<TicketListPage>({
+      queryKey: supportKeys.order("publisher", orderId),
+      queryFn: () => api.support.listTickets({ orderId, limit: 100 }),
+      enabled: Boolean(order),
+    })
 
   const refreshOrder = () => {
     queryClient.invalidateQueries({ queryKey: ["order", orderId] })
@@ -1108,7 +1118,7 @@ export default function OrderDetailPage() {
                 asChild
               >
                 <Link
-                  href={`/dashboard/support?new=true&orderId=${encodeURIComponent(orderId)}&subject=${encodeURIComponent(`Order ${orderId.slice(0, 8)}`)}`}
+                  href={`/dashboard/support?new=true&orderId=${encodeURIComponent(orderId)}`}
                 >
                   <MessageSquare className="mr-2 h-4 w-4" /> Contact Support
                 </Link>
@@ -1126,6 +1136,14 @@ export default function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      <SupportPanel
+        tickets={orderTicketPage?.items}
+        isLoading={ticketsLoading}
+        linkHref={(ticketId) => `/dashboard/support/${ticketId}`}
+        actorScope="publisher"
+        description="Support threads securely linked to this order."
+      />
 
       <Dialog
         open={showCancellationDialog}

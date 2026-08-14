@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: security
 project: guestpost-platform
-updated: 2026-08-12
+updated: 2026-08-14
 ---
 
 # Security
@@ -39,6 +39,35 @@ updated: 2026-08-12
 - Generic support read/reply is customer/publisher-only; staff use the guarded
   admin surface. Generic settlement detail is customer-only; staff use the
   guarded admin settlement surface.
+
+## Support Messaging Security
+
+- Generic support is available to customers and order-authorized publishers.
+  Staff access is limited to Super Admin and assignment-scoped Operations;
+  Finance and unknown/missing staff roles fail closed.
+- Operations treats a ticket as Platform support only when it has an explicit
+  `PLATFORM` channel with no publisher owner, or when it is an unambiguous
+  legacy general ticket with null order, channel, and publisher owner. Every
+  contradictory or ambiguous legacy route fails closed, and the support inbox
+  and Operations workbench consume the same predicate.
+- The API projects a stable sender party, safe display name, and `isSelf` flag.
+  Public ticket responses omit raw requester, organization, assignment, user,
+  email, forensic snapshot, and internal-note fields rather than returning
+  redacted placeholders. Only Super Admin receives raw forensic IDs/email.
+- `PUBLIC` visibility is part of the database message-page predicate before
+  cursor and limit. Internal notes therefore cannot leak, consume a public page
+  slot, change its cursor, or disclose staff activity through inbox ordering.
+- Create and reply commands require actor-scoped UUID v4 idempotency keys.
+  Exact normalized replay returns the original row without duplicate audit or
+  notification evidence; mismatched key reuse fails with conflict.
+- Ticket create/reply/status/claim/reassignment re-resolve live authority in
+  their serializable locked transaction. A prior list/detail response is never
+  accepted as authorization for a later mutation.
+- Operations demotion and suspension use the same serializable staff
+  offboarding boundary as fulfillment ownership. Any assigned non-closed
+  Support ticket, including `RESOLVED`, blocks authority removal. Historical
+  `CLOSED` tickets are atomically released to the unassigned queue and the
+  released count is retained in the protected role/suspension audit event.
 
 ## Channel Security
 

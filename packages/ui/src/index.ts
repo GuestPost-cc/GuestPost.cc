@@ -189,11 +189,32 @@ export type { SpinnerButtonProps } from "./components/spinner-button"
 export { SpinnerButton } from "./components/spinner-button"
 export { StatusBadge, statusBadgeVariants } from "./components/status-badge"
 export type {
+  SupportComposerProps,
+  SupportConversationMessage,
+  SupportConversationMessageType,
+  SupportConversationParty,
+  SupportConversationProps,
+  SupportConversationSender,
+  SupportConversationVisibility,
+} from "./components/support-conversation"
+export {
+  mergeSupportConversationMessages,
+  mergeSupportConversationPages,
+  SupportComposer,
+  SupportConversation,
+  SupportMessage,
+  SupportParticipantBadge,
+  SupportSystemEvent,
+} from "./components/support-conversation"
+export type {
   SupportPanelActorScope,
   SupportPanelProps,
   SupportPanelTicket,
 } from "./components/support-panel"
-export { SupportPanel } from "./components/support-panel"
+export {
+  mergeSupportTicketPages,
+  SupportPanel,
+} from "./components/support-panel"
 export { Switch } from "./components/switch"
 export {
   Table,

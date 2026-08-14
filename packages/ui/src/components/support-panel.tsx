@@ -3,8 +3,7 @@
 // between the portal (customer), publisher, and admin order-detail pages.
 //
 // Kept purely presentational on purpose:
-//   - Callers fetch and filter tickets themselves (each app has its own
-//     api client + query layer).
+//   - Callers fetch tickets through server-authorized, order-scoped queries.
 //   - Callers pass a `linkHref(ticketId)` factory because each app routes
 //     its support detail page at a different path.
 //   - `actorScope` only controls the empty-state copy — it does NOT scope
@@ -44,12 +43,22 @@ export interface SupportPanelTicket {
     | null
 }
 
+/** Append cursor pages while keeping the server's order and newest duplicate. */
+export function mergeSupportTicketPages<T extends { id: string }>(
+  pages: readonly { items: readonly T[] }[] | undefined,
+): T[] {
+  const items = new Map<string, T>()
+  for (const page of pages ?? []) {
+    for (const item of page.items) items.set(item.id, item)
+  }
+  return Array.from(items.values())
+}
+
 export type SupportPanelActorScope =
   | "customer"
   | "publisher"
   | "operations"
   | "admin"
-  | "finance"
 
 export interface SupportPanelProps {
   tickets: SupportPanelTicket[] | undefined
@@ -70,7 +79,6 @@ const EMPTY_COPY: Record<SupportPanelActorScope, string> = {
     "No tickets on this order. Customers will reach you here if they need help.",
   operations: "No support activity on this order yet.",
   admin: "No support activity on this order yet.",
-  finance: "No support activity on this order yet.",
 }
 
 export function SupportPanel({
@@ -140,10 +148,18 @@ function SupportTicketRow({
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
           <FulfillmentChannelBadge channel={ticket.fulfillmentChannel} />
-          <span className="truncate text-sm font-medium">{ticket.subject}</span>
+          <span
+            dir="auto"
+            className="min-w-0 truncate text-sm font-medium [unicode-bidi:plaintext]"
+          >
+            {ticket.subject}
+          </span>
         </div>
         {ticket.lastMessagePreview && (
-          <p className="line-clamp-2 text-xs text-muted-foreground">
+          <p
+            dir="auto"
+            className="line-clamp-2 break-words text-xs text-muted-foreground [overflow-wrap:anywhere] [unicode-bidi:plaintext]"
+          >
             {ticket.lastResponderRole && (
               <span className="font-medium uppercase tracking-wide">
                 {ticket.lastResponderRole.toLowerCase()}:
@@ -190,7 +206,12 @@ function StatusPill({ status }: { status: string }) {
 
 function statusTone(status: string): string {
   const s = status.toUpperCase()
-  if (s === "OPEN" || s === "AWAITING_CUSTOMER" || s === "AWAITING_REPLY") {
+  if (
+    s === "OPEN" ||
+    s === "WAITING_ON_CUSTOMER" ||
+    s === "AWAITING_CUSTOMER" ||
+    s === "AWAITING_REPLY"
+  ) {
     return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
   }
   if (s === "IN_PROGRESS" || s === "ASSIGNED") {

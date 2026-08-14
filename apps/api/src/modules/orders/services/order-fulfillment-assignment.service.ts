@@ -1,13 +1,18 @@
 import type { Prisma } from "@guestpost/database"
-import { ACTIVE_CANCELLATION_REQUEST_STATUSES } from "@guestpost/shared"
+import {
+  ACTIVE_CANCELLATION_REQUEST_STATUSES,
+  runSerializableTransactionWithRetry,
+} from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { CommunicationsService } from "../../communications/communications.service"
 import { projectOperationsOrder } from "../order-visibility"
 import { OrderCancellationService } from "./order-cancellation.service"
 
@@ -35,8 +40,12 @@ export type OperationsInboxView =
   | "verification"
   | "history"
 
-function nextOperationsAction(order: any, claimable: boolean) {
-  if (claimable) return "CLAIM"
+function nextOperationsAction(
+  order: any,
+  claimable: boolean,
+  staffRole?: string,
+) {
+  if (claimable) return staffRole === "OPERATIONS" ? "CLAIM" : "ASSIGN"
   if (order.cancellationRequests?.length) return "CANCELLATION"
   switch (order.status) {
     case "SUBMITTED":
@@ -68,7 +77,132 @@ export class OrderFulfillmentAssignmentService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly cancellation: OrderCancellationService,
+    private readonly communications: CommunicationsService,
   ) {}
+
+  private async syncLinkedPlatformTickets(
+    tx: any,
+    orderId: string,
+    assignedToUserId: string,
+    assignedByUserId: string,
+    assignmentId: string,
+    actorStaffRole: "SUPER_ADMIN" | "OPERATIONS",
+  ): Promise<string[]> {
+    const tickets = await tx.ticket.findMany({
+      where: {
+        orderId,
+        fulfillmentChannel: "PLATFORM",
+        assignedPublisherId: null,
+        // Prisma `not` alone does not match SQL NULL. Explicitly include the
+        // unassigned queue so create-vs-claim always converges.
+        OR: [
+          { assignedToUserId: null },
+          { assignedToUserId: { not: assignedToUserId } },
+        ],
+      },
+      select: {
+        id: true,
+        subject: true,
+        organizationId: true,
+        assignedToUserId: true,
+      },
+      orderBy: { id: "asc" },
+    })
+    if (tickets.length === 0) return []
+
+    const eventIds: string[] = []
+    for (const ticket of tickets) {
+      await tx.ticket.update({
+        where: { id: ticket.id },
+        data: { assignedToUserId },
+      })
+      const systemEvent = await tx.ticketMessage.create({
+        data: {
+          content:
+            "Support ownership updated from the linked order assignment.",
+          userId: assignedByUserId,
+          ticketId: ticket.id,
+          visibility: "INTERNAL",
+          participantRole: actorStaffRole === "SUPER_ADMIN" ? "ADMIN" : "OPS",
+          messageType: "SYSTEM_EVENT",
+          actorSnapshot: {
+            kind: "STAFF",
+            staffRole: actorStaffRole,
+            organizationRole: null,
+            publisherRole: null,
+          },
+        },
+      })
+      await this.audit.log(
+        {
+          action: "TICKET_ORDER_ASSIGNMENT_SYNCED",
+          entityType: "Ticket",
+          entityId: ticket.id,
+          metadata: {
+            orderId,
+            assignmentId,
+            fromAssignedToUserId: ticket.assignedToUserId,
+            toAssignedToUserId: assignedToUserId,
+            systemEventId: systemEvent.id,
+          },
+          userId: assignedByUserId,
+          organizationId: ticket.organizationId,
+        },
+        tx,
+      )
+
+      const communication = await this.communications.record(
+        {
+          type: "SUPPORT_INTERNAL_NOTE",
+          aggregateType: "TicketMessage",
+          aggregateId: systemEvent.id,
+          organizationId: ticket.organizationId,
+          title: "Support ticket assigned",
+          message: `You now own support ticket: ${ticket.subject}`,
+          actionPath: `/dashboard/support/${ticket.id}`,
+          dedupKey: `support:${ticket.id}:${systemEvent.id}:order-assignment`,
+          recipientUserIds: [assignedToUserId],
+          actorUserId: assignedByUserId,
+        },
+        tx,
+      )
+      eventIds.push(communication.eventId)
+    }
+    return eventIds
+  }
+
+  private async assertAssignmentAuthorityInTransaction(
+    tx: any,
+    assignedToUserId: string,
+    assignedByUserId: string,
+  ): Promise<"SUPER_ADMIN" | "OPERATIONS"> {
+    const target = await tx.staffMembership.findUnique({
+      where: { userId: assignedToUserId },
+      select: { role: true, user: { select: { banned: true } } },
+    })
+    const actor =
+      assignedByUserId === assignedToUserId
+        ? target
+        : await tx.staffMembership.findUnique({
+            where: { userId: assignedByUserId },
+            select: { role: true, user: { select: { banned: true } } },
+          })
+    if (target?.role !== "OPERATIONS" || target.user.banned) {
+      throw new BadRequestException(
+        "assignedToUserId must reference an active Operations staff member",
+      )
+    }
+    if (
+      !actor ||
+      actor.user.banned ||
+      (actor.role !== "SUPER_ADMIN" && actor.role !== "OPERATIONS")
+    ) {
+      throw new ConflictException(
+        "Order assignment actor no longer has assignment authority",
+      )
+    }
+    return actor.role
+  }
 
   private async assertPlatformOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
@@ -481,10 +615,12 @@ export class OrderFulfillmentAssignmentService {
             ? projectOperationsOrder(order)
             : order),
           claimable,
+          canSelfClaim: user.staffRole === "OPERATIONS" && claimable,
+          canAssign: user.staffRole === "SUPER_ADMIN" && claimable,
           canProgress:
             user.staffRole === "SUPER_ADMIN" ||
             assignment?.assignedToUserId === user.id,
-          nextAction: nextOperationsAction(order, claimable),
+          nextAction: nextOperationsAction(order, claimable, user.staffRole),
         }
       }),
       total,
@@ -598,10 +734,12 @@ export class OrderFulfillmentAssignmentService {
       ...projectOperationsOrder(order),
       access: {
         claimable,
+        canSelfClaim: user.staffRole === "OPERATIONS" && claimable,
+        canAssign: user.staffRole === "SUPER_ADMIN" && claimable,
         canProgress: user.staffRole === "SUPER_ADMIN" || ownsActiveAssignment,
         readOnly: user.staffRole !== "SUPER_ADMIN" && !ownsActiveAssignment,
       },
-      nextAction: nextOperationsAction(order, claimable),
+      nextAction: nextOperationsAction(order, claimable, user.staffRole),
     }
   }
 
@@ -614,49 +752,72 @@ export class OrderFulfillmentAssignmentService {
     expectedStatus: string,
     action: "ORDER_DELIVERY_ASSIGNED" | "ORDER_DELIVERY_REASSIGNED",
   ) {
-    return this.prisma.$transaction(async (tx: any) => {
-      // Cancel any existing open assignment (reassignment)
-      await tx.fulfillmentAssignment.updateMany({
-        where: { orderId, status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
-        data: { status: "CANCELLED" },
-      })
-      const assignment = await tx.fulfillmentAssignment.create({
-        data: {
+    const committed = await runSerializableTransactionWithRetry(
+      this.prisma,
+      async (tx: any) => {
+        // Ticket creation takes this exact lock before reading the active
+        // assignment. Claim/reassign takes it before mutation, so either order
+        // commits first and the linked ticket owner always converges.
+        await tx.$queryRaw`SELECT "id" FROM public."Order" WHERE "id" = ${orderId} FOR UPDATE`
+        const actorStaffRole =
+          await this.assertAssignmentAuthorityInTransaction(
+            tx,
+            assignedToUserId,
+            assignedByUserId,
+          )
+        const updatedOrder = await tx.order.updateMany({
+          where: {
+            id: orderId,
+            version: expectedVersion,
+            status: expectedStatus,
+          },
+          data: {
+            assigneeId: assignedToUserId,
+            version: { increment: 1 },
+          },
+        })
+        if (updatedOrder.count === 0) {
+          throw new ConflictException(
+            "Order changed while it was being assigned. Refresh and retry.",
+          )
+        }
+        // Cancel any existing open assignment (reassignment)
+        await tx.fulfillmentAssignment.updateMany({
+          where: { orderId, status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
+          data: { status: "CANCELLED" },
+        })
+        const assignment = await tx.fulfillmentAssignment.create({
+          data: {
+            orderId,
+            assignedToUserId,
+            assignedByUserId,
+            status: "ASSIGNED",
+          },
+        })
+        const communicationEventIds = await this.syncLinkedPlatformTickets(
+          tx,
           orderId,
           assignedToUserId,
           assignedByUserId,
-          status: "ASSIGNED",
-        },
-      })
-      const updatedOrder = await tx.order.updateMany({
-        where: {
-          id: orderId,
-          version: expectedVersion,
-          status: expectedStatus,
-        },
-        data: {
-          assigneeId: assignedToUserId,
-          version: { increment: 1 },
-        },
-      })
-      if (updatedOrder.count === 0) {
-        throw new ConflictException(
-          "Order changed while it was being assigned. Refresh and retry.",
+          assignment.id,
+          actorStaffRole,
         )
-      }
-      await this.audit.log(
-        {
-          action,
-          entityType: "FulfillmentAssignment",
-          entityId: assignment.id,
-          metadata: { orderId, assignedToUserId, assignedByUserId },
-          userId: assignedByUserId,
-          organizationId,
-        },
-        tx,
-      )
-      return assignment
-    })
+        await this.audit.log(
+          {
+            action,
+            entityType: "FulfillmentAssignment",
+            entityId: assignment.id,
+            metadata: { orderId, assignedToUserId, assignedByUserId },
+            userId: assignedByUserId,
+            organizationId,
+          },
+          tx,
+        )
+        return { assignment, communicationEventIds }
+      },
+    )
+    this.communications.dispatchManyBestEffort(committed.communicationEventIds)
+    return committed.assignment
   }
 
   private async createClaimAssignment(
@@ -666,48 +827,64 @@ export class OrderFulfillmentAssignmentService {
     expectedVersion: number,
     expectedStatus: string,
   ) {
-    return this.prisma.$transaction(async (tx: any) => {
-      // Do not cancel an existing assignment when claiming. The partial
-      // unique index on active assignments makes concurrent claims fail with
-      // P2002 and prevents an operator from taking another operator's order.
-      const assignment = await tx.fulfillmentAssignment.create({
-        data: {
-          orderId,
-          assignedToUserId: userId,
-          assignedByUserId: userId,
-          status: "ASSIGNED",
-        },
-      })
-      const updatedOrder = await tx.order.updateMany({
-        where: {
-          id: orderId,
-          version: expectedVersion,
-          status: expectedStatus,
-        },
-        data: { assigneeId: userId, version: { increment: 1 } },
-      })
-      if (updatedOrder.count === 0) {
-        throw new ConflictException(
-          "Order changed while it was being claimed. Refresh and retry.",
-        )
-      }
-      await this.audit.log(
-        {
-          action: "ORDER_DELIVERY_ASSIGNED",
-          entityType: "FulfillmentAssignment",
-          entityId: assignment.id,
-          metadata: {
+    const committed = await runSerializableTransactionWithRetry(
+      this.prisma,
+      async (tx: any) => {
+        await tx.$queryRaw`SELECT "id" FROM public."Order" WHERE "id" = ${orderId} FOR UPDATE`
+        const actorStaffRole =
+          await this.assertAssignmentAuthorityInTransaction(tx, userId, userId)
+        const updatedOrder = await tx.order.updateMany({
+          where: {
+            id: orderId,
+            version: expectedVersion,
+            status: expectedStatus,
+          },
+          data: { assigneeId: userId, version: { increment: 1 } },
+        })
+        if (updatedOrder.count === 0) {
+          throw new ConflictException(
+            "Order changed while it was being claimed. Refresh and retry.",
+          )
+        }
+        // Do not cancel an existing assignment when claiming. The partial
+        // unique index on active assignments makes concurrent claims fail with
+        // P2002 and prevents an operator from taking another operator's order.
+        const assignment = await tx.fulfillmentAssignment.create({
+          data: {
             orderId,
             assignedToUserId: userId,
             assignedByUserId: userId,
+            status: "ASSIGNED",
           },
+        })
+        const communicationEventIds = await this.syncLinkedPlatformTickets(
+          tx,
+          orderId,
           userId,
-          organizationId,
-        },
-        tx,
-      )
-      return assignment
-    })
+          userId,
+          assignment.id,
+          actorStaffRole,
+        )
+        await this.audit.log(
+          {
+            action: "ORDER_DELIVERY_ASSIGNED",
+            entityType: "FulfillmentAssignment",
+            entityId: assignment.id,
+            metadata: {
+              orderId,
+              assignedToUserId: userId,
+              assignedByUserId: userId,
+            },
+            userId,
+            organizationId,
+          },
+          tx,
+        )
+        return { assignment, communicationEventIds }
+      },
+    )
+    this.communications.dispatchManyBestEffort(committed.communicationEventIds)
+    return committed.assignment
   }
 
   // Operations user claims an unassigned order for themselves. Phase 7.14
@@ -718,10 +895,13 @@ export class OrderFulfillmentAssignmentService {
   // both pass it. P2002 from upsertAssignment's create step maps to the
   // same user-facing message the pre-check used to return.
   async claim(orderId: string, userId: string, staffRole?: string) {
-    const order = await this.assertPlatformOrder(orderId)
-    if (staffRole !== "SUPER_ADMIN") {
-      await this.assertAssignableOperationsUser(userId)
+    if (staffRole !== "OPERATIONS") {
+      throw new ForbiddenException(
+        "Only Operations staff can self-claim fulfillment",
+      )
     }
+    const order = await this.assertPlatformOrder(orderId)
+    await this.assertAssignableOperationsUser(userId)
     try {
       return await this.createClaimAssignment(
         orderId,

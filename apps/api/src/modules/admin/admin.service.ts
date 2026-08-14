@@ -46,6 +46,7 @@ import {
 import { AuditService } from "../audit/audit.service"
 import { CommunicationsService } from "../communications/communications.service"
 import { QueueService } from "../queues/queue.service"
+import { operationsPlatformSupportWhere } from "../support/support-routing"
 import {
   assertManualMetricValues,
   assertMeasurementDate,
@@ -535,6 +536,61 @@ export class AdminService {
     if (lockedTarget.length !== 1) {
       throw new NotFoundException("User not found")
     }
+  }
+
+  /**
+   * Operations authority cannot be removed while work is still routed to the
+   * actor. These predicates run after the shared staff/target locks and inside
+   * the same SERIALIZABLE transaction as the role or suspension write, so a
+   * concurrent assignment cannot pass the check and commit an orphaned owner.
+   *
+   * RESOLVED support remains active ownership because an external participant
+   * can reopen it. CLOSED is the only excluded state under the current staff
+   * offboarding policy.
+   */
+  private async releaseClosedOperationsSupportOrThrow(
+    tx: any,
+    userId: string,
+    action: "changing this Operations role" | "suspending this Operations user",
+  ): Promise<number> {
+    const activeAssignments = await tx.fulfillmentAssignment.count({
+      where: {
+        assignedToUserId: userId,
+        status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+      },
+    })
+    if (activeAssignments > 0) {
+      throw new ConflictException(
+        `Reassign active fulfillment orders before ${action}`,
+      )
+    }
+
+    const activeSupportTickets = await tx.ticket.count({
+      where: {
+        assignedToUserId: userId,
+        status: { not: "CLOSED" },
+      },
+    })
+    if (activeSupportTickets > 0) {
+      throw new ConflictException(
+        `Reassign non-closed support tickets before ${action}`,
+      )
+    }
+
+    // Historical CLOSED tickets must not permanently pin a staff identity.
+    // Clearing them in this same serializable transaction makes a later reopen
+    // enter the unassigned support queue. A concurrent reopen/reply/reassign
+    // locks or writes the same Ticket predicate and forces one transaction to
+    // retry; Support mutations never take a conflicting Staff/User write lock
+    // after their Ticket lock, so this does not introduce a lock-order cycle.
+    const released = await tx.ticket.updateMany({
+      where: {
+        assignedToUserId: userId,
+        status: "CLOSED",
+      },
+      data: { assignedToUserId: null },
+    })
+    return released.count
   }
 
   async listUsers(params: {
@@ -1232,18 +1288,14 @@ export class AdminService {
               )
             }
           }
+          let releasedClosedSupportTickets = 0
           if (existing.role === "OPERATIONS" && role !== "OPERATIONS") {
-            const activeAssignments = await tx.fulfillmentAssignment.count({
-              where: {
-                assignedToUserId: userId,
-                status: { in: ["ASSIGNED", "IN_PROGRESS"] },
-              },
-            })
-            if (activeAssignments > 0) {
-              throw new ConflictException(
-                "Reassign active fulfillment orders before changing this Operations role",
+            releasedClosedSupportTickets =
+              await this.releaseClosedOperationsSupportOrThrow(
+                tx,
+                userId,
+                "changing this Operations role",
               )
-            }
           }
 
           const updated = await tx.staffMembership.update({
@@ -1255,7 +1307,11 @@ export class AdminService {
               action: "STAFF_ROLE_UPDATE",
               entityType: "StaffMembership",
               entityId: updated.id,
-              metadata: { newRole: role, userId },
+              metadata: {
+                newRole: role,
+                userId,
+                releasedClosedSupportTickets,
+              },
               userId: user.id,
               organizationId: null,
             },
@@ -1306,6 +1362,7 @@ export class AdminService {
             throw new ConflictException("Account is already suspended")
           }
 
+          let releasedClosedSupportTickets = 0
           if (target.userType === "STAFF") {
             const membership = target.staffMemberships[0]
             if (membership?.role === "SUPER_ADMIN") {
@@ -1323,17 +1380,12 @@ export class AdminService {
               }
             }
             if (membership?.role === "OPERATIONS") {
-              const activeAssignments = await tx.fulfillmentAssignment.count({
-                where: {
-                  assignedToUserId: userId,
-                  status: { in: ["ASSIGNED", "IN_PROGRESS"] },
-                },
-              })
-              if (activeAssignments > 0) {
-                throw new ConflictException(
-                  "Reassign active fulfillment orders before suspending this Operations user",
+              releasedClosedSupportTickets =
+                await this.releaseClosedOperationsSupportOrThrow(
+                  tx,
+                  userId,
+                  "suspending this Operations user",
                 )
-              }
             }
           }
 
@@ -1367,6 +1419,7 @@ export class AdminService {
                 internalNote: note,
                 expiresAt: expiresAt?.toISOString() ?? null,
                 sessionsRevoked: revoked.count,
+                releasedClosedSupportTickets,
               },
               userId: actor.id,
               organizationId: null,
@@ -1512,7 +1565,14 @@ export class AdminService {
             },
           ],
         },
-        { tickets: { some: { assignedToUserId: userId } } },
+        {
+          tickets: {
+            some: {
+              assignedToUserId: userId,
+              ...operationsPlatformSupportWhere(),
+            },
+          },
+        },
         {
           dispute: {
             is: { status: { in: ["OPEN", "UNDER_REVIEW"] } },

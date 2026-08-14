@@ -106,7 +106,18 @@ describe("AdminService RBAC scoping", () => {
     expect(JSON.stringify(where)).toContain("ops-1")
     expect(scope.OR).toEqual(
       expect.arrayContaining([
-        { tickets: { some: { assignedToUserId: "ops-1" } } },
+        {
+          tickets: {
+            some: {
+              assignedToUserId: "ops-1",
+              assignedPublisherId: null,
+              OR: [
+                { fulfillmentChannel: "PLATFORM" },
+                { fulfillmentChannel: null, orderId: null },
+              ],
+            },
+          },
+        },
         {
           activeDeliveryVersion: {
             is: {
@@ -118,6 +129,32 @@ describe("AdminService RBAC scoping", () => {
     )
     expect(select.customer.select).toEqual({ id: true, name: true })
     expect(select.organization.select).toEqual({ id: true, name: true })
+  })
+
+  it("does not let corrupt or legacy-general ticket routing grant Operations list access to an order", async () => {
+    await service.listOrders({
+      user: { id: "ops-1", staffRole: "OPERATIONS" },
+    })
+
+    const scope = prisma.order.findMany.mock.calls[0][0].where.AND[0]
+    const ticketGrant = scope.OR.find((candidate: any) => candidate.tickets)
+    expect(ticketGrant).toEqual({
+      tickets: {
+        some: {
+          assignedToUserId: "ops-1",
+          assignedPublisherId: null,
+          OR: [
+            { fulfillmentChannel: "PLATFORM" },
+            // Nested under Order.tickets, this legacy branch can never match a
+            // linked ticket because the safe legacy shape requires no order.
+            { fulfillmentChannel: null, orderId: null },
+          ],
+        },
+      },
+    })
+    expect(ticketGrant.tickets.some).not.toEqual({
+      assignedToUserId: "ops-1",
+    })
   })
 
   it("redacts customer contact and settlement context from Operations order rows", async () => {
@@ -192,6 +229,33 @@ describe("AdminService RBAC scoping", () => {
           AND: expect.any(Array),
         }),
       }),
+    )
+  })
+
+  it("applies the clean Platform ticket predicate to direct Operations order access", async () => {
+    await expect(
+      service.getOrder("publisher-order", {
+        id: "ops-1",
+        staffRole: "OPERATIONS",
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+
+    const directScope = prisma.order.findFirst.mock.calls.at(-1)[0].where.AND[0]
+    expect(directScope.OR).toEqual(
+      expect.arrayContaining([
+        {
+          tickets: {
+            some: {
+              assignedToUserId: "ops-1",
+              assignedPublisherId: null,
+              OR: [
+                { fulfillmentChannel: "PLATFORM" },
+                { fulfillmentChannel: null, orderId: null },
+              ],
+            },
+          },
+        },
+      ]),
     )
   })
 

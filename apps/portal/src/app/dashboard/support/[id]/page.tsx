@@ -1,117 +1,76 @@
 "use client"
 
 import {
-  Badge,
+  supportKeys,
+  type TicketDetail,
+  type TicketMessageDto,
+} from "@guestpost/api-client"
+import type { TicketStatus } from "@guestpost/shared"
+import {
   Button,
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
   ErrorState,
-  Label,
+  getTicketStatusPresentation,
+  mergeSupportConversationPages,
   Skeleton,
-  Textarea,
+  StatusBadge,
+  SupportComposer,
+  SupportConversation,
 } from "@guestpost/ui"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { format, formatDistanceToNow } from "date-fns"
 import {
   AlertCircle,
   ArrowLeft,
   CheckCircle,
-  Clock,
-  Loader2,
-  Mail,
-  MessageSquare,
-  Send,
-  User,
+  Clipboard,
+  ExternalLink,
+  RefreshCw,
+  RotateCcw,
 } from "lucide-react"
 import Link from "next/link"
-import { use } from "react"
-import { useForm } from "react-hook-form"
+import { use, useRef, useState } from "react"
 import { toast } from "sonner"
-import { z } from "zod"
 import { api } from "../../../../lib/api"
-import { useAuth } from "../../../../lib/auth"
-
-interface TicketMessage {
-  id: string
-  content: string
-  createdAt: string
-  author: string
-}
-
-interface TicketDetail {
-  id: string
-  subject: string
-  description?: string | null
-  status: string
-  // Phase 7.1 sibling fix — `priority` is not on the api-client TicketDetail
-  // shape (audit §11 noted this as "pre-existing priority type drift").
-  // Optional here so the cast resolves; UI already handles undefined via
-  // `ticket.priority?.toLowerCase()`.
-  priority?: string | null
-  createdAt: string
-  updatedAt: string
-  order?: { id: string; title: string | null; status: string } | null
-  messages: TicketMessage[]
-}
-
-const statusConfig: Record<
-  string,
-  { color: string; icon: React.ElementType; description: string }
-> = {
-  OPEN: {
-    color: "bg-blue-100 text-blue-700",
-    icon: AlertCircle,
-    description: "Ticket is open and awaiting response",
-  },
-  IN_PROGRESS: {
-    color: "bg-amber-100 text-amber-700",
-    icon: Clock,
-    description: "Our team is working on this",
-  },
-  WAITING_ON_CUSTOMER: {
-    color: "bg-purple-100 text-purple-700",
-    icon: Clock,
-    description: "Waiting for your response",
-  },
-  RESOLVED: {
-    color: "bg-green-100 text-green-700",
-    icon: CheckCircle,
-    description: "This issue has been resolved",
-  },
-  CLOSED: {
-    color: "bg-gray-100 text-gray-500",
-    icon: CheckCircle,
-    description: "This ticket is closed",
-  },
-}
 
 function TicketDetailSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy="true">
       <div className="flex items-center gap-4">
         <Skeleton className="h-10 w-10" />
-        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-8 w-64 max-w-[75vw]" />
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardContent className="pt-6">
-              <Skeleton className="h-48 w-full" />
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="lg:col-span-2">
+          <CardContent className="space-y-4 pt-6">
+            <Skeleton className="h-24 w-4/5 rounded-2xl" />
+            <Skeleton className="ml-auto h-24 w-3/4 rounded-2xl" />
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="pt-6">
             <Skeleton className="h-32 w-full" />
           </CardContent>
         </Card>
       </div>
+      <span className="sr-only">Loading support ticket</span>
     </div>
   )
+}
+
+function supportTimeline(
+  ticket: TicketDetail,
+  pages: readonly TicketDetail[],
+): TicketMessageDto[] {
+  const messages = mergeSupportConversationPages(pages)
+  return ticket.openingMessage ? [ticket.openingMessage, ...messages] : messages
 }
 
 export default function TicketDetailPage({
@@ -119,76 +78,64 @@ export default function TicketDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const resolvedParams = use(params)
-  const { user } = useAuth()
+  const { id } = use(params)
   const queryClient = useQueryClient()
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(
-      z.object({
-        content: z.string().min(1, "Message is required"),
-      }),
-    ),
-    defaultValues: { content: "" },
-  })
+  const [replyContent, setReplyContent] = useState("")
+  const replyIntentId = useRef<string | null>(null)
 
-  const {
-    data: ticket,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery<TicketDetail>({
-    queryKey: ["ticket", resolvedParams.id],
-    // Phase 7.1 sibling fix — api-client TicketDetail diverges from this local
-    // shape (audit §11 "pre-existing priority type drift"). Cast via unknown
-    // per TS's own remediation; reconciling the two shapes is its own follow-up.
-    queryFn: () =>
+  const detailKey = supportKeys.detail("customer", id)
+  const listKey = supportKeys.lists("customer")
+  // One query owns the full cursor chain so invalidation refetches pages in
+  // sequence and recalculates every boundary after a new reply arrives.
+  const ticketQuery = useInfiniteQuery({
+    queryKey: detailKey,
+    queryFn: ({ pageParam }) =>
       api.support.getTicket(
-        resolvedParams.id,
-      ) as unknown as Promise<TicketDetail>,
+        id,
+        pageParam ? { messageCursor: pageParam } : undefined,
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.messagePage?.nextCursor ?? null,
   })
 
-  const addMessageMutation = useMutation({
-    mutationFn: (data: { content: string }) =>
-      api.support.addMessage(resolvedParams.id, data),
-    onSuccess: () => {
-      toast.success("Reply sent successfully")
-      queryClient.invalidateQueries({ queryKey: ["ticket", resolvedParams.id] })
-      queryClient.invalidateQueries({ queryKey: ["tickets"] })
-      reset()
-    },
-    onError: () => {
-      toast.error("Failed to send reply")
-    },
-  })
-
-  const updateStatusMutation = useMutation({
-    mutationFn: (status: string) =>
-      api.support.updateTicketStatus(resolvedParams.id, status as any),
-    onSuccess: () => {
-      toast.success("Ticket status updated")
-      queryClient.invalidateQueries({ queryKey: ["ticket", resolvedParams.id] })
-      queryClient.invalidateQueries({ queryKey: ["tickets"] })
-    },
-    onError: () => {
-      toast.error("Failed to update status")
+  const replyMutation = useMutation({
+    mutationFn: (input: { content: string; clientMessageId: string }) =>
+      api.support.addMessage(id, {
+        content: input.content,
+        clientMessageId: input.clientMessageId,
+        visibility: "PUBLIC",
+      }),
+    onSuccess: async () => {
+      replyIntentId.current = null
+      setReplyContent("")
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: detailKey }),
+        queryClient.invalidateQueries({ queryKey: listKey }),
+      ])
+      toast.success("Reply sent")
     },
   })
 
-  const handleCloseTicket = () => {
-    updateStatusMutation.mutate("CLOSED")
-  }
+  const statusMutation = useMutation({
+    mutationFn: (status: "OPEN" | "CLOSED") =>
+      api.support.updateTicketStatus(id, status),
+    onSuccess: async (_, status) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: detailKey }),
+        queryClient.invalidateQueries({ queryKey: listKey }),
+      ])
+      toast.success(status === "CLOSED" ? "Ticket closed" : "Ticket reopened")
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || "The ticket status could not be updated"),
+  })
 
-  if (isLoading) {
+  if (ticketQuery.isLoading) {
     return (
       <div className="space-y-6">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/dashboard/support">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
             Back to Support
           </Link>
         </Button>
@@ -197,255 +144,215 @@ export default function TicketDetailPage({
     )
   }
 
-  if (error) {
+  if (ticketQuery.error && !ticketQuery.data?.pages[0]) {
     return (
       <ErrorState
         title="Failed to load ticket"
-        description={(error as Error).message}
-        onRetry={() => refetch()}
+        description={(ticketQuery.error as Error).message}
+        onRetry={() => ticketQuery.refetch()}
       />
     )
   }
 
+  const ticket = ticketQuery.data?.pages[0]
   if (!ticket) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <AlertCircle className="h-12 w-12 text-destructive" />
-        <h2 className="mt-4 text-xl font-semibold">Ticket Not Found</h2>
-        <p className="mt-2 text-muted-foreground">
-          The ticket you&apos;re looking for doesn&apos;t exist or you
-          don&apos;t have access to it.
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <AlertCircle
+          className="h-12 w-12 text-destructive"
+          aria-hidden="true"
+        />
+        <h1 className="mt-4 text-xl font-semibold">Ticket not found</h1>
+        <p className="mt-2 max-w-md text-muted-foreground">
+          This ticket does not exist or is not available in your current
+          organization.
         </p>
         <Button className="mt-4" asChild>
-          <Link href="/dashboard/support">View All Tickets</Link>
+          <Link href="/dashboard/support">View all tickets</Link>
         </Button>
       </div>
     )
   }
 
-  const currentStatusConfig = statusConfig[ticket.status] || statusConfig.OPEN
-  const StatusIcon = currentStatusConfig.icon
+  const statusPresentation = getTicketStatusPresentation(
+    ticket.status as TicketStatus,
+  )
+  const timeline = supportTimeline(ticket, ticketQuery.data?.pages ?? [ticket])
+  const readOnlyReason =
+    ticket.capabilities.readOnlyReason ??
+    (ticket.capabilities.canReply
+      ? null
+      : "This conversation is read-only right now.")
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/dashboard/support">
-              <ArrowLeft className="h-5 w-5" />
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <Button variant="ghost" size="icon" asChild className="shrink-0">
+            <Link href="/dashboard/support" aria-label="Back to Support">
+              <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </Link>
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1
+                dir="auto"
+                className="min-w-0 break-words text-2xl font-bold tracking-tight [overflow-wrap:anywhere] [unicode-bidi:plaintext]"
+              >
                 {ticket.subject}
               </h1>
-              <Badge className={`${currentStatusConfig.color} capitalize`}>
-                <StatusIcon className="mr-1 h-3 w-3" />
-                {ticket.status.replace(/_/g, " ").toLowerCase()}
-              </Badge>
+              <StatusBadge variant={statusPresentation.variant}>
+                {statusPresentation.label}
+              </StatusBadge>
             </div>
-            <p className="text-sm text-muted-foreground">
-              #{ticket.id} • Created {format(new Date(ticket.createdAt), "PPp")}
+            <p className="mt-1 break-all text-sm text-muted-foreground">
+              Ticket #{ticket.id} · Created{" "}
+              {format(new Date(ticket.createdAt), "PPp")}
             </p>
             {ticket.order && (
               <Link
                 href={`/dashboard/orders/${ticket.order.id}`}
-                className="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
               >
                 Order #{ticket.order.id.slice(0, 8)}
-                {ticket.order.title ? ` — ${ticket.order.title}` : ""}
+                {ticket.order.title ? (
+                  <>
+                    {" — "}
+                    <bdi className="break-words [overflow-wrap:anywhere]">
+                      {ticket.order.title}
+                    </bdi>
+                  </>
+                ) : null}
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               </Link>
             )}
           </div>
         </div>
 
-        {ticket.status !== "CLOSED" && ticket.status !== "RESOLVED" && (
+        <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
           <Button
             variant="outline"
-            onClick={handleCloseTicket}
-            disabled={updateStatusMutation.isPending}
+            size="sm"
+            onClick={() => ticketQuery.refetch()}
+            disabled={ticketQuery.isFetching}
           >
-            <CheckCircle className="mr-2 h-4 w-4" />
-            Close Ticket
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${ticketQuery.isFetching ? "animate-spin" : ""}`}
+              aria-hidden="true"
+            />
+            Refresh
           </Button>
-        )}
-      </div>
+          {ticket.capabilities.canClose && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => statusMutation.mutate("CLOSED")}
+              disabled={statusMutation.isPending}
+            >
+              <CheckCircle className="mr-2 h-4 w-4" aria-hidden="true" />
+              Close ticket
+            </Button>
+          )}
+          {ticket.capabilities.canReopen && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => statusMutation.mutate("OPEN")}
+              disabled={statusMutation.isPending}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+              Reopen ticket
+            </Button>
+          )}
+        </div>
+      </header>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Conversation</CardTitle>
-              <CardDescription>
-                {ticket.messages.length} message
-                {ticket.messages.length !== 1 ? "s" : ""}
-              </CardDescription>
+              <p className="text-sm text-muted-foreground">
+                {timeline.length} loaded timeline{" "}
+                {timeline.length === 1 ? "entry" : "entries"}
+              </p>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Opening request (ticket body) always shown as the first post */}
-              {ticket.description && (
-                <div className="rounded-lg border bg-muted/30 p-4">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">
-                    Original request
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm">
-                    {ticket.description}
-                  </p>
-                </div>
-              )}
-              {ticket.messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-6 text-center">
-                  <MessageSquare className="h-8 w-8 text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    No replies yet — our team will respond here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {ticket.messages.map((message) => {
-                    const isOwn = message.author === user?.email
+            <CardContent>
+              <SupportConversation
+                messages={timeline}
+                hasOlderMessages={Boolean(ticketQuery.hasNextPage)}
+                isLoadingOlderMessages={ticketQuery.isFetchingNextPage}
+                onLoadOlderMessages={() => ticketQuery.fetchNextPage()}
+                olderMessagesError={
+                  ticketQuery.isFetchNextPageError
+                    ? (ticketQuery.error as Error).message ||
+                      "Older messages could not be loaded."
+                    : null
+                }
+                emptyMessage="No public messages have been posted yet."
+              />
+            </CardContent>
+          </Card>
 
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex gap-3 ${isOwn ? "flex-row-reverse" : ""}`}
-                      >
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                            isOwn ? "bg-primary/10" : "bg-muted"
-                          }`}
-                        >
-                          {isOwn ? (
-                            <User className="h-5 w-5 text-primary" />
-                          ) : (
-                            <Mail className="h-5 w-5 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div
-                          className={`flex flex-col gap-1 ${isOwn ? "items-end" : ""}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {message.author}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(
-                                new Date(message.createdAt),
-                                { addSuffix: true },
-                              )}
-                            </span>
-                          </div>
-                          <div
-                            className={`rounded-lg p-4 ${
-                              isOwn
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
-                            }`}
-                          >
-                            <p className="whitespace-pre-wrap text-sm">
-                              {message.content}
-                            </p>
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {format(new Date(message.createdAt), "PPp")}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {ticket.status !== "CLOSED" && ticket.status !== "RESOLVED" && (
-                <div className="mt-6 border-t pt-6">
-                  <form
-                    onSubmit={handleSubmit((data) =>
-                      addMessageMutation.mutate(data),
-                    )}
-                  >
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reply">Your Reply</Label>
-                        <Textarea
-                          id="reply"
-                          rows={4}
-                          {...register("content")}
-                          placeholder="Type your message here..."
-                        />
-                        {errors.content?.message && (
-                          <p className="text-sm text-destructive">
-                            {errors.content.message}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex justify-end">
-                        <Button
-                          type="submit"
-                          disabled={addMessageMutation.isPending}
-                        >
-                          {addMessageMutation.isPending && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          )}
-                          <Send className="mr-2 h-4 w-4" />
-                          Send Reply
-                        </Button>
-                      </div>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              {(ticket.status === "CLOSED" || ticket.status === "RESOLVED") && (
-                <div className="mt-6 border-t pt-6">
-                  <div className="rounded-lg bg-muted/50 p-4 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      This ticket is {ticket.status.toLowerCase()}.{" "}
-                      <button
-                        onClick={() => updateStatusMutation.mutate("OPEN")}
-                        className="text-primary hover:underline"
-                      >
-                        Reopen ticket
-                      </button>
-                    </p>
-                  </div>
-                </div>
-              )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Reply</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SupportComposer
+                content={replyContent}
+                onContentChange={(content) => {
+                  setReplyContent(content)
+                  if (replyMutation.error) {
+                    replyIntentId.current = null
+                    replyMutation.reset()
+                  }
+                }}
+                onSubmit={() => {
+                  replyIntentId.current ??= crypto.randomUUID()
+                  replyMutation.mutate({
+                    content: replyContent.trim(),
+                    clientMessageId: replyIntentId.current,
+                  })
+                }}
+                allowedVisibilities={
+                  ticket.capabilities.canReply ? ["PUBLIC"] : []
+                }
+                isPending={replyMutation.isPending}
+                disabled={!ticket.capabilities.canReply}
+                disabledReason={readOnlyReason}
+                error={
+                  replyMutation.error
+                    ? (replyMutation.error as Error).message ||
+                      "The reply could not be sent. Your draft has been kept."
+                    : null
+                }
+                maxLength={10_000}
+              />
             </CardContent>
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <aside className="space-y-6" aria-label="Ticket details">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Ticket Details</CardTitle>
+              <CardTitle className="text-base">Ticket details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Status</p>
-                <div className="flex items-center gap-2">
-                  <Badge className={`${currentStatusConfig.color} capitalize`}>
-                    {ticket.status.replace(/_/g, " ").toLowerCase()}
-                  </Badge>
-                </div>
+            <CardContent className="space-y-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Status</p>
+                <StatusBadge variant={statusPresentation.variant}>
+                  {statusPresentation.label}
+                </StatusBadge>
               </div>
-
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Priority</p>
-                <p className="font-medium capitalize">
-                  {ticket.priority?.toLowerCase() || "Not set"}
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Created</p>
+              <div>
+                <p className="text-muted-foreground">Created</p>
                 <p className="font-medium">
                   {format(new Date(ticket.createdAt), "PPp")}
                 </p>
               </div>
-
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Last Updated</p>
+              <div>
+                <p className="text-muted-foreground">Last updated</p>
                 <p className="font-medium">
                   {formatDistanceToNow(new Date(ticket.updatedAt), {
                     addSuffix: true,
@@ -457,53 +364,28 @@ export default function TicketDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Quick Actions</CardTitle>
+              <CardTitle className="text-base">Ticket link</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {ticket.status !== "CLOSED" && ticket.status !== "RESOLVED" && (
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={handleCloseTicket}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Close Ticket
-                </Button>
-              )}
+            <CardContent>
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href)
-                  toast.success("Link copied to clipboard")
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(window.location.href)
+                    toast.success("Ticket link copied")
+                  } catch {
+                    toast.error("The ticket link could not be copied")
+                  }
                 }}
               >
-                <LinkIcon className="mr-2 h-4 w-4" />
-                Copy Ticket Link
+                <Clipboard className="mr-2 h-4 w-4" aria-hidden="true" />
+                Copy ticket link
               </Button>
             </CardContent>
           </Card>
-        </div>
+        </aside>
       </div>
     </div>
-  )
-}
-
-function LinkIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-    </svg>
   )
 }

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from "@nestjs/common"
 import { OrderFulfillmentAssignmentService } from "../order-fulfillment-assignment.service"
@@ -10,6 +11,7 @@ describe("OrderFulfillmentAssignmentService", () => {
   let prisma: any
   let audit: any
   let cancellation: any
+  let communications: any
 
   const platformOrder = {
     id: "order-1",
@@ -24,6 +26,10 @@ describe("OrderFulfillmentAssignmentService", () => {
     audit = { log: jest.fn().mockResolvedValue(undefined) }
     cancellation = {
       assertNoActiveCancellation: jest.fn().mockResolvedValue(undefined),
+    }
+    communications = {
+      record: jest.fn().mockResolvedValue({ eventId: "communication-1" }),
+      dispatchManyBestEffort: jest.fn(),
     }
     prisma = {
       order: {
@@ -42,7 +48,12 @@ describe("OrderFulfillmentAssignmentService", () => {
       },
       $transaction: jest.fn(),
     }
-    service = new OrderFulfillmentAssignmentService(prisma, audit, cancellation)
+    service = new OrderFulfillmentAssignmentService(
+      prisma,
+      audit,
+      cancellation,
+      communications,
+    )
   })
 
   it("scopes the Operations queue to self-assigned and unassigned orders", async () => {
@@ -105,7 +116,15 @@ describe("OrderFulfillmentAssignmentService", () => {
       user: { banned: false },
     })
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
       order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      staffMembership: {
+        findUnique: jest.fn().mockResolvedValue({
+          role: "OPERATIONS",
+          user: { banned: false },
+        }),
+      },
+      ticket: { findMany: jest.fn().mockResolvedValue([]) },
       fulfillmentAssignment: {
         create: jest.fn().mockResolvedValue({ id: "assignment-1" }),
         updateMany: jest.fn(),
@@ -132,13 +151,28 @@ describe("OrderFulfillmentAssignmentService", () => {
     })
   })
 
+  it("rejects Super Admin self-claim before reading or mutating an order", async () => {
+    await expect(
+      service.claim("order-1", "admin-1", "SUPER_ADMIN"),
+    ).rejects.toThrow(ForbiddenException)
+    expect(prisma.order.findUnique).not.toHaveBeenCalled()
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
   it("rolls a claim back when the order changed concurrently", async () => {
     prisma.staffMembership.findUnique.mockResolvedValue({
       role: "OPERATIONS",
       user: { banned: false },
     })
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
       order: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      staffMembership: {
+        findUnique: jest.fn().mockResolvedValue({
+          role: "OPERATIONS",
+          user: { banned: false },
+        }),
+      },
       fulfillmentAssignment: {
         create: jest.fn().mockResolvedValue({ id: "assignment-1" }),
       },
@@ -150,6 +184,92 @@ describe("OrderFulfillmentAssignmentService", () => {
     await expect(
       service.claim("order-1", "ops-1", "OPERATIONS"),
     ).rejects.toThrow(ConflictException)
+  })
+
+  it("synchronizes an unassigned linked ticket with audit, system event, and outbox", async () => {
+    prisma.staffMembership.findUnique.mockResolvedValue({
+      role: "OPERATIONS",
+      user: { banned: false },
+    })
+    communications = {
+      record: jest.fn().mockResolvedValue({ eventId: "communication-1" }),
+      dispatchManyBestEffort: jest.fn(),
+    }
+    service = new OrderFulfillmentAssignmentService(
+      prisma,
+      audit,
+      cancellation,
+      communications as any,
+    )
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
+      order: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      staffMembership: {
+        findUnique: jest.fn().mockResolvedValue({
+          role: "OPERATIONS",
+          user: { banned: false },
+        }),
+      },
+      fulfillmentAssignment: {
+        create: jest.fn().mockResolvedValue({ id: "assignment-1" }),
+      },
+      ticket: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "ticket-1",
+            subject: "Order help",
+            organizationId: "org-1",
+            assignedToUserId: null,
+          },
+        ]),
+        update: jest.fn().mockResolvedValue({ id: "ticket-1" }),
+      },
+      ticketMessage: {
+        create: jest.fn().mockResolvedValue({ id: "system-event-1" }),
+      },
+    }
+    prisma.$transaction.mockImplementation(async (callback: any) =>
+      callback(tx),
+    )
+
+    await service.claim("order-1", "ops-1", "OPERATIONS")
+
+    expect(tx.ticket.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [
+            { assignedToUserId: null },
+            { assignedToUserId: { not: "ops-1" } },
+          ],
+        }),
+      }),
+    )
+    expect(tx.ticket.update).toHaveBeenCalledWith({
+      where: { id: "ticket-1" },
+      data: { assignedToUserId: "ops-1" },
+    })
+    expect(tx.ticketMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          messageType: "SYSTEM_EVENT",
+          visibility: "INTERNAL",
+        }),
+      }),
+    )
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "TICKET_ORDER_ASSIGNMENT_SYNCED" }),
+      tx,
+    )
+    expect(communications.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        aggregateId: "system-event-1",
+        recipientUserIds: ["ops-1"],
+      }),
+      tx,
+    )
+    expect(communications.dispatchManyBestEffort).toHaveBeenCalledWith([
+      "communication-1",
+    ])
   })
 
   it("maps a concurrent claim collision to a clear conflict", async () => {
@@ -187,11 +307,40 @@ describe("OrderFulfillmentAssignmentService", () => {
     )
 
     expect(
-      result.items.map((order: any) => [order.id, order.claimable]),
+      result.items.map((order: any) => [
+        order.id,
+        order.claimable,
+        order.canSelfClaim,
+        order.canAssign,
+        order.nextAction,
+      ]),
     ).toEqual([
-      ["order-1", true],
-      ["order-2", true],
+      ["order-1", true, true, false, "CLAIM"],
+      ["order-2", true, true, false, "CLAIM"],
     ])
+  })
+
+  it("projects assignment eligibility separately for Super Admin", async () => {
+    prisma.order.findMany.mockResolvedValue([
+      {
+        ...platformOrder,
+        fulfillmentAssignments: [],
+        cancellationRequests: [],
+      },
+    ])
+    prisma.order.count.mockResolvedValue(1)
+
+    const result = await service.operationsInbox(
+      { id: "admin-1", staffRole: "SUPER_ADMIN" },
+      { view: "available", includeSummary: false },
+    )
+
+    expect(result.items[0]).toMatchObject({
+      claimable: true,
+      canSelfClaim: false,
+      canAssign: true,
+      nextAction: "ASSIGN",
+    })
   })
 
   it("omits financial fields from Operations inbox items and summaries", async () => {
@@ -302,5 +451,43 @@ describe("OrderFulfillmentAssignmentService", () => {
         staffRole: "OPERATIONS",
       }),
     ).rejects.toThrow(NotFoundException)
+  })
+
+  it("projects actor-specific claim and assignment capabilities on order detail", async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      ...platformOrder,
+      items: [],
+      revisions: [],
+      events: [],
+      cancellationRequests: [],
+      fulfillmentAssignments: [],
+    })
+
+    await expect(
+      service.getOperationsOrder("order-1", {
+        id: "ops-1",
+        staffRole: "OPERATIONS",
+      }),
+    ).resolves.toMatchObject({
+      access: {
+        claimable: true,
+        canSelfClaim: true,
+        canAssign: false,
+      },
+      nextAction: "CLAIM",
+    })
+    await expect(
+      service.getOperationsOrder("order-1", {
+        id: "admin-1",
+        staffRole: "SUPER_ADMIN",
+      }),
+    ).resolves.toMatchObject({
+      access: {
+        claimable: true,
+        canSelfClaim: false,
+        canAssign: true,
+      },
+      nextAction: "ASSIGN",
+    })
   })
 })

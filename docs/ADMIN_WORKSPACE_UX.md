@@ -11,7 +11,7 @@ always the security boundary.
 |---|---|---|---|
 | Super Admin | Cross-platform governance, exception oversight, staff and tenant administration | Violet | Decrypted payout data without the explicit permission |
 | Operations | Assigned and claimable fulfillment, support, verification, moderation, and assigned inventory | Blue | Global people directories, finance, audit logs, publisher import |
-| Finance | Publisher funds, support, settlements, payouts, reconciliation, and financial risk | Emerald | Inventory mutations, fulfillment management, global users, audit logs |
+| Finance | Publisher funds, settlements, payouts, reconciliation, and financial risk | Emerald | Support, inventory mutations, fulfillment management, global users, audit logs |
 
 Navigation is filtered for orientation only. Every route must also retain its
 page guard, and every API call must retain backend role and ownership checks.

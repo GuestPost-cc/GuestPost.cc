@@ -51,6 +51,10 @@ describe("AdminService staff management", () => {
         update: jest.fn(),
       },
       fulfillmentAssignment: { findMany: jest.fn(), count: jest.fn() },
+      ticket: {
+        count: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       auditLog: { findMany: jest.fn(), groupBy: jest.fn() },
       settlementApproval: { findMany: jest.fn() },
       withdrawal: { findMany: jest.fn() },
@@ -247,6 +251,158 @@ describe("AdminService staff management", () => {
       ),
     ).rejects.toThrow(ConflictException)
     expect(prisma.user.update).not.toHaveBeenCalled()
+  })
+
+  it("prevents demoting Operations staff with non-closed support ownership", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "ops-1",
+      userType: "STAFF",
+      banned: false,
+      staffMemberships: [{ id: "membership-1", role: "OPERATIONS" }],
+    })
+    prisma.fulfillmentAssignment.count.mockResolvedValue(0)
+    prisma.ticket.count.mockResolvedValue(1)
+
+    await expect(
+      service.updateStaffRole("ops-1", "FINANCE", { id: "admin-1" }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        message:
+          "Reassign non-closed support tickets before changing this Operations role",
+      }),
+    })
+
+    expect(prisma.ticket.count).toHaveBeenCalledWith({
+      where: {
+        assignedToUserId: "ops-1",
+        status: { not: "CLOSED" },
+      },
+    })
+    expect(prisma.staffMembership.update).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
+  })
+
+  it("atomically releases CLOSED support when demoting Operations staff", async () => {
+    const updated = { id: "membership-1", role: "FINANCE" }
+    prisma.user.findUnique.mockResolvedValue({
+      id: "ops-1",
+      userType: "STAFF",
+      banned: false,
+      staffMemberships: [{ id: "membership-1", role: "OPERATIONS" }],
+    })
+    prisma.fulfillmentAssignment.count.mockResolvedValue(0)
+    prisma.ticket.count.mockResolvedValue(0)
+    prisma.ticket.updateMany.mockResolvedValue({ count: 2 })
+    prisma.staffMembership.update.mockResolvedValue(updated)
+
+    await expect(
+      service.updateStaffRole("ops-1", "FINANCE", { id: "admin-1" }),
+    ).resolves.toEqual(updated)
+
+    expect(prisma.ticket.updateMany).toHaveBeenCalledWith({
+      where: {
+        assignedToUserId: "ops-1",
+        status: "CLOSED",
+      },
+      data: { assignedToUserId: null },
+    })
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "STAFF_ROLE_UPDATE",
+        metadata: expect.objectContaining({
+          releasedClosedSupportTickets: 2,
+        }),
+      }),
+      prisma,
+    )
+  })
+
+  it("prevents suspension when a RESOLVED ticket remains assigned", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "ops-1",
+      userType: "STAFF",
+      banned: false,
+      staffMemberships: [{ id: "membership-1", role: "OPERATIONS" }],
+    })
+    prisma.fulfillmentAssignment.count.mockResolvedValue(0)
+    prisma.ticket.count.mockImplementation(async ({ where }: any) =>
+      where.status?.not === "CLOSED" ? 1 : 0,
+    )
+
+    await expect(
+      service.suspendUser(
+        "ops-1",
+        {
+          reasonCode: "STAFF_ACCESS_REMOVAL",
+          internalNote: "Access review requires support reassignment",
+        },
+        { id: "admin-1" },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        message:
+          "Reassign non-closed support tickets before suspending this Operations user",
+      }),
+    })
+
+    expect(prisma.ticket.count).toHaveBeenCalledWith({
+      where: {
+        assignedToUserId: "ops-1",
+        status: { not: "CLOSED" },
+      },
+    })
+    expect(prisma.user.update).not.toHaveBeenCalled()
+    expect(prisma.session.deleteMany).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
+  })
+
+  it("records CLOSED support released by an Operations suspension", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "ops-1",
+      userType: "STAFF",
+      banned: false,
+      staffMemberships: [{ id: "membership-1", role: "OPERATIONS" }],
+    })
+    prisma.fulfillmentAssignment.count.mockResolvedValue(0)
+    prisma.ticket.count.mockResolvedValue(0)
+    prisma.ticket.updateMany.mockResolvedValue({ count: 1 })
+    prisma.user.update.mockResolvedValue({
+      id: "ops-1",
+      banned: true,
+      banReasonCode: "STAFF_ACCESS_REMOVAL",
+      banExpires: null,
+      suspendedAt: new Date("2026-08-14T12:00:00.000Z"),
+    })
+    prisma.session.deleteMany.mockResolvedValue({ count: 2 })
+
+    await service.suspendUser(
+      "ops-1",
+      {
+        reasonCode: "STAFF_ACCESS_REMOVAL",
+        internalNote: "Access review requires account suspension",
+      },
+      { id: "admin-1" },
+    )
+
+    expect(prisma.ticket.updateMany).toHaveBeenCalledWith({
+      where: {
+        assignedToUserId: "ops-1",
+        status: "CLOSED",
+      },
+      data: { assignedToUserId: null },
+    })
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "USER_SUSPENDED",
+        metadata: expect.objectContaining({
+          sessionsRevoked: 2,
+          releasedClosedSupportTickets: 1,
+        }),
+      }),
+      prisma,
+    )
   })
 
   it("suspends atomically and revokes every active session", async () => {

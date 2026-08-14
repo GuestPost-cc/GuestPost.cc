@@ -28,9 +28,7 @@ import {
   CircleDollarSign,
   Clock3,
   CreditCard,
-  HeadphonesIcon,
   Landmark,
-  LifeBuoy,
   RefreshCw,
   Scale,
   ShieldAlert,
@@ -43,7 +41,6 @@ import { api } from "../../../lib/api"
 
 const actionLabels: Record<AdminFinanceWorkbenchActionType, string> = {
   RECONCILIATION: "Reconciliation",
-  SUPPORT: "Support",
   PAYOUT: "Payout",
   WITHDRAWAL: "Withdrawal",
   CANCELLATION: "Cancellation",
@@ -263,13 +260,14 @@ export function FinanceWorkbench() {
   const data = workbench.data
   const recon = data?.reconciliation
   const revenue = data?.revenue
+  const financeActionQueue = data?.actionQueue ?? []
 
   return (
     <AdminPage className="space-y-7">
       <AdminPageHeader
         eyebrow="Finance workbench"
         title="Money operations"
-        description="Protect publisher funds, respond to support, and move every financial decision through its audited workflow."
+        description="Protect publisher funds and move every financial decision through its audited workflow."
         icon={Landmark}
         actions={
           <>
@@ -295,7 +293,7 @@ export function FinanceWorkbench() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Ready for decision"
           value={String(data?.overview.readyForDecision ?? 0)}
@@ -304,14 +302,6 @@ export function FinanceWorkbench() {
           tone={
             (data?.overview.readyForDecision ?? 0) > 0 ? "warning" : "success"
           }
-          loading={workbench.isLoading}
-        />
-        <MetricCard
-          label="Support needs attention"
-          value={String(data?.overview.activeSupport ?? 0)}
-          description={`${data?.support.overdue ?? 0} beyond the 24-hour target`}
-          icon={HeadphonesIcon}
-          tone={(data?.support.overdue ?? 0) > 0 ? "warning" : "default"}
           loading={workbench.isLoading}
         />
         <MetricCard
@@ -340,23 +330,23 @@ export function FinanceWorkbench() {
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div>
         <Card className="overflow-hidden rounded-2xl shadow-sm">
           <CardHeader className="flex flex-row items-start justify-between gap-4 border-b">
             <div>
               <CardTitle className="text-lg">Priority Finance queue</CardTitle>
               <CardDescription>
-                Support and financial exceptions, prioritized on the server.
-                Decisions stay in protected workspaces.
+                Financial exceptions prioritized on the server. Decisions stay
+                in protected workspaces.
               </CardDescription>
             </div>
-            <Badge variant="secondary">{data?.actionQueue.length ?? 0}</Badge>
+            <Badge variant="secondary">{financeActionQueue.length}</Badge>
           </CardHeader>
           <CardContent className="p-0">
             {workbench.isLoading ? (
               <ActionQueueSkeleton />
-            ) : data?.actionQueue.length ? (
-              data.actionQueue.map((item) => (
+            ) : financeActionQueue.length ? (
+              financeActionQueue.map((item) => (
                 <ActionRow key={`${item.type}:${item.id}`} item={item} />
               ))
             ) : (
@@ -366,93 +356,11 @@ export function FinanceWorkbench() {
                 </div>
                 <p className="mt-4 font-semibold">Finance queue is clear</p>
                 <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                  New support, settlement, withdrawal, payout, and integrity
-                  work will appear here automatically.
+                  New settlement, withdrawal, payout, and integrity work will
+                  appear here automatically.
                 </p>
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <LifeBuoy className="h-5 w-5" /> Finance Support inbox
-              </CardTitle>
-              <CardDescription>
-                Publisher replies and platform-ticket internal coordination.
-              </CardDescription>
-            </div>
-            <Badge
-              variant={
-                (data?.support.overdue ?? 0) > 0 ? "warning" : "secondary"
-              }
-            >
-              {data?.support.active ?? 0} active
-            </Badge>
-          </CardHeader>
-          <CardContent className="space-y-2 px-3">
-            {workbench.isLoading ? (
-              [1, 2, 3, 4].map((item) => (
-                <Skeleton key={item} className="h-20 w-full" />
-              ))
-            ) : data?.support.items.length ? (
-              data.support.items.slice(0, 5).map((ticket) => (
-                <Link
-                  key={ticket.id}
-                  href={`/dashboard/support/${ticket.id}`}
-                  className="group block rounded-xl border p-3 transition-colors hover:bg-muted/40"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {ticket.overdue ? (
-                          <Badge variant="warning">Over 24h</Badge>
-                        ) : null}
-                        <Badge variant="secondary">
-                          {ticket.channel === "PLATFORM"
-                            ? "Platform"
-                            : ticket.channel === "PUBLISHER"
-                              ? "Publisher"
-                              : "General"}
-                        </Badge>
-                      </div>
-                      <p className="mt-2 truncate text-sm font-semibold">
-                        {ticket.subject}
-                      </p>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {ticket.replyMode === "INTERNAL_ONLY"
-                          ? "Internal notes only"
-                          : "Public reply available"}
-                        {ticket.order?.title ? ` · ${ticket.order.title}` : ""}
-                      </p>
-                    </div>
-                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    Updated{" "}
-                    {formatDistanceToNow(new Date(ticket.updatedAt), {
-                      addSuffix: true,
-                    })}
-                  </p>
-                </Link>
-              ))
-            ) : (
-              <div className="rounded-xl border border-dashed px-4 py-10 text-center">
-                <HeadphonesIcon className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                <p className="mt-3 text-sm font-medium">No active tickets</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  New Finance-visible support will appear here.
-                </p>
-              </div>
-            )}
-            <Button variant="outline" className="mt-3 w-full" asChild>
-              <Link href="/dashboard/support">
-                Open Support
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
           </CardContent>
         </Card>
       </div>

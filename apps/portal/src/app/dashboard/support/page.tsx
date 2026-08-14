@@ -1,7 +1,7 @@
 "use client"
 
-import type { TicketListItem } from "@guestpost/api-client"
-import type { TicketStatus } from "@guestpost/database"
+import { supportKeys } from "@guestpost/api-client"
+import type { TicketStatus } from "@guestpost/shared"
 import {
   Badge,
   Button,
@@ -20,6 +20,7 @@ import {
   getTicketStatusPresentation,
   Input,
   Label,
+  mergeSupportTicketPages,
   Select,
   SelectContent,
   SelectItem,
@@ -29,7 +30,11 @@ import {
   Textarea,
 } from "@guestpost/ui"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
 import {
   AlertCircle,
@@ -42,18 +47,23 @@ import {
   ShieldAlert,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { api } from "../../../lib/api"
 
 const createTicketSchema = z.object({
-  subject: z.string().min(1, "Subject is required").max(200),
+  subject: z
+    .string()
+    .trim()
+    .min(3, "Subject must be at least 3 characters")
+    .max(200),
   message: z
     .string()
+    .trim()
     .min(10, "Message must be at least 10 characters")
-    .max(5000),
+    .max(10_000),
 })
 
 type CreateTicketForm = z.infer<typeof createTicketSchema>
@@ -103,21 +113,30 @@ function CreateTicketDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
+  const createIntentId = useRef<string | null>(null)
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
     reset,
+    watch,
   } = useForm<CreateTicketForm>({
     resolver: zodResolver(createTicketSchema),
   })
+  const messageLength = (watch("message") ?? "").length
 
   const createMutation = useMutation({
     mutationFn: (data: { subject: string; message: string }) =>
-      api.support.createTicket(data),
+      api.support.createTicket({
+        ...data,
+        clientRequestId: (createIntentId.current ??= crypto.randomUUID()),
+      }),
     onSuccess: () => {
+      createIntentId.current = null
       toast.success("Support ticket created successfully")
-      queryClient.invalidateQueries({ queryKey: ["tickets"] })
+      queryClient.invalidateQueries({
+        queryKey: supportKeys.lists("customer"),
+      })
       onOpenChange(false)
       reset()
     },
@@ -133,8 +152,24 @@ function CreateTicketDialog({
     })
   }
 
+  const resetIntentAfterEdit = () => {
+    createIntentId.current = null
+    if (createMutation.error) createMutation.reset()
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && createMutation.isPending) return
+        if (!nextOpen) {
+          createIntentId.current = null
+          createMutation.reset()
+          reset()
+        }
+        onOpenChange(nextOpen)
+      }}
+    >
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Create Support Ticket</DialogTitle>
@@ -147,8 +182,12 @@ function CreateTicketDialog({
             <Label htmlFor="subject">Subject *</Label>
             <Input
               id="subject"
-              {...register("subject")}
+              {...register("subject", { onChange: resetIntentAfterEdit })}
+              maxLength={200}
               placeholder="Brief description of your issue"
+              dir="auto"
+              className="[unicode-bidi:plaintext]"
+              disabled={createMutation.isPending}
             />
             {errors.subject && (
               <p className="text-sm text-destructive">
@@ -162,9 +201,16 @@ function CreateTicketDialog({
             <Textarea
               id="message"
               rows={6}
-              {...register("message")}
+              {...register("message", { onChange: resetIntentAfterEdit })}
+              maxLength={10_000}
               placeholder="Describe your issue in detail..."
+              dir="auto"
+              className="[unicode-bidi:plaintext]"
+              disabled={createMutation.isPending}
             />
+            <p className="text-right text-xs tabular-nums text-muted-foreground">
+              {messageLength.toLocaleString()} / 10,000
+            </p>
             {errors.message && (
               <p className="text-sm text-destructive">
                 {errors.message.message}
@@ -180,16 +226,29 @@ function CreateTicketDialog({
             </p>
           </div>
 
+          {createMutation.error && (
+            <p role="alert" className="text-sm text-destructive">
+              {(createMutation.error as Error).message ||
+                "The support ticket could not be created."}
+            </p>
+          )}
+
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                createIntentId.current = null
+                createMutation.reset()
+                reset()
+                onOpenChange(false)
+              }}
+              disabled={createMutation.isPending}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Ticket"}
+            <Button type="submit" disabled={createMutation.isPending}>
+              {createMutation.isPending ? "Creating…" : "Create Ticket"}
             </Button>
           </DialogFooter>
         </form>
@@ -203,15 +262,17 @@ export default function SupportPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
 
-  const {
-    data: ticketsData,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery<TicketListItem[]>({
-    queryKey: ["tickets"],
-    queryFn: () => api.support.listTickets(),
+  const ticketsQuery = useInfiniteQuery({
+    queryKey: supportKeys.list("customer", { limit: 50 }),
+    queryFn: ({ pageParam }) =>
+      api.support.listTickets({
+        cursor: pageParam ?? undefined,
+        limit: 50,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   })
+  const ticketsData = mergeSupportTicketPages(ticketsQuery.data?.pages)
 
   const filteredTickets = (ticketsData ?? [])
     .filter((ticket) => {
@@ -248,16 +309,16 @@ export default function SupportPage() {
     (ticket) => ticket.status === "WAITING_ON_CUSTOMER",
   ).length
 
-  if (error)
+  if (ticketsQuery.error && ticketsData.length === 0)
     return (
       <ErrorState
         title="Failed to load support tickets"
-        description={(error as Error).message}
-        onRetry={() => refetch()}
+        description={(ticketsQuery.error as Error).message}
+        onRetry={() => ticketsQuery.refetch()}
       />
     )
 
-  if (isLoading) {
+  if (ticketsQuery.isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -297,7 +358,7 @@ export default function SupportPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Support</h1>
           <p className="text-muted-foreground">Get help with your orders</p>
@@ -312,7 +373,7 @@ export default function SupportPage() {
         <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Waiting on you
+              Loaded waiting on you
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -324,7 +385,7 @@ export default function SupportPage() {
         <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Open Tickets
+              Loaded open tickets
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -334,13 +395,13 @@ export default function SupportPage() {
         <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Resolved
+              Loaded resolved
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
               {
-                (ticketsData ?? []).filter(
+                ticketsData.filter(
                   (ticket) =>
                     ticket.status === "RESOLVED" || ticket.status === "CLOSED",
                 ).length
@@ -356,14 +417,15 @@ export default function SupportPage() {
             <div>
               <CardTitle>Your Tickets</CardTitle>
               <CardDescription>
-                {filteredTickets.length} ticket
-                {filteredTickets.length !== 1 ? "s" : ""}
+                {filteredTickets.length} matching of {ticketsData.length}{" "}
+                loaded. Search and counts cover loaded tickets.
               </CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
+                  aria-label="Search support tickets"
                   placeholder="Search tickets..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -371,7 +433,10 @@ export default function SupportPage() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger
+                  className="w-full sm:w-40"
+                  aria-label="Filter tickets by status"
+                >
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -392,11 +457,11 @@ export default function SupportPage() {
               <HeadphonesIcon className="h-12 w-12 text-muted-foreground/50" />
               <h3 className="mt-4 text-lg font-medium">No tickets found</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                {searchQuery || statusFilter
+                {searchQuery || (statusFilter && statusFilter !== "all")
                   ? "Try adjusting your filters"
                   : "Create a ticket to get support"}
               </p>
-              {!searchQuery && !statusFilter && (
+              {!searchQuery && (!statusFilter || statusFilter === "all") && (
                 <Button
                   className="mt-4"
                   onClick={() => setShowCreateTicket(true)}
@@ -427,7 +492,12 @@ export default function SupportPage() {
                         <StatusIcon className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="font-medium">{ticket.subject}</p>
+                        <p
+                          dir="auto"
+                          className="break-words font-medium [overflow-wrap:anywhere] [unicode-bidi:plaintext]"
+                        >
+                          {ticket.subject}
+                        </p>
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <span className="text-sm text-muted-foreground">
                             #{ticket.id.slice(0, 8)}
@@ -461,7 +531,10 @@ export default function SupportPage() {
                         {p.label}
                       </Badge>
                       <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/dashboard/support/${ticket.id}`}>
+                        <Link
+                          href={`/dashboard/support/${ticket.id}`}
+                          aria-label={`View support ticket ${ticket.subject}`}
+                        >
                           <Eye className="h-4 w-4" />
                         </Link>
                       </Button>
@@ -470,6 +543,29 @@ export default function SupportPage() {
                 )
               })}
             </div>
+          )}
+          {ticketsQuery.hasNextPage && (
+            <div className="mt-4 flex justify-center border-t pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => ticketsQuery.fetchNextPage()}
+                disabled={ticketsQuery.isFetchingNextPage}
+              >
+                {ticketsQuery.isFetchingNextPage
+                  ? "Loading more…"
+                  : "Load more tickets"}
+              </Button>
+            </div>
+          )}
+          {ticketsQuery.error && ticketsData.length > 0 && (
+            <p
+              role="alert"
+              className="mt-3 text-center text-sm text-destructive"
+            >
+              {(ticketsQuery.error as Error).message ||
+                "More tickets could not be loaded."}
+            </p>
           )}
         </CardContent>
       </Card>

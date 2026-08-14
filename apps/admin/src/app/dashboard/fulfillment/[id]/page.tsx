@@ -568,6 +568,7 @@ function FulfillmentOrderPageInner() {
   const [articleTitle, setArticleTitle] = useState("")
   const [deliveryNotes, setDeliveryNotes] = useState("")
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [assignedOperationsId, setAssignedOperationsId] = useState("")
 
   const query = useQuery({
     queryKey: ["operations-order", orderId],
@@ -577,6 +578,13 @@ function FulfillmentOrderPageInner() {
     retry: false,
   })
   const order = query.data
+
+  const assignmentCandidates = useQuery({
+    queryKey: ["admin", "operations-assignment-candidates"],
+    queryFn: () => api.admin.listOpsStaff(),
+    enabled: Boolean(order?.access.canAssign),
+    staleTime: 30_000,
+  })
 
   useEffect(() => {
     if (!order || contentDirty) return
@@ -598,6 +606,19 @@ function FulfillmentOrderPageInner() {
     },
     onError: async (error: Error) => {
       toast.error(error.message)
+      await refresh()
+    },
+  })
+  const assign = useMutation({
+    mutationFn: (assignedToUserId: string) =>
+      api.admin.assignOrder(orderId, assignedToUserId),
+    onSuccess: async () => {
+      setAssignedOperationsId("")
+      toast.success("Order assigned to Operations")
+      await refresh()
+    },
+    onError: async (error: Error) => {
+      toast.error(error.message || "The order could not be assigned")
       await refresh()
     },
   })
@@ -697,6 +718,12 @@ function FulfillmentOrderPageInner() {
     "CONTENT_CREATION",
     "CONTENT_READY",
   ].includes(order.status)
+  const needsOperationsAssignment = order.access.canAssign
+  const canSelfClaim = order.access.canSelfClaim
+  const operationsStaff = assignmentCandidates.data ?? []
+  const hasValidOperationsAssignee = operationsStaff.some(
+    (member) => member.id === assignedOperationsId,
+  )
 
   return (
     <AdminPage>
@@ -811,7 +838,88 @@ function FulfillmentOrderPageInner() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {order.access.claimable ? (
+              {needsOperationsAssignment ? (
+                <div className="mx-auto max-w-md py-8 text-center">
+                  <UserPlus className="mx-auto h-10 w-10 text-muted-foreground" />
+                  <h2 className="mt-4 text-lg font-semibold">
+                    Assign an Operations owner
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Super Admins oversee fulfillment. Choose an active
+                    Operations staff member who will own and progress this
+                    order.
+                  </p>
+                  {assignmentCandidates.isLoading ? (
+                    <Skeleton className="mx-auto mt-5 h-10 w-full" />
+                  ) : assignmentCandidates.isError ? (
+                    <div
+                      className="mt-5 space-y-3 text-sm text-destructive"
+                      role="alert"
+                    >
+                      <p>
+                        {(assignmentCandidates.error as Error).message ||
+                          "Operations staff could not be loaded."}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => assignmentCandidates.refetch()}
+                        disabled={assignmentCandidates.isFetching}
+                      >
+                        <RefreshCw
+                          className={`h-4 w-4 ${
+                            assignmentCandidates.isFetching
+                              ? "animate-spin"
+                              : ""
+                          }`}
+                        />
+                        Retry staff list
+                      </Button>
+                    </div>
+                  ) : operationsStaff.length > 0 ? (
+                    <div className="mt-5 space-y-3 text-left">
+                      <Label htmlFor="operations-assignee">
+                        Operations assignee
+                      </Label>
+                      <Select
+                        value={assignedOperationsId}
+                        onValueChange={setAssignedOperationsId}
+                        disabled={assign.isPending}
+                      >
+                        <SelectTrigger id="operations-assignee">
+                          <SelectValue placeholder="Select Operations staff" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {operationsStaff.map((member) => (
+                            <SelectItem key={member.id} value={member.id}>
+                              {member.name ?? member.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        className="w-full"
+                        onClick={() => assign.mutate(assignedOperationsId)}
+                        disabled={
+                          !hasValidOperationsAssignee || assign.isPending
+                        }
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        {assign.isPending
+                          ? "Assigning…"
+                          : "Assign Operations owner"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-5 space-y-3 text-sm text-muted-foreground">
+                      <p>No active Operations staff are available.</p>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href="/dashboard/users">Review staff access</Link>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : canSelfClaim ? (
                 <div className="py-8 text-center">
                   <UserPlus className="mx-auto h-10 w-10 text-muted-foreground" />
                   <h2 className="mt-4 text-lg font-semibold">

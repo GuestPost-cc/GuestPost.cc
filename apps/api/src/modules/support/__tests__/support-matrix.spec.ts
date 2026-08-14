@@ -1,19 +1,11 @@
-/**
- * Phase 6.6 — channel-aware reply matrix + INTERNAL note coverage.
- *
- *   PUBLISHER channel: Customer R+W(PUBLIC), Publisher R+W(PUBLIC),
- *                      SUPER_ADMIN R+W(PUBLIC|INTERNAL),
- *                      FINANCE     R+W(PUBLIC|INTERNAL)
- *
- *   PLATFORM channel:  Customer R+W(PUBLIC), Assigned Ops R+W(PUBLIC|INTERNAL),
- *                      SUPER_ADMIN R+W(PUBLIC|INTERNAL),
- *                      FINANCE     R   ; W(INTERNAL only)
- *
- * Customers/publishers never write INTERNAL; their getTicket strips INTERNAL
- * rows before returning. Fan-out is recipient-set computed per channel +
- * visibility; the same user holding multiple roles dedupes to one notification.
- */
-import { ForbiddenException, NotFoundException } from "@nestjs/common"
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common"
+import { HEADERS_METADATA } from "@nestjs/common/constants"
+import { SupportController } from "../support.controller"
 import {
   buildActorSnapshot,
   resolveParticipantRole,
@@ -21,1029 +13,925 @@ import {
   SupportService,
 } from "../support.service"
 
-type Channel = "PUBLISHER" | "PLATFORM"
+const REQUEST_ID = "00000000-0000-4000-8000-000000000001"
+const MESSAGE_ID = "00000000-0000-4000-8000-000000000002"
 
-interface MockTicket {
-  id: string
-  organizationId: string
-  userId: string
-  orderId: string | null
-  fulfillmentChannel: Channel | null
-  assignedToUserId: string | null
-  assignedPublisherId: string | null
-  status: string
-  subject: string
-  description: string | null
-}
+const customer = (organizationId = "org-1", userId = "customer-1") =>
+  ({
+    userId,
+    kind: "CUSTOMER",
+    organizationId,
+    customerRole: "OWNER",
+  }) satisfies SupportActor
 
-function makeTicket(over: Partial<MockTicket> = {}): MockTicket {
-  // Spread last so explicit nulls in `over` override defaults (avoiding the
-  // `??` trap where over.field === null falls back to the default).
+const publisher = (publisherId = "pub-1", userId = "publisher-1") =>
+  ({
+    userId,
+    kind: "PUBLISHER",
+    publisherId,
+    publisherRole: "PUBLISHER_OWNER",
+  }) satisfies SupportActor
+
+const staff = (
+  staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE",
+  userId = staffRole === "SUPER_ADMIN"
+    ? "admin-1"
+    : staffRole === "OPERATIONS"
+      ? "ops-1"
+      : "finance-1",
+) => ({ userId, kind: "STAFF", staffRole }) satisfies SupportActor
+
+function baseTicket(overrides: Record<string, unknown> = {}) {
+  const now = new Date("2026-08-14T10:00:00.000Z")
   return {
-    id: "tkt1",
-    organizationId: "orgA",
-    userId: "customer1",
-    orderId: "ord1",
-    fulfillmentChannel: "PLATFORM",
-    assignedToUserId: "ops1",
-    assignedPublisherId: null,
+    id: "ticket-1",
+    subject: "Order publication help",
+    description: "Please help with this publication order.",
     status: "OPEN",
-    subject: "Help",
-    description: null,
-    ...over,
+    organizationId: "org-1",
+    userId: "customer-1",
+    orderId: "order-1",
+    fulfillmentChannel: "PLATFORM",
+    assignedToUserId: "ops-1",
+    assignedPublisherId: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
   }
 }
 
-function mockPrisma(opts: {
-  ticket: MockTicket
-  staff?: { superAdmins?: string[]; finance?: string[] }
-  customerOrgMembers?: string[]
-  publisherMembers?: string[]
-  messages?: any[]
-}) {
-  const created: any[] = []
+function userFor(id: string | null) {
+  if (!id) return null
+  const userType = id.startsWith("publisher")
+    ? "PUBLISHER"
+    : id.startsWith("customer")
+      ? "CUSTOMER"
+      : "STAFF"
+  return {
+    id,
+    name: `${userType.toLowerCase()} ${id}`,
+    email: `${id}@example.test`,
+    userType,
+    banned: false,
+  }
+}
+
+function makeHarness(
+  options: {
+    ticket?: Record<string, any>
+    messages?: Array<Record<string, any>>
+    order?: Record<string, any>
+    fulfillmentAssignments?: Array<Record<string, any>>
+    staffRoles?: Record<string, "SUPER_ADMIN" | "OPERATIONS" | "FINANCE">
+    bannedUsers?: string[]
+  } = {},
+) {
+  const ticketRows = new Map<string, any>()
+  const ticket = baseTicket(options.ticket)
+  ticketRows.set(ticket.id, ticket)
+  const messageRows = new Map<string, any>()
+  for (const message of options.messages ?? [])
+    messageRows.set(message.id, message)
+  const staffRoles = {
+    "admin-1": "SUPER_ADMIN",
+    "ops-1": "OPERATIONS",
+    "ops-2": "OPERATIONS",
+    "finance-1": "FINANCE",
+    ...options.staffRoles,
+  } as Record<string, "SUPER_ADMIN" | "OPERATIONS" | "FINANCE">
+  const banned = new Set(options.bannedUsers ?? [])
+  const order = options.order
+    ? {
+        id: "order-1",
+        organizationId: "org-1",
+        status: "SUBMITTED",
+        fulfillmentChannel: "PLATFORM",
+        website: { ownershipType: "PLATFORM", publisherId: null },
+        ...options.order,
+      }
+    : null
+  const fulfillmentAssignments = options.fulfillmentAssignments ?? []
+  const audit = { log: jest.fn().mockResolvedValue(undefined) }
+  const queue = { addJob: jest.fn().mockResolvedValue(undefined) }
+
+  const enrich = (row: any) => ({
+    ...row,
+    user: userFor(row.userId),
+    organization: {
+      id: row.organizationId,
+      name: "Example customer",
+      memberships: [
+        { userId: "customer-1", status: "ACTIVE" },
+        { userId: "customer-2", status: "ACTIVE" },
+      ],
+    },
+    assignedTo: row.assignedToUserId
+      ? { id: row.assignedToUserId, name: userFor(row.assignedToUserId)?.name }
+      : null,
+    assignedPublisher: row.assignedPublisherId
+      ? {
+          id: row.assignedPublisherId,
+          name: "Publisher brand",
+          publisherMemberships: [
+            { userId: "publisher-1" },
+            { userId: "publisher-2" },
+          ],
+        }
+      : null,
+    order: row.orderId
+      ? {
+          id: row.orderId,
+          title: "Order title",
+          status: order?.status ?? "SUBMITTED",
+          type: "GUEST_POST",
+          fulfillmentChannel:
+            order?.fulfillmentChannel ?? row.fulfillmentChannel,
+          website: order?.website ?? { ownershipType: "PLATFORM" },
+          fulfillmentAssignments: fulfillmentAssignments.filter((assignment) =>
+            ["ASSIGNED", "IN_PROGRESS"].includes(assignment.status),
+          ),
+        }
+      : null,
+  })
+
   const prisma: any = {
-    _created: created,
+    $queryRaw: jest.fn().mockResolvedValue([{ id: ticket.id }]),
+    user: {
+      findUnique: jest.fn(async ({ where }: any) => {
+        const value = userFor(where.id)
+        return value ? { ...value, banned: banned.has(where.id) } : null
+      }),
+    },
+    membership: {
+      findUnique: jest.fn(async ({ where }: any) => ({
+        role: "OWNER",
+        status:
+          where.userId_organizationId.organizationId === "org-1"
+            ? "ACTIVE"
+            : "PAUSED",
+      })),
+    },
+    publisherMembership: {
+      findUnique: jest.fn(async ({ where }: any) =>
+        where.userId_publisherId.publisherId === "pub-1"
+          ? { role: "PUBLISHER_OWNER" }
+          : null,
+      ),
+    },
+    staffMembership: {
+      findUnique: jest.fn(async ({ where }: any) => {
+        const role = staffRoles[where.userId]
+        return role
+          ? {
+              role,
+              user: {
+                name: userFor(where.userId)?.name,
+                banned: banned.has(where.userId),
+              },
+            }
+          : null
+      }),
+      findMany: jest.fn(async ({ where }: any) =>
+        Object.entries(staffRoles)
+          .filter(([id, role]) => role === where.role && !banned.has(id))
+          .map(([userId]) => ({ userId })),
+      ),
+    },
+    order: {
+      findUnique: jest.fn(async ({ where }: any) =>
+        order && where.id === order.id
+          ? {
+              ...order,
+              fulfillmentAssignments: fulfillmentAssignments.filter(
+                (assignment) =>
+                  ["ASSIGNED", "IN_PROGRESS"].includes(assignment.status),
+              ),
+            }
+          : null,
+      ),
+    },
+    fulfillmentAssignment: {
+      findFirst: jest.fn(async ({ where }: any) => {
+        const statuses = Array.isArray(where.status?.in)
+          ? where.status.in
+          : [where.status]
+        return (
+          fulfillmentAssignments
+            .filter(
+              (assignment) =>
+                assignment.orderId === where.orderId &&
+                statuses.includes(assignment.status),
+            )
+            .sort(
+              (left, right) =>
+                (right.assignedAt?.getTime?.() ?? 0) -
+                (left.assignedAt?.getTime?.() ?? 0),
+            )[0] ?? null
+        )
+      }),
+      create: jest.fn(),
+      updateMany: jest.fn(),
+    },
     ticket: {
-      findUnique: jest
-        .fn()
-        .mockImplementation(async ({ where, include }: any) => {
-          if (!include) return { ...opts.ticket }
-          return {
-            ...opts.ticket,
-            organization: {
-              memberships: (
-                opts.customerOrgMembers ?? [opts.ticket.userId, "owner_orgA"]
-              ).map((userId) => ({ userId, status: "ACTIVE" })),
-            },
-            assignedPublisher: opts.ticket.assignedPublisherId
-              ? {
-                  publisherMemberships: (
-                    opts.publisherMembers ?? ["pubowner1"]
-                  ).map((userId) => ({
-                    userId,
-                  })),
-                }
-              : null,
-          }
-        }),
-      findFirst: jest.fn(),
-      findUniqueOrThrow: jest.fn().mockResolvedValue({ ...opts.ticket }),
-      update: jest.fn().mockResolvedValue({}),
-      create: jest.fn().mockResolvedValue({ ...opts.ticket }),
+      findUnique: jest.fn(async ({ where, include }: any) => {
+        const row = ticketRows.get(where.id) ?? null
+        if (!row) return null
+        return include ? enrich(row) : { ...row }
+      }),
+      findFirst: jest.fn(async ({ where, include }: any) => {
+        const id = where.AND?.[0]?.id ?? ticket.id
+        const row = ticketRows.get(id)
+        if (!row) return null
+        const messageWhere = include.messages.where ?? {}
+        const rows = [...messageRows.values()]
+          .filter(
+            (message) =>
+              message.ticketId === row.id &&
+              (!messageWhere.visibility ||
+                message.visibility === messageWhere.visibility),
+          )
+          .filter((message) => {
+            if (!messageWhere.OR) return true
+            const before = messageWhere.OR[0].createdAt.lt as Date
+            const sameAt = messageWhere.OR[1].createdAt as Date
+            const beforeId = messageWhere.OR[1].id.lt as string
+            return (
+              message.createdAt < before ||
+              (message.createdAt.getTime() === sameAt.getTime() &&
+                message.id < beforeId)
+            )
+          })
+          .sort(
+            (a, b) =>
+              b.createdAt.getTime() - a.createdAt.getTime() ||
+              b.id.localeCompare(a.id),
+          )
+          .slice(0, include.messages.take)
+          .map((message) => ({
+            ...message,
+            user: userFor(message.userId),
+          }))
+        return { ...enrich(row), messages: rows }
+      }),
+      create: jest.fn(async ({ data }: any) => {
+        const row = {
+          ...data,
+          orderId: data.orderId ?? null,
+          status: "OPEN",
+          createdAt: new Date("2026-08-14T11:00:00.000Z"),
+          updatedAt: new Date("2026-08-14T11:00:00.000Z"),
+        }
+        ticketRows.set(row.id, row)
+        return row
+      }),
+      update: jest.fn(async ({ where, data }: any) => {
+        const current = ticketRows.get(where.id)
+        const row = { ...current, ...data, updatedAt: new Date() }
+        ticketRows.set(where.id, row)
+        return row
+      }),
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
     },
     ticketMessage: {
-      create: jest.fn().mockImplementation(async ({ data }: any) => {
-        const row = { id: `msg_${created.length + 1}`, ...data }
-        created.push(row)
+      findUnique: jest.fn(async ({ where }: any) => {
+        const row = messageRows.get(where.id)
+        return row ? { ...row, user: userFor(row.userId) } : null
+      }),
+      findFirst: jest.fn(
+        async ({ where }: any) =>
+          [...messageRows.values()]
+            .filter(
+              (message) =>
+                message.ticketId === where.ticketId &&
+                message.visibility === where.visibility,
+            )
+            .sort(
+              (a, b) =>
+                b.createdAt.getTime() - a.createdAt.getTime() ||
+                b.id.localeCompare(a.id),
+            )[0] ?? null,
+      ),
+      create: jest.fn(async ({ data }: any) => {
+        const row = {
+          id: data.id ?? `system-${messageRows.size + 1}`,
+          createdAt: new Date(
+            `2026-08-14T12:${String(messageRows.size).padStart(2, "0")}:00.000Z`,
+          ),
+          files: null,
+          ...data,
+          user: userFor(data.userId),
+        }
+        messageRows.set(row.id, row)
         return row
       }),
     },
-    staffMembership: {
-      findMany: jest.fn().mockImplementation(async ({ where }: any) => {
-        if (where.role === "SUPER_ADMIN") {
-          return (opts.staff?.superAdmins ?? ["admin1"]).map((userId) => ({
-            userId,
-          }))
-        }
-        if (where.role === "FINANCE") {
-          return (opts.staff?.finance ?? ["fin1"]).map((userId) => ({ userId }))
-        }
-        return []
-      }),
-      findUnique: jest.fn(),
-    },
-    publisher: { findUnique: jest.fn() },
   }
-  prisma.$transaction = jest.fn(async (work: (tx: any) => unknown) =>
-    work(prisma),
+  prisma.$transaction = jest.fn(async (operation: (tx: any) => unknown) =>
+    operation(prisma),
   )
-  return prisma
-}
 
-function mockQueue() {
-  const jobs: any[] = []
   return {
-    _jobs: jobs,
-    addJob: jest.fn().mockImplementation(async (..._args: any[]) => {
-      jobs.push(_args)
-    }),
+    service: new SupportService(prisma, queue as any, audit as any),
+    prisma,
+    queue,
+    audit,
+    ticketRows,
+    messageRows,
   }
 }
 
-function mockAudit() {
-  const rows: any[] = []
-  return {
-    _rows: rows,
-    log: jest.fn().mockImplementation(async (params: any) => {
-      rows.push(params)
-    }),
-  }
-}
-
-// Helpers
-const customerActor = (
-  orgId = "orgA",
-  userId = "customer1",
-  customerRole: "OWNER" | "MEMBER" = "OWNER",
-): SupportActor => ({
-  userId,
-  kind: "CUSTOMER",
-  organizationId: orgId,
-  customerRole,
-})
-const publisherActor = (
-  publisherId: string,
-  userId = "pubowner1",
-  publisherRole: "PUBLISHER_OWNER" | "PUBLISHER_MEMBER" = "PUBLISHER_OWNER",
-): SupportActor => ({
-  userId,
-  kind: "PUBLISHER",
-  publisherId,
-  publisherRole,
-})
-const staffActor = (
-  staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE",
-  userId?: string,
-): SupportActor => ({
-  userId: userId ?? `staff_${staffRole.toLowerCase()}`,
-  kind: "STAFF",
-  staffRole,
-})
-
-// ─── Tests ──────────────────────────────────────────────────────────────────
-
-describe("SupportService.addMessage — reply matrix", () => {
-  describe("CUSTOMER", () => {
-    it("can post PUBLIC on their org's ticket", async () => {
-      const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      const msg = await svc.addMessage(ticket.id, customerActor(), {
-        content: "hi",
-      })
-      expect(msg.visibility).toBe("PUBLIC")
+describe("support participant matrix and safe projection", () => {
+  it("projects a customer reply with self identity but no raw evidence", async () => {
+    const harness = makeHarness()
+    const result = await harness.service.addMessage("ticket-1", customer(), {
+      content: "  Hello support.  ",
+      clientMessageId: MESSAGE_ID,
     })
 
-    it("cannot post INTERNAL", async () => {
-      const ticket = makeTicket()
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      await expect(
-        svc.addMessage(ticket.id, customerActor(), {
-          content: "secret",
-          visibility: "INTERNAL",
-        }),
-      ).rejects.toBeInstanceOf(ForbiddenException)
+    expect(result).toMatchObject({
+      content: "Hello support.",
+      sender: { party: "CUSTOMER", displayName: "You", isSelf: true },
     })
-
-    it("cannot read or reply to another org's ticket", async () => {
-      const ticket = makeTicket({ organizationId: "orgB" })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      await expect(
-        svc.addMessage(ticket.id, customerActor("orgA"), { content: "hi" }),
-      ).rejects.toBeInstanceOf(NotFoundException)
+    expect(result).not.toHaveProperty("participantRole")
+    expect(result).not.toHaveProperty("actorSnapshot")
+    expect(result).not.toHaveProperty("authorEvidence")
+    expect(result).not.toHaveProperty("user")
+    const stored = [...harness.messageRows.values()][0]
+    expect(stored).toMatchObject({
+      participantRole: "CUSTOMER",
+      messageType: "MESSAGE",
+      actorSnapshot: { kind: "CUSTOMER", organizationRole: "OWNER" },
     })
   })
 
-  describe("FINANCE", () => {
-    it("can post PUBLIC on a PUBLISHER ticket", async () => {
-      const ticket = makeTicket({
-        fulfillmentChannel: "PUBLISHER",
-        assignedToUserId: null,
-        assignedPublisherId: "pub1",
-      })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      const msg = await svc.addMessage(ticket.id, staffActor("FINANCE"), {
-        content: "billing reply",
-      })
-      expect(msg.visibility).toBe("PUBLIC")
-    })
-
-    it("CANNOT post PUBLIC on a PLATFORM ticket", async () => {
-      const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      await expect(
-        svc.addMessage(ticket.id, staffActor("FINANCE"), {
-          content: "should fail",
-        }),
-      ).rejects.toBeInstanceOf(ForbiddenException)
-    })
-
-    it("CAN post INTERNAL on a PLATFORM ticket (escape valve)", async () => {
-      const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      const msg = await svc.addMessage(ticket.id, staffActor("FINANCE"), {
-        content: "flag for admin",
+  it("rejects cross-tenant replies and all external internal notes", async () => {
+    const harness = makeHarness()
+    await expect(
+      harness.service.addMessage("ticket-1", customer("org-2"), {
+        content: "Cross tenant",
+        clientMessageId: MESSAGE_ID,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(
+      harness.service.addMessage("ticket-1", customer(), {
+        content: "Private note",
         visibility: "INTERNAL",
-      })
-      expect(msg.visibility).toBe("INTERNAL")
-    })
-  })
-
-  describe("OPERATIONS", () => {
-    it("can post PUBLIC + INTERNAL on a ticket assigned to them", async () => {
-      const ticket = makeTicket({
-        fulfillmentChannel: "PLATFORM",
-        assignedToUserId: "opsA",
-      })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-
-      const pub = await svc.addMessage(
-        ticket.id,
-        staffActor("OPERATIONS", "opsA"),
-        {
-          content: "on it",
-        },
-      )
-      expect(pub.visibility).toBe("PUBLIC")
-
-      const internal = await svc.addMessage(
-        ticket.id,
-        staffActor("OPERATIONS", "opsA"),
-        {
-          content: "fyi internal",
-          visibility: "INTERNAL",
-        },
-      )
-      expect(internal.visibility).toBe("INTERNAL")
-    })
-
-    it("CANNOT post on a PLATFORM ticket assigned to another Ops (unassigned pool is read-only)", async () => {
-      const ticket = makeTicket({
-        fulfillmentChannel: "PLATFORM",
-        assignedToUserId: "opsA",
-      })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      await expect(
-        svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsB"), {
-          content: "claim",
-        }),
-      ).rejects.toBeInstanceOf(NotFoundException) // assertVisible refuses first
-    })
-
-    it("CANNOT post on unassigned platform pool until claimed", async () => {
-      const ticket = makeTicket({
-        fulfillmentChannel: "PLATFORM",
-        assignedToUserId: null,
-      })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      // Visible (unassigned pool), but reply is gated:
-      await expect(
-        svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsB"), {
-          content: "I'll take it",
-        }),
-      ).rejects.toBeInstanceOf(ForbiddenException)
-    })
-  })
-
-  describe("PUBLISHER", () => {
-    it("can post PUBLIC on a ticket assigned to their publisher", async () => {
-      const ticket = makeTicket({
-        fulfillmentChannel: "PUBLISHER",
-        assignedToUserId: null,
-        assignedPublisherId: "pub1",
-      })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      const msg = await svc.addMessage(ticket.id, publisherActor("pub1"), {
-        content: "on it",
-      })
-      expect(msg.visibility).toBe("PUBLIC")
-    })
-
-    it("CANNOT post INTERNAL", async () => {
-      const ticket = makeTicket({
-        fulfillmentChannel: "PUBLISHER",
-        assignedPublisherId: "pub1",
-      })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      await expect(
-        svc.addMessage(ticket.id, publisherActor("pub1"), {
-          content: "leak attempt",
-          visibility: "INTERNAL",
-        }),
-      ).rejects.toBeInstanceOf(ForbiddenException)
-    })
-
-    it("CANNOT read or reply to a different publisher's ticket", async () => {
-      const ticket = makeTicket({
-        fulfillmentChannel: "PUBLISHER",
-        assignedPublisherId: "pub1",
-      })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(
-        prisma as any,
-        mockQueue() as any,
-        mockAudit() as any,
-      )
-      await expect(
-        svc.addMessage(ticket.id, publisherActor("pub2"), { content: "hi" }),
-      ).rejects.toBeInstanceOf(NotFoundException)
-    })
-  })
-})
-
-describe("SupportService.getTicket — INTERNAL message filtering", () => {
-  it("strips INTERNAL messages for CUSTOMER actors", async () => {
-    const ticket = makeTicket()
-    const prisma = mockPrisma({ ticket })
-    // Override findUnique to return both visibilities
-    ;(prisma.ticket.findUnique as jest.Mock).mockImplementationOnce(
-      async ({ where }: any) => ({
-        ...ticket,
-        user: { id: "u1" },
-        messages: [
-          { id: "m1", content: "hi", visibility: "PUBLIC", user: { id: "u1" } },
-          {
-            id: "m2",
-            content: "internal",
-            visibility: "INTERNAL",
-            user: { id: "s1" },
-          },
-        ],
+        clientMessageId: MESSAGE_ID,
       }),
-    )
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    // For CUSTOMER, the prisma query passes `where: { visibility: "PUBLIC" }`
-    // — assert via the call arg.
-    await svc.getTicket(ticket.id, customerActor())
-    const call = (prisma.ticket.findUnique as jest.Mock).mock.calls[0][0]
-    expect(call.include.messages.where).toEqual({ visibility: "PUBLIC" })
+    ).rejects.toBeInstanceOf(ForbiddenException)
   })
 
-  it("does NOT filter for STAFF actors", async () => {
-    const ticket = makeTicket()
-    const prisma = mockPrisma({ ticket })
-    ;(prisma.ticket.findUnique as jest.Mock).mockImplementationOnce(
-      async () => ({
-        ...ticket,
-        user: { id: "u1" },
-        messages: [],
+  it("allows only the assigned publisher tenant on publisher-channel tickets", async () => {
+    const harness = makeHarness({
+      ticket: {
+        fulfillmentChannel: "PUBLISHER",
+        assignedPublisherId: "pub-1",
+        assignedToUserId: null,
+      },
+    })
+    await expect(
+      harness.service.addMessage("ticket-1", publisher(), {
+        content: "Publisher response",
+        clientMessageId: MESSAGE_ID,
       }),
-    )
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    await svc.getTicket(ticket.id, staffActor("FINANCE"))
-    const call = (prisma.ticket.findUnique as jest.Mock).mock.calls[0][0]
-    expect(call.include.messages.where).toBeUndefined()
-  })
-})
-
-describe("SupportService.addMessage — notification fan-out", () => {
-  it("PUBLIC reply on PLATFORM ticket: customer + assigned Ops + SUPER_ADMIN; NO Finance", async () => {
-    const ticket = makeTicket({
-      fulfillmentChannel: "PLATFORM",
-      assignedToUserId: "ops1",
-      assignedPublisherId: null,
-    })
-    const prisma = mockPrisma({
-      ticket,
-      customerOrgMembers: ["customer1", "orgOwner"],
-      staff: { superAdmins: ["admin1"], finance: ["fin1", "fin2"] },
-    })
-    const queue = mockQueue()
-    const svc = new SupportService(
-      prisma as any,
-      queue as any,
-      mockAudit() as any,
-    )
-    await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "admin1"), {
-      content: "answer",
-    })
-
-    const recipients = queue._jobs.map((j) => j[2].userId).sort()
-    expect(recipients).toEqual(["customer1", "ops1", "orgOwner"].sort())
-    expect(recipients).not.toContain("fin1")
-    expect(recipients).not.toContain("fin2")
+    ).resolves.toMatchObject({ sender: { party: "PUBLISHER", isSelf: true } })
+    await expect(
+      harness.service.addMessage("ticket-1", publisher("pub-2"), {
+        content: "Wrong publisher",
+        clientMessageId: "00000000-0000-4000-8000-000000000003",
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
   })
 
-  it("PUBLIC reply on PUBLISHER ticket: customer + publisher members + SUPER_ADMIN + FINANCE", async () => {
-    const ticket = makeTicket({
-      fulfillmentChannel: "PUBLISHER",
-      assignedToUserId: null,
-      assignedPublisherId: "pub1",
-    })
-    const prisma = mockPrisma({
-      ticket,
-      customerOrgMembers: ["customer1", "orgOwner"],
-      publisherMembers: ["pubowner1", "pubmember"],
-      staff: { superAdmins: ["admin1"], finance: ["fin1"] },
-    })
-    const queue = mockQueue()
-    const svc = new SupportService(
-      prisma as any,
-      queue as any,
-      mockAudit() as any,
-    )
-    await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "admin1"), {
-      content: "reply",
-    })
+  it("allows assigned Operations and Super Admin but fails Finance closed", async () => {
+    const operations = makeHarness()
+    await expect(
+      operations.service.addMessage("ticket-1", staff("OPERATIONS"), {
+        content: "Operations response",
+        visibility: "INTERNAL",
+        clientMessageId: MESSAGE_ID,
+      }),
+    ).resolves.toMatchObject({ participantRole: "OPS" })
 
-    const recipients = queue._jobs.map((j) => j[2].userId).sort()
-    expect(recipients).toEqual(
-      ["customer1", "orgOwner", "pubowner1", "pubmember", "fin1"].sort(),
-    )
-    // admin1 (the actor) is excluded — no self-notification.
-    expect(recipients).not.toContain("admin1")
+    const admin = makeHarness()
+    await expect(
+      admin.service.addMessage("ticket-1", staff("SUPER_ADMIN"), {
+        content: "Admin response",
+        clientMessageId: MESSAGE_ID,
+      }),
+    ).resolves.toMatchObject({ participantRole: "ADMIN" })
+
+    const finance = makeHarness()
+    await expect(
+      finance.service.addMessage("ticket-1", staff("FINANCE"), {
+        content: "Finance must not see support",
+        visibility: "INTERNAL",
+        clientMessageId: MESSAGE_ID,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+    expect(finance.prisma.ticketMessage.create).not.toHaveBeenCalled()
   })
 
-  it("INTERNAL note on PLATFORM ticket: assigned Ops + SUPER_ADMIN + FINANCE; NO customer, NO publisher", async () => {
-    const ticket = makeTicket({
-      fulfillmentChannel: "PLATFORM",
-      assignedToUserId: "ops1",
+  it("requires an explicit claim before Operations can reply to an unassigned ticket", async () => {
+    const harness = makeHarness({
+      ticket: { orderId: null, assignedToUserId: null },
     })
-    const prisma = mockPrisma({
-      ticket,
-      customerOrgMembers: ["customer1"],
-      staff: { superAdmins: ["admin1"], finance: ["fin1"] },
-    })
-    const queue = mockQueue()
-    const svc = new SupportService(
-      prisma as any,
-      queue as any,
-      mockAudit() as any,
-    )
-    await svc.addMessage(ticket.id, staffActor("FINANCE", "fin1"), {
-      content: "flag for admin",
-      visibility: "INTERNAL",
-    })
+    await expect(
+      harness.service.addMessage("ticket-1", staff("OPERATIONS"), {
+        content: "Premature response",
+        clientMessageId: MESSAGE_ID,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
 
-    const recipients = queue._jobs.map((j) => j[2].userId).sort()
-    expect(recipients).toEqual(["admin1", "ops1"].sort())
-    expect(recipients).not.toContain("customer1")
-    expect(recipients).not.toContain("fin1") // actor excluded
+    const claimed = await harness.service.claimTicket(
+      "ticket-1",
+      staff("OPERATIONS"),
+    )
+    expect(claimed).toMatchObject({
+      assignedTo: { displayName: "You" },
+      capabilities: { canReply: true, canClaim: false },
+    })
+    expect(claimed.assignedTo).not.toHaveProperty("userId")
   })
 
-  it("INTERNAL note on PUBLISHER ticket: SUPER_ADMIN + FINANCE only; NO customer, NO publisher", async () => {
-    const ticket = makeTicket({
-      fulfillmentChannel: "PUBLISHER",
-      assignedToUserId: null,
-      assignedPublisherId: "pub1",
+  it("fails Operations scope closed for a corrupt Platform row with a publisher owner", async () => {
+    const harness = makeHarness({
+      ticket: { assignedPublisherId: "pub-1", assignedToUserId: "ops-1" },
     })
-    const prisma = mockPrisma({
-      ticket,
-      customerOrgMembers: ["customer1"],
-      publisherMembers: ["pubowner1"],
-      staff: { superAdmins: ["admin1"], finance: ["fin1", "fin2"] },
-    })
-    const queue = mockQueue()
-    const svc = new SupportService(
-      prisma as any,
-      queue as any,
-      mockAudit() as any,
-    )
-    await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "admin1"), {
-      content: "fyi finance",
-      visibility: "INTERNAL",
-    })
-
-    const recipients = queue._jobs.map((j) => j[2].userId).sort()
-    expect(recipients).toEqual(["fin1", "fin2"].sort())
-    expect(recipients).not.toContain("customer1")
-    expect(recipients).not.toContain("pubowner1")
-    expect(recipients).not.toContain("admin1") // actor excluded
-  })
-
-  it("dedupes a user who holds multiple roles to a single notification (fixes Set<object>-identity bug)", async () => {
-    // admin1 is both a SUPER_ADMIN and a customer org member.
-    const ticket = makeTicket({
-      fulfillmentChannel: "PLATFORM",
-      assignedToUserId: "ops1",
-    })
-    const prisma = mockPrisma({
-      ticket,
-      customerOrgMembers: ["customer1", "admin1"], // admin1 wears both hats
-      staff: { superAdmins: ["admin1"], finance: [] },
-    })
-    const queue = mockQueue()
-    const svc = new SupportService(
-      prisma as any,
-      queue as any,
-      mockAudit() as any,
-    )
-    // Ops replies — admin1 should be notified ONCE despite holding two roles.
-    await svc.addMessage(ticket.id, staffActor("OPERATIONS", "ops1"), {
-      content: "update",
-    })
-
-    const recipients = queue._jobs.map((j) => j[2].userId)
-    const admin1Count = recipients.filter((r) => r === "admin1").length
-    expect(admin1Count).toBe(1)
-  })
-
-  it("wakes the legacy queue only after the domain transaction commits", async () => {
-    const ticket = makeTicket()
-    const prisma = mockPrisma({ ticket })
-    const queue = mockQueue()
-    let committed = false
-    prisma.$transaction.mockImplementation(async (work: (tx: any) => any) => {
-      const result = await work(prisma)
-      expect(queue.addJob).not.toHaveBeenCalled()
-      committed = true
-      return result
-    })
-    queue.addJob.mockImplementation(async (...args: any[]) => {
-      expect(committed).toBe(true)
-      queue._jobs.push(args)
-    })
-    const service = new SupportService(
-      prisma as any,
-      queue as any,
-      mockAudit() as any,
-    )
-
-    await service.addMessage(ticket.id, customerActor(), { content: "hello" })
-
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
-    expect(queue.addJob).toHaveBeenCalled()
-  })
-
-  it("propagates an outbox failure so the domain transaction cannot commit", async () => {
-    const ticket = makeTicket()
-    const prisma = mockPrisma({ ticket })
-    const queue = mockQueue()
-    const communications = {
-      record: jest.fn().mockRejectedValue(new Error("outbox unavailable")),
-      dispatchBestEffort: jest.fn(),
-    }
-    let committed = false
-    prisma.$transaction.mockImplementation(async (work: (tx: any) => any) => {
-      const result = await work(prisma)
-      committed = true
-      return result
-    })
-    const service = new SupportService(
-      prisma as any,
-      queue as any,
-      mockAudit() as any,
-      communications as any,
-    )
 
     await expect(
-      service.addMessage(ticket.id, customerActor(), { content: "hello" }),
-    ).rejects.toThrow("outbox unavailable")
+      harness.service.getTicket("ticket-1", staff("OPERATIONS")),
+    ).rejects.toBeInstanceOf(NotFoundException)
+    await expect(
+      harness.service.addMessage("ticket-1", staff("OPERATIONS"), {
+        content: "This corrupt cross-channel row must fail closed.",
+        clientMessageId: MESSAGE_ID,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
 
-    expect(committed).toBe(false)
-    expect(communications.record).toHaveBeenCalledWith(
-      expect.objectContaining({ aggregateId: expect.any(String) }),
-      prisma,
+    await harness.service.listTicketsDetailed(staff("OPERATIONS"))
+    expect(harness.prisma.ticket.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          assignedPublisherId: null,
+          OR: [
+            { fulfillmentChannel: "PLATFORM" },
+            { fulfillmentChannel: null, orderId: null },
+          ],
+          AND: [
+            {
+              OR: [{ assignedToUserId: "ops-1" }, { assignedToUserId: null }],
+            },
+          ],
+        }),
+      }),
     )
-    expect(communications.dispatchBestEffort).not.toHaveBeenCalled()
-    expect(queue.addJob).not.toHaveBeenCalled()
+  })
+
+  it("grandfathers only an unambiguous legacy general ticket into the Operations queue", async () => {
+    const harness = makeHarness({
+      ticket: {
+        orderId: null,
+        fulfillmentChannel: null,
+        assignedPublisherId: null,
+        assignedToUserId: null,
+      },
+    })
+
+    await expect(
+      harness.service.getTicket("ticket-1", staff("OPERATIONS")),
+    ).resolves.toMatchObject({
+      fulfillmentChannel: null,
+      capabilities: { canClaim: true, canReply: false },
+    })
+    await expect(
+      harness.service.claimTicket("ticket-1", staff("OPERATIONS")),
+    ).resolves.toMatchObject({
+      assignedTo: { displayName: "You" },
+      capabilities: { canClaim: false, canReply: true },
+    })
+
+    const ambiguousOrderLinked = makeHarness({
+      ticket: {
+        fulfillmentChannel: null,
+        assignedPublisherId: null,
+        assignedToUserId: null,
+      },
+    })
+    await expect(
+      ambiguousOrderLinked.service.getTicket("ticket-1", staff("OPERATIONS")),
+    ).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it("uses the same clean Platform policy for the Super Admin channel filter", async () => {
+    const harness = makeHarness()
+
+    await harness.service.listTicketsDetailed(staff("SUPER_ADMIN"), {
+      channel: "PLATFORM",
+    })
+
+    expect(harness.prisma.ticket.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: [
+            {
+              assignedPublisherId: null,
+              OR: [
+                { fulfillmentChannel: "PLATFORM" },
+                { fulfillmentChannel: null, orderId: null },
+              ],
+            },
+          ],
+        }),
+      }),
+    )
+  })
+
+  it("allows a ticket-only claim after fulfillment using Order then Ticket locks", async () => {
+    const harness = makeHarness({
+      ticket: { assignedToUserId: null },
+      order: { status: "DELIVERED" },
+      fulfillmentAssignments: [
+        {
+          id: "delivered-assignment",
+          orderId: "order-1",
+          assignedToUserId: "ops-2",
+          status: "DELIVERED",
+          assignedAt: new Date("2026-08-14T09:00:00.000Z"),
+        },
+      ],
+    })
+
+    await expect(
+      harness.service.getTicket("ticket-1", staff("OPERATIONS")),
+    ).resolves.toMatchObject({
+      capabilities: { canClaim: true, canReply: false },
+    })
+    await expect(
+      harness.service.claimTicket("ticket-1", staff("OPERATIONS")),
+    ).resolves.toMatchObject({
+      assignedTo: { displayName: "You" },
+      capabilities: { canClaim: false, canReply: true },
+    })
+    expect(harness.prisma.fulfillmentAssignment.create).not.toHaveBeenCalled()
+    expect(
+      harness.prisma.fulfillmentAssignment.updateMany,
+    ).not.toHaveBeenCalled()
+
+    const lockSql = harness.prisma.$queryRaw.mock.calls.map((call: any[]) =>
+      call[0].join("?"),
+    )
+    expect(
+      lockSql.findIndex((sql: string) => sql.includes('"Order"')),
+    ).toBeLessThan(lockSql.findIndex((sql: string) => sql.includes('"Ticket"')))
+  })
+
+  it("keeps active or still-claimable order tickets read-only", async () => {
+    const claimableOrder = makeHarness({
+      ticket: { assignedToUserId: null },
+      order: { status: "SUBMITTED" },
+    })
+    await expect(
+      claimableOrder.service.claimTicket("ticket-1", staff("OPERATIONS")),
+    ).rejects.toBeInstanceOf(ConflictException)
+
+    const activeAssignment = makeHarness({
+      ticket: { assignedToUserId: null },
+      order: { status: "DELIVERED" },
+      fulfillmentAssignments: [
+        {
+          id: "active-assignment",
+          orderId: "order-1",
+          assignedToUserId: "ops-2",
+          status: "IN_PROGRESS",
+        },
+      ],
+    })
+    await expect(
+      activeAssignment.service.claimTicket("ticket-1", staff("OPERATIONS")),
+    ).rejects.toBeInstanceOf(ConflictException)
   })
 })
 
-// ─── Phase 6.6.1 — participantRole + messageType ───────────────────────────
+describe("retry safety and lifecycle commands", () => {
+  it("returns the exact message winner on replay and rejects payload drift", async () => {
+    const harness = makeHarness()
+    const first = await harness.service.addMessage("ticket-1", customer(), {
+      content: "Retry-safe reply",
+      clientMessageId: MESSAGE_ID,
+    })
+    const replay = await harness.service.addMessage("ticket-1", customer(), {
+      content: "Retry-safe reply",
+      clientMessageId: MESSAGE_ID,
+    })
+    expect(replay.id).toBe(first.id)
+    expect(harness.prisma.ticketMessage.create).toHaveBeenCalledTimes(1)
+    expect(harness.audit.log).toHaveBeenCalledTimes(1)
 
-describe("resolveParticipantRole (pure helper)", () => {
-  it("maps CUSTOMER actor → CUSTOMER", () => {
-    expect(resolveParticipantRole(customerActor())).toBe("CUSTOMER")
+    await expect(
+      harness.service.addMessage("ticket-1", customer(), {
+        content: "Changed payload",
+        clientMessageId: MESSAGE_ID,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException)
   })
-  it("maps PUBLISHER actor → PUBLISHER", () => {
-    expect(resolveParticipantRole(publisherActor("pub1"))).toBe("PUBLISHER")
+
+  it("requires reopen before public replies but still permits authorized internal notes", async () => {
+    const customerHarness = makeHarness({ ticket: { status: "CLOSED" } })
+    await expect(
+      customerHarness.service.addMessage("ticket-1", customer(), {
+        content: "Reply while closed",
+        clientMessageId: MESSAGE_ID,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException)
+
+    const adminHarness = makeHarness({ ticket: { status: "CLOSED" } })
+    await expect(
+      adminHarness.service.addMessage("ticket-1", staff("SUPER_ADMIN"), {
+        content: "Internal follow-up",
+        visibility: "INTERNAL",
+        clientMessageId: MESSAGE_ID,
+      }),
+    ).resolves.toMatchObject({ visibility: "INTERNAL" })
   })
-  it("maps STAFF SUPER_ADMIN → ADMIN", () => {
-    expect(resolveParticipantRole(staffActor("SUPER_ADMIN"))).toBe("ADMIN")
+
+  it("makes same-target status retry a no-op and emits unique events for real transitions", async () => {
+    const harness = makeHarness()
+    const unchanged = await harness.service.updateExternalStatus(
+      "ticket-1",
+      "OPEN",
+      customer(),
+    )
+    expect(unchanged.status).toBe("OPEN")
+    expect(harness.prisma.ticketMessage.create).not.toHaveBeenCalled()
+
+    const closed = await harness.service.updateExternalStatus(
+      "ticket-1",
+      "CLOSED",
+      customer(),
+    )
+    expect(closed.status).toBe("CLOSED")
+    const reopened = await harness.service.updateExternalStatus(
+      "ticket-1",
+      "OPEN",
+      customer(),
+    )
+    expect(reopened.status).toBe("OPEN")
+    const ids = [...harness.messageRows.values()].map((row) => row.id)
+    expect(new Set(ids).size).toBe(2)
   })
-  it("maps STAFF OPERATIONS → OPS", () => {
-    expect(resolveParticipantRole(staffActor("OPERATIONS"))).toBe("OPS")
+
+  it("creates an idempotent normalized ticket and rejects changed request data", async () => {
+    const harness = makeHarness()
+    const input = {
+      subject: "  General account help  ",
+      description: "  Please help with my account access.  ",
+      clientRequestId: REQUEST_ID,
+    }
+    const first = await harness.service.createTicket(customer(), input)
+    const replay = await harness.service.createTicket(customer(), input)
+    expect(replay).toEqual(first)
+    expect(harness.prisma.ticket.create).toHaveBeenCalledTimes(1)
+
+    await expect(
+      harness.service.createTicket(customer(), {
+        ...input,
+        subject: "Different request",
+      }),
+    ).rejects.toBeInstanceOf(ConflictException)
+    await expect(
+      harness.service.createTicket(publisher(), input),
+    ).rejects.toBeInstanceOf(BadRequestException)
   })
-  it("maps STAFF FINANCE → FINANCE", () => {
-    expect(resolveParticipantRole(staffActor("FINANCE"))).toBe("FINANCE")
+
+  it("routes a delivered Platform order ticket to its latest active Operations owner", async () => {
+    const harness = makeHarness({
+      order: { status: "DELIVERED" },
+      fulfillmentAssignments: [
+        {
+          id: "delivered-new",
+          orderId: "order-1",
+          assignedToUserId: "ops-2",
+          status: "DELIVERED",
+          assignedAt: new Date("2026-08-14T09:00:00.000Z"),
+        },
+        {
+          id: "cancelled-newer",
+          orderId: "order-1",
+          assignedToUserId: "ops-1",
+          status: "CANCELLED",
+          assignedAt: new Date("2026-08-14T10:00:00.000Z"),
+        },
+      ],
+    })
+
+    const created = await harness.service.createTicket(customer(), {
+      subject: "Delivered order follow-up",
+      description: "Please help with this completed publication delivery.",
+      orderId: "order-1",
+      clientRequestId: REQUEST_ID,
+    })
+    expect(harness.ticketRows.get(created.id)).toMatchObject({
+      fulfillmentChannel: "PLATFORM",
+      assignedToUserId: "ops-2",
+      assignedPublisherId: null,
+    })
   })
-  it("refuses STAFF actor without a staffRole (forces caller to gate first)", () => {
+})
+
+describe("bounded message history and privacy", () => {
+  it("paginates public rows by stable keyset without internal rows consuming the page", async () => {
+    const messages: Array<Record<string, any>> = Array.from(
+      { length: 205 },
+      (_, index) => ({
+        id: `public-${String(index).padStart(3, "0")}`,
+        ticketId: "ticket-1",
+        userId: index % 2 ? "customer-1" : "admin-1",
+        content: `public ${index}`,
+        visibility: "PUBLIC",
+        participantRole: index % 2 ? "CUSTOMER" : "ADMIN",
+        messageType: "MESSAGE",
+        actorSnapshot: null,
+        files: { secret: true },
+        createdAt: new Date(1_700_000_000_000 + index * 1_000),
+      }),
+    )
+    messages.push(
+      ...Array.from({ length: 10 }, (_, index) => ({
+        id: `internal-${index}`,
+        ticketId: "ticket-1",
+        userId: "admin-1",
+        content: `internal ${index}`,
+        visibility: "INTERNAL",
+        participantRole: "ADMIN",
+        messageType: "INTERNAL_NOTE",
+        actorSnapshot: { kind: "STAFF", secret: "must-not-leak" },
+        createdAt: new Date(1_800_000_000_000 + index * 1_000),
+      })),
+    )
+    const harness = makeHarness({ messages })
+
+    const first = await harness.service.getTicket("ticket-1", customer())
+    expect(first.messages).toHaveLength(200)
+    expect(
+      first.messages.every((row: any) => row.visibility === "PUBLIC"),
+    ).toBe(true)
+    expect(first.messagePage.nextCursor).toEqual(expect.any(String))
+    expect(first.messages[0].createdAt <= first.messages[199].createdAt).toBe(
+      true,
+    )
+
+    const second = await harness.service.getTicket("ticket-1", customer(), {
+      messageCursor: first.messagePage.nextCursor,
+    })
+    expect(second.messages).toHaveLength(5)
+    expect(second.messagePage.nextCursor).toBeNull()
+    const ids = [...first.messages, ...second.messages].map(
+      (row: any) => row.id,
+    )
+    expect(new Set(ids).size).toBe(205)
+    for (const row of [...first.messages, ...second.messages]) {
+      expect(row).not.toHaveProperty("user")
+      expect(row).not.toHaveProperty("files")
+      expect(row).not.toHaveProperty("actorSnapshot")
+    }
+  })
+
+  it("allow-lists staff actor snapshots and restricts raw identity to Super Admin", async () => {
+    const message = {
+      id: "message-1",
+      ticketId: "ticket-1",
+      userId: "customer-1",
+      content: "Evidence",
+      visibility: "PUBLIC",
+      participantRole: "CUSTOMER",
+      messageType: "MESSAGE",
+      actorSnapshot: {
+        kind: "CUSTOMER",
+        organizationRole: "OWNER",
+        secretFutureField: "do not serialize",
+      },
+      createdAt: new Date("2026-08-14T12:00:00.000Z"),
+    }
+    const adminHarness = makeHarness({ messages: [message] })
+    const adminDetail = await adminHarness.service.getTicket(
+      "ticket-1",
+      staff("SUPER_ADMIN"),
+    )
+    expect(adminDetail.messages[0].actorSnapshot).toEqual({
+      kind: "CUSTOMER",
+      staffRole: null,
+      organizationRole: "OWNER",
+      publisherRole: null,
+    })
+    expect(adminDetail.messages[0].authorEvidence).toMatchObject({
+      userId: "customer-1",
+      email: "customer-1@example.test",
+    })
+
+    const opsHarness = makeHarness({ messages: [message] })
+    const operationsDetail = await opsHarness.service.getTicket(
+      "ticket-1",
+      staff("OPERATIONS"),
+    )
+    expect(operationsDetail.messages[0].authorEvidence).not.toHaveProperty(
+      "userId",
+    )
+    expect(operationsDetail.messages[0].authorEvidence).not.toHaveProperty(
+      "email",
+    )
+  })
+
+  it("does not notify a demoted or banned former Operations assignee", async () => {
+    const harness = makeHarness({ staffRoles: { "ops-1": "FINANCE" } })
+    await harness.service.addMessage("ticket-1", customer(), {
+      content: "Public customer update",
+      clientMessageId: MESSAGE_ID,
+    })
+    const recipients = harness.queue.addJob.mock.calls.map(
+      (call) => call[2].userId,
+    )
+    expect(recipients).not.toContain("ops-1")
+    expect(recipients).toContain("admin-1")
+  })
+
+  it("updates staff activity for an internal note without changing the public projection source", async () => {
+    const harness = makeHarness()
+    await harness.service.addMessage("ticket-1", staff("SUPER_ADMIN"), {
+      content: "Internal activity should reorder the staff inbox only.",
+      visibility: "INTERNAL",
+      clientMessageId: MESSAGE_ID,
+    })
+
+    expect(harness.prisma.ticket.update).toHaveBeenCalledWith({
+      where: { id: "ticket-1" },
+      data: { updatedAt: expect.any(Date) },
+    })
+  })
+
+  it("runs authority and support reads in one repeatable snapshot and counts the opening request", async () => {
+    const harness = makeHarness({ ticket: { orderId: null } })
+    harness.prisma.ticket.findMany.mockResolvedValue([
+      {
+        ...baseTicket({ orderId: null }),
+        user: userFor("customer-1"),
+        organization: { id: "org-1", name: "Example customer" },
+        assignedTo: { id: "ops-1", name: "Operations" },
+        assignedPublisher: null,
+        order: null,
+        _count: { messages: 0 },
+      },
+    ])
+    harness.prisma.ticket.count.mockResolvedValue(1)
+
+    const page = await harness.service.listTicketsDetailed(staff("SUPER_ADMIN"))
+    expect(page.items[0].messageCount).toBe(1)
+    expect(harness.prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: "RepeatableRead" },
+    )
+  })
+})
+
+describe("support response cache policy", () => {
+  it.each([
+    "listTickets",
+    "getTicket",
+  ])("marks external %s responses private and no-store", (method) => {
+    const headers = Reflect.getMetadata(
+      HEADERS_METADATA,
+      (SupportController.prototype as any)[method],
+    ) as Array<{ name: string; value: string }>
+    expect(headers).toEqual(
+      expect.arrayContaining([
+        {
+          name: "Cache-Control",
+          value: "private, no-store, no-cache, must-revalidate",
+        },
+        { name: "Pragma", value: "no-cache" },
+      ]),
+    )
+  })
+})
+
+describe("role snapshot helpers", () => {
+  it("resolves current participant roles and rejects roleless staff", () => {
+    expect(resolveParticipantRole(customer())).toBe("CUSTOMER")
+    expect(resolveParticipantRole(publisher())).toBe("PUBLISHER")
+    expect(resolveParticipantRole(staff("SUPER_ADMIN"))).toBe("ADMIN")
+    expect(resolveParticipantRole(staff("OPERATIONS"))).toBe("OPS")
     expect(() =>
-      resolveParticipantRole({ userId: "x", kind: "STAFF", staffRole: null }),
+      resolveParticipantRole({ userId: "staff", kind: "STAFF" }),
     ).toThrow(ForbiddenException)
   })
-})
 
-describe("SupportService.addMessage — participantRole + messageType snapshot", () => {
-  it("CUSTOMER PUBLIC → (CUSTOMER, MESSAGE, PUBLIC)", async () => {
-    const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
-    const prisma = mockPrisma({ ticket })
-    const audit = mockAudit()
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      audit as any,
-    )
-    const msg = await svc.addMessage(ticket.id, customerActor(), {
-      content: "hi",
-    })
-    expect(msg.participantRole).toBe("CUSTOMER")
-    expect(msg.messageType).toBe("MESSAGE")
-    expect(msg.visibility).toBe("PUBLIC")
-    // Audit metadata mirrors the row so reports never disagree.
-    expect(audit._rows[0].metadata.participantRole).toBe("CUSTOMER")
-    expect(audit._rows[0].metadata.messageType).toBe("MESSAGE")
-  })
-
-  it("PUBLISHER PUBLIC → (PUBLISHER, MESSAGE, PUBLIC)", async () => {
-    const ticket = makeTicket({
-      fulfillmentChannel: "PUBLISHER",
-      assignedToUserId: null,
-      assignedPublisherId: "pub1",
-    })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    const msg = await svc.addMessage(ticket.id, publisherActor("pub1"), {
-      content: "ok",
-    })
-    expect(msg.participantRole).toBe("PUBLISHER")
-    expect(msg.messageType).toBe("MESSAGE")
-  })
-
-  it("OPS PUBLIC on assigned ticket → (OPS, MESSAGE, PUBLIC)", async () => {
-    const ticket = makeTicket({
-      fulfillmentChannel: "PLATFORM",
-      assignedToUserId: "opsA",
-    })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    const msg = await svc.addMessage(
-      ticket.id,
-      staffActor("OPERATIONS", "opsA"),
-      {
-        content: "fixing it",
-      },
-    )
-    expect(msg.participantRole).toBe("OPS")
-    expect(msg.messageType).toBe("MESSAGE")
-  })
-
-  it("ADMIN PUBLIC → (ADMIN, MESSAGE, PUBLIC)", async () => {
-    const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    const msg = await svc.addMessage(
-      ticket.id,
-      staffActor("SUPER_ADMIN", "adm1"),
-      {
-        content: "stepping in",
-      },
-    )
-    expect(msg.participantRole).toBe("ADMIN")
-    expect(msg.messageType).toBe("MESSAGE")
-  })
-
-  it("FINANCE PUBLIC on PUBLISHER → (FINANCE, MESSAGE, PUBLIC)", async () => {
-    const ticket = makeTicket({
-      fulfillmentChannel: "PUBLISHER",
-      assignedPublisherId: "pub1",
-    })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    const msg = await svc.addMessage(ticket.id, staffActor("FINANCE"), {
-      content: "billing reply",
-    })
-    expect(msg.participantRole).toBe("FINANCE")
-    expect(msg.messageType).toBe("MESSAGE")
-    expect(msg.visibility).toBe("PUBLIC")
-  })
-
-  it("FINANCE INTERNAL on PLATFORM → (FINANCE, INTERNAL_NOTE, INTERNAL)", async () => {
-    // The escape valve: Finance is read-only on PLATFORM tickets for the
-    // customer thread, but INTERNAL is allowed. The triple captures that.
-    const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
-    const prisma = mockPrisma({ ticket })
-    const audit = mockAudit()
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      audit as any,
-    )
-    const msg = await svc.addMessage(ticket.id, staffActor("FINANCE"), {
-      content: "Settlement amount looks off, flagging for admin.",
-      visibility: "INTERNAL",
-    })
-    expect(msg.participantRole).toBe("FINANCE")
-    expect(msg.messageType).toBe("INTERNAL_NOTE")
-    expect(msg.visibility).toBe("INTERNAL")
-    expect(audit._rows[0].action).toBe("TICKET_INTERNAL_NOTE_ADDED")
-    expect(audit._rows[0].metadata.participantRole).toBe("FINANCE")
-    expect(audit._rows[0].metadata.messageType).toBe("INTERNAL_NOTE")
-  })
-
-  it("OPS INTERNAL on assigned PLATFORM → (OPS, INTERNAL_NOTE, INTERNAL)", async () => {
-    const ticket = makeTicket({
-      fulfillmentChannel: "PLATFORM",
-      assignedToUserId: "opsA",
-    })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    const msg = await svc.addMessage(
-      ticket.id,
-      staffActor("OPERATIONS", "opsA"),
-      {
-        content: "Publisher unresponsive — escalating",
-        visibility: "INTERNAL",
-      },
-    )
-    expect(msg.participantRole).toBe("OPS")
-    expect(msg.messageType).toBe("INTERNAL_NOTE")
-  })
-
-  it("snapshot is immutable: role at write time persists even when actor role would later differ", async () => {
-    // Today the actor is OPS. Tomorrow they get promoted to SUPER_ADMIN. The
-    // row written today must still say OPS — we never derive dynamically.
-    const ticket = makeTicket({
-      fulfillmentChannel: "PLATFORM",
-      assignedToUserId: "alice",
-    })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    const msg = await svc.addMessage(
-      ticket.id,
-      staffActor("OPERATIONS", "alice"),
-      {
-        content: "Delivery verified",
-      },
-    )
-    expect(msg.participantRole).toBe("OPS")
-    // The row in the DB is the snapshot — checked via the mock's _created log.
-    expect(prisma._created[0].participantRole).toBe("OPS")
-  })
-})
-
-// ─── Phase 6.6.2 — actorSnapshot ────────────────────────────────────────────
-
-describe("buildActorSnapshot (pure helper)", () => {
-  it("CUSTOMER OWNER → { kind:CUSTOMER, staffRole:null, organizationRole:OWNER, publisherRole:null }", () => {
-    expect(buildActorSnapshot(customerActor("orgA", "c1", "OWNER"))).toEqual({
+  it("stores a stable allow-listed snapshot shape", () => {
+    expect(buildActorSnapshot(customer())).toEqual({
       kind: "CUSTOMER",
       staffRole: null,
       organizationRole: "OWNER",
       publisherRole: null,
     })
-  })
-  it("CUSTOMER MEMBER → organizationRole:MEMBER", () => {
-    expect(buildActorSnapshot(customerActor("orgA", "c1", "MEMBER"))).toEqual({
-      kind: "CUSTOMER",
-      staffRole: null,
-      organizationRole: "MEMBER",
-      publisherRole: null,
-    })
-  })
-  it("PUBLISHER PUBLISHER_OWNER → publisherRole:PUBLISHER_OWNER", () => {
-    expect(
-      buildActorSnapshot(publisherActor("pub1", "p1", "PUBLISHER_OWNER")),
-    ).toEqual({
-      kind: "PUBLISHER",
-      staffRole: null,
-      organizationRole: null,
-      publisherRole: "PUBLISHER_OWNER",
-    })
-  })
-  it("PUBLISHER PUBLISHER_MEMBER → publisherRole:PUBLISHER_MEMBER", () => {
-    expect(
-      buildActorSnapshot(publisherActor("pub1", "p1", "PUBLISHER_MEMBER")),
-    ).toEqual({
-      kind: "PUBLISHER",
-      staffRole: null,
-      organizationRole: null,
-      publisherRole: "PUBLISHER_MEMBER",
-    })
-  })
-  it("STAFF SUPER_ADMIN → staffRole:SUPER_ADMIN (note: participantRole collapses to ADMIN, snapshot preserves raw)", () => {
-    expect(buildActorSnapshot(staffActor("SUPER_ADMIN"))).toEqual({
-      kind: "STAFF",
-      staffRole: "SUPER_ADMIN",
-      organizationRole: null,
-      publisherRole: null,
-    })
-  })
-  it("STAFF OPERATIONS → staffRole:OPERATIONS (participantRole collapses to OPS)", () => {
-    expect(buildActorSnapshot(staffActor("OPERATIONS"))).toEqual({
-      kind: "STAFF",
-      staffRole: "OPERATIONS",
-      organizationRole: null,
-      publisherRole: null,
-    })
-  })
-  it("STAFF FINANCE → staffRole:FINANCE", () => {
-    expect(buildActorSnapshot(staffActor("FINANCE"))).toEqual({
-      kind: "STAFF",
-      staffRole: "FINANCE",
-      organizationRole: null,
-      publisherRole: null,
-    })
-  })
-  it("missing optional roles default to null (stable JSON shape)", () => {
-    const bare: SupportActor = {
-      userId: "u1",
-      kind: "CUSTOMER",
-      organizationId: "orgA",
-    }
-    expect(buildActorSnapshot(bare)).toEqual({
-      kind: "CUSTOMER",
-      staffRole: null,
-      organizationRole: null,
-      publisherRole: null,
-    })
-  })
-})
-
-describe("SupportService.addMessage — actorSnapshot persisted on row", () => {
-  it("CUSTOMER OWNER → row carries { kind:CUSTOMER, organizationRole:OWNER }", async () => {
-    const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    await svc.addMessage(ticket.id, customerActor("orgA", "c1", "OWNER"), {
-      content: "hi",
-    })
-    expect(prisma._created[0].actorSnapshot).toEqual({
-      kind: "CUSTOMER",
-      staffRole: null,
-      organizationRole: "OWNER",
-      publisherRole: null,
-    })
-  })
-
-  it("PUBLISHER PUBLISHER_MEMBER → row carries { kind:PUBLISHER, publisherRole:PUBLISHER_MEMBER }", async () => {
-    const ticket = makeTicket({
-      fulfillmentChannel: "PUBLISHER",
-      assignedToUserId: null,
-      assignedPublisherId: "pub1",
-    })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    await svc.addMessage(
-      ticket.id,
-      publisherActor("pub1", "p1", "PUBLISHER_MEMBER"),
-      {
-        content: "on it",
-      },
-    )
-    expect(prisma._created[0].actorSnapshot).toEqual({
-      kind: "PUBLISHER",
-      staffRole: null,
-      organizationRole: null,
-      publisherRole: "PUBLISHER_MEMBER",
-    })
-  })
-
-  it("STAFF FINANCE INTERNAL on PLATFORM → row carries { kind:STAFF, staffRole:FINANCE }", async () => {
-    const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
-    const prisma = mockPrisma({ ticket })
-    const audit = mockAudit()
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      audit as any,
-    )
-    await svc.addMessage(ticket.id, staffActor("FINANCE"), {
-      content: "settlement amount off",
-      visibility: "INTERNAL",
-    })
-    expect(prisma._created[0].actorSnapshot).toEqual({
-      kind: "STAFF",
-      staffRole: "FINANCE",
-      organizationRole: null,
-      publisherRole: null,
-    })
-    // Audit metadata mirrors the row.
-    expect(audit._rows[0].metadata.actorSnapshot).toEqual({
-      kind: "STAFF",
-      staffRole: "FINANCE",
-      organizationRole: null,
-      publisherRole: null,
-    })
-  })
-
-  it("captures raw staffRole even though participantRole collapses (SUPER_ADMIN → ADMIN)", async () => {
-    // The forensic value: years later, "was this person SUPER_ADMIN or
-    // something else at the time?" The snapshot answers without joining
-    // StaffMembership history.
-    const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "adm1"), {
-      content: "stepping in",
-    })
-    expect(prisma._created[0].participantRole).toBe("ADMIN")
-    expect(prisma._created[0].actorSnapshot.staffRole).toBe("SUPER_ADMIN")
-  })
-
-  it("snapshot is immutable: stored as JSON copy, not a reference to the live actor", async () => {
-    // If we ever mutate the actor object post-write (unlikely but defensible),
-    // the row's snapshot must be unaffected. Verifies we're storing a value,
-    // not holding a reference.
-    const ticket = makeTicket({
-      fulfillmentChannel: "PUBLISHER",
-      assignedPublisherId: "pub1",
-    })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(
-      prisma as any,
-      mockQueue() as any,
-      mockAudit() as any,
-    )
-    const actor = publisherActor("pub1", "p1", "PUBLISHER_OWNER")
-    await svc.addMessage(ticket.id, actor, { content: "ok" })
-    // Mutate the live actor after the write.
-    ;(actor as any).publisherRole = "PUBLISHER_MEMBER"
-    // The persisted row still reflects what was true at write time.
-    expect(prisma._created[0].actorSnapshot.publisherRole).toBe(
-      "PUBLISHER_OWNER",
-    )
   })
 })
