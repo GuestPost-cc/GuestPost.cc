@@ -21,6 +21,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorState,
   getOrderEventPresentation,
   getOrderStatusPresentation,
   Input,
@@ -319,7 +320,12 @@ export default function OrderDetailPage() {
     refetchOnWindowFocus: true,
   })
 
-  const supportQuery = useQuery<StaffTicketListResponse>({
+  const {
+    data: supportTicketPage,
+    isLoading: supportTicketsLoading,
+    error: supportTicketsError,
+    refetch: refetchSupportTickets,
+  } = useQuery<StaffTicketListResponse>({
     queryKey: supportKeys.list("admin", { orderId: id, page: 1, limit: 100 }),
     queryFn: () => api.admin.listTickets({ orderId: id, page: 1, limit: 100 }),
     enabled: Boolean(order && order.access.role !== "FINANCE"),
@@ -1455,12 +1461,24 @@ export default function OrderDetailPage() {
 
       {role !== "FINANCE" && (
         <SupportPanel
-          tickets={supportQuery.data?.items}
-          isLoading={supportQuery.isLoading}
+          tickets={supportTicketPage?.items}
+          isLoading={supportTicketsLoading}
           linkHref={(ticketId) => `/dashboard/support/${ticketId}`}
           actorScope="operations"
           title="Order support"
           description="Support threads visible in your server-authorized order scope."
+          emptyState={
+            supportTicketsError ? (
+              <div role="alert">
+                <ErrorState
+                  title="Order support could not be loaded"
+                  description="Support threads are temporarily unavailable. This does not mean the order has no tickets."
+                  onRetry={() => refetchSupportTickets()}
+                  className="py-6"
+                />
+              </div>
+            ) : undefined
+          }
         />
       )}
 

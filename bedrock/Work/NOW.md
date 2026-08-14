@@ -129,13 +129,19 @@ image safe to restart.
 
 ## Next actions
 
-1. Restore/upgrade Upstash request capacity, then re-authenticate Northflank and
+1. Before merging or deploying the Support batch, require its disposable
+   PostgreSQL integration run to pass, including privacy, idempotency,
+   pagination, assignment/offboarding, and concurrent reassignment cases. Run
+   the documented multi-actor Chromium acceptance for customer, publisher,
+   Operations, and Super Admin messaging/ownership; do not infer that coverage
+   from the onboarding-only browser smoke.
+2. Restore/upgrade Upstash request capacity, then re-authenticate Northflank and
    configure the protected locked-mode environment for `guestpost-worker`,
    `guestpost-on-demand`, and `guestpost-maintenance-dispatch`. Deploy exact SHA
    `512b851`, verify each workload's SHA/mode/environment, canary realtime at one
    replica before scaling, and only then resume schedules one at a time.
-2. Monitor Render readiness and Upstash usage; keep finance, payouts, and new
+3. Monitor Render readiness and Upstash usage; keep finance, payouts, and new
    deposits disabled until the operational/provider gates are explicitly met.
-3. Keep staff governance and managed KMS/HSM as explicit follow-up gates rather
+4. Keep staff governance and managed KMS/HSM as explicit follow-up gates rather
    than silently treating this schema/application cutover as paid-launch
    approval.

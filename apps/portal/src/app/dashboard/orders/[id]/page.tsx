@@ -441,13 +441,17 @@ export default function OrderDetailPage({
 
   // Phase 7.9 #29 — lifted from OrderSupportPanel (now deleted). Shared
   // <SupportPanel> is presentational; parent owns the fetch.
-  const { data: orderTicketPage, isLoading: ticketsLoading } =
-    useQuery<TicketListPage>({
-      queryKey: supportKeys.order("customer", resolvedParams.id),
-      queryFn: () =>
-        api.support.listTickets({ orderId: resolvedParams.id, limit: 100 }),
-      enabled: Boolean(order),
-    })
+  const {
+    data: orderTicketPage,
+    isLoading: ticketsLoading,
+    error: ticketsError,
+    refetch: refetchTickets,
+  } = useQuery<TicketListPage>({
+    queryKey: supportKeys.order("customer", resolvedParams.id),
+    queryFn: () =>
+      api.support.listTickets({ orderId: resolvedParams.id, limit: 100 }),
+    enabled: Boolean(order),
+  })
 
   const reviewable =
     !!order && ["DELIVERED", "COMPLETED"].includes(order.status)
@@ -1599,9 +1603,21 @@ export default function OrderDetailPage({
       <SupportPanel
         tickets={orderTicketPage?.items}
         isLoading={ticketsLoading}
-        onOpenNew={() => setShowSupportDialog(true)}
+        onOpenNew={ticketsError ? undefined : () => setShowSupportDialog(true)}
         linkHref={(ticketId) => `/dashboard/support/${ticketId}`}
         actorScope="customer"
+        emptyState={
+          ticketsError ? (
+            <div role="alert">
+              <ErrorState
+                title="Order support could not be loaded"
+                description="Support threads are temporarily unavailable. This does not mean the order has no tickets."
+                onRetry={() => refetchTickets()}
+                className="py-6"
+              />
+            </div>
+          ) : undefined
+        }
       />
 
       <Dialog

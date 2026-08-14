@@ -396,12 +396,16 @@ export default function OrderDetailPage() {
     refetchOnWindowFocus: true,
   })
 
-  const { data: orderTicketPage, isLoading: ticketsLoading } =
-    useQuery<TicketListPage>({
-      queryKey: supportKeys.order("publisher", orderId),
-      queryFn: () => api.support.listTickets({ orderId, limit: 100 }),
-      enabled: Boolean(order),
-    })
+  const {
+    data: orderTicketPage,
+    isLoading: ticketsLoading,
+    error: ticketsError,
+    refetch: refetchTickets,
+  } = useQuery<TicketListPage>({
+    queryKey: supportKeys.order("publisher", orderId),
+    queryFn: () => api.support.listTickets({ orderId, limit: 100 }),
+    enabled: Boolean(order),
+  })
 
   const refreshOrder = () => {
     queryClient.invalidateQueries({ queryKey: ["order", orderId] })
@@ -1143,6 +1147,18 @@ export default function OrderDetailPage() {
         linkHref={(ticketId) => `/dashboard/support/${ticketId}`}
         actorScope="publisher"
         description="Support threads securely linked to this order."
+        emptyState={
+          ticketsError ? (
+            <div role="alert">
+              <ErrorState
+                title="Order support could not be loaded"
+                description="Support threads are temporarily unavailable. This does not mean the order has no tickets."
+                onRetry={() => refetchTickets()}
+                className="py-6"
+              />
+            </div>
+          ) : undefined
+        }
       />
 
       <Dialog
