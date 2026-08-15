@@ -817,6 +817,13 @@ export const DeliveryFraudResolutionKind = {
 export type DeliveryFraudResolutionKind = (typeof DeliveryFraudResolutionKind)[keyof typeof DeliveryFraudResolutionKind]
 
 
+export const DeliveryFraudFindingOutcome = {
+  CONFIRMED_FRAUD: 'CONFIRMED_FRAUD'
+} as const
+
+export type DeliveryFraudFindingOutcome = (typeof DeliveryFraudFindingOutcome)[keyof typeof DeliveryFraudFindingOutcome]
+
+
 export const OrderArticleSource = {
   CUSTOMER: 'CUSTOMER',
   PUBLISHER: 'PUBLISHER',

@@ -565,6 +565,7 @@ model User {
   cancelledPayoutExecutions     PayoutExecution[]             @relation("PayoutCancellationActor")
   adminVerifiedDeliveryVersions OrderDeliveryVersion[]        @relation("AdminVerifiedVersion")
   resolvedDeliveryFraudFlags    DeliveryFraudFlagResolution[] @relation("DeliveryFraudResolver")
+  decidedDeliveryFraudFindings  DeliveryFraudFinding[]        @relation("DeliveryFraudFindingDecider")
   tickets                       Ticket[]
   messages                      TicketMessage[]
   notifications                 Notification[]
@@ -1142,6 +1143,7 @@ model Order {
   publisherCompensation  PublisherCompensation?
   fraudHolds             DeliveryFraudHold[]
   fraudFlagResolutions   DeliveryFraudFlagResolution[]
+  fraudFindings          DeliveryFraudFinding[]
   tickets                Ticket[]
   review                 OrderReview?
   cancellationRequests   OrderCancellationRequest[]
@@ -1288,7 +1290,9 @@ model OrderCancellationRequest {
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 
-  order Order @relation(fields: [orderId], references: [id])
+  order             Order                  @relation(fields: [orderId], references: [id])
+  refundTransaction Transaction?           @relation("OrderCancellationRefund", fields: [refundTransactionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  fraudFindings     DeliveryFraudFinding[]
 
   @@unique([orderId, idempotencyKey])
   @@index([orderId, status])
@@ -1434,6 +1438,10 @@ enum DeliveryFraudResolutionKind {
   LINK_RESTORED
 }
 
+enum DeliveryFraudFindingOutcome {
+  CONFIRMED_FRAUD
+}
+
 // Platform-owned orders enter the Operations queue. Operations claims/assigns
 // and fulfills; identical downstream verification + settlement path as
 // publisher inventory (no bypass for platform inventory).
@@ -1496,6 +1504,7 @@ model OrderDeliveryVersion {
   fraudFlags           DeliveryFraudFlag[]
   fraudHolds           DeliveryFraudHold[]
   fraudFlagResolutions DeliveryFraudFlagResolution[]
+  fraudFindings        DeliveryFraudFinding[]
   adminVerifiedBy      User?                          @relation("AdminVerifiedVersion", fields: [adminVerifiedById], references: [id])
 
   @@unique([orderId, version])
@@ -1562,6 +1571,7 @@ model DeliveryFraudFlag {
   order           Order                        @relation(fields: [orderId], references: [id])
   deliveryVersion OrderDeliveryVersion         @relation(fields: [deliveryVersionId], references: [id])
   resolution      DeliveryFraudFlagResolution?
+  finding         DeliveryFraudFinding?
   hold            DeliveryFraudHold?
 
   @@index([deliveryVersionId, type])
@@ -1616,6 +1626,40 @@ model DeliveryFraudFlagResolution {
   @@index([deliveryVersionId])
   @@index([resolvedByUserId])
   @@index([kind, createdAt])
+}
+
+// Append-only staff finding that confirms a fraud signal. Unlike a resolution,
+// a confirmed finding deliberately retains the current DeliveryFraudHold so
+// it remains permanent settlement-deny evidence. Any refund or publisher
+// compensation is derived from its canonical transaction-backed records.
+model DeliveryFraudFinding {
+  id                          String                      @id @default(cuid())
+  fraudFlagId                 String                      @unique
+  orderId                     String
+  deliveryVersionId           String
+  cancellationRequestId       String
+  outcome                     DeliveryFraudFindingOutcome @default(CONFIRMED_FRAUD)
+  internalReason              String                      @db.VarChar(1000)
+  decidedByUserId             String
+  decidedByRole               StaffRole
+  expectedOrderVersion        Int
+  expectedVerificationVersion Int
+  idempotencyKey              String                      @db.Uuid
+  requestFingerprint          String                      @db.Char(64)
+  createdAt                   DateTime                    @default(now())
+
+  fraudFlag           DeliveryFraudFlag        @relation(fields: [fraudFlagId], references: [id], onDelete: Restrict)
+  order               Order                    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  deliveryVersion     OrderDeliveryVersion     @relation(fields: [deliveryVersionId], references: [id], onDelete: Restrict)
+  cancellationRequest OrderCancellationRequest @relation(fields: [cancellationRequestId], references: [id], onDelete: Restrict)
+  decidedBy           User                     @relation("DeliveryFraudFindingDecider", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([decidedByUserId, idempotencyKey])
+  @@index([orderId])
+  @@index([deliveryVersionId])
+  @@index([cancellationRequestId])
+  @@index([decidedByUserId])
+  @@index([outcome, createdAt])
 }
 
 // Per-order review left by the customer after completion. One per order; feeds
@@ -2166,18 +2210,19 @@ model Transaction {
   settlementId String?
   createdAt    DateTime        @default(now())
 
-  wallet                      Wallet?                @relation(fields: [walletId], references: [id])
-  order                       Order?                 @relation(fields: [orderId], references: [id])
-  publisher                   Publisher?             @relation(fields: [publisherId], references: [id])
-  settlement                  Settlement?            @relation(fields: [settlementId], references: [id])
+  wallet                      Wallet?                    @relation(fields: [walletId], references: [id])
+  order                       Order?                     @relation(fields: [orderId], references: [id])
+  publisher                   Publisher?                 @relation(fields: [publisherId], references: [id])
+  settlement                  Settlement?                @relation(fields: [settlementId], references: [id])
   depositAttempt              DepositAttempt?
   withdrawalAllocations       WithdrawalAllocation[]
-  originatingPaymentDisputes  PaymentDispute[]       @relation("PaymentDisputeDepositTransaction")
-  paymentDisputeHold          PaymentDispute?        @relation("PaymentDisputeHoldTransaction")
-  paymentDisputeResolution    PaymentDispute?        @relation("PaymentDisputeResolutionTransaction")
-  publisherCompensationRefund PublisherCompensation? @relation("PublisherCompensationRefund")
-  publisherCompensationCredit PublisherCompensation? @relation("PublisherCompensationCredit")
-  publisherCompensationDebt   PublisherCompensation? @relation("PublisherCompensationDebt")
+  originatingPaymentDisputes  PaymentDispute[]           @relation("PaymentDisputeDepositTransaction")
+  paymentDisputeHold          PaymentDispute?            @relation("PaymentDisputeHoldTransaction")
+  paymentDisputeResolution    PaymentDispute?            @relation("PaymentDisputeResolutionTransaction")
+  publisherCompensationRefund PublisherCompensation?     @relation("PublisherCompensationRefund")
+  publisherCompensationCredit PublisherCompensation?     @relation("PublisherCompensationCredit")
+  publisherCompensationDebt   PublisherCompensation?     @relation("PublisherCompensationDebt")
+  cancellationRefundRequests  OrderCancellationRequest[] @relation("OrderCancellationRefund")
 
   @@unique([reference])
   @@index([walletId])

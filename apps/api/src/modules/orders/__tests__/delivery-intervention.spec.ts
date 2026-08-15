@@ -3,7 +3,12 @@
  * enforcement + status guards + revision request. Pure service unit tests with
  * mocked prisma/audit/queue.
  */
-import { BadRequestException, ForbiddenException, Logger } from "@nestjs/common"
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Logger,
+} from "@nestjs/common"
 import { DeliveryInterventionService } from "../services/delivery-intervention.service"
 
 describe("DeliveryInterventionService", () => {
@@ -11,6 +16,7 @@ describe("DeliveryInterventionService", () => {
   let prisma: any
   let audit: any
   let queue: any
+  let communications: any
 
   const order = {
     id: "o1",
@@ -18,7 +24,7 @@ describe("DeliveryInterventionService", () => {
     customerId: "c1",
     status: "PUBLISHED",
     websiteId: "w1",
-    website: { publisherId: "pub1" },
+    website: { publisherId: "pub1", ownershipType: "PUBLISHER" },
     version: 1,
     activeDeliveryVersionId: "v1",
     publishedUrl: "https://x.com/p",
@@ -38,6 +44,13 @@ describe("DeliveryInterventionService", () => {
   beforeEach(() => {
     audit = { log: jest.fn().mockResolvedValue(undefined) }
     queue = { addJob: jest.fn().mockResolvedValue(undefined) }
+    communications = {
+      customerOrderRecipients: jest.fn().mockResolvedValue(["c1"]),
+      publisherRecipients: jest.fn().mockResolvedValue(["pub-user"]),
+      staffRecipients: jest.fn().mockResolvedValue(["finance-1", "admin-1"]),
+      record: jest.fn().mockResolvedValue({ eventId: "event-1" }),
+      dispatchManyByDedupKeyBestEffort: jest.fn(),
+    }
     prisma = {
       orderDeliveryVersion: {
         findUnique: jest.fn(),
@@ -58,8 +71,26 @@ describe("DeliveryInterventionService", () => {
       deliveryFraudFlagResolution: {
         create: jest.fn().mockResolvedValue({ id: "fraud-resolution-1" }),
       },
+      deliveryFraudFinding: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation(async ({ data }: any) => ({
+          id: "fraud-finding-1",
+          ...data,
+        })),
+      },
+      orderCancellationRequest: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        create: jest.fn().mockImplementation(async ({ data }: any) => ({
+          id: "cancellation-1",
+          createdAt: new Date("2026-08-15T00:00:00.000Z"),
+          ...data,
+        })),
+      },
       deliveryFraudHold: {
         findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
       },
       notification: { create: jest.fn().mockResolvedValue({}) },
       staffMembership: {
@@ -77,10 +108,12 @@ describe("DeliveryInterventionService", () => {
       prisma as any,
       audit as any,
       queue as any,
+      communications as any,
     )
   })
 
   const reason = "this is a sufficiently long reason"
+  const confirmationIdempotencyKey = "123e4567-e89b-42d3-a456-426614174000"
 
   describe("manualApprove", () => {
     it("approves a FAILED delivery with a valid reason + audits", async () => {
@@ -145,6 +178,417 @@ describe("DeliveryInterventionService", () => {
     })
   })
 
+  describe("confirmFraudFlag", () => {
+    const confirmation = {
+      reason: "Operations confirmed the delivery integrity violation.",
+      expectedOrderVersion: 1,
+      expectedVerificationVersion: 0,
+      idempotencyKey: confirmationIdempotencyKey,
+    }
+
+    function unresolvedFlag(extra: Record<string, unknown> = {}) {
+      return {
+        id: "flag-1",
+        orderId: "o1",
+        deliveryVersionId: "v1",
+        type: "URL_REUSED",
+        finding: null,
+        resolution: null,
+        hold: {
+          fraudFlagId: "flag-1",
+          orderId: "o1",
+          deliveryVersionId: "v1",
+          type: "URL_REUSED",
+        },
+        ...extra,
+      }
+    }
+
+    function prepareConfirmation(flag = unresolvedFlag()) {
+      prisma.deliveryFraudFlag.findUnique
+        .mockResolvedValueOnce({ orderId: "o1" })
+        .mockResolvedValueOnce(flag)
+      prisma.orderDeliveryVersion.findUnique.mockResolvedValue(
+        versionWith("MANUAL_REVIEW"),
+      )
+    }
+
+    it("records one confirmed finding and durable audience-safe communications", async () => {
+      prepareConfirmation()
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).resolves.toEqual({
+        status: "CONFIRMED",
+        replayed: false,
+        fraudFlagId: "flag-1",
+        findingId: "fraud-finding-1",
+        cancellationRequestId: "cancellation-1",
+      })
+
+      expect(prisma.orderCancellationRequest.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          orderId: "o1",
+          requesterType: "STAFF",
+          reasonCode: "LEGAL_OR_SECURITY_EMERGENCY",
+          status: "ESCALATED",
+          previousOrderStatus: "PUBLISHED",
+          fulfillmentChannel: "PUBLISHER",
+          responsibility: "UNDETERMINED",
+          requestedResolution: "FULL_REFUND",
+          idempotencyKey: "delivery-fraud-confirmation:flag-1",
+        }),
+      })
+
+      expect(prisma.deliveryFraudFinding.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          fraudFlagId: "flag-1",
+          orderId: "o1",
+          deliveryVersionId: "v1",
+          cancellationRequestId: "cancellation-1",
+          outcome: "CONFIRMED_FRAUD",
+          internalReason: confirmation.reason,
+          decidedByUserId: "u1",
+          decidedByRole: "OPERATIONS",
+          expectedOrderVersion: 1,
+          expectedVerificationVersion: 0,
+          idempotencyKey: confirmationIdempotencyKey,
+          requestFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+        }),
+      })
+      expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
+      expect(
+        prisma.orderCancellationRequest.create.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        prisma.deliveryFraudFinding.create.mock.invocationCallOrder[0],
+      )
+      expect(
+        prisma.deliveryFraudFinding.create.mock.invocationCallOrder[0],
+      ).toBeLessThan(prisma.order.updateMany.mock.invocationCallOrder[0])
+      expect(prisma.order.updateMany).toHaveBeenCalledWith({
+        where: { id: "o1", version: 1, status: "PUBLISHED" },
+        data: { version: { increment: 1 } },
+      })
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "ORDER_DELIVERY_FRAUD_CONFIRMED" }),
+        prisma,
+      )
+      expect(communications.record).toHaveBeenCalledTimes(3)
+      const externalInputs = communications.record.mock.calls
+        .map((call: any[]) => call[0])
+        .filter((event: any) => event.type === "ORDER_SECURITY_REVIEW_DECIDED")
+      expect(externalInputs).toHaveLength(2)
+      for (const event of externalInputs) {
+        const serialized = JSON.stringify({
+          title: event.title,
+          message: event.message,
+          payload: event.payload,
+        })
+        expect(serialized).not.toContain(confirmation.reason)
+        expect(serialized).not.toContain("URL_REUSED")
+        expect(serialized).not.toContain("flag-1")
+      }
+      expect(
+        communications.dispatchManyByDedupKeyBestEffort,
+      ).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          "order:o1:fraud:flag-1:confirmed:customer",
+          "order:o1:fraud:flag-1:confirmed:publisher",
+          "staff:order:o1:fraud:flag-1:confirmed",
+        ]),
+      )
+      expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.deliveryFraudFinding.create.mock.invocationCallOrder[0],
+      )
+    })
+
+    it.each([
+      ["REQUESTED", "ESCALATED", true],
+      ["UNDER_REVIEW", "ESCALATED", true],
+      ["ESCALATED", "ESCALATED", false],
+      ["PENDING_FINANCE", "PENDING_FINANCE", false],
+    ])("reuses a %s cancellation case without bypassing its review stage", async (existingStatus, linkedStatus, shouldEscalate) => {
+      prepareConfirmation()
+      prisma.orderCancellationRequest.findFirst.mockResolvedValue({
+        id: "existing-cancellation",
+        orderId: "o1",
+        status: existingStatus,
+        ...(existingStatus === "PENDING_FINANCE" && {
+          resolution: "FULL_REFUND",
+          responsibility: "PLATFORM",
+          reviewedByUserId: "operations-1",
+          resolutionReason:
+            "Operations completed the full-refund recommendation review.",
+        }),
+        createdAt: new Date("2026-08-14T00:00:00.000Z"),
+      })
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).resolves.toMatchObject({
+        cancellationRequestId: "existing-cancellation",
+      })
+
+      expect(prisma.orderCancellationRequest.create).not.toHaveBeenCalled()
+      expect(prisma.orderCancellationRequest.updateMany).toHaveBeenCalledTimes(
+        shouldEscalate ? 1 : 0,
+      )
+      if (shouldEscalate) {
+        expect(prisma.orderCancellationRequest.updateMany).toHaveBeenCalledWith(
+          {
+            where: {
+              id: "existing-cancellation",
+              orderId: "o1",
+              status: existingStatus,
+            },
+            data: { status: "ESCALATED" },
+          },
+        )
+      }
+      expect(prisma.deliveryFraudFinding.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          cancellationRequestId: "existing-cancellation",
+        }),
+      })
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            cancellationRequestId: "existing-cancellation",
+            cancellationRequestStatus: linkedStatus,
+            cancellationRequestCreated: false,
+            cancellationRequestEscalated: shouldEscalate,
+          }),
+        }),
+        prisma,
+      )
+      expect(prisma.order.updateMany).toHaveBeenCalledTimes(1)
+    })
+
+    it("rejects an incomplete pre-existing Finance review before creating a finding", async () => {
+      prepareConfirmation()
+      prisma.orderCancellationRequest.findFirst.mockResolvedValue({
+        id: "incomplete-finance-case",
+        orderId: "o1",
+        status: "PENDING_FINANCE",
+        resolution: "CONTINUE_ORDER",
+        responsibility: "UNDETERMINED",
+        reviewedByUserId: null,
+        resolutionReason: null,
+      })
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DELIVERY_FRAUD_HANDOFF_INCONSISTENT",
+        }),
+      })
+
+      expect(prisma.deliveryFraudFinding.create).not.toHaveBeenCalled()
+      expect(prisma.order.updateMany).not.toHaveBeenCalled()
+      expect(audit.log).not.toHaveBeenCalled()
+      expect(communications.record).not.toHaveBeenCalled()
+    })
+
+    it("never reopens or overwrites a terminal stable-key cancellation case", async () => {
+      prepareConfirmation()
+      prisma.orderCancellationRequest.findUnique.mockResolvedValue({
+        id: "terminal-cancellation",
+        orderId: "o1",
+        status: "REJECTED",
+        idempotencyKey: "delivery-fraud-confirmation:flag-1",
+      })
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DELIVERY_FRAUD_HANDOFF_INCONSISTENT",
+        }),
+      })
+      expect(prisma.orderCancellationRequest.create).not.toHaveBeenCalled()
+      expect(prisma.orderCancellationRequest.updateMany).not.toHaveBeenCalled()
+      expect(prisma.deliveryFraudFinding.create).not.toHaveBeenCalled()
+      expect(prisma.order.updateMany).not.toHaveBeenCalled()
+    })
+
+    it("returns only an exact actor, UUID, and intent replay", async () => {
+      prepareConfirmation()
+      await svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation)
+      const createdIntent =
+        prisma.deliveryFraudFinding.create.mock.calls[0][0].data
+      prisma.deliveryFraudFlag.findUnique.mockReset()
+      prepareConfirmation(
+        unresolvedFlag({
+          finding: { id: "fraud-finding-1", ...createdIntent },
+        }),
+      )
+      prisma.order.findUnique.mockResolvedValue({
+        ...order,
+        status: "COMPLETED",
+      })
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).resolves.toEqual({
+        status: "CONFIRMED",
+        replayed: true,
+        fraudFlagId: "flag-1",
+        findingId: "fraud-finding-1",
+        cancellationRequestId: "cancellation-1",
+      })
+      expect(prisma.deliveryFraudFinding.create).toHaveBeenCalledTimes(1)
+      expect(prisma.order.updateMany).toHaveBeenCalledTimes(1)
+      expect(communications.record).toHaveBeenCalledTimes(6)
+    })
+
+    it.each([
+      "CANCELLED",
+      "REFUNDED",
+      "COMPLETED",
+    ])("rejects a new finding after the order reached %s", async (status) => {
+      prepareConfirmation()
+      prisma.order.findUnique.mockResolvedValue({ ...order, status })
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DELIVERY_FRAUD_ORDER_TERMINAL",
+        }),
+      })
+      expect(prisma.deliveryFraudFinding.create).not.toHaveBeenCalled()
+      expect(audit.log).not.toHaveBeenCalled()
+      expect(communications.record).not.toHaveBeenCalled()
+    })
+
+    it("rejects a changed actor or intent instead of treating it as a replay", async () => {
+      prepareConfirmation()
+      await svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation)
+      const createdIntent =
+        prisma.deliveryFraudFinding.create.mock.calls[0][0].data
+      prisma.deliveryFraudFlag.findUnique.mockReset()
+      prepareConfirmation(
+        unresolvedFlag({
+          finding: { id: "fraud-finding-1", ...createdIntent },
+        }),
+      )
+      prisma.staffMembership.findUnique.mockResolvedValue({
+        role: "SUPER_ADMIN",
+        user: { userType: "STAFF", banned: false },
+      })
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "another-user", "SUPER_ADMIN", {
+          ...confirmation,
+          reason: "A different operator submitted a different fraud decision.",
+        }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DELIVERY_FRAUD_DECISION_CONFLICT",
+        }),
+      })
+      expect(prisma.deliveryFraudFinding.create).toHaveBeenCalledTimes(1)
+      expect(communications.record).toHaveBeenCalledTimes(3)
+    })
+
+    it("reloads an exact concurrent unique winner in a fresh transaction", async () => {
+      prepareConfirmation()
+      prisma.deliveryFraudFinding.create.mockImplementationOnce(
+        async ({ data }: any) => {
+          prisma.deliveryFraudFlag.findUnique.mockResolvedValueOnce(
+            unresolvedFlag({
+              finding: { id: "fraud-finding-winner", ...data },
+            }),
+          )
+          throw { code: "P2002" }
+        },
+      )
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).resolves.toEqual({
+        status: "CONFIRMED",
+        replayed: true,
+        fraudFlagId: "flag-1",
+        findingId: "fraud-finding-winner",
+        cancellationRequestId: "cancellation-1",
+      })
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+      expect(communications.record).toHaveBeenCalledTimes(3)
+    })
+
+    it("confirms an exact hold for a historical superseded delivery", async () => {
+      prepareConfirmation()
+      prisma.order.findUnique.mockResolvedValue({
+        ...order,
+        activeDeliveryVersionId: "v2",
+      })
+      prisma.orderDeliveryVersion.findUnique.mockResolvedValue({
+        ...versionWith("MANUAL_REVIEW"),
+        supersededByVersion: 2,
+      })
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).resolves.toEqual(
+        expect.objectContaining({ status: "CONFIRMED", replayed: false }),
+      )
+      expect(prisma.deliveryFraudFinding.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ deliveryVersionId: "v1" }),
+      })
+    })
+
+    it("rejects a competing clearance before any finding or outbox write", async () => {
+      prepareConfirmation(
+        unresolvedFlag({ resolution: { id: "resolution-existing" } }),
+      )
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).rejects.toBeInstanceOf(ConflictException)
+      expect(prisma.deliveryFraudFinding.create).not.toHaveBeenCalled()
+      expect(communications.record).not.toHaveBeenCalled()
+    })
+
+    it("rejects stale order and delivery decisions under the order lock", async () => {
+      prepareConfirmation()
+
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", {
+          ...confirmation,
+          expectedOrderVersion: 0,
+        }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "ORDER_VERSION_CONFLICT" }),
+      })
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1)
+      expect(prisma.deliveryFraudFinding.create).not.toHaveBeenCalled()
+      expect(communications.record).not.toHaveBeenCalled()
+    })
+
+    it("rejects Finance and a reused UUID owned by another decision", async () => {
+      await expect(
+        svc.confirmFraudFlag("flag-1", "finance-1", "FINANCE", confirmation),
+      ).rejects.toBeInstanceOf(ForbiddenException)
+      expect(prisma.deliveryFraudFlag.findUnique).not.toHaveBeenCalled()
+
+      prepareConfirmation()
+      prisma.deliveryFraudFinding.findUnique.mockResolvedValue({
+        id: "other-finding",
+      })
+      await expect(
+        svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DELIVERY_FRAUD_IDEMPOTENCY_CONFLICT",
+        }),
+      })
+      expect(prisma.deliveryFraudFinding.create).not.toHaveBeenCalled()
+      expect(communications.record).not.toHaveBeenCalled()
+    })
+  })
+
   describe("resolveFraudFlag", () => {
     it.each([
       "VERIFIED",
@@ -189,6 +633,26 @@ describe("DeliveryInterventionService", () => {
           }),
         }),
       })
+      expect(communications.record).toHaveBeenCalledTimes(2)
+      for (const [event] of communications.record.mock.calls) {
+        const serialized = JSON.stringify({
+          title: event.title,
+          message: event.message,
+          payload: event.payload,
+        })
+        expect(serialized).not.toContain(reason)
+        expect(serialized).not.toContain("FALSE_POSITIVE")
+        expect(serialized).not.toContain("URL_REUSED")
+        expect(serialized).not.toContain("flag-1")
+      }
+      expect(
+        communications.dispatchManyByDedupKeyBestEffort,
+      ).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          "order:o1:fraud:flag-1:cleared:customer",
+          "order:o1:fraud:flag-1:cleared:publisher",
+        ]),
+      )
     })
 
     it("fails closed when token role no longer matches current staff authority", async () => {
@@ -218,7 +682,7 @@ describe("DeliveryInterventionService", () => {
       expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
     })
 
-    it("returns the existing resolution idempotently", async () => {
+    it("does not announce workflow resumption while another fraud hold remains", async () => {
       prisma.deliveryFraudFlag.findUnique
         .mockResolvedValueOnce({ orderId: "o1" })
         .mockResolvedValueOnce({
@@ -226,7 +690,54 @@ describe("DeliveryInterventionService", () => {
           orderId: "o1",
           deliveryVersionId: "v1",
           type: "URL_REUSED",
-          resolution: { id: "resolution-existing" },
+          finding: null,
+          resolution: null,
+        })
+      prisma.deliveryFraudHold.count.mockResolvedValue(1)
+
+      await svc.resolveFraudFlag(
+        "flag-1",
+        "u1",
+        "OPERATIONS",
+        reason,
+        "FALSE_POSITIVE",
+      )
+
+      expect(communications.record).toHaveBeenCalledTimes(2)
+      for (const [event] of communications.record.mock.calls) {
+        expect(event.message).toContain("Another security review remains open")
+        expect(event.payload).toEqual({
+          decision: "REVIEW_PARTIALLY_CLEARED",
+          nextStep: "SECURITY_REVIEW_CONTINUES",
+        })
+      }
+      expect(prisma.deliveryFraudFlagResolution.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          evidence: expect.objectContaining({ blockedAfterDecision: true }),
+        }),
+      })
+    })
+
+    it("replays the immutable partial-clear outcome after later holds are cleared", async () => {
+      prisma.deliveryFraudFlag.findUnique
+        .mockResolvedValueOnce({ orderId: "o1" })
+        .mockResolvedValueOnce({
+          id: "flag-1",
+          orderId: "o1",
+          deliveryVersionId: "v1",
+          type: "URL_REUSED",
+          finding: null,
+          resolution: {
+            id: "resolution-existing",
+            kind: "STAFF_CLEARED",
+            resolvedByUserId: "u1",
+            reason,
+            evidence: {
+              disposition: "FALSE_POSITIVE",
+              evidenceReference: null,
+              blockedAfterDecision: true,
+            },
+          },
         })
 
       await expect(
@@ -241,6 +752,129 @@ describe("DeliveryInterventionService", () => {
         status: "ALREADY_RESOLVED",
         fraudFlagId: "flag-1",
         resolutionId: "resolution-existing",
+      })
+      expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
+      expect(communications.record).toHaveBeenCalledTimes(2)
+      for (const [event] of communications.record.mock.calls) {
+        expect(event.payload).toEqual({
+          decision: "REVIEW_PARTIALLY_CLEARED",
+          nextStep: "SECURITY_REVIEW_CONTINUES",
+        })
+      }
+      expect(
+        communications.dispatchManyByDedupKeyBestEffort,
+      ).toHaveBeenCalledWith([
+        "order:o1:fraud:flag-1:cleared:customer",
+        "order:o1:fraud:flag-1:cleared:publisher",
+      ])
+    })
+
+    it("reloads and repairs an exact concurrent clearance winner", async () => {
+      prisma.deliveryFraudFlag.findUnique
+        .mockResolvedValueOnce({ orderId: "o1" })
+        .mockResolvedValueOnce({
+          id: "flag-1",
+          orderId: "o1",
+          deliveryVersionId: "v1",
+          type: "URL_REUSED",
+          finding: null,
+          resolution: null,
+        })
+      prisma.deliveryFraudFlagResolution.create.mockImplementationOnce(
+        async ({ data }: any) => {
+          prisma.deliveryFraudFlag.findUnique.mockResolvedValueOnce({
+            id: "flag-1",
+            orderId: "o1",
+            deliveryVersionId: "v1",
+            type: "URL_REUSED",
+            finding: null,
+            resolution: {
+              id: "resolution-winner",
+              ...data,
+            },
+          })
+          throw { code: "P2002" }
+        },
+      )
+
+      await expect(
+        svc.resolveFraudFlag(
+          "flag-1",
+          "u1",
+          "OPERATIONS",
+          reason,
+          "FALSE_POSITIVE",
+        ),
+      ).resolves.toEqual({
+        status: "ALREADY_RESOLVED",
+        fraudFlagId: "flag-1",
+        resolutionId: "resolution-winner",
+      })
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+      expect(communications.record).toHaveBeenCalledTimes(2)
+    })
+
+    it("rejects a blind replay with different clearance intent", async () => {
+      prisma.deliveryFraudFlag.findUnique
+        .mockResolvedValueOnce({ orderId: "o1" })
+        .mockResolvedValueOnce({
+          id: "flag-1",
+          orderId: "o1",
+          deliveryVersionId: "v1",
+          type: "URL_REUSED",
+          finding: null,
+          resolution: {
+            id: "resolution-existing",
+            kind: "STAFF_CLEARED",
+            resolvedByUserId: "another-user",
+            reason,
+            evidence: {
+              disposition: "FALSE_POSITIVE",
+              evidenceReference: null,
+            },
+          },
+        })
+
+      await expect(
+        svc.resolveFraudFlag(
+          "flag-1",
+          "u1",
+          "OPERATIONS",
+          reason,
+          "FALSE_POSITIVE",
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DELIVERY_FRAUD_DECISION_CONFLICT",
+        }),
+      })
+      expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
+    })
+
+    it("rejects clearance after a confirmed finding won", async () => {
+      prisma.deliveryFraudFlag.findUnique
+        .mockResolvedValueOnce({ orderId: "o1" })
+        .mockResolvedValueOnce({
+          id: "flag-1",
+          orderId: "o1",
+          deliveryVersionId: "v1",
+          type: "URL_REUSED",
+          finding: { id: "finding-existing" },
+          resolution: null,
+        })
+
+      await expect(
+        svc.resolveFraudFlag(
+          "flag-1",
+          "u1",
+          "OPERATIONS",
+          reason,
+          "FALSE_POSITIVE",
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: "DELIVERY_FRAUD_DECISION_CONFLICT",
+        }),
       })
       expect(prisma.deliveryFraudFlagResolution.create).not.toHaveBeenCalled()
     })

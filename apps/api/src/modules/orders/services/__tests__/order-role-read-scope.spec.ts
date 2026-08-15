@@ -29,20 +29,37 @@ describe("order role read scoping", () => {
   it("scopes publisher delivery proof through website ownership", async () => {
     prisma.order.findFirst.mockResolvedValue({
       id: "order-1",
+      status: "PUBLISHED",
       activeDeliveryVersionId: null,
       fulfillmentChannel: "PUBLISHER",
       website: { ownershipType: "PUBLISHER" },
+      fraudHolds: [],
     })
 
     await expect(
       delivery.deliveryProof("order-1", { publisherId: "publisher-1" }),
-    ).resolves.toEqual({ hasDelivery: false })
+    ).resolves.toEqual({
+      hasDelivery: false,
+      securityReview: null,
+      capabilities: {
+        canConfirm: false,
+        canManualAccept: false,
+        blockedReason: "NO_DELIVERY",
+      },
+    })
     expect(prisma.order.findFirst).toHaveBeenCalledWith({
       where: {
         id: "order-1",
         website: { publisherId: "publisher-1" },
       },
-      include: { website: { select: { ownershipType: true } } },
+      include: {
+        website: { select: { ownershipType: true } },
+        fraudHolds: {
+          select: {
+            fraudFlag: { select: { finding: { select: { id: true } } } },
+          },
+        },
+      },
     })
   })
 

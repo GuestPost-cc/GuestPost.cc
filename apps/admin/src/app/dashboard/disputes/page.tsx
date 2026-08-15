@@ -1,5 +1,9 @@
 "use client"
 
+import {
+  isExactMoneyAtMost,
+  normalizeExactNonNegativeMoney,
+} from "@guestpost/api-client"
 import type { DisputeStatus } from "@guestpost/database"
 import {
   Button,
@@ -75,7 +79,8 @@ export default function DisputesPage() {
     id: string
     action: ResolveAction
     publisherCompensationRequired?: boolean
-    publisherCompensationMaximum?: number
+    publisherCompensationMaximum?: string | number
+    publisherCompensationCurrency?: string
   } | null>(null)
   const [reason, setReason] = useState("")
   const [responsibility, setResponsibility] = useState<
@@ -116,15 +121,28 @@ export default function DisputesPage() {
       action: ResolveAction
       resolution: string
       responsibility?: RefundResponsibility
-      publisherCompensation?: { amount: number; reason: string }
-    }) =>
-      api.admin.resolveDispute(
+      publisherCompensation?: { amount: string; reason: string }
+    }) => {
+      if (
+        publisherCompensation &&
+        (!normalizeExactNonNegativeMoney(publisherCompensation.amount) ||
+          !isExactMoneyAtMost(
+            publisherCompensation.amount,
+            resolveTarget?.publisherCompensationMaximum,
+          ))
+      ) {
+        throw new Error(
+          "Enter an exact publisher compensation amount within the allowed maximum.",
+        )
+      }
+      return api.admin.resolveDispute(
         id,
         action,
         resolution,
         responsibility,
         publisherCompensation,
-      ),
+      )
+    },
     onSuccess: () => {
       toast.success("Dispute resolved")
       setResolveTarget(null)
@@ -341,6 +359,9 @@ export default function DisputesPage() {
                                         publisherCompensationMaximum:
                                           d.order?.publisherCompensationPolicy
                                             ?.maximumAmount ?? 0,
+                                        publisherCompensationCurrency:
+                                          d.order?.publisherCompensationPolicy
+                                            ?.currency ?? d.order?.currency,
                                       })
                                     }
                                   >
@@ -444,20 +465,23 @@ export default function DisputesPage() {
                 </p>
                 <div className="space-y-2">
                   <Label htmlFor="dispute-publisher-compensation">
-                    Compensation amount (USD)
+                    Compensation amount (
+                    {resolveTarget.publisherCompensationCurrency ?? "USD"})
                   </Label>
                   <Input
                     id="dispute-publisher-compensation"
-                    type="number"
-                    min="0"
-                    max={resolveTarget.publisherCompensationMaximum ?? 0}
-                    step="0.01"
+                    type="text"
                     inputMode="decimal"
+                    autoComplete="off"
                     value={publisherCompensationAmount}
                     onChange={(event) =>
                       setPublisherCompensationAmount(event.target.value)
                     }
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum: {resolveTarget.publisherCompensationMaximum ?? "—"}{" "}
+                    {resolveTarget.publisherCompensationCurrency ?? "USD"}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dispute-publisher-compensation-reason">
@@ -497,14 +521,10 @@ export default function DisputesPage() {
                 (resolveTarget?.action === "REFUND" &&
                   resolveTarget.publisherCompensationRequired &&
                   responsibility !== "PUBLISHER" &&
-                  (publisherCompensationAmount.trim() === "" ||
-                    !/^\d+(?:\.\d{1,2})?$/.test(
-                      publisherCompensationAmount.trim(),
-                    ) ||
-                    !Number.isFinite(Number(publisherCompensationAmount)) ||
-                    Number(publisherCompensationAmount) < 0 ||
-                    Number(publisherCompensationAmount) >
-                      (resolveTarget.publisherCompensationMaximum ?? 0) ||
+                  (!isExactMoneyAtMost(
+                    publisherCompensationAmount,
+                    resolveTarget.publisherCompensationMaximum,
+                  ) ||
                     publisherCompensationReason.trim().length < 20))
               }
               onClick={() =>
@@ -522,7 +542,9 @@ export default function DisputesPage() {
                     resolveTarget.publisherCompensationRequired &&
                     responsibility !== "PUBLISHER"
                       ? {
-                          amount: Number(publisherCompensationAmount),
+                          amount: normalizeExactNonNegativeMoney(
+                            publisherCompensationAmount,
+                          )!,
                           reason: publisherCompensationReason.trim(),
                         }
                       : undefined,

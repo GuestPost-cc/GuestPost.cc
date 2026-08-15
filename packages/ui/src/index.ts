@@ -153,6 +153,15 @@ export type {
 export { NotificationPreferencesForm } from "./components/notification-preferences-form"
 export type { OrderLifecycleProgressProps } from "./components/order-lifecycle-progress"
 export { OrderLifecycleProgress } from "./components/order-lifecycle-progress"
+export type {
+  OrderStakeholderFinancialImpact,
+  OrderStakeholderUpdate,
+  OrderStakeholderUpdateKind,
+  OrderStakeholderUpdateSeverity,
+  OrderStakeholderUpdateStatus,
+  OrderStakeholderUpdatesProps,
+} from "./components/order-stakeholder-updates"
+export { OrderStakeholderUpdates } from "./components/order-stakeholder-updates"
 export { PageHeader } from "./components/page-header"
 export type { PasswordInputProps } from "./components/password-input"
 export { PasswordInput } from "./components/password-input"

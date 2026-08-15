@@ -60,6 +60,16 @@ describe("communication contracts", () => {
     expect(
       COMMUNICATION_EVENT_POLICIES.ORDER_REFUNDED.actorRecipientPolicy,
     ).toBe("INCLUDE_IF_LISTED")
+    expect(
+      isRequiredCommunicationChannel("ORDER_SECURITY_REVIEW_DECIDED", "IN_APP"),
+    ).toBe(true)
+    expect(
+      isRequiredCommunicationChannel("PUBLISHER_COMPENSATION_DECIDED", "EMAIL"),
+    ).toBe(true)
+    expect(
+      COMMUNICATION_EVENT_POLICIES.PUBLISHER_COMPENSATION_DECIDED
+        .actorRecipientPolicy,
+    ).toBe("INCLUDE_IF_LISTED")
   })
 
   it("rechecks optional opt-outs while preserving required deliveries", () => {

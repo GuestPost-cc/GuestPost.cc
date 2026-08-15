@@ -193,6 +193,356 @@ signed body for redelivery; “persistence allowed” does not promise a 2xx
 acknowledgment when gated recovery work has not completed. An already
 processed exact replay is a mutation-free 2xx no-op in every mode.
 
+### Required cutover for confirmed delivery-fraud findings
+
+Migration `20260815120000_delivery_fraud_findings` adds append-only confirmed
+finding evidence, a restrictive cancellation-refund foreign key, and database
+guards that retain fraud holds and force linked cases through an exact
+full-refund Finance path. A deferred Order constraint trigger rejects
+`CANCELLED`/`COMPLETED` terminal shortcuts and permits `REFUNDED` only when the
+linked case is fully approved in the same transaction. The new API also changes
+automated link restoration:
+an old worker would keep trying to clear a flag that now has a confirmed
+finding and the database would reject it. Treat this as a mixed-writer
+incompatible boundary even though the new table itself is additive.
+
+1. Build and retain the exact API/worker image. Pause Render and Northflank
+   auto-rollout, keep `FINANCE_RUNTIME_MODE=recovery_only`, and keep payout
+   execution/deposit-creation feature flags at their independently reviewed
+   safe values. Remove mutating fraud/cancellation access at the gateway during
+   the short migration window.
+2. Rotate any database credential that has appeared in chat, a terminal
+   transcript, logs, an issue, or repository history **before** rehearsal or
+   production use. On a recent populated Neon branch/clone, inject a distinct
+   rotated deploy-role DSN into only the isolated migration process. It must use
+   Neon's **direct** endpoint, never the pooled runtime endpoint. Run migration
+   status, deploy, focused migration assertions, and the
+   fraud/cancellation/refund integration suite. The migration intentionally
+   aborts on an orphan `OrderCancellationRequest.refundTransactionId`;
+   reconcile against canonical ledger evidence instead of deleting or
+   inventing a transaction. Revoke or rotate the temporary deploy credential
+   after production postflight.
+3. Provision the restricted API/worker role with the identifier-safe block
+   below. The migration revokes the new table from `PUBLIC`, so omitting this
+   explicit grant makes confirmation fail closed. Grant table `SELECT` and only
+   the application-written `INSERT` columns. Do not grant `createdAt` insert,
+   table UPDATE/DELETE/TRUNCATE/TRIGGER, trigger-function EXECUTE, schema
+   ownership, `CREATE`, deploy-role membership, superuser, or `BYPASSRLS`.
+4. Take the production restore/PITR marker. Stop and drain every old API and
+   **all** Northflank worker lanes: the continuous `realtime` service, the
+   `on-demand` job and catch-up schedule, and the `scheduled`
+   maintenance-dispatch job. Also stop any ad-hoc `WORKER_MODE=all` process or
+   maintenance script that can write Order, fraud, cancellation, refund, or
+   communication state. Prove zero old replicas, schedules, active jobs,
+   database sessions, and in-flight writes, then run the unchanged migration
+   once with `DIRECT_DATABASE_URL` injected only into the isolated migration
+   job. The old and new writers are not compatible across this boundary.
+5. Start only the matching API and worker images in `recovery_only`. Confirm
+   migration status, runtime-role checks, queue health, no unresolved migration
+   constraints, one false-positive clearance canary, one confirmed-finding
+   sandbox path through linked cancellation review, exact response-loss replay,
+   force-cancel and dispute-refund denial while the linked case is open, and
+   audience-specific Order timeline/outbox projections. Do not use real
+   customer money for the canary.
+6. Finance approval/refund is an `operator_decision` and is intentionally
+   blocked in `recovery_only`. After reconciliation, provider truth, worker
+   health, and the sandbox matrix are clean, deliberately set the **server-only**
+   API/worker `FINANCE_RUNTIME_MODE=normal` and restart all intended replicas.
+   Keep `PAYOUT_EXECUTION_ENABLED=false` until the separate payout canary is
+   approved. Verify a consistent mode/image on every replica without logging
+   secrets, then execute the authorized Finance step and reconcile wallet,
+   refund, compensation/debt, audit, and outbox evidence.
+
+#### Runtime-role grant and denial proof
+
+Run this block as the deploy role in `psql` after setting the `runtime_role`
+meta-variable to the exact restricted API/worker role. `:"runtime_role"`
+quotes the value as a PostgreSQL identifier; do not interpolate a role name as
+raw SQL. If the role inherits privileges, apply the same revocations to the
+grant-bearing role and repeat the checks through the exact runtime connection.
+
+`id` is a Prisma-generated CUID and is sent by the application. `outcome` is
+also written explicitly by the confirmation command even though both columns
+have defaults in the schema. `createdAt` is the one database-owned insert
+default and is intentionally omitted from the grant.
+
+```sql
+\if :{?runtime_role}
+\else
+\echo 'runtime_role must name the exact restricted API/worker role'
+\quit 3
+\endif
+
+BEGIN;
+REVOKE ALL ON TABLE public."DeliveryFraudFinding" FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public."guard_delivery_fraud_finding"()
+  FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public."guard_delivery_fraud_resolution"()
+  FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public."guard_confirmed_fraud_cancellation_handoff"()
+  FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public."assert_confirmed_fraud_terminal_outcome"()
+  FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public."guard_confirmed_fraud_refund_transaction"()
+  FROM PUBLIC;
+
+REVOKE ALL ON TABLE public."DeliveryFraudFinding" FROM :"runtime_role";
+REVOKE EXECUTE ON FUNCTION public."guard_delivery_fraud_finding"()
+  FROM :"runtime_role";
+REVOKE EXECUTE ON FUNCTION public."guard_delivery_fraud_resolution"()
+  FROM :"runtime_role";
+REVOKE EXECUTE ON FUNCTION public."guard_confirmed_fraud_cancellation_handoff"()
+  FROM :"runtime_role";
+REVOKE EXECUTE ON FUNCTION public."assert_confirmed_fraud_terminal_outcome"()
+  FROM :"runtime_role";
+REVOKE EXECUTE ON FUNCTION public."guard_confirmed_fraud_refund_transaction"()
+  FROM :"runtime_role";
+REVOKE CREATE ON SCHEMA public FROM :"runtime_role";
+
+GRANT USAGE ON SCHEMA public TO :"runtime_role";
+GRANT SELECT ON TABLE public."DeliveryFraudFinding" TO :"runtime_role";
+GRANT INSERT (
+  "id",
+  "fraudFlagId",
+  "orderId",
+  "deliveryVersionId",
+  "cancellationRequestId",
+  "outcome",
+  "internalReason",
+  "decidedByUserId",
+  "decidedByRole",
+  "expectedOrderVersion",
+  "expectedVerificationVersion",
+  "idempotencyKey",
+  "requestFingerprint"
+) ON TABLE public."DeliveryFraudFinding" TO :"runtime_role";
+COMMIT;
+```
+
+Reconnect with the exact pooled API/worker runtime DSN and run all three
+queries. The first row must be `true, false, true, true, false, false, false,
+false, false`; the required-column query must return `true` with no missing
+columns; and all five trigger-function rows must report `function_exists=true`
+and `can_execute=false`.
+
+```sql
+SELECT
+  has_schema_privilege(current_user, 'public', 'USAGE') AS can_use_schema,
+  has_schema_privilege(current_user, 'public', 'CREATE') AS can_create_schema,
+  has_table_privilege(
+    current_user, 'public."DeliveryFraudFinding"', 'SELECT'
+  ) AS can_select,
+  has_any_column_privilege(
+    current_user, 'public."DeliveryFraudFinding"', 'INSERT'
+  ) AS can_insert_required_columns,
+  has_column_privilege(
+    current_user, 'public."DeliveryFraudFinding"', 'createdAt', 'INSERT'
+  ) AS can_override_created_at,
+  has_any_column_privilege(
+    current_user, 'public."DeliveryFraudFinding"', 'UPDATE'
+  ) AS can_update_any_column,
+  has_table_privilege(
+    current_user, 'public."DeliveryFraudFinding"', 'DELETE'
+  ) AS can_delete,
+  has_table_privilege(
+    current_user, 'public."DeliveryFraudFinding"', 'TRUNCATE'
+  ) AS can_truncate,
+  has_table_privilege(
+    current_user, 'public."DeliveryFraudFinding"', 'TRIGGER'
+  ) AS can_replace_triggers;
+
+WITH required(column_name) AS (
+  VALUES
+    ('id'),
+    ('fraudFlagId'),
+    ('orderId'),
+    ('deliveryVersionId'),
+    ('cancellationRequestId'),
+    ('outcome'),
+    ('internalReason'),
+    ('decidedByUserId'),
+    ('decidedByRole'),
+    ('expectedOrderVersion'),
+    ('expectedVerificationVersion'),
+    ('idempotencyKey'),
+    ('requestFingerprint')
+)
+SELECT
+  bool_and(has_column_privilege(
+    current_user,
+    'public."DeliveryFraudFinding"',
+    column_name,
+    'INSERT'
+  )) AS all_required_insert_columns,
+  array_agg(column_name ORDER BY column_name) FILTER (
+    WHERE NOT has_column_privilege(
+      current_user,
+      'public."DeliveryFraudFinding"',
+      column_name,
+      'INSERT'
+    )
+  ) AS missing_insert_columns
+FROM required;
+
+WITH expected(function_name) AS (
+  VALUES
+    ('guard_delivery_fraud_finding'),
+    ('guard_delivery_fraud_resolution'),
+    ('guard_confirmed_fraud_cancellation_handoff'),
+    ('assert_confirmed_fraud_terminal_outcome'),
+    ('guard_confirmed_fraud_refund_transaction')
+)
+SELECT
+  expected.function_name,
+  function_row.oid IS NOT NULL AS function_exists,
+  has_function_privilege(
+    current_user, function_row.oid, 'EXECUTE'
+  ) AS can_execute
+FROM expected
+LEFT JOIN pg_catalog.pg_namespace AS namespace_row
+  ON namespace_row.nspname = 'public'
+LEFT JOIN pg_catalog.pg_proc AS function_row
+  ON function_row.pronamespace = namespace_row.oid
+ AND function_row.proname = expected.function_name
+ AND function_row.pronargs = 0
+ORDER BY expected.function_name;
+```
+
+Trigger invocation does not require function `EXECUTE`; all five functions are
+`SECURITY INVOKER`, so the existing narrow DML grants on Order, cancellation,
+delivery, staff, user, hold, and ledger relations remain load-bearing. Do not
+change a trigger function to `SECURITY DEFINER` or widen runtime authority to
+make a failed canary pass.
+
+#### Migration status and postflight
+
+Run `pnpm db:migrations:status`, then `pnpm db:migrations:deploy`, then status
+again in both the clone rehearsal and production migration job. The final
+status must be current and the following migration row must exist exactly once
+with `finished=true` and `not_rolled_back=true`:
+
+```sql
+SELECT
+  "migration_name",
+  "finished_at" IS NOT NULL AS finished,
+  "rolled_back_at" IS NULL AS not_rolled_back
+FROM public."_prisma_migrations"
+WHERE "migration_name" = '20260815120000_delivery_fraud_findings';
+```
+
+The deferred terminal-outcome backstop must also return exactly one enabled,
+deferrable, initially deferred row. This timing is intentional: the canonical
+refund changes the Order before it finalizes the linked cancellation inside the
+same transaction, and the complete aggregate is validated at commit.
+
+```sql
+SELECT
+  trigger_row.tgname,
+  trigger_row.tgenabled,
+  trigger_row.tgdeferrable,
+  trigger_row.tginitdeferred
+FROM pg_catalog.pg_trigger AS trigger_row
+WHERE trigger_row.tgrelid = 'public."Order"'::regclass
+  AND trigger_row.tgname = 'Order_confirmed_fraud_terminal_outcome_guard'
+  AND NOT trigger_row.tgisinternal;
+```
+
+Run the following read-only integrity checks after the matching image is up.
+Every query must return zero rows. Preserve and investigate any row; never edit
+the finding, hold, cancellation, Order, or REFUND transaction merely to make a
+postflight green.
+
+```sql
+SELECT conrelid::regclass AS relation, conname
+FROM pg_catalog.pg_constraint
+WHERE NOT convalidated
+  AND conrelid IN (
+    'public."DeliveryFraudFinding"'::regclass,
+    'public."OrderCancellationRequest"'::regclass
+  );
+
+SELECT finding."id", finding."fraudFlagId", finding."cancellationRequestId"
+FROM public."DeliveryFraudFinding" AS finding
+LEFT JOIN public."DeliveryFraudFlag" AS flag
+  ON flag."id" = finding."fraudFlagId"
+LEFT JOIN public."DeliveryFraudHold" AS hold
+  ON hold."fraudFlagId" = finding."fraudFlagId"
+ AND hold."orderId" = finding."orderId"
+ AND hold."deliveryVersionId" = finding."deliveryVersionId"
+ AND hold."type" = flag."type"
+ AND hold."createdAt" = flag."createdAt"
+LEFT JOIN public."OrderCancellationRequest" AS cancellation_request
+  ON cancellation_request."id" = finding."cancellationRequestId"
+ AND cancellation_request."orderId" = finding."orderId"
+LEFT JOIN public."Order" AS order_row
+  ON order_row."id" = finding."orderId"
+WHERE flag."id" IS NULL
+   OR hold."fraudFlagId" IS NULL
+   OR cancellation_request."id" IS NULL
+   OR cancellation_request."status" NOT IN (
+     'UNDER_REVIEW', 'ESCALATED', 'PENDING_FINANCE', 'APPROVED'
+   )
+   OR (
+     order_row."status" IN ('CANCELLED', 'REFUNDED', 'COMPLETED')
+     AND cancellation_request."status" IS DISTINCT FROM 'APPROVED'
+   );
+
+SELECT cancellation_request."id"
+FROM public."OrderCancellationRequest" AS cancellation_request
+JOIN public."DeliveryFraudFinding" AS finding
+  ON finding."cancellationRequestId" = cancellation_request."id"
+WHERE cancellation_request."status" = 'PENDING_FINANCE'
+  AND (
+    cancellation_request."resolution" IS DISTINCT FROM 'FULL_REFUND'
+    OR cancellation_request."responsibility" IS NULL
+    OR cancellation_request."responsibility" = 'UNDETERMINED'
+    OR cancellation_request."reviewedByUserId" IS NULL
+    OR cancellation_request."resolutionReason" IS NULL
+    OR cancellation_request."resolutionReason" <>
+       btrim(cancellation_request."resolutionReason")
+    OR char_length(cancellation_request."resolutionReason") NOT BETWEEN 20 AND 2000
+  );
+
+SELECT cancellation_request."id", cancellation_request."refundTransactionId"
+FROM public."OrderCancellationRequest" AS cancellation_request
+JOIN public."DeliveryFraudFinding" AS finding
+  ON finding."cancellationRequestId" = cancellation_request."id"
+LEFT JOIN public."Order" AS order_row
+  ON order_row."id" = cancellation_request."orderId"
+LEFT JOIN public."Transaction" AS refund
+  ON refund."id" = cancellation_request."refundTransactionId"
+WHERE cancellation_request."status" = 'APPROVED'
+  AND (
+    cancellation_request."resolution" IS DISTINCT FROM 'FULL_REFUND'
+    OR cancellation_request."responsibility" IS NULL
+    OR cancellation_request."responsibility" = 'UNDETERMINED'
+    OR cancellation_request."financeApprovedByUserId" IS NULL
+    OR cancellation_request."resolvedAt" IS NULL
+    OR order_row."status" IS DISTINCT FROM 'REFUNDED'
+    OR order_row."paymentStatus" IS DISTINCT FROM 'REFUNDED'
+    OR order_row."refundResponsibility" IS DISTINCT FROM
+       cancellation_request."responsibility"
+    OR refund."id" IS NULL
+    OR refund."orderId" IS DISTINCT FROM order_row."id"
+    OR refund."type" IS DISTINCT FROM 'REFUND'
+    OR refund."amount" IS DISTINCT FROM order_row."amount"
+    OR refund."currency" IS DISTINCT FROM order_row."currency"
+  );
+```
+
+There is no destructive down migration for this cutover. If a failure occurs
+before any finding is written, keep finance frozen and forward-fix or roll back
+only the application image while retaining the additive schema. Once a finding
+exists, old images are not a valid rollback target: their restoration and
+cancellation behavior does not understand the permanent hold or linked state
+machine. Keep writers drained and roll forward. If the migrated database itself
+cannot be safely forward-fixed, use the pre-cutover Neon PITR/restore marker
+under an incident decision, then reconcile every externally accepted event
+before reopening ingress. Never drop the guards, delete evidence, or rewrite a
+decision as rollback. Changing `FINANCE_RUNTIME_MODE` merely to suppress a 503
+is prohibited; restore `recovery_only` or `locked` as the operational rollback
+and investigate.
+
 The mode does not protect against an old image that does not implement it.
 Remove money-route access at the gateway, drain old writers, and prove their
 replica count is zero before applying the guards.

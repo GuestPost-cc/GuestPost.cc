@@ -8,6 +8,7 @@ describe("AdminVerificationQueueService", () => {
         findMany: jest.fn().mockResolvedValue([
           {
             id: "order-1",
+            version: 4,
             status: "PUBLISHED",
             title: "Platform delivery",
             amount: 250,
@@ -57,7 +58,33 @@ describe("AdminVerificationQueueService", () => {
               ],
               fraudFlags: [],
             },
-            fraudFlags: [],
+            fraudFlags: [
+              {
+                id: "fraud-flag-1",
+                deliveryVersionId: "delivery-1",
+                type: "URL_REUSED",
+                details: { match: "internal-evidence" },
+                createdAt: submittedAt,
+                finding: {
+                  id: "finding-1",
+                  cancellationRequestId: "cancellation-1",
+                  outcome: "CONFIRMED_FRAUD",
+                  internalReason:
+                    "The immutable evidence confirms intentional URL reuse.",
+                  decidedByRole: "OPERATIONS",
+                  createdAt: submittedAt,
+                },
+                deliveryVersion: {
+                  id: "delivery-1",
+                  version: 2,
+                  publishedUrl: "https://example.com/article",
+                  verificationStatus: "MANUAL_REVIEW",
+                  verificationVersion: 3,
+                  supersededByVersion: null,
+                  evidence: [],
+                },
+              },
+            ],
           },
         ]),
       },
@@ -68,7 +95,7 @@ describe("AdminVerificationQueueService", () => {
       {} as any,
     )
 
-    await expect(service.listQueue()).resolves.toEqual([
+    await expect(service.listQueue("SUPER_ADMIN")).resolves.toEqual([
       expect.objectContaining({
         orderId: "order-1",
         website: {
@@ -88,6 +115,15 @@ describe("AdminVerificationQueueService", () => {
           id: "delivery-1",
           verificationStatus: "MANUAL_REVIEW",
           publishedUrl: "https://example.com/article",
+          fraudFlags: [
+            expect.objectContaining({
+              id: "fraud-flag-1",
+              finding: expect.objectContaining({
+                id: "finding-1",
+                cancellationRequestId: "cancellation-1",
+              }),
+            }),
+          ],
         }),
       }),
     ])
@@ -101,7 +137,18 @@ describe("AdminVerificationQueueService", () => {
                 verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
               },
             },
-            { fraudFlags: { some: { resolution: null } } },
+            {
+              status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
+              fraudHolds: {
+                some: { fraudFlag: { finding: { is: null } } },
+              },
+            },
+            {
+              status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
+              fraudHolds: {
+                some: { fraudFlag: { finding: { isNot: null } } },
+              },
+            },
           ],
         },
       }),

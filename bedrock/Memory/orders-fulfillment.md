@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: orders-fulfillment
 project: guestpost-platform
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # Orders & Fulfillment
@@ -315,6 +315,43 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 - Manual settlement approval requires a reason and is available to `FINANCE`
   and `SUPER_ADMIN` after customer approval. Super Admin retains the separate
   force-approval step for exceptional missing-customer-approval cases.
+
+### Confirmed delivery-policy findings (2026-08-15)
+
+- Confirming a fraud signal is not a clearance or a money command. Operations
+  or Super Admin supplies the expected Order and delivery-verification
+  versions, a bounded internal reason, and an actor-scoped UUID idempotency
+  key. The Order-locked serializable command creates or escalates the structured
+  cancellation review before appending one immutable `DeliveryFraudFinding`.
+- A new confirmation advances `Order.version` exactly once for the combined
+  handoff-and-finding command. An exact replay checks every immutable input,
+  advances the version zero times, and may repair only missing durable
+  communication projections.
+- `CONFIRMED_FRAUD` deliberately leaves the exact `DeliveryFraudHold` in place.
+  Finding and clearance are mutually exclusive behind the same Order fence,
+  and the hold remains permanent settlement-deny evidence.
+- Every finding links a same-order cancellation case. A new case is an
+  `ESCALATED`, staff-requested `LEGAL_OR_SECURITY_EMERGENCY` review requesting
+  `FULL_REFUND`; a reused `PENDING_FINANCE` case must already have a final
+  responsibility, reviewer, and bounded reason. Operations or Super Admin can
+  send it only to `PENDING_FINANCE` with `FULL_REFUND`; Finance or Super Admin
+  approves the canonical refund and required publisher outcome through a
+  separate money command. Super Admin can currently authorize both commands;
+  universal actor-independent maker-checker remains deferred governance.
+- Force cancellation and dispute refund recheck the finding under the locked
+  Order and refuse to bypass the linked case. A deferred Order constraint
+  trigger independently rejects `CANCELLED`/`COMPLETED` and permits `REFUNDED`
+  only when every linked case has complete `APPROVED` full-refund evidence at
+  commit. This timing lets the canonical refund update the Order before the
+  case is finalized within the same transaction.
+- The Order-page stakeholder timeline is server-projected from flags,
+  findings, resolutions, REFUND transactions, and publisher-compensation
+  records. Customer, publisher, Operations, Finance, and Super Admin receive
+  separate allowlisted copy and money fields. Raw staff reasons, cancellation
+  notes, `OrderEvent.message`, generic metadata, provider facts, and support
+  identifiers are never external timeline inputs. Audience-specific outbox
+  events commit with the domain command and use stable decision-bound dedup
+  keys.
 
 ## Key Models
 

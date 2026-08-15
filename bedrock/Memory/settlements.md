@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: settlements
 project: guestpost-platform
-updated: 2026-06-14
+updated: 2026-08-15
 ---
 
 # Settlements
@@ -55,6 +55,32 @@ global auto-release switch. Settlement creation loads organization/customer
 history inside its locked transaction, and auto-release reloads the same
 evidence after locking the Order so a later risk fact cannot rely on the older
 snapshot.
+
+## Confirmed delivery-fraud deny evidence
+
+`DeliveryFraudFinding(outcome=CONFIRMED_FRAUD)` is an immutable operational
+decision, not a settlement or refund record. It deliberately retains the
+matching database-maintained `DeliveryFraudHold`. Settlement creation, manual
+or automatic approval, release, and platform-revenue recognition all re-read
+current holds under the Order fence and fail closed while that row exists.
+
+The finding must link a cancellation review for the same Order. Operations or
+Super Admin can recommend only a full refund with final responsibility;
+Finance or Super Admin invokes the canonical refund primitive in a separate
+money command. This is not actor-independent maker-checker because Super Admin
+can currently authorize both commands. A
+finding-linked case progresses only to `PENDING_FINANCE` and then `APPROVED`.
+PostgreSQL rejects terminal diversion, incomplete Finance handoff, mismatched
+refund amount/currency/order/responsibility, later cancellation rewrite, and
+update/delete/truncate of the linked approved REFUND ledger row. Compensation
+or correction uses new canonical evidence and never changes the permanent hold
+or rewrites the original financial decision.
+
+Force cancellation and dispute refund are blocked under the Order lock while a
+finding exists. A deferred Order constraint validates the final transaction
+state: `CANCELLED`/`COMPLETED` are forbidden, and `REFUNDED` requires every
+linked case to contain complete approved Finance/refund evidence. This is the
+alternate-writer and direct-SQL backstop for the application guards.
 
 ## Key Models
 

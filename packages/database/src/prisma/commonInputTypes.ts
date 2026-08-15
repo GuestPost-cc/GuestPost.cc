@@ -1201,6 +1201,50 @@ export type EnumStaffRoleNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumStaffRoleNullableFilter<$PrismaModel>
 }
 
+export type EnumDeliveryFraudFindingOutcomeFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryFraudFindingOutcome | Prisma.EnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryFraudFindingOutcome[] | Prisma.ListEnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryFraudFindingOutcome[] | Prisma.ListEnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryFraudFindingOutcomeFilter<$PrismaModel> | $Enums.DeliveryFraudFindingOutcome
+}
+
+export type UuidFilter<$PrismaModel = never> = {
+  equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  notIn?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  lt?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  lte?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  gt?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  gte?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  mode?: Prisma.QueryMode
+  not?: Prisma.NestedUuidFilter<$PrismaModel> | string
+}
+
+export type EnumDeliveryFraudFindingOutcomeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryFraudFindingOutcome | Prisma.EnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryFraudFindingOutcome[] | Prisma.ListEnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryFraudFindingOutcome[] | Prisma.ListEnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryFraudFindingOutcomeWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryFraudFindingOutcome
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryFraudFindingOutcomeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryFraudFindingOutcomeFilter<$PrismaModel>
+}
+
+export type UuidWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  notIn?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  lt?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  lte?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  gt?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  gte?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  mode?: Prisma.QueryMode
+  not?: Prisma.NestedUuidWithAggregatesFilter<$PrismaModel> | string
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedStringFilter<$PrismaModel>
+  _max?: Prisma.NestedStringFilter<$PrismaModel>
+}
+
 export type EnumWithdrawalStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.WithdrawalStatus | Prisma.EnumWithdrawalStatusFieldRefInput<$PrismaModel>
   in?: $Enums.WithdrawalStatus[] | Prisma.ListEnumWithdrawalStatusFieldRefInput<$PrismaModel>
@@ -3187,6 +3231,48 @@ export type NestedEnumStaffRoleNullableWithAggregatesFilter<$PrismaModel = never
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedEnumStaffRoleNullableFilter<$PrismaModel>
   _max?: Prisma.NestedEnumStaffRoleNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumDeliveryFraudFindingOutcomeFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryFraudFindingOutcome | Prisma.EnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryFraudFindingOutcome[] | Prisma.ListEnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryFraudFindingOutcome[] | Prisma.ListEnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryFraudFindingOutcomeFilter<$PrismaModel> | $Enums.DeliveryFraudFindingOutcome
+}
+
+export type NestedUuidFilter<$PrismaModel = never> = {
+  equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  notIn?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  lt?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  lte?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  gt?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  gte?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedUuidFilter<$PrismaModel> | string
+}
+
+export type NestedEnumDeliveryFraudFindingOutcomeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryFraudFindingOutcome | Prisma.EnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  in?: $Enums.DeliveryFraudFindingOutcome[] | Prisma.ListEnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DeliveryFraudFindingOutcome[] | Prisma.ListEnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDeliveryFraudFindingOutcomeWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryFraudFindingOutcome
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryFraudFindingOutcomeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryFraudFindingOutcomeFilter<$PrismaModel>
+}
+
+export type NestedUuidWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  notIn?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  lt?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  lte?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  gt?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  gte?: string | Prisma.StringFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedUuidWithAggregatesFilter<$PrismaModel> | string
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedStringFilter<$PrismaModel>
+  _max?: Prisma.NestedStringFilter<$PrismaModel>
 }
 
 export type NestedEnumWithdrawalStatusFilter<$PrismaModel = never> = {

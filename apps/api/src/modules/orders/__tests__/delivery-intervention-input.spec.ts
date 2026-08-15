@@ -1,5 +1,6 @@
 import { validate } from "class-validator"
 import {
+  ConfirmDeliveryFraudFlagDto,
   DeliveryInterventionReasonDto,
   OverrideDeliveryVerificationDto,
   ResolveDeliveryFraudFlagDto,
@@ -16,6 +17,24 @@ describe("delivery intervention input", () => {
 
     await expect(validate(valid)).resolves.toEqual([])
     await expect(validate(short)).resolves.not.toEqual([])
+  })
+
+  it("requires exact versions and a UUID for confirmed-fraud commands", async () => {
+    const valid = Object.assign(new ConfirmDeliveryFraudFlagDto(), {
+      reason: "Operations confirmed the delivery integrity violation.",
+      expectedOrderVersion: 4,
+      expectedVerificationVersion: 2,
+      idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
+    })
+    const invalid = Object.assign(new ConfirmDeliveryFraudFlagDto(), {
+      reason: "Operations confirmed the delivery integrity violation.",
+      expectedOrderVersion: -1,
+      expectedVerificationVersion: 1.5,
+      idempotencyKey: "not-a-uuid",
+    })
+
+    await expect(validate(valid)).resolves.toEqual([])
+    await expect(validate(invalid)).resolves.not.toEqual([])
   })
 
   it("allowlists override targets and classified fraud dispositions", async () => {

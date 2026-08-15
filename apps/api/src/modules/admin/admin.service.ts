@@ -45,6 +45,7 @@ import {
 } from "../../common/utils/marketplace-categories"
 import { AuditService } from "../audit/audit.service"
 import { CommunicationsService } from "../communications/communications.service"
+import { buildOrderStakeholderTimeline } from "../orders/order-stakeholder-timeline"
 import { QueueService } from "../queues/queue.service"
 import { operationsPlatformSupportWhere } from "../support/support-routing"
 import {
@@ -1948,7 +1949,7 @@ export class AdminService {
         activeDeliveryVersion: {
           include: {
             evidence: { orderBy: { createdAt: "desc" } },
-            fraudFlags: { include: { resolution: true } },
+            fraudFlags: { include: { resolution: true, finding: true } },
             snapshots: true,
             adminVerifiedBy: { select: { id: true, name: true, email: true } },
           },
@@ -2009,6 +2010,28 @@ export class AdminService {
         },
         revisions: true,
         platformRevenue: true,
+        fraudFlags: {
+          orderBy: { createdAt: "asc" },
+          include: { resolution: true, finding: true, hold: true },
+        },
+        transactions: {
+          where: { type: "REFUND" },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            type: true,
+            amount: true,
+            currency: true,
+            createdAt: true,
+          },
+        },
+        publisherCompensation: {
+          include: {
+            debtRepaymentTransaction: {
+              select: { id: true, amount: true, currency: true },
+            },
+          },
+        },
         fulfillmentAssignments: {
           select: {
             id: true,
@@ -2207,6 +2230,7 @@ export class AdminService {
             "SETTLEMENT_RELEASED",
             "REFUND_ISSUED",
             "REFUNDED",
+            "PUBLISHER_COMPENSATION_RECORDED",
           ].includes(event.eventType)
             ? "Financial lifecycle event recorded"
             : event.message,
@@ -2239,8 +2263,28 @@ export class AdminService {
                     id: flag.resolution.id,
                     kind: flag.resolution.kind,
                     reason: flag.resolution.reason,
+                    disposition:
+                      flag.resolution.evidence &&
+                      typeof flag.resolution.evidence === "object" &&
+                      !Array.isArray(flag.resolution.evidence)
+                        ? ((flag.resolution.evidence as Record<string, unknown>)
+                            .disposition ?? null)
+                        : null,
                     resolvedByUserId: flag.resolution.resolvedByUserId,
+                    resolvedByRole: flag.resolution.resolvedByRole,
                     createdAt: flag.resolution.createdAt,
+                  }
+                : null,
+              finding: flag.finding
+                ? {
+                    id: flag.finding.id,
+                    outcome: flag.finding.outcome,
+                    reason: flag.finding.internalReason,
+                    decidedByRole: flag.finding.decidedByRole,
+                    ...(isSuperAdmin && {
+                      decidedByUserId: flag.finding.decidedByUserId,
+                    }),
+                    createdAt: flag.finding.createdAt,
                   }
                 : null,
             })),
@@ -2282,6 +2326,7 @@ export class AdminService {
           }
         : null,
       cancellation: order.cancellationRequests?.[0] ?? null,
+      stakeholderTimeline: buildOrderStakeholderTimeline(order, role),
       activeAssignment: activeAssignment
         ? {
             id: activeAssignment.id,

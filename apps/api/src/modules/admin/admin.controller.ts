@@ -459,7 +459,10 @@ export class AdminController {
 
   @Get("orders/:id")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
-  getOrder(@Param("id") id: string, @CurrentUser() user: any) {
+  getOrder(
+    @Param("id") id: string,
+    @CurrentAuthority() user: DurableCurrentAuthority,
+  ) {
     return this.admin.getOrder(id, user)
   }
 
@@ -485,8 +488,8 @@ export class AdminController {
   // ── Verification queue ────────────────────────────────────────────────────
   @Get("verification-queue")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
-  listVerificationQueue() {
-    return this.verificationQueue.listQueue()
+  listVerificationQueue(@CurrentAuthority() user: DurableCurrentAuthority) {
+    return this.verificationQueue.listQueue(user.staffRole ?? "")
   }
 
   @Post("verification-queue/:id/retry")
@@ -594,6 +597,7 @@ export class AdminController {
   @Get("cancellation-requests")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listCancellationRequests(
+    @CurrentAuthority() user: DurableCurrentAuthority,
     @Query(
       "status",
       new ParseEnumPipe(CancellationRequestStatus, { optional: true }),
@@ -601,9 +605,15 @@ export class AdminController {
     status?: CancellationRequestStatus,
     @Query("take") take?: string,
     @Query("skip") skip?: string,
+    @Query("requestId") requestId?: string,
   ) {
     const pagination = parsePagination(take, skip)
-    return this.cancellation.listRequests({ status, ...pagination })
+    return this.cancellation.listRequests({
+      status,
+      requestId,
+      ...pagination,
+      role: user.staffRole ?? "",
+    })
   }
 
   @Post("cancellation-requests/:id/review")
@@ -611,9 +621,9 @@ export class AdminController {
   reviewCancellationRequest(
     @Param("id") id: string,
     @Body() body: ReviewCancellationRequestDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: DurableCurrentAuthority,
   ) {
-    return this.cancellation.review(id, user.id, body)
+    return this.cancellation.review(id, user.id, user.staffRole, body)
   }
 
   @Post("cancellation-requests/:id/finance-approve")
@@ -621,10 +631,10 @@ export class AdminController {
   financeApproveCancellation(
     @Param("id") id: string,
     @Body() body: FinanceApproveCancellationDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() user: DurableCurrentAuthority,
   ) {
     assertApiFinanceOperationAllowed("operator_decision")
-    return this.cancellation.financeApprove(id, user.id, body)
+    return this.cancellation.financeApprove(id, user.id, user.staffRole, body)
   }
 
   @Post("orders/:id/decline")

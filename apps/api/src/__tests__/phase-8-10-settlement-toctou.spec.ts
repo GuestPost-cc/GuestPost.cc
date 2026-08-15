@@ -88,9 +88,9 @@ function makeTxMock(disputeFindFirst: jest.Mock) {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     deliveryFraudFlag: {
-      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    deliveryFraudHold: { count: jest.fn().mockResolvedValue(0) },
     orderEvent: { create: jest.fn().mockResolvedValue({}) },
     platformSettings: {
       findMany: jest.fn().mockResolvedValue([
@@ -139,9 +139,9 @@ function makePrismaMock(tx: ReturnType<typeof makeTxMock>) {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     deliveryFraudFlag: {
-      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    deliveryFraudHold: { count: jest.fn().mockResolvedValue(0) },
   }
 }
 

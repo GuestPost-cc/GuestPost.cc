@@ -1,147 +1,103 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # Current focus
 
-The 2026-08-12 correctness and security hardening batch is merged and deployed
-at `main` SHA `512b851`. Neon production is fully migrated and the matching
-Render API is live in finance-locked mode. The complete Northflank worker fleet
-is intentionally stopped: the continuous realtime service is scaled to zero
-and both jobs have inactive schedules. None may resume until its protected
-environment and old deployment are replaced with the matching locked release.
-`Work/backlog.md` owns open work; `Work/risks.md`
-owns launch risks. Historical PR and rollout diaries were moved to
-`History/NOW-through-2026-08-11.md`.
+The active branch `agent/fraud-case-workflow-20260815` is implementing the
+confirmed delivery-fraud operational-to-financial handoff on top of
+`origin/main` SHA `508b47e` (Support PR #103). Migration
+`20260815120000_delivery_fraud_findings` and its matching application writers
+are present only in this active change set at the time of this note. They have
+not been represented as merged, applied to Neon, or deployed.
 
-## Implemented in the active batch
+The last independently recorded production deployment remains SHA `512b851`
+in finance-locked mode. A merge to `main` does not deploy Render because every
+Blueprint service has manual deployment enabled. The Northflank worker fleet
+also remains under the previously recorded full hold; do not infer a running
+matching worker from an application build or GitHub merge.
 
-- Reworked Support into a server-projected multi-actor conversation. Every
-  message carries an explicit customer/publisher/support/system party, safe
-  display label, and viewer-relative `isSelf`; all three dashboards use the
-  shared accessible conversation component instead of inferring alignment.
-- Made public ticket projections least-privilege, filtered internal notes
-  before cursor pagination, removed Finance from generic Support, and added
-  fail-closed capability-driven reply/status/claim/reassignment controls.
-- Added actor-scoped idempotency for ticket creation and replies, locked
-  order-derived customer/publisher/Operations routing, and atomic ticket sync
-  when a Platform fulfillment assignment changes. No database migration is
-  required.
-- Added reasoned Super Admin reassignment/unassignment for general and eligible
-  post-fulfillment Platform tickets. It shares the claim command's
-  Order-before-Ticket eligibility rule, fails closed on inconsistent dispute
-  state, uses a locked expected-owner compare-and-set to reject stale concurrent
-  decisions, and never rewrites fulfillment assignment history.
-- Staff offboarding now blocks Operations demotion/suspension while active
-  fulfillment or any non-closed Support ticket remains assigned. Closed ticket
-  ownership is released atomically and counted in the protected offboarding
-  audit so historical conversations do not permanently pin a staff account.
+## Implemented in the active fraud batch
 
-- Removed phantom `OrderStatus.SETTLED`; `COMPLETED` is the sole successful
-  terminal order status. Settlement approval, return-to-review, and release now
-  have distinct relationally bound events.
-- Added server-computed settlement eligibility for Finance and aligned release
-  ordering and Decimal-only balance invariants.
-- Made emergency cancellation serializable and order-locked. Unpaid reservation
-  release now writes exact ledger evidence and reconciliation checks it.
-- Post-publication publisher refunds require an explicit compensation
-  disposition, including `NONE`, with immutable ledger/event evidence and debt
-  netting.
-- Added authenticated Stripe deposit recovery with fenced leases, append-only
-  bounded evidence, and the same serializable finalizer as signed webhooks.
-- Added payout-encryption v2 envelopes with immutable-context AAD, key identity,
-  legacy decrypt-only reads, resumable CAS rotation, verification, and a
-  deployment runbook.
-- Made the 30-second auth projection presentation-only. Every protected request
-  resolves durable tenant, membership, role, and permission authority; money
-  mutations recheck relevant membership inside their locked transaction.
-- Quarantined Wise completely from runtime registration and legacy polling.
-- Replaced duplicated order-transition writers with one mandatory status/version
-  CAS and modeled payment capture/submission as one externally visible command.
-- Replaced worker source-string contracts with typed runtime plans and
-  dependency-injected behavioral boot/shutdown tests.
-- Added strict shared browser API-origin resolution and a self-starting,
-  CI-gated Chromium onboarding harness. Existing financial API integration
-  suites remain the money-invariant system tests.
-- Added missing CSRF compatibility-path tests; the reported missing-Origin
-  bypass was not present because the primary middleware already rejects missing
-  Origin and Referer for unsafe cookie-authenticated requests.
+- Operations or Super Admin can confirm one current delivery-fraud flag with
+  expected Order/delivery versions, a bounded internal reason, and an
+  actor-scoped UUID idempotency key. Confirmation is mutually exclusive with
+  clearance, appends an immutable `CONFIRMED_FRAUD` finding, retains the exact
+  `DeliveryFraudHold`, and moves no money.
+- The same Order-locked transaction creates or escalates a structured,
+  same-order `LEGAL_OR_SECURITY_EMERGENCY` cancellation review requesting
+  `FULL_REFUND` before the finding is inserted. A reused `PENDING_FINANCE` case
+  must already contain final responsibility, reviewer, and a bounded reason.
+  The combined new command increments `Order.version` exactly once; exact
+  replay increments it zero times and repairs only missing projections.
+- A finding-linked cancellation can progress only through Operations/Super
+  Admin full-refund review to `PENDING_FINANCE`, then a separate Finance/Super
+  Admin canonical refund approval to `APPROVED`. Continue-order, dispute,
+  rejection, withdrawal, deletion, repurposing, and terminal evidence rewrite
+  fail closed.
+- Force cancellation and dispute refund refuse a confirmed-fraud Order under
+  the aggregate lock. A deferred Order constraint independently forbids
+  `CANCELLED`/`COMPLETED` shortcuts and permits `REFUNDED` only when every
+  linked case has complete approved full-refund evidence at commit.
+- PostgreSQL independently enforces live staff authority, same-order linkage,
+  permanent hold retention, full-refund state, exact canonical refund facts,
+  append-only approved cancellation evidence, a restrictive refund foreign
+  key, and update/delete/truncate denial for the linked approved REFUND ledger
+  row.
+- Customer, publisher, Operations, Finance, and Super Admin Order pages receive
+  audience-specific timeline entries derived from immutable domain/ledger
+  facts. Confirmation, clearance, refund, and publisher-compensation events use
+  transactional outbox rows with stable decision-bound dedup keys. External
+  projections never consume raw staff notes, `OrderEvent.message`, audit text,
+  provider details, support IDs, or generic metadata.
+- The dedicated production runbook now covers a populated-clone rehearsal,
+  rotated direct deploy credential, exact identifier-safe runtime grants,
+  API/all-worker hard drain, migration status and integrity postflight,
+  `recovery_only` canaries, intentional server-only return to `normal`, payout
+  execution remaining false, and forward-fix/PITR recovery.
 
-## Deliberately deferred
+## Explicitly unchanged
 
-- Staff security and finance governance: phishing-resistant MFA, step-up,
-  maker-checker for every human money/fee command, append-only staff audit
-  evidence, and break-glass rehearsal.
-- The worker deployment itself: the owner confirms it runs on Northflank outside
-  this repository. Repository runtime contracts were still made behavioral.
-
-## Required before paid production
-
-- Provision and implement the chosen managed KMS/HSM adapter. The transitional
-  static environment keyring is not equivalent to managed key protection.
-- Keep Wise disabled until a complete quote/transfer/funding/recovery/returned-
-  funds design passes real sandbox certification.
-- Restore Northflank Redis capacity, re-authenticate protected settings, and
-  deploy exact SHA `512b851` with the locked v2 keyring/runtime-role contract to
-  the continuous `WORKER_MODE=realtime` service plus the on-demand and
-  maintenance jobs. Prove each workload's SHA, mode, environment, and canary
-  before scaling realtime above zero or resuming either schedule.
-- Complete provider, backup/restore, paging, legal/entity, underwriting, and
-  corridor-specific operational gates tracked in `Work/backlog.md`.
+- Staff security and finance governance remains owner-deferred: phishing-
+  resistant MFA, recent step-up authorization, universal human money-command
+  maker-checker, append-only staff-security evidence, and break-glass rehearsal
+  are still paid-launch gates. Super Admin can currently authorize both the
+  operational and financial fraud commands; this batch does not claim actor
+  independence.
+- The existing managed KMS/HSM, provider certification, legal/entity, browser
+  acceptance, Redis capacity, and worker rollout gates remain open. This fraud
+  correctness batch does not certify paid production.
 
 ## Validation state
 
-The Support hardening branch has passing repository format, type, lint,
-dependency, health, and production-build gates across the API, shared
-packages, worker, and customer/publisher/admin dashboards. API-client, shared
-UI, Support, Finance, staff-offboarding, fulfillment-assignment, and
-delivery-RBAC suites pass, including the final fail-closed routing regressions.
-Its real PostgreSQL projection, inbox/message pagination, idempotency,
-publisher authorization, assignment races, and offboarding-versus-reopen suite
-is checked in. This workstation has no `psql` client and its Docker daemon is
-unavailable; the disposable PostgreSQL execution therefore remains an
-authoritative CI gate rather than a locally passed check. Browser acceptance
-also remains a deployment gate and must not be represented as passed until
-executed in the configured environment.
-
-The frozen-lockfile install is clean and does not change `pnpm-lock.yaml`.
-Repository type, format, lint, dependency-policy, health, API, worker, shared,
-auth, integrations, API-client, and UI gates pass. PR #100, PR #101, and final
-`main` push CI run `31729969759` passed migration apply/status, the populated
-historical-data rehearsal, integration-template migration, all database-backed
-financial suites, every production build, UI coverage, and Chromium E2E.
-Neon production has all 75 migrations; the exact-clone and production
-postflights matched with zero anomaly findings. Render API readiness reports
-database and Redis healthy on exact SHA `512b851`.
-
-The final topology audit found the continuous Northflank `guestpost-worker`
-still running one replica of incompatible SHA `0e68af7` after the migration.
-It was immediately scaled to `0/0`; CI and CD are both disabled. Its last logs
-show all four realtime queues failing closed on the exhausted Upstash request
-quota. A least-privilege production audit then found no database activity in
-the seven-second migration window or afterward, no old-image delivery snapshot
-fingerprint, unchanged financial row counts, and zero lifecycle, settlement,
-payout, constraint, or index anomalies. The temporary local DSN file and audit
-script were destroyed. This clean containment evidence does not make the old
-image safe to restart.
+Database client generation/build, the API and API-client builds, Admin
+TypeScript, and focused fraud, cancellation, refund, settlement-gating,
+timeline, communication, and client suites have passed during active
+development. The local full Admin Next production build reached a sandbox-only
+Turbopack port-permission failure and is not recorded as a passing build. Final
+repository CI, real PostgreSQL migration execution on a populated clone,
+runtime-role canaries, and production postflight remain release gates. No Neon
+migration or deployment was performed by this documentation pass.
 
 ## Next actions
 
-1. Before merging or deploying the Support batch, require its disposable
-   PostgreSQL integration run to pass, including privacy, idempotency,
-   pagination, assignment/offboarding, and concurrent reassignment cases. Run
-   the documented multi-actor Chromium acceptance for customer, publisher,
-   Operations, and Super Admin messaging/ownership; do not infer that coverage
-   from the onboarding-only browser smoke.
-2. Restore/upgrade Upstash request capacity, then re-authenticate Northflank and
-   configure the protected locked-mode environment for `guestpost-worker`,
-   `guestpost-on-demand`, and `guestpost-maintenance-dispatch`. Deploy exact SHA
-   `512b851`, verify each workload's SHA/mode/environment, canary realtime at one
-   replica before scaling, and only then resume schedules one at a time.
-3. Monitor Render readiness and Upstash usage; keep finance, payouts, and new
-   deposits disabled until the operational/provider gates are explicitly met.
-4. Keep staff governance and managed KMS/HSM as explicit follow-up gates rather
-   than silently treating this schema/application cutover as paid-launch
-   approval.
+1. Freeze the application/schema/migration diff, run format/type/lint/build and
+   the complete focused plus database-backed CI matrix, and resolve every
+   failure without weakening an invariant.
+2. Rotate any database credential exposed outside approved secret storage.
+   Rehearse the unchanged migration on a recent populated Neon branch/clone
+   through a direct deploy-role DSN and execute the exact runtime grant/denial
+   proof through the pooled API/worker role.
+3. Create the production PITR marker, drain Render API and every Northflank
+   `realtime`, `on-demand`, `scheduled`, and ad-hoc writer, prove zero old
+   sessions/in-flight work, then apply the migration once.
+4. Start only the matching image in `FINANCE_RUNTIME_MODE=recovery_only`; run
+   migration status, privilege, invariant, reconciliation, replay,
+   force-cancel/dispute-refund denial, stakeholder-timeline, and outbox canaries
+   without real customer money.
+5. Only after those gates pass, deliberately set server-only
+   `FINANCE_RUNTIME_MODE=normal` for the intended replicas. Keep
+   `PAYOUT_EXECUTION_ENABLED=false` until its separate certification gate is
+   approved.

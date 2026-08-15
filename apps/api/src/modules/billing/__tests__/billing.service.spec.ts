@@ -900,6 +900,28 @@ describe("BillingService", () => {
       expect(prismaMock.wallet.create).not.toHaveBeenCalled()
     })
 
+    it("redacts legacy internal refund rationale from the embedded wallet history", async () => {
+      const secret = "FINANCE_INTERNAL_TOKEN_9b71"
+      prismaMock.wallet.findUnique.mockResolvedValue({
+        ...mockWallet,
+        transactions: [
+          {
+            id: "refund-legacy-1",
+            type: "REFUND",
+            orderId: "order-1",
+            description: `Refund for order order-1: ${secret}`,
+          },
+        ],
+      })
+
+      const result = await service.getWallet("org-1", "user-1")
+
+      expect(result.transactions[0].description).toBe(
+        "Refund for order order-1",
+      )
+      expect(JSON.stringify(result)).not.toContain(secret)
+    })
+
     it("404s without mutating when an organization wallet is missing", async () => {
       prismaMock.wallet.findUnique.mockResolvedValue(null)
 
@@ -934,6 +956,30 @@ describe("BillingService", () => {
       )
       expect(prismaMock.wallet.findFirst).toHaveBeenCalledTimes(1)
       expect(prismaMock.wallet.create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("listTransactions", () => {
+    it("redacts legacy internal refund rationale from the full transaction list", async () => {
+      const secret = "OPS_CASE_SECRET_a82f"
+      prismaMock.wallet.findUnique.mockResolvedValue({
+        ...mockWallet,
+        transactions: [],
+      })
+      prismaMock.transaction.findMany.mockResolvedValue([
+        {
+          id: "refund-legacy-2",
+          walletId: mockWallet.id,
+          type: "REFUND",
+          orderId: "order-2",
+          description: `Refund for order order-2: ${secret}`,
+        },
+      ])
+
+      const result = await service.listTransactions("org-1", "user-1")
+
+      expect(result[0].description).toBe("Refund for order order-2")
+      expect(JSON.stringify(result)).not.toContain(secret)
     })
   })
 

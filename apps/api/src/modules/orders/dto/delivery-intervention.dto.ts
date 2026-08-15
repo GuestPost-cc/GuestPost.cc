@@ -1,7 +1,10 @@
 import {
   IsIn,
+  IsInt,
   IsString,
+  IsUUID,
   MaxLength,
+  Min,
   MinLength,
   ValidateIf,
 } from "class-validator"
@@ -42,4 +45,17 @@ export class ResolveDeliveryFraudFlagDto extends DeliveryInterventionReasonDto {
   @MinLength(1)
   @MaxLength(200)
   evidenceReference?: string
+}
+
+export class ConfirmDeliveryFraudFlagDto extends DeliveryInterventionReasonDto {
+  @IsInt()
+  @Min(0)
+  expectedOrderVersion!: number
+
+  @IsInt()
+  @Min(0)
+  expectedVerificationVersion!: number
+
+  @IsUUID()
+  idempotencyKey!: string
 }

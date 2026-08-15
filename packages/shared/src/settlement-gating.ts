@@ -355,9 +355,10 @@ async function buildSnapshotForOrder(
     },
   )
 
-  const fraud = await db.deliveryFraudFlag.count({
-    where: { orderId, resolution: null },
-  })
+  // DeliveryFraudHold is the database-maintained settlement authority. A
+  // confirmed finding intentionally retains its hold even though the signal
+  // has been adjudicated, so `resolution: null` is not a safe proxy here.
+  const fraud = await db.deliveryFraudHold.count({ where: { orderId } })
 
   return {
     orderStatus: order.status,

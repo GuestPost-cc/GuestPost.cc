@@ -71,6 +71,7 @@ function makePrismaMock() {
     "orderDeliveryVersion",
     "revision",
     "deliveryFraudFlag",
+    "deliveryFraudHold",
     "orderCancellationRequest",
     "auditLog",
     "marketplaceListing",
@@ -1552,7 +1553,7 @@ describe("F-5: customerApprove cannot corrupt a RELEASED settlement", () => {
     prisma.orderDispute.findFirst.mockResolvedValue(null)
     prisma.revision.findFirst.mockResolvedValue(null)
     prisma.orderCancellationRequest.findFirst.mockResolvedValue(null)
-    prisma.deliveryFraudFlag.count.mockResolvedValue(0)
+    prisma.deliveryFraudHold.count.mockResolvedValue(0)
     service = new SettlementsService(
       prisma,
       auditMock() as any,

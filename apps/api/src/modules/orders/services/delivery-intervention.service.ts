@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import {
   deliveryVerificationJobId,
   isUniqueViolation,
@@ -20,8 +21,10 @@ import {
 } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
 import {
+  type ConfirmDeliveryFraudFlagDto,
   DELIVERY_FRAUD_DISPOSITIONS,
   type DeliveryFraudDisposition,
 } from "../dto/delivery-intervention.dto"
@@ -30,12 +33,28 @@ import { assertCurrentStaffAuthority } from "./staff-authority"
 
 const MIN_REASON = 20
 const FRAUD_RESOLVER_ROLES = new Set(["SUPER_ADMIN", "OPERATIONS", "FINANCE"])
+const FRAUD_CONFIRMATION_ROLES = ["SUPER_ADMIN", "OPERATIONS"] as const
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const FINANCIALLY_TERMINAL_ORDER_STATUSES = new Set([
   "DELIVERED",
   "COMPLETED",
   "CANCELLED",
   "REFUNDED",
 ])
+const FRAUD_CONFIRMATION_TERMINAL_ORDER_STATUSES = new Set([
+  "CANCELLED",
+  "REFUNDED",
+  "COMPLETED",
+])
+const ACTIVE_CANCELLATION_REVIEW_STATUSES = [
+  "REQUESTED",
+  "UNDER_REVIEW",
+  "PENDING_FINANCE",
+  "ESCALATED",
+] as const
+const FRAUD_CANCELLATION_NOTE =
+  "A platform delivery integrity review confirmed an issue. Financial and remediation decisions remain pending authorized staff review."
 
 // Manual intervention + evidence retrieval for deliveries. All transitions are
 // optimistic-lock guarded, require a substantive reason, and are audited +
@@ -49,6 +68,7 @@ export class DeliveryInterventionService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    private readonly communications: CommunicationsService,
   ) {}
 
   private requireReason(reason: string | undefined) {
@@ -141,6 +161,694 @@ export class DeliveryInterventionService {
     return { currentOrder, currentVersion }
   }
 
+  private requireExpectedVersion(value: number, label: string): number {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new BadRequestException(`${label} must be a non-negative integer`)
+    }
+    return value
+  }
+
+  private requireIdempotencyKey(value: string): string {
+    if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+      throw new BadRequestException("idempotencyKey must be a valid UUID")
+    }
+    return value.toLowerCase()
+  }
+
+  private fraudConfirmationFingerprint(input: {
+    fraudFlagId: string
+    actorUserId: string
+    role: string
+    reason: string
+    expectedOrderVersion: number
+    expectedVerificationVersion: number
+    idempotencyKey: string
+  }): string {
+    return createHash("sha256")
+      .update(
+        JSON.stringify({
+          version: 1,
+          fraudFlagId: input.fraudFlagId,
+          actorUserId: input.actorUserId,
+          role: input.role,
+          reason: input.reason,
+          expectedOrderVersion: input.expectedOrderVersion,
+          expectedVerificationVersion: input.expectedVerificationVersion,
+          idempotencyKey: input.idempotencyKey,
+        }),
+      )
+      .digest("hex")
+  }
+
+  private exactFraudFindingReplay(
+    finding: any,
+    expected: {
+      fraudFlagId: string
+      orderId: string
+      deliveryVersionId: string
+      actorUserId: string
+      role: string
+      reason: string
+      expectedOrderVersion: number
+      expectedVerificationVersion: number
+      idempotencyKey: string
+      requestFingerprint: string
+    },
+  ): boolean {
+    return (
+      finding.fraudFlagId === expected.fraudFlagId &&
+      finding.orderId === expected.orderId &&
+      finding.deliveryVersionId === expected.deliveryVersionId &&
+      finding.outcome === "CONFIRMED_FRAUD" &&
+      finding.internalReason === expected.reason &&
+      finding.decidedByUserId === expected.actorUserId &&
+      finding.decidedByRole === expected.role &&
+      finding.expectedOrderVersion === expected.expectedOrderVersion &&
+      finding.expectedVerificationVersion ===
+        expected.expectedVerificationVersion &&
+      finding.idempotencyKey.toLowerCase() === expected.idempotencyKey &&
+      finding.requestFingerprint === expected.requestFingerprint
+    )
+  }
+
+  private fraudCancellationIdempotencyKey(fraudFlagId: string): string {
+    return `delivery-fraud-confirmation:${fraudFlagId}`
+  }
+
+  /**
+   * Enter a confirmed operational finding into the existing cancellation
+   * review workflow without making a financial decision. The enclosing Order
+   * lock serializes this with customer/publisher cancellation writers, while
+   * the database partial unique index remains the direct-SQL backstop.
+   */
+  private async ensureFraudCancellationHandoff(
+    tx: any,
+    input: {
+      order: any
+      fraudFlagId: string
+      actorUserId: string
+      role: string
+    },
+  ): Promise<{ request: any; created: boolean; escalated: boolean }> {
+    const { order, fraudFlagId, actorUserId, role } = input
+    const active = await tx.orderCancellationRequest.findFirst({
+      where: {
+        orderId: order.id,
+        status: { in: [...ACTIVE_CANCELLATION_REVIEW_STATUSES] },
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    })
+
+    if (active) {
+      if (active.status === "REQUESTED" || active.status === "UNDER_REVIEW") {
+        const escalated = await tx.orderCancellationRequest.updateMany({
+          where: { id: active.id, orderId: order.id, status: active.status },
+          data: { status: "ESCALATED" },
+        })
+        if (escalated.count !== 1) {
+          throw new ConflictException({
+            code: "DELIVERY_FRAUD_CANCELLATION_CONFLICT",
+            message:
+              "The cancellation review changed while fraud was confirmed. Refresh and retry.",
+          })
+        }
+        return {
+          request: { ...active, status: "ESCALATED" },
+          created: false,
+          escalated: true,
+        }
+      }
+      if (
+        active.status === "PENDING_FINANCE" &&
+        (active.resolution !== "FULL_REFUND" ||
+          active.responsibility === "UNDETERMINED" ||
+          !active.reviewedByUserId ||
+          typeof active.resolutionReason !== "string" ||
+          active.resolutionReason !== active.resolutionReason.trim() ||
+          active.resolutionReason.length < 20 ||
+          active.resolutionReason.length > 2000)
+      ) {
+        throw new ConflictException({
+          code: "DELIVERY_FRAUD_HANDOFF_INCONSISTENT",
+          message:
+            "The existing Finance review is incomplete and requires reconciliation before fraud can be confirmed.",
+        })
+      }
+      return { request: active, created: false, escalated: false }
+    }
+
+    const stableIdempotencyKey =
+      this.fraudCancellationIdempotencyKey(fraudFlagId)
+    const priorStableCase = await tx.orderCancellationRequest.findUnique({
+      where: {
+        orderId_idempotencyKey: {
+          orderId: order.id,
+          idempotencyKey: stableIdempotencyKey,
+        },
+      },
+    })
+    if (priorStableCase) {
+      throw new ConflictException({
+        code: "DELIVERY_FRAUD_HANDOFF_INCONSISTENT",
+        message:
+          "The fraud review case is already terminal without a matching finding and requires reconciliation.",
+      })
+    }
+
+    const fulfillmentChannel =
+      order.fulfillmentChannel ??
+      (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    const request = await tx.orderCancellationRequest.create({
+      data: {
+        orderId: order.id,
+        requestedByUserId: actorUserId,
+        requesterType: "STAFF",
+        actorSnapshot: {
+          userId: actorUserId,
+          kind: "STAFF",
+          staffRole: role,
+          source: "DELIVERY_FRAUD_CONFIRMATION",
+        },
+        reasonCode: "LEGAL_OR_SECURITY_EMERGENCY",
+        note: FRAUD_CANCELLATION_NOTE,
+        status: "ESCALATED",
+        previousOrderStatus: order.status,
+        fulfillmentChannel,
+        responsibility: "UNDETERMINED",
+        requestedResolution: "FULL_REFUND",
+        responseDeadlineAt: null,
+        idempotencyKey: stableIdempotencyKey,
+      },
+    })
+    return { request, created: true, escalated: false }
+  }
+
+  private async recordConfirmedFraudCommunications(
+    tx: any,
+    input: {
+      order: any
+      flag: any
+      finding: any
+      actorUserId: string
+    },
+  ): Promise<string[]> {
+    const { order, flag, finding, actorUserId } = input
+    const [customerRecipients, publisherRecipients, staffRecipients] =
+      await Promise.all([
+        this.communications.customerOrderRecipients(order.id, tx),
+        this.communications.publisherRecipients(
+          order.website?.publisherId,
+          false,
+          tx,
+        ),
+        this.communications.staffRecipients(
+          ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
+          tx,
+        ),
+      ])
+    const prefix = `order:${order.id}:fraud:${flag.id}:confirmed`
+    const dedupKeys: string[] = []
+
+    const customerDedupKey = `${prefix}:customer`
+    await this.communications.record(
+      {
+        type: "ORDER_SECURITY_REVIEW_DECIDED",
+        aggregateType: "DeliveryFraudFinding",
+        aggregateId: finding.id,
+        organizationId: order.organizationId,
+        title: "Delivery integrity review completed",
+        message: `A delivery integrity issue was confirmed for order ${order.id}. The order remains on hold while the platform reviews the next steps.`,
+        actionPath: `/dashboard/orders/${order.id}`,
+        payload: {
+          decision: "INTEGRITY_ISSUE_CONFIRMED",
+          nextStep: "PLATFORM_ACTION_PENDING",
+        },
+        dedupKey: customerDedupKey,
+        recipientUserIds: customerRecipients,
+        actorUserId,
+      },
+      tx,
+    )
+    dedupKeys.push(customerDedupKey)
+
+    if (order.website?.publisherId) {
+      const publisherDedupKey = `${prefix}:publisher`
+      await this.communications.record(
+        {
+          type: "ORDER_SECURITY_REVIEW_DECIDED",
+          aggregateType: "DeliveryFraudFinding",
+          aggregateId: finding.id,
+          organizationId: null,
+          title: "Delivery integrity review completed",
+          message: `A delivery integrity issue was confirmed for order ${order.id}. The order remains on hold while remediation or other next steps are reviewed.`,
+          actionPath: `/dashboard/orders/${order.id}`,
+          payload: {
+            decision: "INTEGRITY_ISSUE_CONFIRMED",
+            nextStep: "PLATFORM_ACTION_PENDING",
+          },
+          dedupKey: publisherDedupKey,
+          recipientUserIds: publisherRecipients,
+          actorUserId,
+        },
+        tx,
+      )
+      dedupKeys.push(publisherDedupKey)
+    }
+
+    const staffDedupKey = `staff:${prefix}`
+    await this.communications.record(
+      {
+        type: "STAFF_FRAUD_ALERT",
+        aggregateType: "DeliveryFraudFinding",
+        aggregateId: finding.id,
+        organizationId: null,
+        title: "Confirmed delivery integrity issue requires action",
+        message: `Order ${order.id} has a confirmed delivery integrity finding linked to cancellation review ${finding.cancellationRequestId}.`,
+        actionPath: `/dashboard/cancellations?requestId=${finding.cancellationRequestId}`,
+        payload: {
+          fraudFindingId: finding.id,
+          fraudFlagId: flag.id,
+          deliveryVersionId: flag.deliveryVersionId,
+          fraudType: flag.type,
+          cancellationRequestId: finding.cancellationRequestId,
+        },
+        dedupKey: staffDedupKey,
+        recipientUserIds: staffRecipients,
+        actorUserId,
+      },
+      tx,
+    )
+    dedupKeys.push(staffDedupKey)
+    return dedupKeys
+  }
+
+  private async recordClearedFraudCommunications(
+    tx: any,
+    input: {
+      order: any
+      flag: any
+      resolution: any
+      actorUserId: string
+    },
+  ): Promise<string[]> {
+    const { order, flag, resolution, actorUserId } = input
+    const [customerRecipients, publisherRecipients] = await Promise.all([
+      this.communications.customerOrderRecipients(order.id, tx),
+      this.communications.publisherRecipients(
+        order.website?.publisherId,
+        false,
+        tx,
+      ),
+    ])
+    const resolutionEvidence =
+      resolution.evidence &&
+      typeof resolution.evidence === "object" &&
+      !Array.isArray(resolution.evidence)
+        ? (resolution.evidence as Record<string, unknown>)
+        : null
+    // New decisions persist this aggregate snapshot before the resolution
+    // trigger deletes the selected hold. Exact replays must reuse it: deriving
+    // content from today's aggregate could conflict with the immutable outbox
+    // event after another flag is later cleared.
+    const reviewContinues =
+      typeof resolutionEvidence?.blockedAfterDecision === "boolean"
+        ? resolutionEvidence.blockedAfterDecision
+        : (await tx.deliveryFraudHold.count({
+            where: { orderId: order.id },
+          })) > 0
+    const publicMessage = reviewContinues
+      ? `One delivery integrity signal for order ${order.id} was cleared. Another security review remains open, so acceptance and payment release are still paused.`
+      : `The delivery integrity review for order ${order.id} was completed. No security holds remain, and the order may continue through its normal checks.`
+    const decision = reviewContinues
+      ? "REVIEW_PARTIALLY_CLEARED"
+      : "REVIEW_HOLD_CLEARED"
+    const nextStep = reviewContinues
+      ? "SECURITY_REVIEW_CONTINUES"
+      : "ORDER_WORKFLOW_RESUMED"
+    const prefix = `order:${order.id}:fraud:${flag.id}:cleared`
+    const dedupKeys: string[] = []
+
+    const customerDedupKey = `${prefix}:customer`
+    await this.communications.record(
+      {
+        type: "ORDER_SECURITY_REVIEW_DECIDED",
+        aggregateType: "DeliveryFraudFlagResolution",
+        aggregateId: resolution.id,
+        organizationId: order.organizationId,
+        title: "Delivery integrity review completed",
+        message: publicMessage,
+        actionPath: `/dashboard/orders/${order.id}`,
+        payload: {
+          decision,
+          nextStep,
+        },
+        dedupKey: customerDedupKey,
+        recipientUserIds: customerRecipients,
+        actorUserId,
+      },
+      tx,
+    )
+    dedupKeys.push(customerDedupKey)
+
+    if (order.website?.publisherId) {
+      const publisherDedupKey = `${prefix}:publisher`
+      await this.communications.record(
+        {
+          type: "ORDER_SECURITY_REVIEW_DECIDED",
+          aggregateType: "DeliveryFraudFlagResolution",
+          aggregateId: resolution.id,
+          organizationId: null,
+          title: "Delivery integrity review completed",
+          message: publicMessage,
+          actionPath: `/dashboard/orders/${order.id}`,
+          payload: {
+            decision,
+            nextStep,
+          },
+          dedupKey: publisherDedupKey,
+          recipientUserIds: publisherRecipients,
+          actorUserId,
+        },
+        tx,
+      )
+      dedupKeys.push(publisherDedupKey)
+    }
+    return dedupKeys
+  }
+
+  /**
+   * Confirm an immutable fraud signal without clearing its settlement hold or
+   * moving money. Operational and financial enforcement remain separate
+   * commands; this finding is their durable, order-serialized prerequisite.
+   */
+  async confirmFraudFlag(
+    fraudFlagId: string,
+    userId: string,
+    role: string,
+    input: ConfirmDeliveryFraudFlagDto,
+  ) {
+    if (!(FRAUD_CONFIRMATION_ROLES as readonly string[]).includes(role)) {
+      throw new ForbiddenException(
+        "Only Operations or Super Admin may confirm delivery fraud",
+      )
+    }
+    const reason = this.requireReason(input.reason)
+    const expectedOrderVersion = this.requireExpectedVersion(
+      input.expectedOrderVersion,
+      "expectedOrderVersion",
+    )
+    const expectedVerificationVersion = this.requireExpectedVersion(
+      input.expectedVerificationVersion,
+      "expectedVerificationVersion",
+    )
+    const idempotencyKey = this.requireIdempotencyKey(input.idempotencyKey)
+    const requestFingerprint = this.fraudConfirmationFingerprint({
+      fraudFlagId,
+      actorUserId: userId,
+      role,
+      reason,
+      expectedOrderVersion,
+      expectedVerificationVersion,
+      idempotencyKey,
+    })
+    const candidate = await this.prisma.deliveryFraudFlag.findUnique({
+      where: { id: fraudFlagId },
+      select: { orderId: true },
+    })
+    if (!candidate) throw new NotFoundException("Fraud flag not found")
+
+    let committed: {
+      status: "CONFIRMED"
+      replayed: boolean
+      fraudFlagId: string
+      findingId: string
+      cancellationRequestId: string
+      communicationDedupKeys: string[]
+    }
+    const runConfirmation = () =>
+      runLockedOrderSerializableTransaction(
+        this.prisma,
+        candidate.orderId,
+        async (tx: any) => {
+          const [flag, order] = await Promise.all([
+            tx.deliveryFraudFlag.findUnique({
+              where: { id: fraudFlagId },
+              include: { finding: true, resolution: true, hold: true },
+            }),
+            tx.order.findUnique({
+              where: { id: candidate.orderId },
+              select: {
+                id: true,
+                organizationId: true,
+                customerId: true,
+                status: true,
+                version: true,
+                fulfillmentChannel: true,
+                activeDeliveryVersionId: true,
+                website: {
+                  select: { publisherId: true, ownershipType: true },
+                },
+              },
+            }),
+          ])
+          if (!flag || flag.orderId !== candidate.orderId) {
+            throw new NotFoundException("Fraud flag not found")
+          }
+          if (!order) throw new NotFoundException("Order not found")
+          const [currentRole, delivery] = await Promise.all([
+            assertCurrentStaffAuthority(
+              tx,
+              userId,
+              role,
+              FRAUD_CONFIRMATION_ROLES,
+            ),
+            tx.orderDeliveryVersion.findUnique({
+              where: { id: flag.deliveryVersionId },
+              select: {
+                id: true,
+                orderId: true,
+                verificationVersion: true,
+                supersededByVersion: true,
+              },
+            }),
+          ])
+          const expectedFinding = {
+            fraudFlagId,
+            orderId: order.id,
+            deliveryVersionId: flag.deliveryVersionId,
+            actorUserId: userId,
+            role: currentRole,
+            reason,
+            expectedOrderVersion,
+            expectedVerificationVersion,
+            idempotencyKey,
+            requestFingerprint,
+          }
+
+          if (flag.finding && flag.resolution) {
+            throw new ConflictException({
+              code: "DELIVERY_FRAUD_STATE_INCONSISTENT",
+              message:
+                "Fraud evidence has conflicting decisions and requires reconciliation.",
+            })
+          }
+          if (flag.finding) {
+            if (!this.exactFraudFindingReplay(flag.finding, expectedFinding)) {
+              throw new ConflictException({
+                code: "DELIVERY_FRAUD_DECISION_CONFLICT",
+                message:
+                  "This fraud flag already has a different confirmed decision.",
+              })
+            }
+            const communicationDedupKeys =
+              await this.recordConfirmedFraudCommunications(tx, {
+                order,
+                flag,
+                finding: flag.finding,
+                actorUserId: userId,
+              })
+            return {
+              status: "CONFIRMED" as const,
+              replayed: true,
+              fraudFlagId,
+              findingId: flag.finding.id,
+              cancellationRequestId: flag.finding.cancellationRequestId,
+              communicationDedupKeys,
+            }
+          }
+          if (flag.resolution) {
+            throw new ConflictException({
+              code: "DELIVERY_FRAUD_DECISION_CONFLICT",
+              message:
+                "This fraud flag was already cleared by a competing decision.",
+            })
+          }
+          if (FRAUD_CONFIRMATION_TERMINAL_ORDER_STATUSES.has(order.status)) {
+            throw new ConflictException({
+              code: "DELIVERY_FRAUD_ORDER_TERMINAL",
+              message:
+                "A new fraud finding cannot be created after the order reached a terminal outcome.",
+            })
+          }
+
+          const idempotencyWinner = await tx.deliveryFraudFinding.findUnique({
+            where: {
+              decidedByUserId_idempotencyKey: {
+                decidedByUserId: userId,
+                idempotencyKey,
+              },
+            },
+          })
+          if (idempotencyWinner) {
+            throw new ConflictException({
+              code: "DELIVERY_FRAUD_IDEMPOTENCY_CONFLICT",
+              message:
+                "This idempotency key belongs to a different fraud decision.",
+            })
+          }
+          if (
+            !flag.hold ||
+            flag.hold.orderId !== order.id ||
+            flag.hold.deliveryVersionId !== flag.deliveryVersionId ||
+            flag.hold.type !== flag.type
+          ) {
+            throw new ConflictException({
+              code: "DELIVERY_FRAUD_HOLD_MISSING",
+              message:
+                "The fraud hold changed or is inconsistent. Refresh before deciding.",
+            })
+          }
+          if (order.version !== expectedOrderVersion) {
+            throw new ConflictException({
+              code: "ORDER_VERSION_CONFLICT",
+              message: "Order changed. Refresh before confirming fraud.",
+            })
+          }
+          if (!delivery || delivery.orderId !== order.id) {
+            throw new ConflictException({
+              code: "DELIVERY_VERSION_CONFLICT",
+              message:
+                "Fraud evidence no longer belongs to this order. Refresh before confirming fraud.",
+            })
+          }
+          if (delivery.verificationVersion !== expectedVerificationVersion) {
+            throw new ConflictException({
+              code: "DELIVERY_VERIFICATION_VERSION_CONFLICT",
+              message:
+                "Delivery verification changed. Refresh before confirming fraud.",
+            })
+          }
+
+          const handoff = await this.ensureFraudCancellationHandoff(tx, {
+            order,
+            fraudFlagId,
+            actorUserId: userId,
+            role: currentRole,
+          })
+
+          const finding = await tx.deliveryFraudFinding.create({
+            data: {
+              fraudFlagId,
+              orderId: order.id,
+              deliveryVersionId: delivery.id,
+              cancellationRequestId: handoff.request.id,
+              outcome: "CONFIRMED_FRAUD",
+              internalReason: reason,
+              decidedByUserId: userId,
+              decidedByRole: currentRole,
+              expectedOrderVersion,
+              expectedVerificationVersion,
+              idempotencyKey,
+              requestFingerprint,
+            },
+          })
+          const versionClaim = await tx.order.updateMany({
+            where: {
+              id: order.id,
+              version: expectedOrderVersion,
+              status: order.status,
+            },
+            data: { version: { increment: 1 } },
+          })
+          if (versionClaim.count !== 1) {
+            throw new ConflictException({
+              code: "ORDER_VERSION_CONFLICT",
+              message: "Order changed. Refresh before confirming fraud.",
+            })
+          }
+          await this.audit.log(
+            {
+              action: "ORDER_DELIVERY_FRAUD_CONFIRMED",
+              entityType: "DeliveryFraudFinding",
+              entityId: finding.id,
+              metadata: {
+                ...orderEventMetadata(order),
+                fraudFindingId: finding.id,
+                fraudFlagId,
+                cancellationRequestId: handoff.request.id,
+                cancellationRequestStatus: handoff.request.status,
+                cancellationRequestCreated: handoff.created,
+                cancellationRequestEscalated: handoff.escalated,
+                fraudDeliveryVersionId: delivery.id,
+                fraudType: flag.type,
+                internalReason: reason,
+                roleAtTime: currentRole,
+                expectedOrderVersion,
+                expectedVerificationVersion,
+              },
+              userId,
+              organizationId: order.organizationId,
+            },
+            tx,
+          )
+          const communicationDedupKeys =
+            await this.recordConfirmedFraudCommunications(tx, {
+              order,
+              flag,
+              finding,
+              actorUserId: userId,
+            })
+          return {
+            status: "CONFIRMED" as const,
+            replayed: false,
+            fraudFlagId,
+            findingId: finding.id,
+            cancellationRequestId: handoff.request.id,
+            communicationDedupKeys,
+          }
+        },
+      )
+
+    try {
+      committed = await runConfirmation()
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error
+
+      // A concurrent exact request can lose the unique insert even though it
+      // has the same immutable intent. Re-enter once with a fresh SERIALIZABLE
+      // snapshot so the normal exact-replay branch can return/repair the
+      // committed winner. The retry is deliberately bounded: a second unique
+      // failure is inconsistent state or a genuinely different decision.
+      try {
+        committed = await runConfirmation()
+      } catch (replayError) {
+        if (!isUniqueViolation(replayError)) throw replayError
+        throw new ConflictException({
+          code: "DELIVERY_FRAUD_DECISION_CONFLICT",
+          message:
+            "Another fraud decision won concurrently. Refresh before retrying.",
+        })
+      }
+    }
+
+    this.communications.dispatchManyByDedupKeyBestEffort(
+      committed.communicationDedupKeys,
+    )
+    const { communicationDedupKeys: _communicationDedupKeys, ...result } =
+      committed
+    return result
+  }
+
   /**
    * Adjudicate one immutable fraud flag without changing Order or delivery
    * lifecycle state. The database independently revalidates role-at-time and
@@ -184,101 +892,188 @@ export class DeliveryInterventionService {
     })
     if (!candidate) throw new NotFoundException("Fraud flag not found")
 
-    return runLockedOrderSerializableTransaction(
-      this.prisma,
-      candidate.orderId,
-      async (tx: any) => {
-        const [flag, order] = await Promise.all([
-          tx.deliveryFraudFlag.findUnique({
-            where: { id: fraudFlagId },
-            include: { resolution: true },
-          }),
-          tx.order.findUnique({
-            where: { id: candidate.orderId },
-            include: { website: { select: { publisherId: true } } },
-          }),
-        ])
-        if (!flag || flag.orderId !== candidate.orderId) {
-          throw new NotFoundException("Fraud flag not found")
-        }
-        if (!order) throw new NotFoundException("Order not found")
-        const currentRole = await assertCurrentStaffAuthority(
-          tx,
-          userId,
-          role,
-          [...FRAUD_RESOLVER_ROLES],
-        )
-        if (flag.resolution) {
-          return {
-            status: "ALREADY_RESOLVED",
-            fraudFlagId,
-            resolutionId: flag.resolution.id,
+    let committed: {
+      status: "RESOLVED" | "ALREADY_RESOLVED"
+      fraudFlagId: string
+      resolutionId: string
+      communicationDedupKeys: string[]
+    }
+    const runResolution = () =>
+      runLockedOrderSerializableTransaction(
+        this.prisma,
+        candidate.orderId,
+        async (tx: any) => {
+          const [flag, order] = await Promise.all([
+            tx.deliveryFraudFlag.findUnique({
+              where: { id: fraudFlagId },
+              include: { finding: true, resolution: true },
+            }),
+            tx.order.findUnique({
+              where: { id: candidate.orderId },
+              include: { website: { select: { publisherId: true } } },
+            }),
+          ])
+          if (!flag || flag.orderId !== candidate.orderId) {
+            throw new NotFoundException("Fraud flag not found")
           }
-        }
-        if (
-          disposition !== "FALSE_POSITIVE" &&
-          currentRole !== "SUPER_ADMIN" &&
-          currentRole !== "FINANCE"
-        ) {
-          throw new ForbiddenException(
-            "Only Finance or Super Admin may accept or authorize a known delivery risk",
-          )
-        }
-        if (disposition === "AUTHORIZED_REUSE" && flag.type !== "URL_REUSED") {
-          throw new BadRequestException(
-            "AUTHORIZED_REUSE applies only to a URL_REUSED fraud signal",
-          )
-        }
-
-        const resolution = await tx.deliveryFraudFlagResolution.create({
-          data: {
-            fraudFlagId,
-            orderId: flag.orderId,
-            deliveryVersionId: flag.deliveryVersionId,
-            kind: "STAFF_CLEARED",
-            reason: r,
-            resolvedByUserId: userId,
-            resolvedByRole: currentRole,
-            evidence: {
-              activeDeliveryVersionId: order.activeDeliveryVersionId,
-              adjudicatedDeliveryVersionId: flag.deliveryVersionId,
-              fraudType: flag.type,
-              disposition,
-              evidenceReference: normalizedEvidenceReference,
-              orderStatusAtResolution: order.status,
-              roleAtTime: currentRole,
-            },
-          },
-        })
-        await this.audit.log(
-          {
-            action: "ORDER_DELIVERY_FRAUD_RESOLVED",
-            entityType: "DeliveryFraudFlag",
-            entityId: fraudFlagId,
-            metadata: {
-              ...orderEventMetadata(order),
-              fraudFlagId,
-              fraudDeliveryVersionId: flag.deliveryVersionId,
-              fraudType: flag.type,
-              resolutionId: resolution.id,
-              resolutionKind: "STAFF_CLEARED",
-              disposition,
-              evidenceReference: normalizedEvidenceReference,
-              reason: r,
-              roleAtTime: currentRole,
-            },
+          if (!order) throw new NotFoundException("Order not found")
+          const currentRole = await assertCurrentStaffAuthority(
+            tx,
             userId,
-            organizationId: order.organizationId,
-          },
-          tx,
-        )
-        return {
-          status: "RESOLVED",
-          fraudFlagId,
-          resolutionId: resolution.id,
-        }
-      },
+            role,
+            [...FRAUD_RESOLVER_ROLES],
+          )
+          if (flag.finding) {
+            throw new ConflictException({
+              code: "DELIVERY_FRAUD_DECISION_CONFLICT",
+              message:
+                "This fraud flag was already confirmed and can no longer be cleared.",
+            })
+          }
+          if (flag.resolution) {
+            const evidence =
+              flag.resolution.evidence &&
+              typeof flag.resolution.evidence === "object" &&
+              !Array.isArray(flag.resolution.evidence)
+                ? (flag.resolution.evidence as Record<string, unknown>)
+                : null
+            const storedEvidenceReference =
+              typeof evidence?.evidenceReference === "string"
+                ? evidence.evidenceReference.trim() || null
+                : null
+            const exactReplay =
+              flag.resolution.kind === "STAFF_CLEARED" &&
+              flag.resolution.resolvedByUserId === userId &&
+              flag.resolution.reason === r &&
+              evidence?.disposition === disposition &&
+              storedEvidenceReference === normalizedEvidenceReference
+            if (!exactReplay) {
+              throw new ConflictException({
+                code: "DELIVERY_FRAUD_DECISION_CONFLICT",
+                message:
+                  "This fraud flag already has a different clearance decision.",
+              })
+            }
+            const communicationDedupKeys =
+              await this.recordClearedFraudCommunications(tx, {
+                order,
+                flag,
+                resolution: flag.resolution,
+                actorUserId: userId,
+              })
+            return {
+              status: "ALREADY_RESOLVED" as const,
+              fraudFlagId,
+              resolutionId: flag.resolution.id,
+              communicationDedupKeys,
+            }
+          }
+          if (
+            disposition !== "FALSE_POSITIVE" &&
+            currentRole !== "SUPER_ADMIN" &&
+            currentRole !== "FINANCE"
+          ) {
+            throw new ForbiddenException(
+              "Only Finance or Super Admin may accept or authorize a known delivery risk",
+            )
+          }
+          if (
+            disposition === "AUTHORIZED_REUSE" &&
+            flag.type !== "URL_REUSED"
+          ) {
+            throw new BadRequestException(
+              "AUTHORIZED_REUSE applies only to a URL_REUSED fraud signal",
+            )
+          }
+
+          const remainingHoldCount = await tx.deliveryFraudHold.count({
+            where: {
+              orderId: order.id,
+              fraudFlagId: { not: fraudFlagId },
+            },
+          })
+
+          const resolution = await tx.deliveryFraudFlagResolution.create({
+            data: {
+              fraudFlagId,
+              orderId: flag.orderId,
+              deliveryVersionId: flag.deliveryVersionId,
+              kind: "STAFF_CLEARED",
+              reason: r,
+              resolvedByUserId: userId,
+              resolvedByRole: currentRole,
+              evidence: {
+                activeDeliveryVersionId: order.activeDeliveryVersionId,
+                adjudicatedDeliveryVersionId: flag.deliveryVersionId,
+                fraudType: flag.type,
+                disposition,
+                evidenceReference: normalizedEvidenceReference,
+                orderStatusAtResolution: order.status,
+                roleAtTime: currentRole,
+                blockedAfterDecision: remainingHoldCount > 0,
+              },
+            },
+          })
+          await this.audit.log(
+            {
+              action: "ORDER_DELIVERY_FRAUD_RESOLVED",
+              entityType: "DeliveryFraudFlag",
+              entityId: fraudFlagId,
+              metadata: {
+                ...orderEventMetadata(order),
+                fraudFlagId,
+                fraudDeliveryVersionId: flag.deliveryVersionId,
+                fraudType: flag.type,
+                resolutionId: resolution.id,
+                resolutionKind: "STAFF_CLEARED",
+                disposition,
+                evidenceReference: normalizedEvidenceReference,
+                reason: r,
+                roleAtTime: currentRole,
+              },
+              userId,
+              organizationId: order.organizationId,
+            },
+            tx,
+          )
+          const communicationDedupKeys =
+            await this.recordClearedFraudCommunications(tx, {
+              order,
+              flag,
+              resolution,
+              actorUserId: userId,
+            })
+          return {
+            status: "RESOLVED" as const,
+            fraudFlagId,
+            resolutionId: resolution.id,
+            communicationDedupKeys,
+          }
+        },
+      )
+
+    try {
+      committed = await runResolution()
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error
+      try {
+        committed = await runResolution()
+      } catch (replayError) {
+        if (!isUniqueViolation(replayError)) throw replayError
+        throw new ConflictException({
+          code: "DELIVERY_FRAUD_DECISION_CONFLICT",
+          message:
+            "Another fraud decision won concurrently. Refresh before retrying.",
+        })
+      }
+    }
+
+    this.communications.dispatchManyByDedupKeyBestEffort(
+      committed.communicationDedupKeys,
     )
+    const { communicationDedupKeys: _communicationDedupKeys, ...result } =
+      committed
+    return result
   }
 
   // Phase 6.9 — Audit finding #4 closure. The legacy `auditMeta` helper has

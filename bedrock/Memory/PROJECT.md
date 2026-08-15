@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # GuestPost.cc
@@ -273,6 +273,17 @@ historical audit batches.
 - Shared `CommandItem` disabled styling must target `data-disabled=true`, because cmdk renders `data-disabled=false` on enabled options; a presence-only selector blocks pointer input across every shared multi-select.
 - Order cancellation is a dedicated domain workflow, not a generic status mutation. `packages/shared/src/order-cancellation-policy.ts` owns the stage/channel decision matrix and `OrderCancellationRequest` retains structured case history.
 - Pre-acceptance exits are immediate; accepted work requires counterparty consent or Operations review plus Finance approval; published/delivered/completed work uses the dispute path. An active case holds fulfillment and increments `Order.version` to close transition races. Publisher actions require a publisher owner, and platform-fulfiller actions require the assigned Operations user (or Super Admin).
+- A confirmed delivery-fraud signal is separate immutable evidence, not a
+  clearance or money mutation. Operations or Super Admin appends the finding
+  and links a same-order full-refund cancellation review while retaining the
+  permanent settlement-deny hold; Finance or Super Admin approves the canonical
+  refund and publisher outcome through a separate command. Super Admin can
+  currently authorize both commands, so universal actor-independent
+  maker-checker remains a separate paid-launch gate. Exact command replay
+  creates no second finding, Order-version increment, refund, document, or
+  outbox event. Force cancellation and dispute refund cannot bypass the linked
+  case, and a deferred Order constraint rejects any terminal state other than
+  the canonical linked `REFUNDED` result at transaction commit.
 - Paid refunds use one transaction-aware path that reverses platform revenue or publisher settlement, cancels active assignments, credits the organization wallet, transitions the order, and writes ledger/event/audit records together. `Order.refundResponsibility` prevents platform/customer-attributed refunds from lowering publisher trust.
 - Refund clawbacks that create publisher debt write an idempotent in-app
   explanation in the same transaction. Later settlement-release notifications

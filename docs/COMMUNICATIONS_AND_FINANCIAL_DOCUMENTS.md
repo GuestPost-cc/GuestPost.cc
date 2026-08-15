@@ -77,6 +77,40 @@ cross-order customer details remain in staff-authorized delivery evidence
 surfaces. See `docs/DELIVERY_FRAUD_AND_MANUAL_VERIFICATION.md` for adjudication
 and customer-denial behavior.
 
+Fraud adjudication uses decision-specific events, never a best-effort bare
+Notification write. Confirmation atomically records safe customer and
+publisher `ORDER_SECURITY_REVIEW_DECIDED` events plus an internal
+`STAFF_FRAUD_ALERT` linked to the exact `DeliveryFraudFinding` and structured
+cancellation case. Clearance records its own audience events. The immutable
+clearance evidence stores whether another hold remained at decision time, so
+an exact replay cannot change “review continues” into “workflow resumed” after
+a later flag is resolved. Confirmed findings retain their hold and therefore
+never emit resume copy.
+
+The canonical refund transaction separately records `ORDER_REFUNDED` for the
+customer and `PUBLISHER_COMPENSATION_DECIDED` for eligible publisher members;
+amounts are exact decimal strings. Staff receives a non-causal correlation
+alert when an Order has both a confirmed finding and a refund. Customer mail
+never contains publisher compensation/debt, and publisher mail never contains
+customer payment references. Recipient IDs and public text are derived on the
+server from the locked aggregate; mutation DTOs cannot choose either.
+
+A fraud flag, confirmed finding, cancellation creation/escalation, or
+Operations review is not a financial-document issuance event. Only the
+canonical refund transaction creates the customer's immutable credit note and
+its original-invoice relationship. Exact confirmation or Finance replay reuses
+the existing event/document identities; it cannot mint a second credit note.
+Publisher compensation is represented by its own canonical record and
+audience event, never by exposing it in the customer's document.
+
+The authenticated Order page remains the durable decision history if email,
+Redis, or a worker is unavailable. Its server-side projector uses a closed
+event/message catalog and audience-specific canonical records. Free-form staff
+reasons, cancellation response notes, provider errors, support IDs, raw
+`OrderEvent.message`, and generic metadata are not stakeholder communication
+fields. Required outbox delivery is recovered by the database sweep after the
+domain transaction commits.
+
 Recipient eligibility is evaluated twice: when the event commits and again
 immediately before SMTP delivery. A deleted, banned, unverified, opted-out, or
 suppressed recipient is not sent mail. Required messages still require an

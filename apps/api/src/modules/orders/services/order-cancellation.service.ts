@@ -3,10 +3,12 @@ import {
   CancellationRequestStatus,
   CancellationResolution,
   CancellationResponsibility,
+  Prisma,
 } from "@guestpost/database"
 import {
   ACTIVE_CANCELLATION_REQUEST_STATUSES,
   decideOrderCancellation,
+  isPostPublicationPublisherOrder,
   isSupportedMoneyCurrency,
   orderEventMetadata,
   resolveOrderCancellationConfig,
@@ -42,6 +44,7 @@ import { assertOwnerOrCreator } from "./owner-or-creator"
 import { RefundService } from "./refund.service"
 
 const TERMINAL_ORDER_STATUSES = ["CANCELLED", "REFUNDED"] as const
+const CANCELLATION_REQUEST_LOOKUP_ID = /^[A-Za-z0-9_-]{1,128}$/
 
 export interface CancellationActorContext {
   userId: string
@@ -570,8 +573,20 @@ export class OrderCancellationService {
   async review(
     requestId: string,
     staffUserId: string,
+    claimedStaffRole: string | null,
     body: ReviewCancellationRequestDto,
   ) {
+    const reviewReason = body.reason?.trim()
+    if (!reviewReason || reviewReason.length < 20) {
+      throw new BadRequestException(
+        "Cancellation review reason must be at least 20 characters",
+      )
+    }
+    if (reviewReason.length > 2000) {
+      throw new BadRequestException(
+        "Cancellation review reason must be 2,000 characters or fewer",
+      )
+    }
     const preflight = await this.prisma.orderCancellationRequest.findUnique({
       where: { id: requestId },
       select: { orderId: true },
@@ -584,16 +599,58 @@ export class OrderCancellationService {
       this.prisma,
       preflight.orderId,
       async (tx: any) => {
+        await this.assertCurrentCancellationStaffAuthority(
+          tx,
+          staffUserId,
+          claimedStaffRole,
+          ["OPERATIONS", "SUPER_ADMIN"],
+          "Current Operations or Super Admin authority is required",
+        )
         const request = await tx.orderCancellationRequest.findUnique({
           where: { id: requestId },
           include: { order: true },
         })
         if (!request)
           throw new NotFoundException("Cancellation request not found")
+        if (request.orderId !== preflight.orderId) {
+          throw new ConflictException(
+            "Cancellation request changed order ownership while review was starting",
+          )
+        }
+        const confirmedFraudFinding = await tx.deliveryFraudFinding.findFirst({
+          where: { cancellationRequestId: request.id },
+          select: { id: true },
+        })
+
+        if (
+          confirmedFraudFinding &&
+          request.status === "PENDING_FINANCE" &&
+          body.resolution === CancellationResolution.FULL_REFUND &&
+          request.resolution === body.resolution &&
+          request.responsibility === body.responsibility &&
+          request.resolutionReason === reviewReason &&
+          request.reviewedByUserId === staffUserId
+        ) {
+          // Exact response-loss replay. The original transaction already
+          // committed its event and audit evidence; never append duplicates.
+          return tx.orderCancellationRequest.findUniqueOrThrow({
+            where: { id: requestId },
+          })
+        }
         if (!["UNDER_REVIEW", "ESCALATED"].includes(request.status)) {
           throw new BadRequestException(
             "Cancellation request is not awaiting review",
           )
+        }
+        if (
+          confirmedFraudFinding &&
+          body.resolution !== CancellationResolution.FULL_REFUND
+        ) {
+          throw new ConflictException({
+            code: "CONFIRMED_FRAUD_REFUND_REQUIRED",
+            message:
+              "A cancellation linked to confirmed fraud must proceed to Finance for a full refund",
+          })
         }
 
         if (body.resolution === CancellationResolution.FULL_REFUND) {
@@ -605,7 +662,7 @@ export class OrderCancellationService {
               reviewedByUserId: staffUserId,
               responsibility: body.responsibility,
               resolution: body.resolution,
-              resolutionReason: body.reason,
+              resolutionReason: reviewReason,
             },
           })
         } else if (body.resolution === CancellationResolution.CONTINUE_ORDER) {
@@ -616,7 +673,7 @@ export class OrderCancellationService {
               reviewedByUserId: staffUserId,
               responsibility: body.responsibility,
               resolution: body.resolution,
-              resolutionReason: body.reason,
+              resolutionReason: reviewReason,
               resolvedAt: new Date(),
             },
           })
@@ -633,7 +690,7 @@ export class OrderCancellationService {
             data: {
               orderId: request.orderId,
               raisedBy: request.requestedByUserId ?? staffUserId,
-              reason: body.reason,
+              reason: reviewReason,
               previousStatus: request.order.status,
             },
           })
@@ -657,7 +714,7 @@ export class OrderCancellationService {
               reviewedByUserId: staffUserId,
               responsibility: body.responsibility,
               resolution: body.resolution,
-              resolutionReason: body.reason,
+              resolutionReason: reviewReason,
               resolvedAt: new Date(),
             },
           })
@@ -687,7 +744,7 @@ export class OrderCancellationService {
               orderId: request.orderId,
               resolution: body.resolution,
               responsibility: body.responsibility,
-              reason: body.reason,
+              reason: reviewReason,
             },
             userId: staffUserId,
             organizationId: request.order.organizationId,
@@ -717,8 +774,20 @@ export class OrderCancellationService {
   async financeApprove(
     requestId: string,
     financeUserId: string,
+    claimedStaffRole: string | null,
     body: FinanceApproveCancellationDto,
   ) {
+    const financeReason = body.reason?.trim()
+    if (!financeReason || financeReason.length < 20) {
+      throw new BadRequestException(
+        "Finance approval reason must be at least 20 characters",
+      )
+    }
+    if (financeReason.length > 2000) {
+      throw new BadRequestException(
+        "Finance approval reason must be 2,000 characters or fewer",
+      )
+    }
     let publisherId: string | null = null
     let responsibility: CancellationResponsibility | null = null
     const preflight = await this.prisma.orderCancellationRequest.findUnique({
@@ -733,6 +802,11 @@ export class OrderCancellationService {
       this.prisma,
       preflight.orderId,
       async (tx: any) => {
+        await this.assertCurrentFinanceAuthority(
+          tx,
+          financeUserId,
+          claimedStaffRole,
+        )
         const request = await tx.orderCancellationRequest.findUnique({
           where: { id: requestId },
           include: {
@@ -741,30 +815,103 @@ export class OrderCancellationService {
                 website: {
                   select: { ownershipType: true, publisherId: true },
                 },
+                settlements: {
+                  where: { status: { not: "CANCELLED" } },
+                  orderBy: { createdAt: "desc" },
+                  take: 1,
+                  select: { id: true },
+                },
               },
             },
           },
         })
         if (!request)
           throw new NotFoundException("Cancellation request not found")
-        if (request.status !== "PENDING_FINANCE") {
+        if (request.orderId !== preflight.orderId) {
+          throw new ConflictException(
+            "Cancellation request changed order ownership while approval was starting",
+          )
+        }
+        if (
+          request.status !== "PENDING_FINANCE" &&
+          request.status !== "APPROVED"
+        ) {
           throw new BadRequestException(
             "Cancellation is not pending finance approval",
           )
+        }
+        if (request.resolution !== CancellationResolution.FULL_REFUND) {
+          throw new ConflictException({
+            code: "CANCELLATION_FINANCE_STATE_INVALID",
+            message:
+              "Finance approval requires a reviewed full-refund recommendation",
+          })
         }
         publisherId = request.order.website?.publisherId ?? null
         const resolvedResponsibility = this.assertFinalResponsibility(
           request.responsibility,
         )
         responsibility = resolvedResponsibility
+        const refundReason = this.financeRefundReason(request, financeReason)
+        const requiresPublisherCompensationDisposition =
+          isPostPublicationPublisherOrder({
+            fulfillmentChannel:
+              request.fulfillmentChannel ?? request.order.fulfillmentChannel,
+            websiteOwnershipType: request.order.website?.ownershipType,
+            effectiveOrderStatus: request.previousOrderStatus,
+            hasSettlement: (request.order.settlements?.length ?? 0) > 0,
+          })
+        if (
+          !requiresPublisherCompensationDisposition &&
+          body.publisherCompensation
+        ) {
+          throw new BadRequestException({
+            code: "PUBLISHER_COMPENSATION_NOT_APPLICABLE",
+            message:
+              "Publisher compensation is not applicable to this cancellation",
+          })
+        }
+        const publisherCompensationIntent =
+          requiresPublisherCompensationDisposition
+            ? {
+                ...(body.publisherCompensation ?? {}),
+                effectiveOrderStatus: request.previousOrderStatus,
+              }
+            : undefined
         const refunded = await this.refund.refundOrderInTransaction(
           tx,
           request.order,
-          `${request.resolutionReason ?? "Cancellation approved"} — Finance: ${body.reason}`,
+          refundReason,
           financeUserId,
           `cancellation-request:${request.id}`,
           resolvedResponsibility,
+          publisherCompensationIntent,
         )
+
+        if (request.status === "APPROVED") {
+          await this.assertExactFinanceApprovalReplay(tx, request, {
+            financeUserId,
+            financeReason,
+            responsibility: resolvedResponsibility,
+            refundTransactionId: refunded.refundTransactionId,
+          })
+          // The financial primitive repairs the refund/publisher projections.
+          // Repair the cancellation audience with the same stable dedup key;
+          // CommunicationsService.record is itself exact-key idempotent.
+          await this.recordCancellationCommunication(
+            tx,
+            request.order,
+            requestId,
+            "ORDER_CANCELLATION_RESOLVED",
+            "Cancellation refund approved",
+            `The cancellation refund for order ${request.orderId} was approved.`,
+            financeUserId,
+          )
+          return tx.orderCancellationRequest.findUniqueOrThrow({
+            where: { id: requestId },
+          })
+        }
+
         await tx.orderCancellationRequest.update({
           where: { id: requestId },
           data: {
@@ -796,7 +943,7 @@ export class OrderCancellationService {
               orderId: request.orderId,
               responsibility,
               refundTransactionId: refunded.refundTransactionId,
-              reason: body.reason,
+              reason: financeReason,
             },
             userId: financeUserId,
             organizationId: request.order.organizationId,
@@ -832,6 +979,139 @@ export class OrderCancellationService {
     return result
   }
 
+  /**
+   * Lock both rows that confer staff authority after the canonical Order lock.
+   * This makes a concurrent ban or role change serialize with the approval and
+   * prevents a cached request role from authorizing a financial mutation.
+   */
+  private async assertCurrentFinanceAuthority(
+    tx: any,
+    userId: string,
+    claimedRole: string | null,
+  ): Promise<void> {
+    await this.assertCurrentCancellationStaffAuthority(
+      tx,
+      userId,
+      claimedRole,
+      ["FINANCE", "SUPER_ADMIN"],
+      "Current Finance or Super Admin authority is required",
+    )
+  }
+
+  private async assertCurrentCancellationStaffAuthority(
+    tx: any,
+    userId: string,
+    claimedRole: string | null,
+    allowedRoles: readonly string[],
+    message: string,
+  ): Promise<void> {
+    const rows = (await tx.$queryRaw(
+      Prisma.sql`
+        SELECT sm."role"::text AS "role", u."banned", u."userType"::text AS "userType"
+        FROM "StaffMembership" sm
+        INNER JOIN "User" u ON u."id" = sm."userId"
+        WHERE sm."userId" = ${userId}
+        FOR UPDATE OF sm, u
+      `,
+    )) as Array<{ role: string; banned: boolean; userType: string }>
+    const current = rows.length === 1 ? rows[0] : null
+    if (
+      !current ||
+      current.banned ||
+      current.userType !== "STAFF" ||
+      current.role !== claimedRole ||
+      !allowedRoles.includes(current.role)
+    ) {
+      throw new ForbiddenException(message)
+    }
+  }
+
+  private financeRefundReason(request: any, financeReason: string): string {
+    return `${request.resolutionReason ?? "Cancellation approved"} — Finance: ${financeReason}`
+  }
+
+  /**
+   * APPROVED is a valid response-loss replay only when every immutable record
+   * proves it is the same command. Missing or ambiguous evidence is treated as
+   * corruption, never as permission to issue or acknowledge another refund.
+   */
+  private async assertExactFinanceApprovalReplay(
+    tx: any,
+    request: any,
+    expected: {
+      financeUserId: string
+      financeReason: string
+      responsibility: CancellationResponsibility
+      refundTransactionId: string
+    },
+  ): Promise<void> {
+    const mismatch = () =>
+      new ConflictException({
+        code: "CANCELLATION_FINANCE_REPLAY_MISMATCH",
+        message:
+          "Cancellation approval was already completed with different instructions",
+      })
+
+    if (
+      request.status !== "APPROVED" ||
+      request.resolution !== CancellationResolution.FULL_REFUND ||
+      request.financeApprovedByUserId !== expected.financeUserId ||
+      request.refundTransactionId !== expected.refundTransactionId ||
+      request.responsibility !== expected.responsibility ||
+      !request.resolvedAt
+    ) {
+      throw mismatch()
+    }
+
+    const [events, auditRows] = await Promise.all([
+      tx.orderEvent.findMany({
+        where: {
+          orderId: request.orderId,
+          eventType: "CANCELLATION_RESOLVED",
+          metadata: { path: ["requestId"], equals: request.id },
+        },
+        select: { actorId: true, message: true, metadata: true },
+      }),
+      tx.auditLog.findMany({
+        where: {
+          action: "ORDER_CANCELLATION_FINANCE_APPROVED",
+          entityType: "OrderCancellationRequest",
+          entityId: request.id,
+          userId: expected.financeUserId,
+        },
+        select: { metadata: true },
+      }),
+    ])
+    const eventMatches = events.filter((event: any) => {
+      const metadata = this.objectMetadata(event.metadata)
+      return (
+        event.actorId === expected.financeUserId &&
+        event.message === "Cancellation refund approved by Finance" &&
+        metadata?.requestId === request.id &&
+        metadata?.responsibility === expected.responsibility &&
+        metadata?.refundTransactionId === expected.refundTransactionId
+      )
+    })
+    const auditMatches = auditRows.filter((row: any) => {
+      const metadata = this.objectMetadata(row.metadata)
+      return (
+        metadata?.orderId === request.orderId &&
+        metadata?.responsibility === expected.responsibility &&
+        metadata?.refundTransactionId === expected.refundTransactionId &&
+        metadata?.reason === expected.financeReason
+      )
+    })
+    if (eventMatches.length !== 1 || auditMatches.length !== 1) {
+      throw mismatch()
+    }
+  }
+
+  private objectMetadata(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null
+  }
+
   async forceCancel(
     orderId: string,
     staffUserId: string,
@@ -861,6 +1141,17 @@ export class OrderCancellationService {
           (TERMINAL_ORDER_STATUSES as readonly string[]).includes(order.status)
         ) {
           return order
+        }
+        const confirmedFraudFinding = await tx.deliveryFraudFinding.findFirst({
+          where: { orderId },
+          select: { cancellationRequestId: true },
+        })
+        if (confirmedFraudFinding) {
+          throw new ConflictException({
+            code: "CONFIRMED_FRAUD_FINANCE_WORKFLOW_REQUIRED",
+            message:
+              "This order has confirmed fraud evidence. Complete its linked cancellation and Finance refund workflow instead.",
+          })
         }
         if (order.paymentStatus === "PAID") {
           return (
@@ -912,22 +1203,61 @@ export class OrderCancellationService {
 
   async listRequests(params: {
     status?: CancellationRequestStatus
+    requestId?: string
     take?: number
     skip?: number
+    role: string
   }) {
+    if (!new Set(["SUPER_ADMIN", "OPERATIONS", "FINANCE"]).has(params.role)) {
+      throw new ForbiddenException("Staff cancellation access is required")
+    }
+    const canViewFinancials = params.role !== "OPERATIONS"
+    const canViewIdentity = params.role === "SUPER_ADMIN"
     const take = Math.min(Math.max(params.take ?? 50, 1), 100)
     const skip = Math.max(params.skip ?? 0, 0)
-    const where = params.status ? { status: params.status } : {}
+    if (
+      params.requestId !== undefined &&
+      (typeof params.requestId !== "string" ||
+        !CANCELLATION_REQUEST_LOOKUP_ID.test(params.requestId))
+    ) {
+      throw new BadRequestException({
+        code: "INVALID_CANCELLATION_REQUEST_ID",
+        message: "Cancellation request ID is invalid",
+      })
+    }
+    const where = {
+      ...(params.status && { status: params.status }),
+      ...(params.requestId && { id: params.requestId }),
+    }
     const [items, total] = await this.prisma.$transaction([
       this.prisma.orderCancellationRequest.findMany({
         where,
         include: {
+          fraudFindings: {
+            where: { outcome: "CONFIRMED_FRAUD" },
+            select: { id: true },
+            take: 1,
+          },
           order: {
             include: {
               website: {
-                select: { id: true, domain: true, publisherId: true },
+                select: {
+                  id: true,
+                  domain: true,
+                  publisherId: true,
+                  ownershipType: true,
+                },
               },
               customer: { select: { id: true, name: true, email: true } },
+              settlements: {
+                where: { status: { not: "CANCELLED" } },
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: {
+                  publisherAmount: true,
+                  currency: true,
+                },
+              },
             },
           },
         },
@@ -937,7 +1267,61 @@ export class OrderCancellationService {
       }),
       this.prisma.orderCancellationRequest.count({ where }),
     ])
-    return { items, total, take, skip }
+    return {
+      items: items.map((request: any) => {
+        const { fraudFindings, ...requestWithoutFraudFindings } = request
+        const activeSettlement = request.order.settlements?.[0] ?? null
+        const required = isPostPublicationPublisherOrder({
+          fulfillmentChannel: request.fulfillmentChannel,
+          websiteOwnershipType: request.order.website?.ownershipType,
+          effectiveOrderStatus: request.previousOrderStatus,
+          hasSettlement: Boolean(activeSettlement),
+        })
+        const {
+          settlements: _settlements,
+          customer,
+          amount: _amount,
+          currency: _currency,
+          ...nonFinancialOrder
+        } = request.order
+        const order = {
+          ...nonFinancialOrder,
+          ...(canViewFinancials && {
+            amount: request.order.amount,
+            currency: request.order.currency,
+          }),
+          customer: customer
+            ? {
+                id: customer.id,
+                name: customer.name,
+                ...(canViewIdentity && { email: customer.email }),
+              }
+            : null,
+        }
+        return {
+          ...requestWithoutFraudFindings,
+          order,
+          requiresConfirmedFraudFullRefund: (fraudFindings?.length ?? 0) > 0,
+          ...(canViewFinancials && {
+            publisherCompensationPolicy: {
+              required,
+              maximumAmount: String(
+                required
+                  ? (activeSettlement?.publisherAmount ??
+                      request.order.amount ??
+                      0)
+                  : 0,
+              ),
+              currency: activeSettlement?.currency ?? request.order.currency,
+              effectiveOrderStatus: request.previousOrderStatus,
+            },
+          }),
+        }
+      }),
+      total,
+      take,
+      skip,
+    }
   }
 
   async assertNoActiveCancellation(orderId: string, db: any = this.prisma) {

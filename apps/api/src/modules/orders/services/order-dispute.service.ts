@@ -519,6 +519,19 @@ export class OrderDisputeService {
             : order.status
         let refundTransactionId: string | null = null
         if (action === "REFUND") {
+          const confirmedFraudFinding = await tx.deliveryFraudFinding.findFirst(
+            {
+              where: { orderId: order.id },
+              select: { cancellationRequestId: true },
+            },
+          )
+          if (confirmedFraudFinding) {
+            throw new ConflictException({
+              code: "CONFIRMED_FRAUD_FINANCE_WORKFLOW_REQUIRED",
+              message:
+                "This order has confirmed fraud evidence. Complete its linked cancellation and Finance refund workflow instead.",
+            })
+          }
           const refunded = await this.refund.refundOrderInTransaction(
             tx,
             order,

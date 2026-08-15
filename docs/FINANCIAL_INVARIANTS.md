@@ -137,7 +137,7 @@ it. Current orders are:
   the reverse order.
 
 For every `OrderDeliveryVersion`, `OrderDispute`, `Revision`,
-`DeliveryFraudFlag`, `DeliveryFraudFlagResolution`, or
+`DeliveryFraudFlag`, `DeliveryFraudFlagResolution`, `DeliveryFraudFinding`, or
 `OrderCancellationRequest` command, the parent `Order ... FOR UPDATE` lock is
 the first application lock in the retryable transaction. `DeliveryFraudHold`
 is not a command surface: PostgreSQL projects it from an immutable flag and
@@ -591,6 +591,56 @@ link-recheck jobs re-read active-delivery identity, supersession, and the
 signed optimistic generation under that lock before changing state or
 appending evidence. Stale jobs may leave an unreferenced content-addressed
 object, but no database evidence, state, flag, or hold.
+
+A confirmed signal is not a resolution. Operations or Super Admin appends one
+immutable `DeliveryFraudFinding` with the expected Order and delivery
+verification versions, role-at-time, bounded internal reason, request
+fingerprint, and actor-scoped UUID idempotency key. The same transaction links
+or creates one same-order nonterminal `OrderCancellationRequest`; it never
+deletes `DeliveryFraudHold` or moves money. Finding insertion, resolution
+insertion, and automated link restoration all serialize through the same Order
+fence and are mutually exclusive for one flag. Exact retries validate every
+immutable input and may repair only missing audience projections. A new
+finding-and-handoff command advances `Order.version` exactly once after the
+database validates the caller's expected version; an exact replay advances it
+zero times.
+
+Once linked, the cancellation case may progress only through
+`FULL_REFUND -> PENDING_FINANCE -> APPROVED`. Operations or Super Admin assigns
+responsibility; Finance or Super Admin approves the canonical refund and
+required publisher-compensation disposition in a separate money command. Both
+commands lock and revalidate current STAFF authority after the Order lock.
+PostgreSQL rejects a different order, a reused `PENDING_FINANCE` case without
+final responsibility, reviewer and bounded reason,
+continue/dispute/reject/withdraw transition, stale or banned actor, non-refund
+transaction, amount/currency mismatch, deletion, or later evidence rewrite.
+The cancellation refund ID has a restrictive foreign key, and a linked
+approved refund ledger row is append-only. A correction is a new compensating
+record, never an UPDATE of the evidence that authorized the outcome.
+
+Force cancellation and dispute refund fail before money movement when the
+locked Order has a confirmed finding. PostgreSQL independently defers the
+Order terminal-outcome assertion until transaction commit so the canonical
+refund may update the Order and then approve its linked case atomically. An
+Order with a finding cannot become `CANCELLED` or `COMPLETED`; it can become
+`REFUNDED` only when every linked case is `APPROVED`, `FULL_REFUND`, and carries
+complete responsibility, Finance actor, refund-transaction, and resolution
+evidence. Direct SQL and alternate writers therefore cannot strand a terminal
+Order beside a non-actionable case.
+
+This workflow does not claim maker-checker actor independence: Super Admin is
+allowed on both commands. Phishing-resistant step-up and universal independent
+checking for human money mutations remain separate paid-launch gates.
+
+Customer-facing wallet and order projections never use free-form ledger,
+AuditLog, cancellation, or OrderEvent text as public copy. New REFUND ledger
+descriptions contain only the Order identity; historical REFUND descriptions
+are replaced at the customer API boundary. The stakeholder timeline derives
+exact amounts from canonical REFUND and `PublisherCompensation` rows and uses
+the database-maintained `DeliveryFraudHold` as its blocked-state authority.
+Customer, publisher, Operations, Finance, and Super Admin receive distinct
+allowlisted fields; client code never infers access from a role badge or raw
+metadata.
 
 Delivery approval never clears fraud as a side effect. A technically passing
 delivery that generates a fraud signal remains in `MANUAL_REVIEW`; customer

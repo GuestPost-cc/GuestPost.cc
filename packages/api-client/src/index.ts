@@ -24,6 +24,10 @@ export {
   bindDepositIdempotencyKey,
   depositErrorPresentation,
 } from "./deposit-command"
+export {
+  isExactMoneyAtMost,
+  normalizeExactNonNegativeMoney,
+} from "./exact-money"
 export { payoutErrorPresentation } from "./payout-command"
 export type {
   AccountSuspensionMutationResponse,
@@ -116,9 +120,20 @@ export type {
   CancellationRequestResponse,
   CancellationRequestStatus,
   CreateOrderData,
+  DeliveryCapabilityBlockedReason,
+  DeliveryProofAvailableResponse,
+  DeliveryProofCapabilities,
+  DeliveryProofResponse,
+  DeliveryProofUnavailableResponse,
+  DeliverySecurityReviewStatus,
   OrderItemData,
   OrderResponse,
   PublisherCompensationDecisionInput,
+  StakeholderFinancialImpact,
+  StakeholderTimelineEntry,
+  StakeholderTimelineEntryKind,
+  StakeholderTimelineEntrySeverity,
+  StakeholderTimelineEntryStatus,
 } from "./services/orders"
 export { OrdersService } from "./services/orders"
 export type {

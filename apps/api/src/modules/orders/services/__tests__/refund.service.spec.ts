@@ -61,6 +61,9 @@ describe("RefundService", () => {
         create: jest.fn().mockResolvedValue({ id: "compensation-1" }),
         findUnique: jest.fn().mockResolvedValue(null),
       },
+      deliveryFraudFinding: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       publisher: {
         findUnique: jest.fn().mockResolvedValue({
           organizationId: "publisher-org-1",
@@ -102,6 +105,7 @@ describe("RefundService", () => {
     }
     communicationsMock = {
       customerOrderRecipients: jest.fn().mockResolvedValue(["customer-user-1"]),
+      publisherRecipients: jest.fn().mockResolvedValue(["publisher-user-1"]),
       staffRecipients: jest.fn().mockResolvedValue(["finance-user-1"]),
       record: jest.fn().mockResolvedValue({ eventId: "event-1" }),
       repairValidatedLegacyEvent: jest
@@ -277,6 +281,7 @@ describe("RefundService", () => {
         data: expect.objectContaining({
           type: "REFUND",
           reference: "refund-command-1",
+          description: "Refund for order order-1",
         }),
       }),
     )
@@ -295,7 +300,16 @@ describe("RefundService", () => {
       currency: "USD",
       walletId: "wallet-1",
       reference: "refund-command-1",
-      description: "Refund for order order-1: retry",
+      description: "Refund for order order-1",
+    })
+    prismaMock.orderEvent.findFirst.mockResolvedValue({
+      id: "refund-event-1",
+      actorId: "admin-1",
+      metadata: {
+        reason: "retry",
+        responsibility: "SYSTEM",
+        refundTransactionId: "refund-tx-existing",
+      },
     })
     prismaMock.order.findUniqueOrThrow.mockResolvedValue({
       ...baseOrder,
@@ -326,6 +340,40 @@ describe("RefundService", () => {
     expect(communicationsMock.dispatchManyBestEffort).toHaveBeenCalledWith([
       "event-1",
     ])
+  })
+
+  it("grandfathers a publisher-attributed replay whose legacy refund predates explicit NONE evidence", async () => {
+    prismaMock.transaction.findFirst.mockResolvedValue({
+      id: "refund-tx-legacy-publisher",
+      orderId: "order-1",
+      type: "REFUND",
+      amount: new Decimal(100),
+      currency: "USD",
+      walletId: "wallet-1",
+      reference: "refund-command-publisher",
+      description: "Refund for order order-1: publisher failure",
+    })
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+      ...baseOrder,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "PUBLISHER",
+    })
+    prismaMock.publisherCompensation.findUnique.mockResolvedValue(null)
+
+    const result = await service.refundOrder(
+      "order-1",
+      "publisher failure",
+      "finance-1",
+      "refund-command-publisher",
+      {
+        responsibility: "PUBLISHER",
+        publisherCompensation: { effectiveOrderStatus: "PUBLISHED" },
+      },
+    )
+
+    expect(result.status).toBe("REFUNDED")
+    expect(prismaMock.transaction.create).not.toHaveBeenCalled()
   })
 
   it("re-reads idempotent refund evidence after locking the Order", async () => {
@@ -447,6 +495,7 @@ describe("RefundService", () => {
       submittedAt: new Date("2026-08-11T00:00:00.000Z"),
     }
     let refundRow: any = null
+    let refundEventRow: any = null
     let refundCreates = 0
     let outsideChecks = 0
     let releaseOutside!: () => void
@@ -528,17 +577,21 @@ describe("RefundService", () => {
             },
           },
           orderEvent: {
-            async create() {
-              return { id: "refund-event-1" }
+            async create(input: { data: any }) {
+              refundEventRow = { id: "refund-event-1", ...input.data }
+              return refundEventRow
             },
             async findFirst(input: { where: any }) {
               return input.where.metadata.equals === refundRow?.id
-                ? { id: "refund-event-1" }
+                ? refundEventRow
                 : null
             },
           },
           publisherCompensation: {
             findUnique: jest.fn().mockResolvedValue(null),
+          },
+          deliveryFraudFinding: {
+            findMany: jest.fn().mockResolvedValue([]),
           },
         }
         try {
@@ -593,7 +646,16 @@ describe("RefundService", () => {
       currency: "USD",
       walletId: "wallet-1",
       reference: "refund-command-1",
-      description: "Refund for order order-1: original reason",
+      description: "Refund for order order-1",
+    })
+    prismaMock.orderEvent.findFirst.mockResolvedValue({
+      id: "refund-event-1",
+      actorId: "admin-1",
+      metadata: {
+        reason: "original reason",
+        responsibility: "SYSTEM",
+        refundTransactionId: "refund-tx-existing",
+      },
     })
     prismaMock.order.findUniqueOrThrow.mockResolvedValue({
       ...baseOrder,

@@ -162,9 +162,111 @@ interface RawOrder {
   dispute?: OrderDisputeResponse | null
   fulfillmentChannel?: "PUBLISHER" | "PLATFORM" | null
   cancellationRequests?: CancellationRequestResponse[]
+  stakeholderTimeline?: StakeholderTimelineEntry[]
   createdAt: string
   updatedAt: string
 }
+
+export type StakeholderTimelineEntryKind =
+  | "SECURITY_REVIEW_OPENED"
+  | "SECURITY_REVIEW_CLEARED"
+  | "SECURITY_VIOLATION_CONFIRMED"
+  | "CUSTOMER_REFUND_COMPLETED"
+  | "PUBLISHER_COMPENSATION_DECIDED"
+
+export type StakeholderTimelineEntryStatus =
+  | "PENDING"
+  | "ACTION_REQUIRED"
+  | "COMPLETED"
+
+export type StakeholderTimelineEntrySeverity =
+  | "INFO"
+  | "WARNING"
+  | "CRITICAL"
+  | "SUCCESS"
+
+export interface StakeholderFinancialImpact {
+  currency: string
+  customerRefund?: string
+  publisherCompensation?: string
+  debtApplied?: string
+  netPublisherCredit?: string
+}
+
+/**
+ * Server-authored, viewer-specific order update. Clients must render only the
+ * fields returned by the API and must never infer hidden fraud or financial
+ * details from generic OrderEvent metadata.
+ */
+export interface StakeholderTimelineEntry {
+  id: string
+  kind: StakeholderTimelineEntryKind
+  occurredAt: string
+  status: StakeholderTimelineEntryStatus
+  severity: StakeholderTimelineEntrySeverity
+  title: string
+  summary: string
+  financialImpact?: StakeholderFinancialImpact
+}
+
+export type DeliverySecurityReviewStatus =
+  | "UNDER_REVIEW"
+  | "CONFIRMED_ACTION_REQUIRED"
+
+export type DeliveryCapabilityBlockedReason =
+  | "SECURITY_REVIEW"
+  | "VERIFICATION_PENDING"
+  | "WRONG_STATUS"
+  | "NO_DELIVERY"
+
+export interface DeliveryProofCapabilities {
+  canConfirm: boolean
+  canManualAccept: boolean
+  blockedReason: DeliveryCapabilityBlockedReason | null
+}
+
+interface DeliveryProofAccessProjection {
+  securityReview: { status: DeliverySecurityReviewStatus } | null
+  capabilities: DeliveryProofCapabilities
+}
+
+export interface DeliveryProofUnavailableResponse
+  extends DeliveryProofAccessProjection {
+  hasDelivery: false
+}
+
+export interface DeliveryProofAvailableResponse
+  extends DeliveryProofAccessProjection {
+  hasDelivery: true
+  publishedUrl: string
+  articleTitle: string | null
+  screenshotUrl: string | null
+  verificationStatus:
+    | "PENDING"
+    | "VERIFIED"
+    | "FAILED"
+    | "MANUAL_REVIEW"
+    | "RETRYING"
+  interventionStatus: "NONE" | "APPROVED" | "REJECTED" | "OVERRIDDEN"
+  submittedAt: string
+  deliveredBy: "Platform" | "Publisher"
+  verifyMethod: "AUTO" | "MANUAL_ADMIN" | "CUSTOMER_MANUAL" | null
+  autoAcceptAt: string | null
+  verifiedAt: string | null
+  pageTitle: string | null
+  results: {
+    urlReachable: boolean
+    linkFound: boolean
+    targetUrlMatched: boolean
+    anchorVerified: boolean
+    verifiedAnchorText: string | null
+    checkedAt: string
+  } | null
+}
+
+export type DeliveryProofResponse =
+  | DeliveryProofUnavailableResponse
+  | DeliveryProofAvailableResponse
 
 export interface OrderResponse {
   id: string
@@ -255,6 +357,7 @@ export interface OrderResponse {
   dispute?: OrderDisputeResponse | null
   fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
   cancellationRequests: CancellationRequestResponse[]
+  stakeholderTimeline: StakeholderTimelineEntry[]
 }
 
 export type CancellationReasonCode =
@@ -280,7 +383,8 @@ export interface CancellationMutationData {
 }
 
 export interface PublisherCompensationDecisionInput {
-  amount: number
+  /** Exact decimal string; never round-trip a financial decision through Number. */
+  amount: string
   reason: string
 }
 
@@ -298,11 +402,11 @@ export interface CancellationRequestResponse {
   orderId: string
   requesterType: "CUSTOMER" | "PUBLISHER" | "STAFF" | "SYSTEM"
   reasonCode: CancellationReasonCode
-  note: string | null
+  note?: string | null
   status: CancellationRequestStatus
   responsibility: string
   responseDeadlineAt: string | null
-  responseNote: string | null
+  responseNote?: string | null
   createdAt: string
 }
 
@@ -427,6 +531,7 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
     dispute: raw.dispute,
     fulfillmentChannel: raw.fulfillmentChannel ?? null,
     cancellationRequests: raw.cancellationRequests ?? [],
+    stakeholderTimeline: raw.stakeholderTimeline ?? [],
   }
 }
 
@@ -622,7 +727,9 @@ export class OrdersService {
 
   // Customer-facing delivery proof (verification checklist + status).
   deliveryProof(id: string) {
-    return this.client.get<any>(`/orders/${id}/delivery-proof`)
+    return this.client.get<DeliveryProofResponse>(
+      `/orders/${id}/delivery-proof`,
+    )
   }
 
   // ── Customer review flow ──────────────────────────────────────────────────
