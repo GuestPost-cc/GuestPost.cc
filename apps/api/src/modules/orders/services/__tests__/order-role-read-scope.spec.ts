@@ -44,7 +44,7 @@ describe("order role read scoping", () => {
       capabilities: {
         canConfirm: false,
         canManualAccept: false,
-        blockedReason: "NO_DELIVERY",
+        blockedReason: null,
       },
     })
     expect(prisma.order.findFirst).toHaveBeenCalledWith({

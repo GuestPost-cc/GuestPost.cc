@@ -26,7 +26,7 @@ const metric = {
   status: "CURRENT",
   measuredAt: new Date("2026-07-20T00:00:00Z"),
   collectedAt: new Date("2026-07-20T01:00:00Z"),
-  expiresAt: new Date("2026-08-20T00:00:00Z"),
+  expiresAt: new Date("2099-08-20T00:00:00Z"),
   enteredByUserId: "must-not-leak",
   importBatchId: "must-not-leak",
 }
