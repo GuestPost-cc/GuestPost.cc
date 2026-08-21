@@ -6,22 +6,27 @@ updated: 2026-08-21
 
 # Risks
 
-Updated 2026-08-21 after the marketplace trust-boundary implementation and the
-controlled Neon cutover/worker-fleet containment. Historical audit Views are
-snapshots, not current status;
+Updated 2026-08-21 for PR #105's marketplace trust-boundary work on top of the
+merged confirmed-fraud/support release and the controlled Neon cutover/worker-
+fleet containment. Historical audit Views are snapshots, not current status;
 `Work/backlog.md` is the canonical open-work register and this file is the
 canonical launch-risk register.
 
 ## Current production-hold risk
 
-- **The marketplace moderation migration is not yet deployed.** Migration
+- **The marketplace moderation migration is current in the authorized Neon
+  staging database, but is not deployed to production.** Migration
   `20260821120000_marketplace_moderation` introduces append-only moderation
   history, current projections, versioned commands, and conservative legacy
-  hold backfill. Old writers do not understand these authority boundaries.
-  Rehearse on a populated clone, verify backfill counts/pointers, drain old API
-  writers, apply the migration before the matching application image, and use a
-  forward fix rather than dropping immutability guards. The production runtime
-  role must remain DML-only and lack TRUNCATE/DDL privileges.
+  hold backfill. The staging postflight found all 77 migrations current, no
+  failed migration, complete projections for three held listings and one
+  inactive website, zero invalid event targets, both append-only guards
+  enabled, and all five moderation constraints validated. Old writers still do
+  not understand these authority boundaries. Before production, rehearse on a
+  populated clone, verify backfill counts/projections, drain old API writers,
+  apply the migration before the matching application image, and use a forward
+  fix rather than dropping immutability guards. The production runtime role
+  must remain DML-only and lack TRUNCATE/DDL privileges.
 
 - **Buyer metrics intentionally disappear when authoritative evidence is
   absent or stale.** Publisher/staff/imported values remain available for
@@ -29,6 +34,41 @@ canonical launch-risk register.
   recommendations. This fail-closed behavior can reduce apparent inventory
   until provider collection succeeds; do not restore compatibility scalars or
   manual-source allowlists as an availability shortcut.
+
+- **The confirmed-fraud release is mixed-writer incompatible and is not yet
+  deployed.** Migration `20260815120000_delivery_fraud_findings` makes findings,
+  linked cancellation decisions, and approved REFUND evidence append-only and
+  prevents automated restoration from clearing a confirmed flag. It also adds
+  a deferred Order terminal-outcome constraint that old terminal writers do
+  not understand. An old API,
+  delivery worker, on-demand job, maintenance dispatcher, or ad-hoc writer can
+  fail against these guards or apply behavior that does not understand the
+  permanent hold. Mitigation: rotate exposed credentials, rehearse on a
+  populated Neon clone using a direct deploy-role DSN, provision and prove the
+  exact restricted runtime grants, take a PITR marker, hard-drain API plus all
+  worker modes, migrate once, and start only the matching image in
+  `recovery_only`. After a finding exists, rollback is forward-fix or controlled
+  PITR; never drop guards or restart an older writer.
+
+- **The new table intentionally has no default runtime access.** The migration
+  revokes `DeliveryFraudFinding` from `PUBLIC`. Starting the matching API before
+  granting table SELECT and the exact column-scoped INSERT surface to the
+  restricted runtime role makes confirmation unavailable; granting broad DML,
+  trigger-function EXECUTE, ownership, or schema CREATE would undermine the
+  evidence boundary. The identifier-safe grant and effective `has_*` denial
+  checks in `docs/PRODUCTION_RUNBOOK.md` are mandatory pre-start gates and must
+  include `assert_confirmed_fraud_terminal_outcome()`.
+
+- **Support still needs one real multi-actor browser acceptance journey.** The
+  service, API-client, and shared UI have focused coverage, and a disposable
+  PostgreSQL suite covers projection privacy, internal-note filtering,
+  idempotent replay, publisher order authorization, and assignment races. The
+  repository does not yet provision customer, publisher, Operations, and Super
+  Admin browser sessions in one isolated Playwright fixture. Before paid
+  launch, prove sender side/label/accessibility, publisher assigned-thread
+  routing, internal-note invisibility after refresh, close/reopen, and
+  ambiguous retry in real browsers; do not substitute mocks or source-string
+  checks for that gate.
 
 - **The schema cutover succeeded, but the worker hard drain missed one workload.**
   All 75 migrations are committed on Neon and exact SHA `512b851` is live on

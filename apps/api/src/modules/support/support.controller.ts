@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -15,24 +16,20 @@ import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import type { DurableCurrentAuthority } from "../auth/current-authority.service"
 import { AddTicketMessageDto } from "./dto/add-ticket-message.dto"
 import { CreateTicketDto } from "./dto/create-ticket.dto"
-import { SupportService } from "./support.service"
+import { ListSupportTicketsQueryDto } from "./dto/list-support-tickets-query.dto"
+import { ReassignTicketDto } from "./dto/reassign-ticket.dto"
+import { UpdateExternalTicketStatusDto } from "./dto/update-external-ticket-status.dto"
+import { type SupportActor, SupportService } from "./support.service"
 
 // The support API is now multi-actor: CUSTOMER, PUBLISHER, and STAFF all
 // read/write the same Ticket rows, but each sees a different slice based on
 // the channel-aware visibility rules in SupportService. We split the
 // endpoints by their guard so each group's role gate is explicit.
 
-function buildActor(user: any): {
-  userId: string
-  kind: "CUSTOMER" | "PUBLISHER" | "STAFF"
-  organizationId?: string | null
-  publisherId?: string | null
-  staffRole?: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
-  customerRole?: "OWNER" | "MEMBER" | null
-  publisherRole?: "PUBLISHER_OWNER" | "PUBLISHER_MEMBER" | null
-} {
+function buildActor(user: DurableCurrentAuthority): SupportActor {
   if (user.userType === "STAFF") {
     return { userId: user.id, kind: "STAFF", staffRole: user.staffRole ?? null }
   }
@@ -56,38 +53,51 @@ function buildActor(user: any): {
 export class SupportController {
   constructor(private readonly support: SupportService) {}
 
-  // ── Customer endpoints (existing surface, channel snapshot happens
-  //    server-side inside createTicket) ────────────────────────────────────
+  // Tenant and assignment routing is derived server-side from authenticated
+  // membership and, when present, the locked order.
   @Post("tickets")
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
-  @ActorType("CUSTOMER")
-  @MemberRoles("OWNER", "MEMBER")
-  createTicket(@Body() body: CreateTicketDto, @CurrentAuthority() user: any) {
-    return this.support.createTicket({
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @MemberRoles("OWNER", "MEMBER", "PUBLISHER_OWNER", "PUBLISHER_MEMBER")
+  createTicket(
+    @Body() body: CreateTicketDto,
+    @CurrentAuthority() user: DurableCurrentAuthority,
+  ) {
+    return this.support.createTicket(buildActor(user), {
+      clientRequestId: body.clientRequestId,
       subject: body.subject,
       description: body.description,
       orderId: body.orderId,
-      userId: user.id,
-      organizationId: user.organizationId,
     })
   }
 
   // ── Multi-actor list / get / reply ───────────────────────────────────────
   // Same path; the service decides the visible slice via buildActor().
   @Get("tickets")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @MemberRoles("OWNER", "MEMBER", "PUBLISHER_OWNER", "PUBLISHER_MEMBER")
-  listTickets(@CurrentAuthority() user: any, @Query("status") status?: string) {
-    return this.support.listTickets(buildActor(user), { status })
+  listTickets(
+    @CurrentAuthority() user: DurableCurrentAuthority,
+    @Query() query: ListSupportTicketsQueryDto,
+  ) {
+    return this.support.listTickets(buildActor(user), query)
   }
 
   @Get("tickets/:id")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @MemberRoles("OWNER", "MEMBER", "PUBLISHER_OWNER", "PUBLISHER_MEMBER")
-  getTicket(@Param("id") id: string, @CurrentAuthority() user: any) {
-    return this.support.getTicket(id, buildActor(user))
+  getTicket(
+    @Param("id") id: string,
+    @CurrentAuthority() user: DurableCurrentAuthority,
+    @Query("messageCursor") messageCursor?: string,
+  ) {
+    return this.support.getTicket(id, buildActor(user), { messageCursor })
   }
 
   @Post("tickets/:id/messages")
@@ -97,12 +107,29 @@ export class SupportController {
   addMessage(
     @Param("id") ticketId: string,
     @Body() body: AddTicketMessageDto,
-    @CurrentAuthority() user: any,
+    @CurrentAuthority() user: DurableCurrentAuthority,
   ) {
     return this.support.addMessage(ticketId, buildActor(user), {
       content: body.content,
+      clientMessageId: body.clientMessageId,
       visibility: body.visibility,
     })
+  }
+
+  @Patch("tickets/:id/status")
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @MemberRoles("OWNER", "MEMBER", "PUBLISHER_OWNER", "PUBLISHER_MEMBER")
+  updateStatus(
+    @Param("id") ticketId: string,
+    @Body() body: UpdateExternalTicketStatusDto,
+    @CurrentAuthority() user: DurableCurrentAuthority,
+  ) {
+    return this.support.updateExternalStatus(
+      ticketId,
+      body.status,
+      buildActor(user),
+    )
   }
 
   // ── Admin-only reassignment ──────────────────────────────────────────────
@@ -112,16 +139,9 @@ export class SupportController {
   @StaffRoles("SUPER_ADMIN")
   reassign(
     @Param("id") ticketId: string,
-    @Body() body: {
-      assignedToUserId?: string | null
-      assignedPublisherId?: string | null
-      reason?: string
-    },
-    @CurrentAuthority() user: any,
+    @Body() body: ReassignTicketDto,
+    @CurrentAuthority() user: DurableCurrentAuthority,
   ) {
-    return this.support.reassignTicket(ticketId, body, {
-      userId: user.id,
-      staffRole: user.staffRole,
-    })
+    return this.support.reassignTicket(ticketId, body, buildActor(user))
   }
 }

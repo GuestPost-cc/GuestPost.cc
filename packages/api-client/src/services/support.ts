@@ -1,17 +1,8 @@
-import type { TicketStatus } from "@guestpost/shared"
+import type { OrderStatus, ServiceType, TicketStatus } from "@guestpost/shared"
 import type { HttpClient } from "../client"
 
-// Phase 6.6: visibility scope for a ticket reply.
-//   PUBLIC   — customer-visible message (default).
-//   INTERNAL — staff-only note. Customer-side clients never see these
-//              messages and never send this visibility; staff frontends use
-//              it for cross-role coordination.
 export type TicketMessageVisibility = "PUBLIC" | "INTERNAL"
 
-// Phase 6.6.1: role-at-write-time, snapshotted on every message. UI keys
-// the role badge off this; reports key audit filters off this. Never
-// derived dynamically — a role change later does NOT mutate historical
-// messages.
 export type TicketParticipantRole =
   | "CUSTOMER"
   | "PUBLISHER"
@@ -19,18 +10,11 @@ export type TicketParticipantRole =
   | "ADMIN"
   | "FINANCE"
 
-// Phase 6.6.1: how to classify this row in the thread render.
-//   MESSAGE       — human reply.
-//   INTERNAL_NOTE — staff-only note (visibility is always INTERNAL).
-//   SYSTEM_EVENT  — machine-emitted thread entry (reassignment, status
-//                   transition). Schema-ready; no service emits yet.
 export type TicketMessageType = "MESSAGE" | "INTERNAL_NOTE" | "SYSTEM_EVENT"
 
-// Phase 6.6.2: uncollapsed role context snapshot. Companion to
-// participantRole — preserves the raw schema-level roles (StaffRole /
-// CustomerRole / PublisherRole) so investigations can answer "OWNER vs
-// MEMBER?" / "SUPER_ADMIN vs FINANCE?" without joining memberships at
-// query time. Nullable on pre-migration rows.
+/** The stable party used for alignment and labels in every support client. */
+export type SupportParty = "CUSTOMER" | "PUBLISHER" | "SUPPORT" | "SYSTEM"
+
 export interface TicketMessageActorSnapshot {
   kind: "CUSTOMER" | "PUBLISHER" | "STAFF"
   staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
@@ -38,108 +22,269 @@ export interface TicketMessageActorSnapshot {
   publisherRole: "PUBLISHER_OWNER" | "PUBLISHER_MEMBER" | null
 }
 
+export interface SupportMessageSender {
+  party: SupportParty
+  displayName: string
+  isSelf: boolean
+}
+
+export interface TicketMessageAuthorEvidence {
+  displayName: string
+  /** Present only for SUPER_ADMIN responses. */
+  userId?: string
+  /** Present only for SUPER_ADMIN responses. */
+  email?: string
+}
+
+/**
+ * Public messages contain only the base properties. The optional forensic
+ * properties are included solely on staff projections and are omitted (not
+ * serialized as null) from customer and publisher responses.
+ */
 export interface TicketMessageDto {
   id: string
   content: string
   visibility: TicketMessageVisibility
-  participantRole: TicketParticipantRole
   messageType: TicketMessageType
-  actorSnapshot: TicketMessageActorSnapshot | null
   createdAt: string
-  user: {
-    id: string
-    name: string | null
-    email?: string
-    userType?: string
-  } | null
+  sender: SupportMessageSender
+  participantRole?: TicketParticipantRole
+  actorSnapshot?: TicketMessageActorSnapshot | null
+  authorEvidence?: TicketMessageAuthorEvidence | null
+}
+
+export interface TicketCapabilities {
+  canReply: boolean
+  canClose: boolean
+  canReopen: boolean
+  canPostInternal: boolean
+  canClaim: boolean
+  /** Server-authorized ticket-only Operations assignment management. */
+  canReassign: boolean
+  allowedVisibilities: TicketMessageVisibility[]
+  allowedStatuses: TicketStatus[]
+  readOnlyReason: string | null
+}
+
+export interface TicketOrderSummary {
+  id: string
+  title: string | null
+  status: OrderStatus
+  type: ServiceType
+  fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
 }
 
 export interface TicketListItem {
   id: string
   subject: string
   status: TicketStatus
+  fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
+  order: TicketOrderSummary | null
+  messageCount?: number
   createdAt: string
   updatedAt: string
-  fulfillmentChannel?: "PUBLISHER" | "PLATFORM" | null
-  assignedTo?: { id: string; name: string | null } | null
-  assignedPublisher?: { id: string; name: string | null } | null
-  order?: {
-    id: string
-    title: string | null
-    status: string
-    type: string
-    fulfillmentChannel: string | null
-  } | null
+  capabilities: TicketCapabilities
 }
 
 export interface TicketDetail extends TicketListItem {
-  description: string | null
-  user: { id: string; name: string | null; email: string; userType?: string }
-  organization?: { id: string; name: string } | null
+  openingMessage: TicketMessageDto | null
   messages: TicketMessageDto[]
+  messagePage: TicketMessagePage
+}
+
+export interface TicketMessagePage {
+  /** Opaque cursor for the next, older page; null when history is exhausted. */
+  nextCursor: string | null
+  limit: number
+}
+
+export interface TicketDetailQuery {
+  messageCursor?: string
+}
+
+export interface StaffTicketIdentity {
+  displayName: string
+  /** Present only for SUPER_ADMIN responses. */
+  userId?: string
+}
+
+export interface StaffTicketRequester extends StaffTicketIdentity {
+  /** Present only for SUPER_ADMIN responses. */
+  email?: string
+}
+
+export interface StaffTicketPublisherIdentity {
+  displayName: string
+  /** Present only for SUPER_ADMIN responses. */
+  publisherId?: string
+}
+
+export interface StaffTicketListItem extends TicketListItem {
+  requester: StaffTicketRequester
+  organization: { name: string } | null
+  assignedTo: StaffTicketIdentity | null
+  assignedPublisher: StaffTicketPublisherIdentity | null
+  messageCount: number
+}
+
+export interface StaffTicketDetail extends TicketDetail {
+  requester: StaffTicketRequester
+  organization: { name: string } | null
+  assignedTo: StaffTicketIdentity | null
+  assignedPublisher: StaffTicketPublisherIdentity | null
+}
+
+export interface StaffTicketListResponse {
+  items: StaffTicketListItem[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export interface TicketListPage {
+  items: TicketListItem[]
+  /** Opaque cursor for the next, older public-activity page. */
+  nextCursor: string | null
+  limit: number
+}
+
+export interface CreateSupportTicketInput {
+  subject: string
+  message: string
+  /** Stable per user intent; retry the same command with the same value. */
+  clientRequestId: string
+  /** Required by policy when the authenticated actor is a publisher. */
+  orderId?: string
+}
+
+export interface CreateSupportTicketResponse {
+  id: string
+  status: TicketStatus
+  createdAt: string
+}
+
+export interface AddTicketMessageInput {
+  content: string
+  /** Stable per composed reply; retry the same command with the same value. */
+  clientMessageId: string
+  visibility?: TicketMessageVisibility
+}
+
+export type PublicTicketStatusMutation = Extract<
+  TicketStatus,
+  "OPEN" | "CLOSED"
+>
+
+export interface TicketStatusMutationResponse {
+  id: string
+  status: TicketStatus
+  updatedAt: string
+  capabilities: TicketCapabilities
+}
+
+export interface ReassignTicketInput {
+  assignedToUserId: string | null
+  expectedAssignedToUserId: string | null
+  reason: string
+}
+
+export interface TicketAssignmentMutationResponse {
+  id: string
+  assignedTo: StaffTicketIdentity | null
+  capabilities: TicketCapabilities
+}
+
+export interface PublicSupportListFilters
+  extends Record<string, string | number | undefined> {
+  status?: TicketStatus
+  orderId?: string
+  cursor?: string
+  limit?: number
+}
+
+export interface StaffSupportListFilters
+  extends Record<string, string | number | undefined> {
+  status?: TicketStatus
+  orderId?: string
+  search?: string
+  channel?: "PLATFORM" | "PUBLISHER"
+  assignedToUserId?: string | "UNASSIGNED"
+  page?: number
+  limit?: number
+}
+
+export type SupportListFilters =
+  | PublicSupportListFilters
+  | StaffSupportListFilters
+
+export type SupportQueryScope = "customer" | "publisher" | "admin"
+
+/** Shared hierarchy so list/detail invalidation is consistent in every app. */
+export const supportKeys = {
+  all: ["support"] as const,
+  scope: (scope: SupportQueryScope) => [...supportKeys.all, scope] as const,
+  lists: (scope: SupportQueryScope) =>
+    [...supportKeys.scope(scope), "list"] as const,
+  list: (scope: SupportQueryScope, filters?: SupportListFilters) =>
+    [...supportKeys.lists(scope), filters ?? {}] as const,
+  details: (scope: SupportQueryScope) =>
+    [...supportKeys.scope(scope), "detail"] as const,
+  detail: (scope: SupportQueryScope, ticketId: string) =>
+    [...supportKeys.details(scope), ticketId] as const,
+  order: (scope: Exclude<SupportQueryScope, "admin">, orderId: string) =>
+    [...supportKeys.scope(scope), "order", orderId] as const,
 }
 
 export class SupportService {
   constructor(private client: HttpClient) {}
 
-  // Backend stores the body as `description` — the previous `message`/`priority`
-  // keys were silently dropped, so tickets were created with no detail. Map
-  // explicitly and allow linking an order.
-  createTicket(data: { subject: string; message: string; orderId?: string }) {
-    return this.client.post<{ id: string; status: string }>(
-      "/support/tickets",
+  createTicket(data: CreateSupportTicketInput) {
+    return this.client.post<CreateSupportTicketResponse>("/support/tickets", {
+      json: {
+        subject: data.subject,
+        description: data.message,
+        clientRequestId: data.clientRequestId,
+        orderId: data.orderId,
+      },
+    })
+  }
+
+  listTickets(params?: PublicSupportListFilters) {
+    return this.client.get<TicketListPage>("/support/tickets", { params })
+  }
+
+  getTicket(id: string, params?: TicketDetailQuery) {
+    return this.client.get<TicketDetail>(`/support/tickets/${id}`, {
+      params: params ? { messageCursor: params.messageCursor } : undefined,
+    })
+  }
+
+  addMessage(ticketId: string, data: AddTicketMessageInput) {
+    return this.client.post<TicketMessageDto>(
+      `/support/tickets/${ticketId}/messages`,
       {
         json: {
-          subject: data.subject,
-          description: data.message,
-          orderId: data.orderId,
+          content: data.content,
+          clientMessageId: data.clientMessageId,
+          visibility: data.visibility,
         },
       },
     )
   }
 
-  // Phase 6.5: actor-aware. Customer sees their org; publisher sees their
-  // assigned tickets; staff sees the slice per role (see SupportService).
-  // Optional status filter.
-  listTickets(params?: { status?: string }) {
-    return this.client.get<TicketListItem[]>("/support/tickets", {
-      params: params as Record<string, any>,
-    })
+  updateTicketStatus(ticketId: string, status: PublicTicketStatusMutation) {
+    return this.client.patch<TicketStatusMutationResponse>(
+      `/support/tickets/${ticketId}/status`,
+      { json: { status } },
+    )
   }
 
-  // Phase 6.5 admin-only reassignment.
-  reassignTicket(
-    ticketId: string,
-    body: {
-      assignedToUserId?: string | null
-      assignedPublisherId?: string | null
-      reason?: string
-    },
-  ) {
-    return this.client.patch(`/support/tickets/${ticketId}/reassign`, {
-      json: body,
-    })
+  closeTicket(ticketId: string) {
+    return this.updateTicketStatus(ticketId, "CLOSED")
   }
 
-  getTicket(id: string) {
-    return this.client.get<TicketDetail>(`/support/tickets/${id}`)
-  }
-
-  // Phase 6.6: optional visibility on replies. Customer/publisher clients
-  // should not pass INTERNAL — the server enforces this and returns 403 if
-  // they try. Default visibility is PUBLIC.
-  addMessage(
-    ticketId: string,
-    data: { content: string; visibility?: TicketMessageVisibility },
-  ) {
-    return this.client.post(`/support/tickets/${ticketId}/messages`, {
-      json: data,
-    })
-  }
-
-  updateTicketStatus(ticketId: string, status: TicketStatus) {
-    return this.client.patch(`/support/tickets/${ticketId}/status`, {
-      json: { status },
-    })
+  reopenTicket(ticketId: string) {
+    return this.updateTicketStatus(ticketId, "OPEN")
   }
 }

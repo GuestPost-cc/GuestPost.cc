@@ -118,6 +118,26 @@ const baseEvent = {
 }
 
 describe("CommunicationsService", () => {
+  it("resolves staff recipients only from live STAFF identities", async () => {
+    const tx = {
+      staffMembership: {
+        findMany: jest.fn().mockResolvedValue([{ userId: "staff-1" }]),
+      },
+    }
+    const service = new CommunicationsService({} as any, {} as any)
+
+    await expect(
+      service.staffRecipients(["FINANCE", "SUPER_ADMIN"], tx as any),
+    ).resolves.toEqual(["staff-1"])
+    expect(tx.staffMembership.findMany).toHaveBeenCalledWith({
+      where: {
+        role: { in: ["FINANCE", "SUPER_ADMIN"] },
+        user: { banned: false, userType: "STAFF" },
+      },
+      select: { userId: true },
+    })
+  })
+
   it("rejects outbox writes against the root client", async () => {
     const { service, prisma } = createHarness()
 

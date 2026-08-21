@@ -280,7 +280,6 @@ describe("external order projection", () => {
         status: "PENDING_FINANCE",
         responsibility: "CUSTOMER",
         responseDeadlineAt: new Date("2026-08-03T00:00:00.000Z"),
-        responseNote: "Accepted",
         createdAt: new Date("2026-08-02T00:00:00.000Z"),
       },
     ])
@@ -373,6 +372,118 @@ describe("external order projection", () => {
     )
   })
 
+  it("omits non-public event identities instead of returning redacted shells", () => {
+    const projected = projectExternalOrder(
+      {
+        ...internalOrder,
+        events: [
+          ...internalOrder.events,
+          {
+            id: "internal-compensation-event",
+            eventType: "PUBLISHER_COMPENSATION_RECORDED",
+            message: "Publisher compensation recorded: 80.00 USD",
+            metadata: { amount: "80.00", debtApplied: "20.00" },
+            createdAt: new Date("2026-08-03T00:00:00.000Z"),
+          },
+        ],
+      },
+      "CUSTOMER",
+    )
+
+    expect(projected.events).toHaveLength(1)
+    expect(JSON.stringify(projected)).not.toContain(
+      "PUBLISHER_COMPENSATION_RECORDED",
+    )
+    expect(JSON.stringify(projected)).not.toContain(
+      "internal-compensation-event",
+    )
+  })
+
+  it("never exposes free-form staff verification reasons through public event metadata", () => {
+    const projected = projectExternalOrder(
+      {
+        ...internalOrder,
+        events: [
+          {
+            id: "manual-verification-event",
+            eventType: "VERIFIED_MANUAL",
+            message: "Delivery manually verified by staff",
+            metadata: {
+              verificationStatus: "VERIFIED",
+              reason: "investigator-secret-reason",
+              note: "investigator-secret-note",
+              notes: "investigator-secret-notes",
+            },
+            createdAt: new Date("2026-08-03T00:00:00.000Z"),
+          },
+          {
+            id: "escalation-event",
+            eventType: "VERIFICATION_ESCALATED",
+            message: "Delivery rejected during manual verification",
+            metadata: {
+              reason: "rejection-secret-reason",
+              reasonCode: "POLICY_REVIEW_REQUIRED",
+            },
+            createdAt: new Date("2026-08-03T01:00:00.000Z"),
+          },
+        ],
+      },
+      "CUSTOMER",
+    )
+
+    expect(projected.events).toEqual([
+      expect.objectContaining({
+        eventType: "VERIFIED_MANUAL",
+        metadata: { verificationStatus: "VERIFIED" },
+      }),
+      expect.objectContaining({
+        eventType: "VERIFICATION_ESCALATED",
+        metadata: { reasonCode: "POLICY_REVIEW_REQUIRED" },
+      }),
+    ])
+    expect(JSON.stringify(projected.events)).not.toContain(
+      "investigator-secret",
+    )
+    expect(JSON.stringify(projected.events)).not.toContain("rejection-secret")
+  })
+
+  it("uses canonical public event messages instead of writer-supplied internal text", () => {
+    const projected = projectExternalOrder(
+      {
+        ...internalOrder,
+        events: [
+          {
+            id: "cancelled-event",
+            eventType: "ORDER_CANCELLED",
+            message: "cancel-note-secret: legal investigation CASE-77",
+            metadata: { reasonCode: "LEGAL_OR_SECURITY_EMERGENCY" },
+            createdAt: new Date("2026-08-03T00:00:00.000Z"),
+          },
+          {
+            id: "escalated-event",
+            eventType: "VERIFICATION_ESCALATED",
+            message: "provider-error-secret from private crawler trace",
+            metadata: {
+              reason: "provider-error-secret",
+              ticketId: "support-ticket-secret",
+            },
+            createdAt: new Date("2026-08-03T01:00:00.000Z"),
+          },
+        ],
+      },
+      "PUBLISHER",
+    )
+
+    expect(projected.events.map((event: any) => event.message)).toEqual([
+      "Order cancelled",
+      "Delivery verification requires staff review",
+    ])
+    const serialized = JSON.stringify(projected.events)
+    expect(serialized).not.toContain("cancel-note-secret")
+    expect(serialized).not.toContain("provider-error-secret")
+    expect(serialized).not.toContain("support-ticket-secret")
+  })
+
   it("projects standalone cancellation responses to the public contract", () => {
     const projected = projectExternalCancellationRequest(
       internalOrder.cancellationRequests[0],
@@ -387,8 +498,22 @@ describe("external order projection", () => {
       status: "PENDING_FINANCE",
       responsibility: "CUSTOMER",
       responseDeadlineAt: new Date("2026-08-03T00:00:00.000Z"),
-      responseNote: "Accepted",
       createdAt: new Date("2026-08-02T00:00:00.000Z"),
     })
+  })
+
+  it("never exposes staff cancellation evidence notes to order participants", () => {
+    const projected = projectExternalCancellationRequest({
+      ...internalOrder.cancellationRequests[0],
+      requesterType: "STAFF",
+      note: "staff-investigation-secret-note",
+      responseNote: "staff-response-secret-note",
+    })
+
+    const serialized = JSON.stringify(projected)
+    expect(projected).not.toHaveProperty("note")
+    expect(projected).not.toHaveProperty("responseNote")
+    expect(serialized).not.toContain("staff-investigation-secret")
+    expect(serialized).not.toContain("staff-response-secret")
   })
 })

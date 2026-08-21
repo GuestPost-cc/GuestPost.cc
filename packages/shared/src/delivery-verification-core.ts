@@ -1187,7 +1187,9 @@ export async function runDeliveryLinkRecheck(
   if (version.supersededByVersion != null) return { skipped: "superseded" }
 
   // We monitor VERIFIED deliveries (detect removal) and FAILED deliveries that
-  // were flagged LINK_REMOVED (detect restoration). Anything else is skipped.
+  // were flagged LINK_REMOVED (detect restoration). An immutable confirmed
+  // finding is not remediated by a later crawler result: its hold remains for
+  // the explicit enforcement/refund workflow. Anything else is skipped.
   const hadRemovalFlag =
     version.verificationStatus === "FAILED"
       ? await prisma.deliveryFraudFlag.findFirst({
@@ -1195,6 +1197,7 @@ export async function runDeliveryLinkRecheck(
             deliveryVersionId: version.id,
             type: "LINK_REMOVED",
             resolution: null,
+            finding: null,
           },
           select: { id: true },
         })
@@ -1260,6 +1263,7 @@ export async function runDeliveryLinkRecheck(
             deliveryVersionId: version.id,
             type: "LINK_REMOVED",
             resolution: null,
+            finding: null,
           },
           select: { id: true, createdAt: true },
         })

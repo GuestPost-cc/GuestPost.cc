@@ -24,6 +24,10 @@ export {
   bindDepositIdempotencyKey,
   depositErrorPresentation,
 } from "./deposit-command"
+export {
+  isExactMoneyAtMost,
+  normalizeExactNonNegativeMoney,
+} from "./exact-money"
 export type {
   ActiveModerationDecision,
   ModerationAction,
@@ -86,6 +90,7 @@ export type {
   AdminUserResponse,
   AdminWithdrawalResponse,
   DeliveryFraudDisposition,
+  OperationsInboxFilters,
   OperationsInboxOrder,
   OperationsInboxResponse,
   OperationsInboxView,
@@ -137,9 +142,20 @@ export type {
   CancellationRequestResponse,
   CancellationRequestStatus,
   CreateOrderData,
+  DeliveryCapabilityBlockedReason,
+  DeliveryProofAvailableResponse,
+  DeliveryProofCapabilities,
+  DeliveryProofResponse,
+  DeliveryProofUnavailableResponse,
+  DeliverySecurityReviewStatus,
   OrderItemData,
   OrderResponse,
   PublisherCompensationDecisionInput,
+  StakeholderFinancialImpact,
+  StakeholderTimelineEntry,
+  StakeholderTimelineEntryKind,
+  StakeholderTimelineEntrySeverity,
+  StakeholderTimelineEntryStatus,
 } from "./services/orders"
 export { OrdersService } from "./services/orders"
 export type {
@@ -161,11 +177,40 @@ export { ReportingService } from "./services/reporting"
 export type { SettlementResponse } from "./services/settlements"
 export { SettlementsService } from "./services/settlements"
 export type {
+  AddTicketMessageInput,
+  CreateSupportTicketInput,
+  CreateSupportTicketResponse,
+  PublicSupportListFilters,
+  PublicTicketStatusMutation,
+  ReassignTicketInput,
+  StaffSupportListFilters,
+  StaffTicketDetail,
+  StaffTicketIdentity,
+  StaffTicketListItem,
+  StaffTicketListResponse,
+  StaffTicketPublisherIdentity,
+  StaffTicketRequester,
+  SupportListFilters,
+  SupportMessageSender,
+  SupportParty,
+  SupportQueryScope,
+  TicketAssignmentMutationResponse,
+  TicketCapabilities,
   TicketDetail,
+  TicketDetailQuery,
   TicketListItem,
+  TicketListPage,
+  TicketMessageActorSnapshot,
+  TicketMessageAuthorEvidence,
   TicketMessageDto,
+  TicketMessagePage,
+  TicketMessageType,
+  TicketMessageVisibility,
+  TicketOrderSummary,
+  TicketParticipantRole,
+  TicketStatusMutationResponse,
 } from "./services/support"
-export { SupportService } from "./services/support"
+export { SupportService, supportKeys } from "./services/support"
 
 import { type ApiClientConfig, HttpClient } from "./client"
 import { AdminService } from "./services/admin"

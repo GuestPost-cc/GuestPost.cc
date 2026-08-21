@@ -1,6 +1,7 @@
 import {
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   MinLength,
@@ -17,16 +18,20 @@ import {
 // SupportService.createTicket; the client only provides the user-facing
 // fields here.
 export class CreateTicketDto {
+  @IsUUID("4")
+  clientRequestId!: string
+
   @IsString()
   @Matches(/\S/, { message: "Subject is required" })
   @MinLength(3, { message: "Subject must be at least 3 characters" })
   @MaxLength(200)
   subject!: string
 
-  @IsOptional()
   @IsString()
+  @Matches(/\S/, { message: "Description is required" })
+  @MinLength(10, { message: "Description must be at least 10 characters" })
   @MaxLength(10_000)
-  description?: string
+  description!: string
 
   // CUID format for order references. Bounds the string + format so a junk
   // orderId can't reach the service layer's order lookup with weird content.

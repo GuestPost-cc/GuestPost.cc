@@ -198,6 +198,11 @@ export type DeliveryFraudHold = Prisma.DeliveryFraudHoldModel
  */
 export type DeliveryFraudFlagResolution = Prisma.DeliveryFraudFlagResolutionModel
 /**
+ * Model DeliveryFraudFinding
+ *
+ */
+export type DeliveryFraudFinding = Prisma.DeliveryFraudFindingModel
+/**
  * Model OrderReview
  *
  */

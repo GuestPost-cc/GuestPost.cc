@@ -45,9 +45,9 @@ function setup(chargebackCount: number) {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     deliveryFraudFlag: {
-      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    deliveryFraudHold: { count: jest.fn().mockResolvedValue(0) },
     settlement: {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockImplementation(({ data }) => ({

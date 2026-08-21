@@ -153,6 +153,15 @@ export type {
 export { NotificationPreferencesForm } from "./components/notification-preferences-form"
 export type { OrderLifecycleProgressProps } from "./components/order-lifecycle-progress"
 export { OrderLifecycleProgress } from "./components/order-lifecycle-progress"
+export type {
+  OrderStakeholderFinancialImpact,
+  OrderStakeholderUpdate,
+  OrderStakeholderUpdateKind,
+  OrderStakeholderUpdateSeverity,
+  OrderStakeholderUpdateStatus,
+  OrderStakeholderUpdatesProps,
+} from "./components/order-stakeholder-updates"
+export { OrderStakeholderUpdates } from "./components/order-stakeholder-updates"
 export { PageHeader } from "./components/page-header"
 export type { PasswordInputProps } from "./components/password-input"
 export { PasswordInput } from "./components/password-input"
@@ -189,11 +198,32 @@ export type { SpinnerButtonProps } from "./components/spinner-button"
 export { SpinnerButton } from "./components/spinner-button"
 export { StatusBadge, statusBadgeVariants } from "./components/status-badge"
 export type {
+  SupportComposerProps,
+  SupportConversationMessage,
+  SupportConversationMessageType,
+  SupportConversationParty,
+  SupportConversationProps,
+  SupportConversationSender,
+  SupportConversationVisibility,
+} from "./components/support-conversation"
+export {
+  mergeSupportConversationMessages,
+  mergeSupportConversationPages,
+  SupportComposer,
+  SupportConversation,
+  SupportMessage,
+  SupportParticipantBadge,
+  SupportSystemEvent,
+} from "./components/support-conversation"
+export type {
   SupportPanelActorScope,
   SupportPanelProps,
   SupportPanelTicket,
 } from "./components/support-panel"
-export { SupportPanel } from "./components/support-panel"
+export {
+  mergeSupportTicketPages,
+  SupportPanel,
+} from "./components/support-panel"
 export { Switch } from "./components/switch"
 export {
   Table,

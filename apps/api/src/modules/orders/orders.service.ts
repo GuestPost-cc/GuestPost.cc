@@ -1163,6 +1163,28 @@ export class OrdersService {
         settlements: { include: { approvals: true } },
         dispute: true,
         cancellationRequests: { orderBy: { createdAt: "desc" } },
+        fraudFlags: {
+          orderBy: { createdAt: "asc" },
+          include: { resolution: true, finding: true, hold: true },
+        },
+        transactions: {
+          where: { type: "REFUND" },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            type: true,
+            amount: true,
+            currency: true,
+            createdAt: true,
+          },
+        },
+        publisherCompensation: {
+          include: {
+            debtRepaymentTransaction: {
+              select: { id: true, amount: true, currency: true },
+            },
+          },
+        },
       },
     })
     if (!order) throw new NotFoundException(`Order ${id} not found`)

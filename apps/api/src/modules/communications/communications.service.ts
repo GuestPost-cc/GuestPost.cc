@@ -202,7 +202,10 @@ export class CommunicationsService {
   ): Promise<string[]> {
     this.assertDomainTransaction(tx)
     const memberships = await tx.staffMembership.findMany({
-      where: { role: { in: roles }, user: { banned: false } },
+      where: {
+        role: { in: roles },
+        user: { banned: false, userType: "STAFF" },
+      },
       select: { userId: true },
     })
     return memberships.map(

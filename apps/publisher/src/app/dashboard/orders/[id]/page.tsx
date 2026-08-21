@@ -1,8 +1,10 @@
 "use client"
 
-import type {
-  CancellationReasonCode,
-  OrderResponse,
+import {
+  type CancellationReasonCode,
+  type OrderResponse,
+  supportKeys,
+  type TicketListPage,
 } from "@guestpost/api-client"
 import type { OrderStatus } from "@guestpost/shared"
 import {
@@ -25,12 +27,14 @@ import {
   Input,
   Label,
   OrderLifecycleProgress,
+  OrderStakeholderUpdates,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Skeleton,
+  SupportPanel,
   Textarea,
   StatusBadge as UIStatusBadge,
 } from "@guestpost/ui"
@@ -376,7 +380,7 @@ export default function OrderDetailPage() {
     enabled: Boolean(order),
   })
 
-  const { data: proof } = useQuery<any>({
+  const { data: proof } = useQuery({
     queryKey: ["order-proof", orderId],
     queryFn: () => api.orders.deliveryProof(orderId),
     enabled:
@@ -391,6 +395,17 @@ export default function OrderDetailPage() {
     queryFn: () => api.orders.getEvents(orderId),
     refetchInterval: 10_000,
     refetchOnWindowFocus: true,
+  })
+
+  const {
+    data: orderTicketPage,
+    isLoading: ticketsLoading,
+    error: ticketsError,
+    refetch: refetchTickets,
+  } = useQuery<TicketListPage>({
+    queryKey: supportKeys.order("publisher", orderId),
+    queryFn: () => api.support.listTickets({ orderId, limit: 100 }),
+    enabled: Boolean(order),
   })
 
   const refreshOrder = () => {
@@ -646,6 +661,8 @@ export default function OrderDetailPage() {
 
       {/* Progress */}
       <OrderProgress status={s} />
+
+      <OrderStakeholderUpdates updates={order.stakeholderTimeline ?? []} />
 
       {cancellationPreview?.activeRequest?.status === "REQUESTED" &&
         cancellationPreview.activeRequest.requesterType === "CUSTOMER" && (
@@ -1108,7 +1125,7 @@ export default function OrderDetailPage() {
                 asChild
               >
                 <Link
-                  href={`/dashboard/support?new=true&orderId=${encodeURIComponent(orderId)}&subject=${encodeURIComponent(`Order ${orderId.slice(0, 8)}`)}`}
+                  href={`/dashboard/support?new=true&orderId=${encodeURIComponent(orderId)}`}
                 >
                   <MessageSquare className="mr-2 h-4 w-4" /> Contact Support
                 </Link>
@@ -1126,6 +1143,26 @@ export default function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      <SupportPanel
+        tickets={orderTicketPage?.items}
+        isLoading={ticketsLoading}
+        linkHref={(ticketId) => `/dashboard/support/${ticketId}`}
+        actorScope="publisher"
+        description="Support threads securely linked to this order."
+        emptyState={
+          ticketsError ? (
+            <div role="alert">
+              <ErrorState
+                title="Order support could not be loaded"
+                description="Support threads are temporarily unavailable. This does not mean the order has no tickets."
+                onRetry={() => refetchTickets()}
+                className="py-6"
+              />
+            </div>
+          ) : undefined
+        }
+      />
 
       <Dialog
         open={showCancellationDialog}

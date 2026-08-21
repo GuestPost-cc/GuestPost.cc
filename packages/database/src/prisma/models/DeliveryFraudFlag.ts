@@ -189,6 +189,7 @@ export type DeliveryFraudFlagWhereInput = {
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
   deliveryVersion?: Prisma.XOR<Prisma.OrderDeliveryVersionScalarRelationFilter, Prisma.OrderDeliveryVersionWhereInput>
   resolution?: Prisma.XOR<Prisma.DeliveryFraudFlagResolutionNullableScalarRelationFilter, Prisma.DeliveryFraudFlagResolutionWhereInput> | null
+  finding?: Prisma.XOR<Prisma.DeliveryFraudFindingNullableScalarRelationFilter, Prisma.DeliveryFraudFindingWhereInput> | null
   hold?: Prisma.XOR<Prisma.DeliveryFraudHoldNullableScalarRelationFilter, Prisma.DeliveryFraudHoldWhereInput> | null
 }
 
@@ -202,6 +203,7 @@ export type DeliveryFraudFlagOrderByWithRelationInput = {
   order?: Prisma.OrderOrderByWithRelationInput
   deliveryVersion?: Prisma.OrderDeliveryVersionOrderByWithRelationInput
   resolution?: Prisma.DeliveryFraudFlagResolutionOrderByWithRelationInput
+  finding?: Prisma.DeliveryFraudFindingOrderByWithRelationInput
   hold?: Prisma.DeliveryFraudHoldOrderByWithRelationInput
 }
 
@@ -218,6 +220,7 @@ export type DeliveryFraudFlagWhereUniqueInput = Prisma.AtLeast<{
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
   deliveryVersion?: Prisma.XOR<Prisma.OrderDeliveryVersionScalarRelationFilter, Prisma.OrderDeliveryVersionWhereInput>
   resolution?: Prisma.XOR<Prisma.DeliveryFraudFlagResolutionNullableScalarRelationFilter, Prisma.DeliveryFraudFlagResolutionWhereInput> | null
+  finding?: Prisma.XOR<Prisma.DeliveryFraudFindingNullableScalarRelationFilter, Prisma.DeliveryFraudFindingWhereInput> | null
   hold?: Prisma.XOR<Prisma.DeliveryFraudHoldNullableScalarRelationFilter, Prisma.DeliveryFraudHoldWhereInput> | null
 }, "id">
 
@@ -253,6 +256,7 @@ export type DeliveryFraudFlagCreateInput = {
   order: Prisma.OrderCreateNestedOneWithoutFraudFlagsInput
   deliveryVersion: Prisma.OrderDeliveryVersionCreateNestedOneWithoutFraudFlagsInput
   resolution?: Prisma.DeliveryFraudFlagResolutionCreateNestedOneWithoutFraudFlagInput
+  finding?: Prisma.DeliveryFraudFindingCreateNestedOneWithoutFraudFlagInput
   hold?: Prisma.DeliveryFraudHoldCreateNestedOneWithoutFraudFlagInput
 }
 
@@ -264,6 +268,7 @@ export type DeliveryFraudFlagUncheckedCreateInput = {
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedOneWithoutFraudFlagInput
+  finding?: Prisma.DeliveryFraudFindingUncheckedCreateNestedOneWithoutFraudFlagInput
   hold?: Prisma.DeliveryFraudHoldUncheckedCreateNestedOneWithoutFraudFlagInput
 }
 
@@ -275,6 +280,7 @@ export type DeliveryFraudFlagUpdateInput = {
   order?: Prisma.OrderUpdateOneRequiredWithoutFraudFlagsNestedInput
   deliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneRequiredWithoutFraudFlagsNestedInput
   resolution?: Prisma.DeliveryFraudFlagResolutionUpdateOneWithoutFraudFlagNestedInput
+  finding?: Prisma.DeliveryFraudFindingUpdateOneWithoutFraudFlagNestedInput
   hold?: Prisma.DeliveryFraudHoldUpdateOneWithoutFraudFlagNestedInput
 }
 
@@ -286,6 +292,7 @@ export type DeliveryFraudFlagUncheckedUpdateInput = {
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateOneWithoutFraudFlagNestedInput
+  finding?: Prisma.DeliveryFraudFindingUncheckedUpdateOneWithoutFraudFlagNestedInput
   hold?: Prisma.DeliveryFraudHoldUncheckedUpdateOneWithoutFraudFlagNestedInput
 }
 
@@ -466,6 +473,20 @@ export type DeliveryFraudFlagUpdateOneRequiredWithoutResolutionNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.DeliveryFraudFlagUpdateToOneWithWhereWithoutResolutionInput, Prisma.DeliveryFraudFlagUpdateWithoutResolutionInput>, Prisma.DeliveryFraudFlagUncheckedUpdateWithoutResolutionInput>
 }
 
+export type DeliveryFraudFlagCreateNestedOneWithoutFindingInput = {
+  create?: Prisma.XOR<Prisma.DeliveryFraudFlagCreateWithoutFindingInput, Prisma.DeliveryFraudFlagUncheckedCreateWithoutFindingInput>
+  connectOrCreate?: Prisma.DeliveryFraudFlagCreateOrConnectWithoutFindingInput
+  connect?: Prisma.DeliveryFraudFlagWhereUniqueInput
+}
+
+export type DeliveryFraudFlagUpdateOneRequiredWithoutFindingNestedInput = {
+  create?: Prisma.XOR<Prisma.DeliveryFraudFlagCreateWithoutFindingInput, Prisma.DeliveryFraudFlagUncheckedCreateWithoutFindingInput>
+  connectOrCreate?: Prisma.DeliveryFraudFlagCreateOrConnectWithoutFindingInput
+  upsert?: Prisma.DeliveryFraudFlagUpsertWithoutFindingInput
+  connect?: Prisma.DeliveryFraudFlagWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.DeliveryFraudFlagUpdateToOneWithWhereWithoutFindingInput, Prisma.DeliveryFraudFlagUpdateWithoutFindingInput>, Prisma.DeliveryFraudFlagUncheckedUpdateWithoutFindingInput>
+}
+
 export type DeliveryFraudFlagCreateWithoutOrderInput = {
   id?: string
   type: string
@@ -473,6 +494,7 @@ export type DeliveryFraudFlagCreateWithoutOrderInput = {
   createdAt?: Date | string
   deliveryVersion: Prisma.OrderDeliveryVersionCreateNestedOneWithoutFraudFlagsInput
   resolution?: Prisma.DeliveryFraudFlagResolutionCreateNestedOneWithoutFraudFlagInput
+  finding?: Prisma.DeliveryFraudFindingCreateNestedOneWithoutFraudFlagInput
   hold?: Prisma.DeliveryFraudHoldCreateNestedOneWithoutFraudFlagInput
 }
 
@@ -483,6 +505,7 @@ export type DeliveryFraudFlagUncheckedCreateWithoutOrderInput = {
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedOneWithoutFraudFlagInput
+  finding?: Prisma.DeliveryFraudFindingUncheckedCreateNestedOneWithoutFraudFlagInput
   hold?: Prisma.DeliveryFraudHoldUncheckedCreateNestedOneWithoutFraudFlagInput
 }
 
@@ -531,6 +554,7 @@ export type DeliveryFraudFlagCreateWithoutDeliveryVersionInput = {
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutFraudFlagsInput
   resolution?: Prisma.DeliveryFraudFlagResolutionCreateNestedOneWithoutFraudFlagInput
+  finding?: Prisma.DeliveryFraudFindingCreateNestedOneWithoutFraudFlagInput
   hold?: Prisma.DeliveryFraudHoldCreateNestedOneWithoutFraudFlagInput
 }
 
@@ -541,6 +565,7 @@ export type DeliveryFraudFlagUncheckedCreateWithoutDeliveryVersionInput = {
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedOneWithoutFraudFlagInput
+  finding?: Prisma.DeliveryFraudFindingUncheckedCreateNestedOneWithoutFraudFlagInput
   hold?: Prisma.DeliveryFraudHoldUncheckedCreateNestedOneWithoutFraudFlagInput
 }
 
@@ -578,6 +603,7 @@ export type DeliveryFraudFlagCreateWithoutHoldInput = {
   order: Prisma.OrderCreateNestedOneWithoutFraudFlagsInput
   deliveryVersion: Prisma.OrderDeliveryVersionCreateNestedOneWithoutFraudFlagsInput
   resolution?: Prisma.DeliveryFraudFlagResolutionCreateNestedOneWithoutFraudFlagInput
+  finding?: Prisma.DeliveryFraudFindingCreateNestedOneWithoutFraudFlagInput
 }
 
 export type DeliveryFraudFlagUncheckedCreateWithoutHoldInput = {
@@ -588,6 +614,7 @@ export type DeliveryFraudFlagUncheckedCreateWithoutHoldInput = {
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedOneWithoutFraudFlagInput
+  finding?: Prisma.DeliveryFraudFindingUncheckedCreateNestedOneWithoutFraudFlagInput
 }
 
 export type DeliveryFraudFlagCreateOrConnectWithoutHoldInput = {
@@ -614,6 +641,7 @@ export type DeliveryFraudFlagUpdateWithoutHoldInput = {
   order?: Prisma.OrderUpdateOneRequiredWithoutFraudFlagsNestedInput
   deliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneRequiredWithoutFraudFlagsNestedInput
   resolution?: Prisma.DeliveryFraudFlagResolutionUpdateOneWithoutFraudFlagNestedInput
+  finding?: Prisma.DeliveryFraudFindingUpdateOneWithoutFraudFlagNestedInput
 }
 
 export type DeliveryFraudFlagUncheckedUpdateWithoutHoldInput = {
@@ -624,6 +652,7 @@ export type DeliveryFraudFlagUncheckedUpdateWithoutHoldInput = {
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateOneWithoutFraudFlagNestedInput
+  finding?: Prisma.DeliveryFraudFindingUncheckedUpdateOneWithoutFraudFlagNestedInput
 }
 
 export type DeliveryFraudFlagCreateWithoutResolutionInput = {
@@ -633,6 +662,7 @@ export type DeliveryFraudFlagCreateWithoutResolutionInput = {
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutFraudFlagsInput
   deliveryVersion: Prisma.OrderDeliveryVersionCreateNestedOneWithoutFraudFlagsInput
+  finding?: Prisma.DeliveryFraudFindingCreateNestedOneWithoutFraudFlagInput
   hold?: Prisma.DeliveryFraudHoldCreateNestedOneWithoutFraudFlagInput
 }
 
@@ -643,6 +673,7 @@ export type DeliveryFraudFlagUncheckedCreateWithoutResolutionInput = {
   type: string
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
+  finding?: Prisma.DeliveryFraudFindingUncheckedCreateNestedOneWithoutFraudFlagInput
   hold?: Prisma.DeliveryFraudHoldUncheckedCreateNestedOneWithoutFraudFlagInput
 }
 
@@ -669,6 +700,7 @@ export type DeliveryFraudFlagUpdateWithoutResolutionInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutFraudFlagsNestedInput
   deliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneRequiredWithoutFraudFlagsNestedInput
+  finding?: Prisma.DeliveryFraudFindingUpdateOneWithoutFraudFlagNestedInput
   hold?: Prisma.DeliveryFraudHoldUpdateOneWithoutFraudFlagNestedInput
 }
 
@@ -679,6 +711,67 @@ export type DeliveryFraudFlagUncheckedUpdateWithoutResolutionInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  finding?: Prisma.DeliveryFraudFindingUncheckedUpdateOneWithoutFraudFlagNestedInput
+  hold?: Prisma.DeliveryFraudHoldUncheckedUpdateOneWithoutFraudFlagNestedInput
+}
+
+export type DeliveryFraudFlagCreateWithoutFindingInput = {
+  id?: string
+  type: string
+  details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  order: Prisma.OrderCreateNestedOneWithoutFraudFlagsInput
+  deliveryVersion: Prisma.OrderDeliveryVersionCreateNestedOneWithoutFraudFlagsInput
+  resolution?: Prisma.DeliveryFraudFlagResolutionCreateNestedOneWithoutFraudFlagInput
+  hold?: Prisma.DeliveryFraudHoldCreateNestedOneWithoutFraudFlagInput
+}
+
+export type DeliveryFraudFlagUncheckedCreateWithoutFindingInput = {
+  id?: string
+  orderId: string
+  deliveryVersionId: string
+  type: string
+  details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedOneWithoutFraudFlagInput
+  hold?: Prisma.DeliveryFraudHoldUncheckedCreateNestedOneWithoutFraudFlagInput
+}
+
+export type DeliveryFraudFlagCreateOrConnectWithoutFindingInput = {
+  where: Prisma.DeliveryFraudFlagWhereUniqueInput
+  create: Prisma.XOR<Prisma.DeliveryFraudFlagCreateWithoutFindingInput, Prisma.DeliveryFraudFlagUncheckedCreateWithoutFindingInput>
+}
+
+export type DeliveryFraudFlagUpsertWithoutFindingInput = {
+  update: Prisma.XOR<Prisma.DeliveryFraudFlagUpdateWithoutFindingInput, Prisma.DeliveryFraudFlagUncheckedUpdateWithoutFindingInput>
+  create: Prisma.XOR<Prisma.DeliveryFraudFlagCreateWithoutFindingInput, Prisma.DeliveryFraudFlagUncheckedCreateWithoutFindingInput>
+  where?: Prisma.DeliveryFraudFlagWhereInput
+}
+
+export type DeliveryFraudFlagUpdateToOneWithWhereWithoutFindingInput = {
+  where?: Prisma.DeliveryFraudFlagWhereInput
+  data: Prisma.XOR<Prisma.DeliveryFraudFlagUpdateWithoutFindingInput, Prisma.DeliveryFraudFlagUncheckedUpdateWithoutFindingInput>
+}
+
+export type DeliveryFraudFlagUpdateWithoutFindingInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.StringFieldUpdateOperationsInput | string
+  details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  order?: Prisma.OrderUpdateOneRequiredWithoutFraudFlagsNestedInput
+  deliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneRequiredWithoutFraudFlagsNestedInput
+  resolution?: Prisma.DeliveryFraudFlagResolutionUpdateOneWithoutFraudFlagNestedInput
+  hold?: Prisma.DeliveryFraudHoldUpdateOneWithoutFraudFlagNestedInput
+}
+
+export type DeliveryFraudFlagUncheckedUpdateWithoutFindingInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  deliveryVersionId?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.StringFieldUpdateOperationsInput | string
+  details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateOneWithoutFraudFlagNestedInput
   hold?: Prisma.DeliveryFraudHoldUncheckedUpdateOneWithoutFraudFlagNestedInput
 }
 
@@ -697,6 +790,7 @@ export type DeliveryFraudFlagUpdateWithoutOrderInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneRequiredWithoutFraudFlagsNestedInput
   resolution?: Prisma.DeliveryFraudFlagResolutionUpdateOneWithoutFraudFlagNestedInput
+  finding?: Prisma.DeliveryFraudFindingUpdateOneWithoutFraudFlagNestedInput
   hold?: Prisma.DeliveryFraudHoldUpdateOneWithoutFraudFlagNestedInput
 }
 
@@ -707,6 +801,7 @@ export type DeliveryFraudFlagUncheckedUpdateWithoutOrderInput = {
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateOneWithoutFraudFlagNestedInput
+  finding?: Prisma.DeliveryFraudFindingUncheckedUpdateOneWithoutFraudFlagNestedInput
   hold?: Prisma.DeliveryFraudHoldUncheckedUpdateOneWithoutFraudFlagNestedInput
 }
 
@@ -733,6 +828,7 @@ export type DeliveryFraudFlagUpdateWithoutDeliveryVersionInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutFraudFlagsNestedInput
   resolution?: Prisma.DeliveryFraudFlagResolutionUpdateOneWithoutFraudFlagNestedInput
+  finding?: Prisma.DeliveryFraudFindingUpdateOneWithoutFraudFlagNestedInput
   hold?: Prisma.DeliveryFraudHoldUpdateOneWithoutFraudFlagNestedInput
 }
 
@@ -743,6 +839,7 @@ export type DeliveryFraudFlagUncheckedUpdateWithoutDeliveryVersionInput = {
   details?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   resolution?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateOneWithoutFraudFlagNestedInput
+  finding?: Prisma.DeliveryFraudFindingUncheckedUpdateOneWithoutFraudFlagNestedInput
   hold?: Prisma.DeliveryFraudHoldUncheckedUpdateOneWithoutFraudFlagNestedInput
 }
 
@@ -766,6 +863,7 @@ export type DeliveryFraudFlagSelect<ExtArgs extends runtime.Types.Extensions.Int
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
   deliveryVersion?: boolean | Prisma.OrderDeliveryVersionDefaultArgs<ExtArgs>
   resolution?: boolean | Prisma.DeliveryFraudFlag$resolutionArgs<ExtArgs>
+  finding?: boolean | Prisma.DeliveryFraudFlag$findingArgs<ExtArgs>
   hold?: boolean | Prisma.DeliveryFraudFlag$holdArgs<ExtArgs>
 }, ExtArgs["result"]["deliveryFraudFlag"]>
 
@@ -805,6 +903,7 @@ export type DeliveryFraudFlagInclude<ExtArgs extends runtime.Types.Extensions.In
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
   deliveryVersion?: boolean | Prisma.OrderDeliveryVersionDefaultArgs<ExtArgs>
   resolution?: boolean | Prisma.DeliveryFraudFlag$resolutionArgs<ExtArgs>
+  finding?: boolean | Prisma.DeliveryFraudFlag$findingArgs<ExtArgs>
   hold?: boolean | Prisma.DeliveryFraudFlag$holdArgs<ExtArgs>
 }
 export type DeliveryFraudFlagIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -822,6 +921,7 @@ export type $DeliveryFraudFlagPayload<ExtArgs extends runtime.Types.Extensions.I
     order: Prisma.$OrderPayload<ExtArgs>
     deliveryVersion: Prisma.$OrderDeliveryVersionPayload<ExtArgs>
     resolution: Prisma.$DeliveryFraudFlagResolutionPayload<ExtArgs> | null
+    finding: Prisma.$DeliveryFraudFindingPayload<ExtArgs> | null
     hold: Prisma.$DeliveryFraudHoldPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -1228,6 +1328,7 @@ export interface Prisma__DeliveryFraudFlagClient<T, Null = never, ExtArgs extend
   order<T extends Prisma.OrderDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDefaultArgs<ExtArgs>>): Prisma.Prisma__OrderClient<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   deliveryVersion<T extends Prisma.OrderDeliveryVersionDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDeliveryVersionDefaultArgs<ExtArgs>>): Prisma.Prisma__OrderDeliveryVersionClient<runtime.Types.Result.GetResult<Prisma.$OrderDeliveryVersionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   resolution<T extends Prisma.DeliveryFraudFlag$resolutionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.DeliveryFraudFlag$resolutionArgs<ExtArgs>>): Prisma.Prisma__DeliveryFraudFlagResolutionClient<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudFlagResolutionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  finding<T extends Prisma.DeliveryFraudFlag$findingArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.DeliveryFraudFlag$findingArgs<ExtArgs>>): Prisma.Prisma__DeliveryFraudFindingClient<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudFindingPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   hold<T extends Prisma.DeliveryFraudFlag$holdArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.DeliveryFraudFlag$holdArgs<ExtArgs>>): Prisma.Prisma__DeliveryFraudHoldClient<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudHoldPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1681,6 +1782,25 @@ export type DeliveryFraudFlag$resolutionArgs<ExtArgs extends runtime.Types.Exten
    */
   include?: Prisma.DeliveryFraudFlagResolutionInclude<ExtArgs> | null
   where?: Prisma.DeliveryFraudFlagResolutionWhereInput
+}
+
+/**
+ * DeliveryFraudFlag.finding
+ */
+export type DeliveryFraudFlag$findingArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the DeliveryFraudFinding
+   */
+  select?: Prisma.DeliveryFraudFindingSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the DeliveryFraudFinding
+   */
+  omit?: Prisma.DeliveryFraudFindingOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.DeliveryFraudFindingInclude<ExtArgs> | null
+  where?: Prisma.DeliveryFraudFindingWhereInput
 }
 
 /**

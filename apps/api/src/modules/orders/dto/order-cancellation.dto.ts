@@ -7,9 +7,9 @@ import { Transform, Type } from "class-transformer"
 import {
   IsEnum,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
   MinLength,
@@ -17,15 +17,14 @@ import {
 } from "class-validator"
 
 export class PublisherCompensationDecisionDto {
-  @IsNumber(
-    { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
-    {
-      message:
-        "Publisher compensation must be an exact amount with at most two decimal places",
-    },
-  )
-  @Min(0)
-  amount!: number
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MaxLength(32)
+  @Matches(/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/, {
+    message:
+      "Publisher compensation must be a non-negative decimal string with at most two decimal places",
+  })
+  amount!: string
 
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
@@ -79,15 +78,29 @@ export class ReviewCancellationRequestDto {
   @IsEnum(CancellationResponsibility)
   responsibility: CancellationResponsibility
 
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
+  @MinLength(20, {
+    message: "Cancellation review reason must be at least 20 characters",
+  })
   @MaxLength(2000)
   reason: string
 }
 
 export class FinanceApproveCancellationDto {
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
+  @MinLength(20)
   @MaxLength(2000)
   reason: string
+
+  // Required for post-publication publisher orders unless responsibility is
+  // PUBLISHER. The service re-evaluates applicability and the maximum from
+  // locked order/settlement evidence; this DTO only validates shape.
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PublisherCompensationDecisionDto)
+  publisherCompensation?: PublisherCompensationDecisionDto
 }
 
 export class ForceCancelOrderDto extends CancelOrderDto {

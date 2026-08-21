@@ -9,6 +9,7 @@ describe("AdminService RBAC scoping", () => {
 
   beforeEach(() => {
     prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "ops-1" }]),
       $transaction: jest.fn(async (callback: (tx: any) => unknown) =>
         callback(prisma),
       ),
@@ -40,7 +41,12 @@ describe("AdminService RBAC scoping", () => {
           ]),
       },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
-      staffMembership: { findUnique: jest.fn() },
+      staffMembership: {
+        findUnique: jest.fn().mockResolvedValue({
+          role: "OPERATIONS",
+          user: { banned: false, userType: "STAFF" },
+        }),
+      },
     }
     audit = { log: jest.fn().mockResolvedValue(undefined) }
     service = new AdminService(prisma, audit, {} as any)
@@ -106,7 +112,18 @@ describe("AdminService RBAC scoping", () => {
     expect(JSON.stringify(where)).toContain("ops-1")
     expect(scope.OR).toEqual(
       expect.arrayContaining([
-        { tickets: { some: { assignedToUserId: "ops-1" } } },
+        {
+          tickets: {
+            some: {
+              assignedToUserId: "ops-1",
+              assignedPublisherId: null,
+              OR: [
+                { fulfillmentChannel: "PLATFORM" },
+                { fulfillmentChannel: null, orderId: null },
+              ],
+            },
+          },
+        },
         {
           activeDeliveryVersion: {
             is: {
@@ -118,6 +135,32 @@ describe("AdminService RBAC scoping", () => {
     )
     expect(select.customer.select).toEqual({ id: true, name: true })
     expect(select.organization.select).toEqual({ id: true, name: true })
+  })
+
+  it("does not let corrupt or legacy-general ticket routing grant Operations list access to an order", async () => {
+    await service.listOrders({
+      user: { id: "ops-1", staffRole: "OPERATIONS" },
+    })
+
+    const scope = prisma.order.findMany.mock.calls[0][0].where.AND[0]
+    const ticketGrant = scope.OR.find((candidate: any) => candidate.tickets)
+    expect(ticketGrant).toEqual({
+      tickets: {
+        some: {
+          assignedToUserId: "ops-1",
+          assignedPublisherId: null,
+          OR: [
+            { fulfillmentChannel: "PLATFORM" },
+            // Nested under Order.tickets, this legacy branch can never match a
+            // linked ticket because the safe legacy shape requires no order.
+            { fulfillmentChannel: null, orderId: null },
+          ],
+        },
+      },
+    })
+    expect(ticketGrant.tickets.some).not.toEqual({
+      assignedToUserId: "ops-1",
+    })
   })
 
   it("redacts customer contact and settlement context from Operations order rows", async () => {
@@ -195,6 +238,33 @@ describe("AdminService RBAC scoping", () => {
     )
   })
 
+  it("applies the clean Platform ticket predicate to direct Operations order access", async () => {
+    await expect(
+      service.getOrder("publisher-order", {
+        id: "ops-1",
+        staffRole: "OPERATIONS",
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+
+    const directScope = prisma.order.findFirst.mock.calls.at(-1)[0].where.AND[0]
+    expect(directScope.OR).toEqual(
+      expect.arrayContaining([
+        {
+          tickets: {
+            some: {
+              assignedToUserId: "ops-1",
+              assignedPublisherId: null,
+              OR: [
+                { fulfillmentChannel: "PLATFORM" },
+                { fulfillmentChannel: null, orderId: null },
+              ],
+            },
+          },
+        },
+      ]),
+    )
+  })
+
   it("auto-assigns an Operations-created website and listing to its creator", async () => {
     prisma.website.create.mockResolvedValue({
       id: "site-1",
@@ -228,7 +298,23 @@ describe("AdminService RBAC scoping", () => {
       { id: "ops-1", staffRole: "OPERATIONS" },
     )
 
-    expect(prisma.staffMembership.findUnique).not.toHaveBeenCalled()
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    })
+    expect(prisma.staffMembership.findUnique).toHaveBeenCalledWith({
+      where: { userId: "ops-1" },
+      select: {
+        role: true,
+        user: { select: { banned: true, userType: true } },
+      },
+    })
+    expect(prisma.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      prisma.staffMembership.findUnique.mock.invocationCallOrder[0],
+    )
+    expect(
+      prisma.staffMembership.findUnique.mock.invocationCallOrder[0],
+    ).toBeLessThan(prisma.website.create.mock.invocationCallOrder[0])
     expect(prisma.website.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         ownershipType: "PLATFORM",
@@ -241,6 +327,157 @@ describe("AdminService RBAC scoping", () => {
         ownerType: "PLATFORM",
       }),
     })
+  })
+
+  it("fails closed when an Operations creator loses assignment eligibility after the staff lock", async () => {
+    prisma.staffMembership.findUnique.mockResolvedValue({
+      role: "FINANCE",
+      user: { banned: false, userType: "STAFF" },
+    })
+
+    await expect(
+      service.createPlatformWebsite(
+        {
+          url: "https://demoted-ops-example.com",
+          listingTitle: "Demoted Operations example listing",
+          description: "A complete platform listing description.",
+          categoryIds: ["category-1"],
+          language: "English",
+          sportsGamingAllowed: false,
+          pharmacyAllowed: false,
+          cryptoAllowed: false,
+          backlinkCount: 1,
+          linkType: "DOFOLLOW",
+          linkValidity: "PERMANENT",
+          googleNews: false,
+          markedSponsored: false,
+          foreignLanguageAllowed: false,
+          manualMetrics: {
+            ahrefsOrganicTraffic: 1200,
+            ahrefsTrafficAsOf: new Date().toISOString().slice(0, 10),
+            mozDomainAuthority: 45,
+            mozDomainAuthorityAsOf: new Date().toISOString().slice(0, 10),
+          },
+        },
+        { id: "ops-1", staffRole: "OPERATIONS" },
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        code: "INVALID_OWNER",
+        message:
+          "managedByUserId must reference an active OPERATIONS staff member",
+      },
+    })
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+    expect(prisma.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      prisma.staffMembership.findUnique.mock.invocationCallOrder[0],
+    )
+    expect(prisma.website.create).not.toHaveBeenCalled()
+    expect(prisma.marketplaceListing.create).not.toHaveBeenCalled()
+  })
+
+  it("locks and revalidates a platform website owner before reassignment", async () => {
+    prisma.website.findUnique.mockResolvedValue({
+      id: "site-1",
+      ownershipType: "PLATFORM",
+      managedByUserId: "ops-1",
+      url: "https://platform-example.com",
+    })
+
+    await expect(
+      service.reassignPlatformWebsite(
+        "site-1",
+        { managedByUserId: "ops-2", reason: "Balance future order routing" },
+        { id: "admin-1", staffRole: "SUPER_ADMIN" },
+      ),
+    ).resolves.toEqual({ id: "site-1", managedByUserId: "ops-2" })
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    })
+    expect(prisma.staffMembership.findUnique).toHaveBeenCalledWith({
+      where: { userId: "ops-2" },
+      select: {
+        role: true,
+        user: { select: { banned: true, userType: true } },
+      },
+    })
+    expect(prisma.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      prisma.staffMembership.findUnique.mock.invocationCallOrder[0],
+    )
+    expect(
+      prisma.staffMembership.findUnique.mock.invocationCallOrder[0],
+    ).toBeLessThan(prisma.website.findUnique.mock.invocationCallOrder[0])
+    expect(prisma.website.update).toHaveBeenCalledWith({
+      where: { id: "site-1" },
+      data: { managedByUserId: "ops-2" },
+    })
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "WEBSITE_OWNERSHIP_REASSIGNED",
+        metadata: expect.objectContaining({
+          fromUserId: "ops-1",
+          toUserId: "ops-2",
+        }),
+      }),
+      prisma,
+    )
+  })
+
+  it("does not assign a platform website when a concurrent demotion wins", async () => {
+    prisma.staffMembership.findUnique.mockResolvedValue({
+      role: "FINANCE",
+      user: { banned: false, userType: "STAFF" },
+    })
+
+    await expect(
+      service.reassignPlatformWebsite(
+        "site-1",
+        { managedByUserId: "ops-2", reason: "Route future orders" },
+        { id: "admin-1", staffRole: "SUPER_ADMIN" },
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        code: "INVALID_OWNER",
+        message:
+          "managedByUserId must reference an active OPERATIONS staff member",
+      },
+    })
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+    expect(prisma.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
+      prisma.staffMembership.findUnique.mock.invocationCallOrder[0],
+    )
+    expect(prisma.website.findUnique).not.toHaveBeenCalled()
+    expect(prisma.website.update).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+  })
+
+  it("does not assign a platform website when a concurrent suspension wins", async () => {
+    prisma.staffMembership.findUnique.mockResolvedValue({
+      role: "OPERATIONS",
+      user: { banned: true, userType: "STAFF" },
+    })
+
+    await expect(
+      service.reassignPlatformWebsite(
+        "site-1",
+        { managedByUserId: "ops-2", reason: "Route future orders" },
+        { id: "admin-1", staffRole: "SUPER_ADMIN" },
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        code: "INVALID_OWNER",
+        message:
+          "managedByUserId must reference an active OPERATIONS staff member",
+      },
+    })
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+    expect(prisma.website.findUnique).not.toHaveBeenCalled()
+    expect(prisma.website.update).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
   })
 
   it("creates the platform website and its only listing atomically", async () => {

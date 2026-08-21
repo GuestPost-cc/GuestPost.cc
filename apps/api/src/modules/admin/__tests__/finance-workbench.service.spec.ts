@@ -92,7 +92,7 @@ function createService(overrides?: {
 }
 
 describe("FinanceWorkbenchService", () => {
-  it("sorts by severity and keeps Support first inside the same band", () => {
+  it("sorts financial actions by severity, type, deadline, and age", () => {
     const base = {
       title: "Review",
       description: "Needs review",
@@ -112,8 +112,8 @@ describe("FinanceWorkbenchService", () => {
       },
       {
         ...base,
-        id: "support",
-        type: "SUPPORT" as const,
+        id: "withdrawal",
+        type: "WITHDRAWAL" as const,
         priority: "HIGH" as const,
         createdAt: "2026-07-02T00:00:00.000Z",
       },
@@ -128,7 +128,7 @@ describe("FinanceWorkbenchService", () => {
 
     expect(
       actions.sort(sortFinanceWorkbenchActions).map((item) => item.id),
-    ).toEqual(["payout", "support", "settlement"])
+    ).toEqual(["payout", "withdrawal", "settlement"])
   })
 
   it("fails closed for Operations before reading any financial data", async () => {
@@ -141,7 +141,7 @@ describe("FinanceWorkbenchService", () => {
     expect(prisma.ticket.findMany).not.toHaveBeenCalled()
   })
 
-  it("uses exact aggregates, prioritizes Support, and returns only sanitized activity", async () => {
+  it("uses exact aggregates and returns only sanitized financial activity", async () => {
     const { prisma, service } = createService({
       reconciliation: {
         run: jest.fn().mockResolvedValue({
@@ -202,7 +202,6 @@ describe("FinanceWorkbenchService", () => {
     prisma.withdrawal.count.mockResolvedValueOnce(4).mockResolvedValueOnce(2)
     prisma.orderCancellationRequest.count.mockResolvedValue(2)
     prisma.orderDispute.count.mockResolvedValue(6)
-    prisma.ticket.count.mockResolvedValueOnce(9).mockResolvedValueOnce(4)
     prisma.payoutExecution.count.mockResolvedValue(1)
     prisma.settlement.aggregate.mockResolvedValue({
       _sum: { publisherAmount: "1000.00" },
@@ -210,19 +209,6 @@ describe("FinanceWorkbenchService", () => {
     prisma.withdrawal.aggregate.mockResolvedValue({
       _sum: { amount: "250.00" },
     })
-    prisma.ticket.findMany.mockResolvedValue([
-      {
-        id: "ticket-1",
-        subject: "Withdrawal has not arrived",
-        status: "OPEN",
-        fulfillmentChannel: "PUBLISHER",
-        createdAt: new Date("2026-07-01T00:00:00.000Z"),
-        updatedAt: new Date("2026-07-01T01:00:00.000Z"),
-        user: { name: "Customer" },
-        assignedPublisher: { name: "Publisher" },
-        order: null,
-      },
-    ])
     prisma.auditLog.findMany.mockResolvedValue([
       {
         id: "audit-1",
@@ -238,18 +224,22 @@ describe("FinanceWorkbenchService", () => {
 
     expect(result.overview).toEqual({
       readyForDecision: 9,
-      activeSupport: 9,
       fundsInFlight: "1250.00",
       financialExceptions: 5,
       netRevenue30d: "321.45",
     })
-    expect(result.support).toMatchObject({ active: 9, overdue: 4 })
     expect(result.actionQueue).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: "RECONCILIATION" }),
-        expect.objectContaining({ type: "SUPPORT", id: "ticket-1" }),
       ]),
     )
+    expect(result).not.toHaveProperty("support")
+    expect(result.overview).not.toHaveProperty("activeSupport")
+    expect(result.actionQueue).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: "SUPPORT" })]),
+    )
+    expect(prisma.ticket.count).not.toHaveBeenCalled()
+    expect(prisma.ticket.findMany).not.toHaveBeenCalled()
     expect(result.recentActivity).toEqual([
       expect.objectContaining({
         id: "audit-1",

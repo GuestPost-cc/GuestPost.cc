@@ -51,7 +51,9 @@ import {
 } from "../../common/utils/marketplace-categories"
 import { AuditService } from "../audit/audit.service"
 import { CommunicationsService } from "../communications/communications.service"
+import { buildOrderStakeholderTimeline } from "../orders/order-stakeholder-timeline"
 import { QueueService } from "../queues/queue.service"
+import { operationsPlatformSupportWhere } from "../support/support-routing"
 import {
   assertManualMetricValues,
   assertMeasurementDate,
@@ -558,6 +560,114 @@ export class AdminService {
     if (lockedTarget.length !== 1) {
       throw new NotFoundException("User not found")
     }
+  }
+
+  private invalidPlatformWebsiteOwner() {
+    return new BadRequestException({
+      code: "INVALID_OWNER",
+      message:
+        "managedByUserId must reference an active OPERATIONS staff member",
+    })
+  }
+
+  /**
+   * Platform-site ownership participates in the staff offboarding lock order.
+   * Re-reading eligibility only after this lock means exactly one side of a
+   * concurrent assignment vs. demotion/suspension can commit:
+   *
+   *   every Staff User (id ASC), target User, then Website
+   */
+  private async lockAndAssertActiveOperationsOwner(tx: any, userId: string) {
+    try {
+      await this.lockStaffAccessMutationScope(tx, userId)
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw this.invalidPlatformWebsiteOwner()
+      }
+      throw error
+    }
+
+    const target = await tx.staffMembership.findUnique({
+      where: { userId },
+      select: {
+        role: true,
+        user: { select: { banned: true, userType: true } },
+      },
+    })
+    if (
+      target?.role !== "OPERATIONS" ||
+      target.user.banned ||
+      target.user.userType !== "STAFF"
+    ) {
+      throw this.invalidPlatformWebsiteOwner()
+    }
+  }
+
+  /**
+   * Operations authority cannot be removed while work is still routed to the
+   * actor. These predicates run after the shared staff/target locks and inside
+   * the same SERIALIZABLE transaction as the role or suspension write, so a
+   * concurrent assignment cannot pass the check and commit an orphaned owner.
+   *
+   * RESOLVED support remains active ownership because an external participant
+   * can reopen it. CLOSED is the only excluded state under the current staff
+   * offboarding policy.
+   */
+  private async releaseClosedOperationsSupportOrThrow(
+    tx: any,
+    userId: string,
+    action: "changing this Operations role" | "suspending this Operations user",
+  ): Promise<number> {
+    const activeAssignments = await tx.fulfillmentAssignment.count({
+      where: {
+        assignedToUserId: userId,
+        status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+      },
+    })
+    if (activeAssignments > 0) {
+      throw new ConflictException(
+        `Reassign active fulfillment orders before ${action}`,
+      )
+    }
+
+    const managedPlatformWebsites = await tx.website.count({
+      where: {
+        managedByUserId: userId,
+        ownershipType: WebsiteOwnershipType.PLATFORM,
+      },
+    })
+    if (managedPlatformWebsites > 0) {
+      throw new ConflictException(
+        `Reassign managed platform websites before ${action}`,
+      )
+    }
+
+    const activeSupportTickets = await tx.ticket.count({
+      where: {
+        assignedToUserId: userId,
+        status: { not: "CLOSED" },
+      },
+    })
+    if (activeSupportTickets > 0) {
+      throw new ConflictException(
+        `Reassign non-closed support tickets before ${action}`,
+      )
+    }
+
+    // Historical CLOSED tickets must not permanently pin a staff identity.
+    // Clearing them in this same serializable transaction makes a later reopen
+    // enter the unassigned support queue. A concurrent reopen/reply/reassign
+    // locks or writes the same Ticket predicate and forces one transaction to
+    // retry; Support mutations never take a conflicting Staff/User write lock
+    // after their Ticket lock, so this does not introduce a lock-order cycle.
+    const released = await tx.ticket.updateMany({
+      where: {
+        assignedToUserId: userId,
+        status: "CLOSED",
+      },
+      data: { assignedToUserId: null },
+    })
+    return released.count
   }
 
   async listUsers(params: {
@@ -1255,18 +1365,14 @@ export class AdminService {
               )
             }
           }
+          let releasedClosedSupportTickets = 0
           if (existing.role === "OPERATIONS" && role !== "OPERATIONS") {
-            const activeAssignments = await tx.fulfillmentAssignment.count({
-              where: {
-                assignedToUserId: userId,
-                status: { in: ["ASSIGNED", "IN_PROGRESS"] },
-              },
-            })
-            if (activeAssignments > 0) {
-              throw new ConflictException(
-                "Reassign active fulfillment orders before changing this Operations role",
+            releasedClosedSupportTickets =
+              await this.releaseClosedOperationsSupportOrThrow(
+                tx,
+                userId,
+                "changing this Operations role",
               )
-            }
           }
 
           const updated = await tx.staffMembership.update({
@@ -1278,7 +1384,11 @@ export class AdminService {
               action: "STAFF_ROLE_UPDATE",
               entityType: "StaffMembership",
               entityId: updated.id,
-              metadata: { newRole: role, userId },
+              metadata: {
+                newRole: role,
+                userId,
+                releasedClosedSupportTickets,
+              },
               userId: user.id,
               organizationId: null,
             },
@@ -1329,6 +1439,7 @@ export class AdminService {
             throw new ConflictException("Account is already suspended")
           }
 
+          let releasedClosedSupportTickets = 0
           if (target.userType === "STAFF") {
             const membership = target.staffMemberships[0]
             if (membership?.role === "SUPER_ADMIN") {
@@ -1346,17 +1457,12 @@ export class AdminService {
               }
             }
             if (membership?.role === "OPERATIONS") {
-              const activeAssignments = await tx.fulfillmentAssignment.count({
-                where: {
-                  assignedToUserId: userId,
-                  status: { in: ["ASSIGNED", "IN_PROGRESS"] },
-                },
-              })
-              if (activeAssignments > 0) {
-                throw new ConflictException(
-                  "Reassign active fulfillment orders before suspending this Operations user",
+              releasedClosedSupportTickets =
+                await this.releaseClosedOperationsSupportOrThrow(
+                  tx,
+                  userId,
+                  "suspending this Operations user",
                 )
-              }
             }
           }
 
@@ -1390,6 +1496,7 @@ export class AdminService {
                 internalNote: note,
                 expiresAt: expiresAt?.toISOString() ?? null,
                 sessionsRevoked: revoked.count,
+                releasedClosedSupportTickets,
               },
               userId: actor.id,
               organizationId: null,
@@ -1535,7 +1642,14 @@ export class AdminService {
             },
           ],
         },
-        { tickets: { some: { assignedToUserId: userId } } },
+        {
+          tickets: {
+            some: {
+              assignedToUserId: userId,
+              ...operationsPlatformSupportWhere(),
+            },
+          },
+        },
         {
           dispute: {
             is: { status: { in: ["OPEN", "UNDER_REVIEW"] } },
@@ -1871,6 +1985,9 @@ export class AdminService {
   }
 
   async getOrder(id: string, user?: any) {
+    if (user && !VALID_STAFF_ROLES.includes(user.staffRole as StaffRole)) {
+      throw new ForbiddenException("A current staff role is required")
+    }
     const order = await this.prisma.order.findFirst({
       where: {
         id,
@@ -1911,7 +2028,7 @@ export class AdminService {
         activeDeliveryVersion: {
           include: {
             evidence: { orderBy: { createdAt: "desc" } },
-            fraudFlags: { include: { resolution: true } },
+            fraudFlags: { include: { resolution: true, finding: true } },
             snapshots: true,
             adminVerifiedBy: { select: { id: true, name: true, email: true } },
           },
@@ -1972,6 +2089,28 @@ export class AdminService {
         },
         revisions: true,
         platformRevenue: true,
+        fraudFlags: {
+          orderBy: { createdAt: "asc" },
+          include: { resolution: true, finding: true, hold: true },
+        },
+        transactions: {
+          where: { type: "REFUND" },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            type: true,
+            amount: true,
+            currency: true,
+            createdAt: true,
+          },
+        },
+        publisherCompensation: {
+          include: {
+            debtRepaymentTransaction: {
+              select: { id: true, amount: true, currency: true },
+            },
+          },
+        },
         fulfillmentAssignments: {
           select: {
             id: true,
@@ -1984,10 +2123,14 @@ export class AdminService {
       },
     })
     if (!order) throw new NotFoundException(`Order ${id} not found`)
+    // Internal callers that deliberately omit an actor retain the historical
+    // system projection. Request-bound callers above fail closed instead.
     const role: StaffRole = user?.staffRole ?? "SUPER_ADMIN"
     const isSuperAdmin = role === "SUPER_ADMIN"
     const canViewFinancials = role !== "OPERATIONS"
     const canViewOrderContent = role === "OPERATIONS" || isSuperAdmin
+    const canViewInvestigatorDetails =
+      role === "FINANCE" || role === "SUPER_ADMIN"
 
     const approverIds = [
       ...new Set(
@@ -2076,8 +2219,8 @@ export class AdminService {
         publisherCompensationPolicy: {
           required: publisherCompensationRequired,
           maximumAmount: publisherCompensationRequired
-            ? (activeSettlement?.publisherAmount ?? order.amount ?? 0)
-            : 0,
+            ? String(activeSettlement?.publisherAmount ?? order.amount ?? 0)
+            : "0",
           currency: activeSettlement?.currency ?? order.currency,
           effectiveOrderStatus: effectiveRefundStatus,
         },
@@ -2170,6 +2313,7 @@ export class AdminService {
             "SETTLEMENT_RELEASED",
             "REFUND_ISSUED",
             "REFUNDED",
+            "PUBLISHER_COMPENSATION_RECORDED",
           ].includes(event.eventType)
             ? "Financial lifecycle event recorded"
             : event.message,
@@ -2202,8 +2346,30 @@ export class AdminService {
                     id: flag.resolution.id,
                     kind: flag.resolution.kind,
                     reason: flag.resolution.reason,
+                    disposition:
+                      flag.resolution.evidence &&
+                      typeof flag.resolution.evidence === "object" &&
+                      !Array.isArray(flag.resolution.evidence)
+                        ? ((flag.resolution.evidence as Record<string, unknown>)
+                            .disposition ?? null)
+                        : null,
                     resolvedByUserId: flag.resolution.resolvedByUserId,
+                    resolvedByRole: flag.resolution.resolvedByRole,
                     createdAt: flag.resolution.createdAt,
+                  }
+                : null,
+              finding: flag.finding
+                ? {
+                    id: flag.finding.id,
+                    outcome: flag.finding.outcome,
+                    ...(canViewInvestigatorDetails && {
+                      reason: flag.finding.internalReason,
+                    }),
+                    decidedByRole: flag.finding.decidedByRole,
+                    ...(isSuperAdmin && {
+                      decidedByUserId: flag.finding.decidedByUserId,
+                    }),
+                    createdAt: flag.finding.createdAt,
                   }
                 : null,
             })),
@@ -2245,6 +2411,7 @@ export class AdminService {
           }
         : null,
       cancellation: order.cancellationRequests?.[0] ?? null,
+      stakeholderTimeline: buildOrderStakeholderTimeline(order, role),
       activeAssignment: activeAssignment
         ? {
             id: activeAssignment.id,
@@ -3298,131 +3465,129 @@ export class AdminService {
     // An Operations-created site is always assigned to its creator. A crafted
     // managedByUserId cannot transfer inventory; only Super Admin can select a
     // different owner or use the separate reassignment workflow.
-    let managedByUserId: string | null = null
-    if (isOperations) {
-      managedByUserId = user.id
-    } else if (dto.managedByUserId) {
-      const target = await this.prisma.staffMembership.findUnique({
-        where: { userId: dto.managedByUserId },
-        select: { role: true, user: { select: { banned: true } } },
-      })
-      if (target?.role !== "OPERATIONS" || target.user.banned) {
-        throw new BadRequestException({
-          code: "INVALID_OWNER",
-          message:
-            "managedByUserId must reference an active OPERATIONS staff member",
-        })
-      }
-      managedByUserId = dto.managedByUserId
-    }
+    const managedByUserId: string | null = isOperations
+      ? user.id
+      : (dto.managedByUserId ?? null)
 
     let website: any
     try {
-      website = await this.prisma.$transaction(async (tx: any) => {
-        const createdWebsite = await tx.website.create({
-          data: {
-            url: dto.url,
-            domain,
-            canonicalDomain,
-            name: dto.name ?? null,
-            country: dto.country ?? null,
-            language: dto.language,
-            category: marketplaceCategories
-              .map((category) => category.name)
-              .join(", "),
-            ownershipType: WebsiteOwnershipType.PLATFORM,
-            isActive: true,
-            managedByUserId,
-            // Platform inventory intentionally bypasses DNS ownership checks.
-            // GSC/GA4 links are performance-data integrations, not ownership
-            // gates, and are managed separately from the listing lifecycle.
-            verificationStatus: WebsiteVerificationStatus.VERIFIED,
-          },
-        })
+      website = await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx: any) => {
+          if (managedByUserId) {
+            await this.lockAndAssertActiveOperationsOwner(tx, managedByUserId)
+          }
 
-        // A platform website and its single draft marketplace listing are one
-        // aggregate. Creating them transactionally prevents orphan sites and
-        // removes the old second listing-creation path from Marketplace.
-        const listing = await tx.marketplaceListing.create({
-          data: {
-            title: dto.listingTitle.trim(),
-            slug: `platform-${createdWebsite.id}`,
-            description: dto.description.trim(),
-            status: ListingStatus.DRAFT,
-            fulfillmentType: "INTERNAL",
-            currency: "USD",
-            country: dto.country ?? null,
-            language: dto.language,
-            websiteUrl: dto.url,
+          const createdWebsite = await tx.website.create({
+            data: {
+              url: dto.url,
+              domain,
+              canonicalDomain,
+              name: dto.name ?? null,
+              country: dto.country ?? null,
+              language: dto.language,
+              category: marketplaceCategories
+                .map((category) => category.name)
+                .join(", "),
+              ownershipType: WebsiteOwnershipType.PLATFORM,
+              isActive: true,
+              managedByUserId,
+              // Platform inventory intentionally bypasses DNS ownership checks.
+              // GSC/GA4 links are performance-data integrations, not ownership
+              // gates, and are managed separately from the listing lifecycle.
+              verificationStatus: WebsiteVerificationStatus.VERIFIED,
+            },
+          })
+
+          // A platform website and its single draft marketplace listing are one
+          // aggregate. Creating them transactionally prevents orphan sites and
+          // removes the old second listing-creation path from Marketplace.
+          const listing = await tx.marketplaceListing.create({
+            data: {
+              title: dto.listingTitle.trim(),
+              slug: `platform-${createdWebsite.id}`,
+              description: dto.description.trim(),
+              status: ListingStatus.DRAFT,
+              fulfillmentType: "INTERNAL",
+              currency: "USD",
+              country: dto.country ?? null,
+              language: dto.language,
+              websiteUrl: dto.url,
+              websiteId: createdWebsite.id,
+              organizationId: null,
+              publisherId: null,
+              ownerType: "PLATFORM",
+              traffic: dto.manualMetrics.ahrefsOrganicTraffic,
+              domainAuthority: dto.manualMetrics.mozDomainAuthority,
+              sportsGamingAllowed: dto.sportsGamingAllowed,
+              pharmacyAllowed: dto.pharmacyAllowed,
+              cryptoAllowed: dto.cryptoAllowed,
+              backlinkCount: dto.backlinkCount,
+              linkType: dto.linkType,
+              linkValidity: dto.linkValidity,
+              googleNews: dto.googleNews,
+              markedSponsored: dto.markedSponsored,
+              foreignLanguageAllowed: dto.foreignLanguageAllowed,
+              categories: {
+                create: marketplaceCategories.map((category) => ({
+                  category: { connect: { id: category.id } },
+                })),
+              },
+            },
+          })
+
+          await upsertWebsiteMetric(tx, {
             websiteId: createdWebsite.id,
-            organizationId: null,
-            publisherId: null,
-            ownerType: "PLATFORM",
-            traffic: dto.manualMetrics.ahrefsOrganicTraffic,
-            domainAuthority: dto.manualMetrics.mozDomainAuthority,
-            sportsGamingAllowed: dto.sportsGamingAllowed,
-            pharmacyAllowed: dto.pharmacyAllowed,
-            cryptoAllowed: dto.cryptoAllowed,
-            backlinkCount: dto.backlinkCount,
-            linkType: dto.linkType,
-            linkValidity: dto.linkValidity,
-            googleNews: dto.googleNews,
-            markedSponsored: dto.markedSponsored,
-            foreignLanguageAllowed: dto.foreignLanguageAllowed,
-            categories: {
-              create: marketplaceCategories.map((category) => ({
-                category: { connect: { id: category.id } },
-              })),
+            key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+            provider: WebsiteMetricProvider.AHREFS,
+            source: WebsiteMetricSource.STAFF_MANUAL,
+            value: dto.manualMetrics.ahrefsOrganicTraffic,
+            measuredAt: ahrefsTrafficAsOf,
+            expiresAt: manualMetricExpiry(ahrefsTrafficAsOf),
+            enteredByUserId: user.id,
+          })
+          await upsertWebsiteMetric(tx, {
+            websiteId: createdWebsite.id,
+            key: WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
+            provider: WebsiteMetricProvider.MOZ,
+            source: WebsiteMetricSource.STAFF_MANUAL,
+            value: dto.manualMetrics.mozDomainAuthority,
+            measuredAt: mozDomainAuthorityAsOf,
+            expiresAt: manualMetricExpiry(mozDomainAuthorityAsOf),
+            enteredByUserId: user.id,
+          })
+          await this.audit.log(
+            {
+              action: "WEBSITE_MANUAL_METRICS_CREATED",
+              entityType: "Website",
+              entityId: createdWebsite.id,
+              metadata: {
+                ahrefsOrganicTraffic: dto.manualMetrics.ahrefsOrganicTraffic,
+                ahrefsTrafficAsOf: ahrefsTrafficAsOf.toISOString(),
+                mozDomainAuthority: dto.manualMetrics.mozDomainAuthority,
+                mozDomainAuthorityAsOf: mozDomainAuthorityAsOf.toISOString(),
+                source: "STAFF_MANUAL",
+              },
+              userId: user.id,
+              organizationId: null,
             },
-          },
-        })
+            tx,
+          )
 
-        await upsertWebsiteMetric(tx, {
-          websiteId: createdWebsite.id,
-          key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
-          provider: WebsiteMetricProvider.AHREFS,
-          source: WebsiteMetricSource.STAFF_MANUAL,
-          value: dto.manualMetrics.ahrefsOrganicTraffic,
-          measuredAt: ahrefsTrafficAsOf,
-          expiresAt: manualMetricExpiry(ahrefsTrafficAsOf),
-          enteredByUserId: user.id,
-        })
-        await upsertWebsiteMetric(tx, {
-          websiteId: createdWebsite.id,
-          key: WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
-          provider: WebsiteMetricProvider.MOZ,
-          source: WebsiteMetricSource.STAFF_MANUAL,
-          value: dto.manualMetrics.mozDomainAuthority,
-          measuredAt: mozDomainAuthorityAsOf,
-          expiresAt: manualMetricExpiry(mozDomainAuthorityAsOf),
-          enteredByUserId: user.id,
-        })
-        await this.audit.log(
-          {
-            action: "WEBSITE_MANUAL_METRICS_CREATED",
-            entityType: "Website",
-            entityId: createdWebsite.id,
-            metadata: {
-              ahrefsOrganicTraffic: dto.manualMetrics.ahrefsOrganicTraffic,
-              ahrefsTrafficAsOf: ahrefsTrafficAsOf.toISOString(),
-              mozDomainAuthority: dto.manualMetrics.mozDomainAuthority,
-              mozDomainAuthorityAsOf: mozDomainAuthorityAsOf.toISOString(),
-              source: "STAFF_MANUAL",
-            },
-            userId: user.id,
-            organizationId: null,
-          },
-          tx,
-        )
-
-        return { ...createdWebsite, listing }
-      })
+          return { ...createdWebsite, listing }
+        },
+      )
     } catch (error: any) {
       if (error?.code === "P2002") {
         throw new BadRequestException({
           code: "DOMAIN_ALREADY_REGISTERED",
           message: `Domain ${canonicalDomain} is already registered`,
         })
+      }
+      if (isRetryablePrismaTransactionError(error)) {
+        throw new ConflictException(
+          "Platform website creation changed concurrently. Review the latest staff and inventory state and try again.",
+        )
       }
       throw error
     }
@@ -3461,64 +3626,76 @@ export class AdminService {
     body: { managedByUserId: string | null; reason?: string },
     user: any,
   ) {
-    const website = await this.prisma.website.findUnique({
-      where: { id: websiteId },
-      select: {
-        id: true,
-        ownershipType: true,
-        managedByUserId: true,
-        url: true,
-      },
-    })
-    if (!website) throw new NotFoundException("Website not found")
-    if (website.ownershipType !== "PLATFORM") {
-      throw new BadRequestException(
-        "Only platform websites have a managed-by owner",
+    const newOwnerId = body.managedByUserId ?? null
+
+    try {
+      return await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx: any) => {
+          // Acquire the staff aggregate/target locks before touching Website so
+          // this command has the same lock order as demotion and suspension.
+          if (newOwnerId) {
+            await this.lockAndAssertActiveOperationsOwner(tx, newOwnerId)
+          }
+
+          const website = await tx.website.findUnique({
+            where: { id: websiteId },
+            select: {
+              id: true,
+              ownershipType: true,
+              managedByUserId: true,
+              url: true,
+            },
+          })
+          if (!website) throw new NotFoundException("Website not found")
+          if (website.ownershipType !== "PLATFORM") {
+            throw new BadRequestException(
+              "Only platform websites have a managed-by owner",
+            )
+          }
+
+          await tx.website.update({
+            where: { id: websiteId },
+            data: { managedByUserId: newOwnerId },
+          })
+
+          await this.audit.log(
+            {
+              action: "WEBSITE_OWNERSHIP_REASSIGNED",
+              entityType: "Website",
+              entityId: websiteId,
+              metadata: {
+                url: website.url,
+                fromUserId: website.managedByUserId ?? null,
+                toUserId: newOwnerId,
+                reason: body.reason ?? null,
+              },
+              userId: user.id,
+              organizationId: null,
+            },
+            tx,
+          )
+
+          return { id: websiteId, managedByUserId: newOwnerId }
+        },
       )
-    }
-
-    let newOwnerId: string | null = null
-    if (body.managedByUserId) {
-      const target = await this.prisma.staffMembership.findUnique({
-        where: { userId: body.managedByUserId },
-        select: { role: true, user: { select: { banned: true } } },
-      })
-      if (target?.role !== "OPERATIONS" || target.user.banned) {
-        throw new BadRequestException({
-          code: "INVALID_OWNER",
-          message:
-            "managedByUserId must reference an active OPERATIONS staff member",
-        })
+    } catch (error) {
+      if (isRetryablePrismaTransactionError(error)) {
+        throw new ConflictException(
+          "Platform website ownership changed concurrently. Review the latest assignment and try again.",
+        )
       }
-      newOwnerId = body.managedByUserId
+      throw error
     }
-
-    await this.prisma.website.update({
-      where: { id: websiteId },
-      data: { managedByUserId: newOwnerId },
-    })
-
-    await this.audit.log({
-      action: "WEBSITE_OWNERSHIP_REASSIGNED",
-      entityType: "Website",
-      entityId: websiteId,
-      metadata: {
-        url: website.url,
-        fromUserId: website.managedByUserId ?? null,
-        toUserId: newOwnerId,
-        reason: body.reason ?? null,
-      },
-      userId: user.id,
-      organizationId: null,
-    })
-
-    return { id: websiteId, managedByUserId: newOwnerId }
   }
 
   // List OPERATIONS staff for the admin reassignment picker.
   async listOperationsStaff() {
     const memberships = await this.prisma.staffMembership.findMany({
-      where: { role: "OPERATIONS", user: { banned: false } },
+      where: {
+        role: "OPERATIONS",
+        user: { banned: false, userType: "STAFF" },
+      },
       include: { user: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: "asc" },
     })

@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-08-11
+updated: 2026-08-15
 ---
 
 # GuestPost.cc
@@ -273,6 +273,17 @@ historical audit batches.
 - Shared `CommandItem` disabled styling must target `data-disabled=true`, because cmdk renders `data-disabled=false` on enabled options; a presence-only selector blocks pointer input across every shared multi-select.
 - Order cancellation is a dedicated domain workflow, not a generic status mutation. `packages/shared/src/order-cancellation-policy.ts` owns the stage/channel decision matrix and `OrderCancellationRequest` retains structured case history.
 - Pre-acceptance exits are immediate; accepted work requires counterparty consent or Operations review plus Finance approval; published/delivered/completed work uses the dispute path. An active case holds fulfillment and increments `Order.version` to close transition races. Publisher actions require a publisher owner, and platform-fulfiller actions require the assigned Operations user (or Super Admin).
+- A confirmed delivery-fraud signal is separate immutable evidence, not a
+  clearance or money mutation. Operations or Super Admin appends the finding
+  and links a same-order full-refund cancellation review while retaining the
+  permanent settlement-deny hold; Finance or Super Admin approves the canonical
+  refund and publisher outcome through a separate command. Super Admin can
+  currently authorize both commands, so universal actor-independent
+  maker-checker remains a separate paid-launch gate. Exact command replay
+  creates no second finding, Order-version increment, refund, document, or
+  outbox event. Force cancellation and dispute refund cannot bypass the linked
+  case, and a deferred Order constraint rejects any terminal state other than
+  the canonical linked `REFUNDED` result at transaction commit.
 - Paid refunds use one transaction-aware path that reverses platform revenue or publisher settlement, cancels active assignments, credits the organization wallet, transitions the order, and writes ledger/event/audit records together. `Order.refundResponsibility` prevents platform/customer-attributed refunds from lowering publisher trust.
 - Refund clawbacks that create publisher debt write an idempotent in-app
   explanation in the same transaction. Later settlement-release notifications
@@ -295,7 +306,7 @@ historical audit batches.
 - Customer actions are role-aware in the UI but remain server-authorized. An organization OWNER can act across the organization and manage Billing; a MEMBER can mutate only orders they created. Billing is hidden from member navigation and direct member access fails closed. Wallet display uses authoritative available and reserved balances from the billing API; no payment, refund, payout, or settlement behavior is derived in the client.
 - Campaign-origin order creation uses the marketplace as its only customer entry point. A canonical `campaignId` query value is preserved across listing and service navigation, preselected only from the tenant-scoped campaign list, and reauthorized by the order API. The retired `/dashboard/orders/new` route is a compatibility-only redirect and never creates orders.
 - The Super Admin overview is a read-only command center backed by `GET /admin/command-center`. It returns exact server-side workflow counts, a bounded priority queue, lifecycle/health/finance summaries, and sanitized audit activity. The route is `SUPER_ADMIN`-only, sends private no-store headers, excludes audit metadata and decrypted payout data, and leaves all high-impact decisions in the existing reasoned and audited workspaces. Operations and Finance keep their separate role-focused overviews.
-- The Finance overview is a Support-first money-operations workbench backed by `GET /admin/finance-workbench`. It is restricted to Finance and Super Admin, uses exact database aggregates and Prisma Decimal money math, returns a bounded server-prioritized decision queue, and exposes only allowlisted/sanitized finance activity. Payout credentials, provider configuration, raw execution errors, audit metadata, and decrypted payout data never enter the overview response; all money mutations remain in the existing reasoned and audited Finance workspaces.
+- The Finance overview is a money-operations workbench backed by `GET /admin/finance-workbench`. It is restricted to Finance and Super Admin, uses exact database aggregates and Prisma Decimal money math, returns a bounded server-prioritized decision queue, and exposes only allowlisted/sanitized finance activity. Finance has no generic Support access or Support-derived workbench fields. Payout credentials, provider configuration, raw execution errors, audit metadata, and decrypted payout data never enter the overview response; all money mutations remain in the existing reasoned and audited Finance workspaces.
 - The Operations overview is an assignment-focused workbench backed by `GET /admin/operations-workbench`. It is restricted to Operations and Super Admin and combines assigned/claimable platform fulfillment, assigned platform Support, operational cancellations and disputes, delivery/domain verification, moderation, and assigned-site readiness into one bounded server-prioritized queue. Only fulfillment is claimable inline; all other decisions deep-link to their existing authorized workspaces. Operations order list/detail reads use the same assignment, assigned-Support, and operational-exception scope and return sanitized contextual identities rather than global-directory or finance data.
 - Operations fulfillment projections omit order amount/currency and delivered-sales aggregates at the API boundary; Super Admin retains those financial fields. The Operations UI uses verification workload in the corresponding workspace slot and never relies on client-only hiding for this separation.
 - All Admin routes share Admin-only workspace primitives for responsive page boundaries, task-oriented headers, semantic KPI colors, filter state/result summaries, notices, status badges, and empty states. Super Admin, Operations, and Finance retain violet, blue, and emerald shell accents respectively. These presentation conventions never replace route guards or server authorization; direct access remains fail-closed and sensitive decisions stay in their existing reasoned and audited workflows. The durable design contract is documented in `docs/ADMIN_WORKSPACE_UX.md`.

@@ -13,6 +13,7 @@ import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
 import { PrismaService } from "../../common/prisma.service"
 import {
+  ConfirmDeliveryFraudFlagDto,
   DeliveryInterventionReasonDto,
   OverrideDeliveryVerificationDto,
   ResolveDeliveryFraudFlagDto,
@@ -126,7 +127,7 @@ export class DeliveriesController {
   }
 
   @Post("orders/:id/claim")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("OPERATIONS")
   claim(@Param("id") id: string, @CurrentAuthority() user: any) {
     return this.assignment.claim(id, user.id, user.staffRole)
   }
@@ -244,6 +245,21 @@ export class DeliveriesController {
       body.reason,
       body.disposition,
       body.evidenceReference,
+    )
+  }
+
+  @Post("fraud-flags/:id/confirm")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  confirmFraudFlag(
+    @Param("id") id: string,
+    @Body() body: ConfirmDeliveryFraudFlagDto,
+    @CurrentAuthority() user: any,
+  ) {
+    return this.intervention.confirmFraudFlag(
+      id,
+      user.id,
+      this.role(user),
+      body,
     )
   }
 }

@@ -308,16 +308,55 @@ export class OrderDeliveryService {
 
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, ...ownershipScope },
-      include: { website: { select: { ownershipType: true } } },
+      include: {
+        website: { select: { ownershipType: true } },
+        fraudHolds: {
+          select: {
+            fraudFlag: { select: { finding: { select: { id: true } } } },
+          },
+        },
+      },
     })
     if (!order) throw new NotFoundException("Order not found")
-    if (!order.activeDeliveryVersionId) return { hasDelivery: false }
+    const securityReview =
+      order.fraudHolds.length > 0
+        ? {
+            status: order.fraudHolds.some((hold: any) => hold.fraudFlag.finding)
+              ? ("CONFIRMED_ACTION_REQUIRED" as const)
+              : ("UNDER_REVIEW" as const),
+          }
+        : null
+    const unavailableDelivery = {
+      hasDelivery: false as const,
+      securityReview,
+      capabilities: {
+        canConfirm: false,
+        canManualAccept: false,
+        blockedReason: !access.organizationId
+          ? null
+          : securityReview
+            ? ("SECURITY_REVIEW" as const)
+            : ("NO_DELIVERY" as const),
+      },
+    }
+    if (!order.activeDeliveryVersionId) return unavailableDelivery
     const version = await this.prisma.orderDeliveryVersion.findUnique({
       where: { id: order.activeDeliveryVersionId },
       include: { evidence: { orderBy: { createdAt: "desc" }, take: 1 } },
     })
-    if (!version) return { hasDelivery: false }
+    if (!version) return unavailableDelivery
     const ev = version.evidence[0]
+    const isCustomer = Boolean(access.organizationId)
+    const canConfirm =
+      isCustomer &&
+      !securityReview &&
+      order.status === "VERIFIED" &&
+      version.verificationStatus === "VERIFIED"
+    const canManualAccept =
+      isCustomer &&
+      !securityReview &&
+      order.status === "PUBLISHED" &&
+      ["FAILED", "MANUAL_REVIEW"].includes(version.verificationStatus)
     return {
       hasDelivery: true,
       publishedUrl: version.publishedUrl,
@@ -347,6 +386,20 @@ export class OrderDeliveryService {
             checkedAt: ev.checkedAt,
           }
         : null,
+      securityReview,
+      capabilities: {
+        canConfirm,
+        canManualAccept,
+        blockedReason: !isCustomer
+          ? null
+          : securityReview
+            ? ("SECURITY_REVIEW" as const)
+            : canConfirm || canManualAccept
+              ? null
+              : ["PENDING", "RETRYING"].includes(version.verificationStatus)
+                ? ("VERIFICATION_PENDING" as const)
+                : ("WRONG_STATUS" as const),
+      },
     }
   }
 

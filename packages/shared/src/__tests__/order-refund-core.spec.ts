@@ -76,8 +76,18 @@ describe("unaccepted order refund core", () => {
       }),
     )
     expect(tx.fulfillmentAssignment.updateMany).toHaveBeenCalled()
+    expect(tx.transaction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        description: "Refund for order order-1",
+      }),
+    })
     expect(writeAudit).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "ORDER_ACCEPTANCE_TIMEOUT_REFUND" }),
+      expect.objectContaining({
+        action: "ORDER_ACCEPTANCE_TIMEOUT_REFUND",
+        metadata: expect.objectContaining({
+          reason: "Acceptance deadline missed",
+        }),
+      }),
       tx,
     )
   })

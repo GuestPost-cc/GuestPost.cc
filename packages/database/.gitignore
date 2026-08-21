@@ -18,3 +18,4 @@ node_modules
 !/src/prisma/models/DepositCreditRecovery.ts
 !/src/prisma/models/DepositCreditEvidence.ts
 !/src/prisma/models/ModerationEvent.ts
+!/src/prisma/models/DeliveryFraudFinding.ts

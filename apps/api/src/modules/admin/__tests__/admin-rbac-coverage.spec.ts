@@ -1,5 +1,12 @@
-import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants"
+import {
+  HEADERS_METADATA,
+  METHOD_METADATA,
+  PATH_METADATA,
+  ROUTE_ARGS_METADATA,
+} from "@nestjs/common/constants"
 import { Reflector } from "@nestjs/core"
+import { CurrentAuthority } from "../../../common/decorators/current-authority.decorator"
+import { CurrentUser } from "../../../common/decorators/current-user.decorator"
 import { STAFF_ROLES_KEY } from "../../../common/decorators/staff-roles.decorator"
 import { AdminController } from "../admin.controller"
 
@@ -323,12 +330,7 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
   })
 
   it("shared contextual reads include all three staff roles", () => {
-    const universalReads = [
-      "listOrders",
-      "listSupportTickets",
-      "getSupportTicket",
-      "getPlatformSettings",
-    ]
+    const universalReads = ["listOrders", "getPlatformSettings"]
 
     for (const method of universalReads) {
       const handler = (AdminController.prototype as any)[method]
@@ -341,6 +343,93 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
         ["FINANCE", "OPERATIONS", "SUPER_ADMIN"],
       ])
     }
+  })
+
+  it("keeps support routes out of Finance and injects fresh authority instead of cached user role", () => {
+    const supportMethods = [
+      "listSupportTickets",
+      "getSupportTicket",
+      "updateSupportTicketStatus",
+      "addSupportTicketMessage",
+      "claimSupportTicket",
+    ]
+
+    class AuthorityProbe {
+      method(_value?: unknown) {}
+    }
+    class UserProbe {
+      method(_value?: unknown) {}
+    }
+    CurrentAuthority()(AuthorityProbe.prototype, "method", 0)
+    CurrentUser()(UserProbe.prototype, "method", 0)
+    const authorityFactory = Object.values(
+      Reflect.getMetadata(
+        ROUTE_ARGS_METADATA,
+        AuthorityProbe,
+        "method",
+      ) as Record<string, any>,
+    )[0].factory
+    const userFactory = Object.values(
+      Reflect.getMetadata(ROUTE_ARGS_METADATA, UserProbe, "method") as Record<
+        string,
+        any
+      >,
+    )[0].factory
+
+    for (const method of supportMethods) {
+      const handler = (AdminController.prototype as any)[method]
+      const roles = (
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      ).sort()
+      expect(roles).not.toContain("FINANCE")
+
+      const parameters = Object.values(
+        (Reflect.getMetadata(
+          ROUTE_ARGS_METADATA,
+          AdminController,
+          method,
+        ) as Record<string, any>) ?? {},
+      ) as Array<{ factory?: unknown }>
+      expect(
+        parameters.some((value) => value.factory === authorityFactory),
+      ).toBe(true)
+      expect(parameters.some((value) => value.factory === userFactory)).toBe(
+        false,
+      )
+    }
+
+    const workbenchParameters = Object.values(
+      (Reflect.getMetadata(
+        ROUTE_ARGS_METADATA,
+        AdminController,
+        "getOperationsWorkbench",
+      ) as Record<string, any>) ?? {},
+    ) as Array<{ factory?: unknown }>
+    expect(
+      workbenchParameters.some((value) => value.factory === authorityFactory),
+    ).toBe(true)
+    expect(
+      workbenchParameters.some((value) => value.factory === userFactory),
+    ).toBe(false)
+  })
+
+  it.each([
+    "listSupportTickets",
+    "getSupportTicket",
+  ])("marks staff %s responses private and no-store", (method) => {
+    const headers = Reflect.getMetadata(
+      HEADERS_METADATA,
+      (AdminController.prototype as any)[method],
+    ) as Array<{ name: string; value: string }>
+    expect(headers).toEqual(
+      expect.arrayContaining([
+        {
+          name: "Cache-Control",
+          value: "private, no-store, no-cache, must-revalidate",
+        },
+        { name: "Pragma", value: "no-cache" },
+      ]),
+    )
   })
 })
 

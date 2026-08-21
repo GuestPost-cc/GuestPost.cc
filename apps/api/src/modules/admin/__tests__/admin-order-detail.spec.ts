@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common"
+import { ForbiddenException, NotFoundException } from "@nestjs/common"
 import { AdminService } from "../admin.service"
 
 describe("AdminService — order detail", () => {
@@ -11,6 +11,13 @@ describe("AdminService — order detail", () => {
       user: { findMany: jest.fn() },
     }
     service = new AdminService(prisma, {} as any, {} as any)
+  })
+
+  it("fails closed before reading an order when a request lacks a current staff role", async () => {
+    await expect(
+      service.getOrder("order-1", { id: "staff-1", staffRole: "" }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+    expect(prisma.order.findFirst).not.toHaveBeenCalled()
   })
 
   it("enriches human settlement approvers and preserves approval timestamps", async () => {

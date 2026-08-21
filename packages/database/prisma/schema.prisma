@@ -565,6 +565,7 @@ model User {
   cancelledPayoutExecutions     PayoutExecution[]             @relation("PayoutCancellationActor")
   adminVerifiedDeliveryVersions OrderDeliveryVersion[]        @relation("AdminVerifiedVersion")
   resolvedDeliveryFraudFlags    DeliveryFraudFlagResolution[] @relation("DeliveryFraudResolver")
+  decidedDeliveryFraudFindings  DeliveryFraudFinding[]        @relation("DeliveryFraudFindingDecider")
   tickets                       Ticket[]
   messages                      TicketMessage[]
   notifications                 Notification[]
@@ -1154,6 +1155,7 @@ model Order {
   publisherCompensation  PublisherCompensation?
   fraudHolds             DeliveryFraudHold[]
   fraudFlagResolutions   DeliveryFraudFlagResolution[]
+  fraudFindings          DeliveryFraudFinding[]
   tickets                Ticket[]
   review                 OrderReview?
   cancellationRequests   OrderCancellationRequest[]
@@ -1294,13 +1296,15 @@ model OrderCancellationRequest {
   financeApprovedByUserId String?
   resolution              CancellationResolution?
   resolutionReason        String?
-  refundTransactionId     String?
+  refundTransactionId     String?                    @unique
   idempotencyKey          String?
   resolvedAt              DateTime?
   createdAt               DateTime                   @default(now())
   updatedAt               DateTime                   @updatedAt
 
-  order Order @relation(fields: [orderId], references: [id])
+  order             Order                  @relation(fields: [orderId], references: [id])
+  refundTransaction Transaction?           @relation("OrderCancellationRefund", fields: [refundTransactionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  fraudFindings     DeliveryFraudFinding[]
 
   @@unique([orderId, idempotencyKey])
   @@index([orderId, status])
@@ -1446,6 +1450,10 @@ enum DeliveryFraudResolutionKind {
   LINK_RESTORED
 }
 
+enum DeliveryFraudFindingOutcome {
+  CONFIRMED_FRAUD
+}
+
 // Platform-owned orders enter the Operations queue. Operations claims/assigns
 // and fulfills; identical downstream verification + settlement path as
 // publisher inventory (no bypass for platform inventory).
@@ -1508,6 +1516,7 @@ model OrderDeliveryVersion {
   fraudFlags           DeliveryFraudFlag[]
   fraudHolds           DeliveryFraudHold[]
   fraudFlagResolutions DeliveryFraudFlagResolution[]
+  fraudFindings        DeliveryFraudFinding[]
   adminVerifiedBy      User?                          @relation("AdminVerifiedVersion", fields: [adminVerifiedById], references: [id])
 
   @@unique([orderId, version])
@@ -1574,6 +1583,7 @@ model DeliveryFraudFlag {
   order           Order                        @relation(fields: [orderId], references: [id])
   deliveryVersion OrderDeliveryVersion         @relation(fields: [deliveryVersionId], references: [id])
   resolution      DeliveryFraudFlagResolution?
+  finding         DeliveryFraudFinding?
   hold            DeliveryFraudHold?
 
   @@index([deliveryVersionId, type])
@@ -1628,6 +1638,40 @@ model DeliveryFraudFlagResolution {
   @@index([deliveryVersionId])
   @@index([resolvedByUserId])
   @@index([kind, createdAt])
+}
+
+// Append-only staff finding that confirms a fraud signal. Unlike a resolution,
+// a confirmed finding deliberately retains the current DeliveryFraudHold so
+// it remains permanent settlement-deny evidence. Any refund or publisher
+// compensation is derived from its canonical transaction-backed records.
+model DeliveryFraudFinding {
+  id                          String                      @id @default(cuid())
+  fraudFlagId                 String                      @unique
+  orderId                     String
+  deliveryVersionId           String
+  cancellationRequestId       String
+  outcome                     DeliveryFraudFindingOutcome @default(CONFIRMED_FRAUD)
+  internalReason              String                      @db.VarChar(1000)
+  decidedByUserId             String
+  decidedByRole               StaffRole
+  expectedOrderVersion        Int
+  expectedVerificationVersion Int
+  idempotencyKey              String                      @db.Uuid
+  requestFingerprint          String                      @db.Char(64)
+  createdAt                   DateTime                    @default(now())
+
+  fraudFlag           DeliveryFraudFlag        @relation(fields: [fraudFlagId], references: [id], onDelete: Restrict)
+  order               Order                    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  deliveryVersion     OrderDeliveryVersion     @relation(fields: [deliveryVersionId], references: [id], onDelete: Restrict)
+  cancellationRequest OrderCancellationRequest @relation(fields: [cancellationRequestId], references: [id], onDelete: Restrict)
+  decidedBy           User                     @relation("DeliveryFraudFindingDecider", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([decidedByUserId, idempotencyKey])
+  @@index([orderId])
+  @@index([deliveryVersionId])
+  @@index([cancellationRequestId])
+  @@index([decidedByUserId])
+  @@index([outcome, createdAt])
 }
 
 // Per-order review left by the customer after completion. One per order; feeds
@@ -2178,18 +2222,19 @@ model Transaction {
   settlementId String?
   createdAt    DateTime        @default(now())
 
-  wallet                      Wallet?                @relation(fields: [walletId], references: [id])
-  order                       Order?                 @relation(fields: [orderId], references: [id])
-  publisher                   Publisher?             @relation(fields: [publisherId], references: [id])
-  settlement                  Settlement?            @relation(fields: [settlementId], references: [id])
+  wallet                      Wallet?                    @relation(fields: [walletId], references: [id])
+  order                       Order?                     @relation(fields: [orderId], references: [id])
+  publisher                   Publisher?                 @relation(fields: [publisherId], references: [id])
+  settlement                  Settlement?                @relation(fields: [settlementId], references: [id])
   depositAttempt              DepositAttempt?
   withdrawalAllocations       WithdrawalAllocation[]
-  originatingPaymentDisputes  PaymentDispute[]       @relation("PaymentDisputeDepositTransaction")
-  paymentDisputeHold          PaymentDispute?        @relation("PaymentDisputeHoldTransaction")
-  paymentDisputeResolution    PaymentDispute?        @relation("PaymentDisputeResolutionTransaction")
-  publisherCompensationRefund PublisherCompensation? @relation("PublisherCompensationRefund")
-  publisherCompensationCredit PublisherCompensation? @relation("PublisherCompensationCredit")
-  publisherCompensationDebt   PublisherCompensation? @relation("PublisherCompensationDebt")
+  originatingPaymentDisputes  PaymentDispute[]           @relation("PaymentDisputeDepositTransaction")
+  paymentDisputeHold          PaymentDispute?            @relation("PaymentDisputeHoldTransaction")
+  paymentDisputeResolution    PaymentDispute?            @relation("PaymentDisputeResolutionTransaction")
+  publisherCompensationRefund PublisherCompensation?     @relation("PublisherCompensationRefund")
+  publisherCompensationCredit PublisherCompensation?     @relation("PublisherCompensationCredit")
+  publisherCompensationDebt   PublisherCompensation?     @relation("PublisherCompensationDebt")
+  cancellationRefundRequests  OrderCancellationRequest[] @relation("OrderCancellationRefund")
 
   @@unique([reference])
   @@index([walletId])
@@ -2428,9 +2473,11 @@ model Ticket {
   // Phase 6.5 channel-aware routing. Snapshotted from the linked order at
   // ticket creation; subsequent website/listing edits never re-route an
   // existing ticket (prevents accidental exposure to a new owner).
-  //   - PLATFORM channel: assignedToUserId = Website.managedByUserId at the
-  //     moment the ticket was opened. NULL falls back to the unassigned-Ops
-  //     queue surfaced to every OPERATIONS staffer.
+  //   - PLATFORM channel: assignedToUserId follows the order's locked active
+  //     Operations fulfillment assignment, or the latest eligible delivered
+  //     assignment after fulfillment. NULL falls back to the unassigned-Ops
+  //     queue; eligible terminal-order tickets can be claimed without changing
+  //     fulfillment ownership.
   //   - PUBLISHER channel: assignedPublisherId = Website.publisherId. Reply
   //     access then keys off PublisherMembership rather than a single user.
   fulfillmentChannel  FulfillmentChannel?
@@ -2458,9 +2505,8 @@ model Ticket {
 // Phase 6.6: every ticket message carries a visibility scope. PUBLIC is the
 // historical default and what every existing row gets at migration time;
 // INTERNAL is staff-only — invisible to the ticket's customer and to any
-// publisher member, and used by Finance (who is read-only on PLATFORM tickets)
-// + Admin + Ops as an escape valve to coordinate without writing to the
-// customer-facing thread.
+// publisher member. New support access is limited to Super Admin and scoped
+// Operations staff; the value remains in historical rows for audit continuity.
 enum TicketMessageVisibility {
   PUBLIC
   INTERNAL
@@ -2475,8 +2521,7 @@ enum TicketMessageVisibility {
 // Used for:
 //   - Dispute / refund / settlement investigations ("who said what in what
 //     capacity?")
-//   - Staff QA reviews ("Finance posted on a Platform ticket — that's the
-//     internal-note escape valve in action")
+//   - Staff QA reviews, including historical role-at-write evidence
 //   - Audit log enrichment (TICKET_MESSAGE_ADDED metadata carries this so
 //     reports can group by role without a join through StaffMembership)
 enum TicketParticipantRole {

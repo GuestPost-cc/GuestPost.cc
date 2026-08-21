@@ -18,7 +18,19 @@ import type {
   CancellationRequestResponse,
   CancellationRequestStatus,
   PublisherCompensationDecisionInput,
+  StakeholderTimelineEntry,
 } from "./orders"
+import type {
+  AddTicketMessageInput,
+  ReassignTicketInput,
+  StaffSupportListFilters,
+  StaffTicketDetail,
+  StaffTicketListResponse,
+  TicketAssignmentMutationResponse,
+  TicketDetailQuery,
+  TicketMessageDto,
+  TicketStatusMutationResponse,
+} from "./support"
 
 export interface PaginatedResponse<T> {
   items: T[]
@@ -200,7 +212,6 @@ export type AdminFinanceWorkbenchPriority = "CRITICAL" | "HIGH" | "MEDIUM"
 
 export type AdminFinanceWorkbenchActionType =
   | "RECONCILIATION"
-  | "SUPPORT"
   | "PAYOUT"
   | "WITHDRAWAL"
   | "CANCELLATION"
@@ -225,35 +236,11 @@ export interface AdminFinanceWorkbenchResponse {
   currency: "USD"
   overview: {
     readyForDecision: number
-    activeSupport: number
     fundsInFlight: string
     financialExceptions: number
     netRevenue30d: string
   }
   actionQueue: AdminFinanceWorkbenchAction[]
-  support: {
-    active: number
-    overdue: number
-    items: Array<{
-      id: string
-      subject: string
-      status: TicketStatus
-      channel: "PUBLISHER" | "PLATFORM" | null
-      replyMode: "PUBLIC_AND_INTERNAL" | "INTERNAL_ONLY"
-      requesterName: string | null
-      publisherName: string | null
-      order: {
-        id: string
-        title: string | null
-        status: string
-        amount: string | null
-        currency: string
-      } | null
-      createdAt: string
-      updatedAt: string
-      overdue: boolean
-    }>
-  }
   pipeline: {
     settlements: AdminFinancePipelineStage[]
     withdrawals: AdminFinancePipelineStage[]
@@ -327,6 +314,7 @@ export type OperationsInboxView =
 
 export type OperationsNextAction =
   | "CLAIM"
+  | "ASSIGN"
   | "ACCEPT"
   | "CONTENT"
   | "WAITING_CUSTOMER"
@@ -378,9 +366,21 @@ export interface OperationsInboxOrder {
     publishedUrl: string
   } | null
   cancellationRequests: CancellationRequestResponse[]
+  /** Eligibility only; use the role-aware capabilities for authorization UX. */
   claimable: boolean
+  canSelfClaim: boolean
+  canAssign: boolean
   canProgress: boolean
   nextAction: OperationsNextAction
+}
+
+export interface OperationsInboxFilters
+  extends Record<string, string | number | boolean | undefined> {
+  view?: OperationsInboxView
+  take?: number
+  skip?: number
+  search?: string
+  includeSummary?: boolean
 }
 
 export interface OperationsInboxResponse
@@ -537,6 +537,8 @@ export interface OperationsOrderDetail extends OperationsInboxOrder {
     | null
   access: {
     claimable: boolean
+    canSelfClaim: boolean
+    canAssign: boolean
     canProgress: boolean
     readOnly: boolean
   }
@@ -544,13 +546,15 @@ export interface OperationsOrderDetail extends OperationsInboxOrder {
 
 export interface AdminDeliveryVerificationQueueItem {
   orderId: string
+  orderVersion: number
   status: OrderStatus
   title: string | null
-  amount: string | number | null
+  /** Finance and Super Admin only. */
+  amount?: string | number | null
   targetUrl: string | null
   anchorText: string | null
   createdAt: string
-  customer: { id: string; name: string | null; email: string } | null
+  customer: { id: string; name: string | null; email?: string } | null
   website: {
     id: string
     name: string | null
@@ -560,9 +564,9 @@ export interface AdminDeliveryVerificationQueueItem {
   } | null
   publisher: {
     id: string
-    name: string
-    email: string | null
-    tier: string
+    name: string | null
+    email?: string | null
+    tier?: string
   } | null
   deliveryVersion: {
     id: string
@@ -594,11 +598,20 @@ export interface AdminDeliveryVerificationQueueItem {
       type: string
       details: unknown
       createdAt: string
+      finding?: {
+        id: string
+        cancellationRequestId: string
+        outcome: "CONFIRMED_FRAUD"
+        reason: string
+        decidedByRole: "SUPER_ADMIN" | "OPERATIONS"
+        createdAt: string
+      } | null
       deliveryVersion: {
         id: string
         version: number
         publishedUrl: string
         verificationStatus: string
+        verificationVersion: number
         supersededByVersion: number | null
         evidence: {
           httpStatus: number
@@ -664,11 +677,12 @@ export interface AdminOrderDetailResponse {
   }
   publisherCompensationPolicy?: {
     required: boolean
-    maximumAmount: string | number
+    maximumAmount: string
     currency: string
     effectiveOrderStatus: string
   }
   organization?: { id: string; name: string; slug?: string } | null
+  stakeholderTimeline: StakeholderTimelineEntry[]
   events: AdminOrderTimelineEvent[]
   customer?: {
     id: string
@@ -784,14 +798,29 @@ export interface AdminOrderDetailResponse {
 
 export interface AdminCancellationRequestResponse
   extends CancellationRequestResponse {
+  /** True when immutable confirmed-fraud evidence requires a full refund path. */
+  requiresConfirmedFraudFullRefund: boolean
+  publisherCompensationPolicy?: {
+    required: boolean
+    maximumAmount: string
+    currency: string
+    effectiveOrderStatus: string
+  }
   order: {
     id: string
     title: string | null
     status: OrderStatus
-    amount: string | number | null
-    currency: string
+    /** Finance and Super Admin only. */
+    amount?: string | number | null
+    /** Finance and Super Admin only. */
+    currency?: string
     fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
-    customer: { id: string; name: string | null; email: string }
+    customer: {
+      id: string
+      name: string | null
+      /** Super Admin only. */
+      email?: string
+    } | null
     website: { id: string; domain: string; publisherId: string | null } | null
   }
 }
@@ -1354,6 +1383,7 @@ export class AdminService {
 
   listCancellationRequests(params?: {
     status?: CancellationRequestStatus
+    requestId?: string
     take?: number
     skip?: number
   }) {
@@ -1378,10 +1408,16 @@ export class AdminService {
     })
   }
 
-  financeApproveCancellation(id: string, reason: string) {
+  financeApproveCancellation(
+    id: string,
+    data: {
+      reason: string
+      publisherCompensation?: PublisherCompensationDecisionInput
+    },
+  ) {
     return this.client.post(
       `/admin/cancellation-requests/${id}/finance-approve`,
-      { json: { reason } },
+      { json: data },
     )
   }
 
@@ -1823,16 +1859,10 @@ export class AdminService {
   }
 
   // -- Delivery verification + fulfillment --
-  operationsInbox(params?: {
-    view?: OperationsInboxView
-    take?: number
-    skip?: number
-    search?: string
-    includeSummary?: boolean
-  }) {
+  operationsInbox(params?: OperationsInboxFilters) {
     return this.client.get<OperationsInboxResponse>("/operations/fulfillment", {
-      params: params as Record<string, string | number | boolean | undefined>,
-    } as RequestOptions)
+      params,
+    })
   }
   getOperationsWorkbench() {
     return this.client.get<AdminOperationsWorkbenchResponse>(
@@ -1848,7 +1878,9 @@ export class AdminService {
     return this.client.get<any[]>("/operations/fulfillment-queue")
   }
   claimOrder(orderId: string) {
-    return this.client.post(`/orders/${orderId}/claim`)
+    return this.client.post<OperationsAssignmentResponse>(
+      `/orders/${orderId}/claim`,
+    )
   }
   acceptPlatformOrder(orderId: string) {
     return this.client.post(`/admin/orders/${orderId}/accept`)
@@ -1961,6 +1993,24 @@ export class AdminService {
     })
   }
 
+  confirmDeliveryFraudFlag(
+    fraudFlagId: string,
+    input: {
+      reason: string
+      expectedOrderVersion: number
+      expectedVerificationVersion: number
+      idempotencyKey: string
+    },
+  ) {
+    return this.client.post<{
+      status: "CONFIRMED"
+      replayed: boolean
+      fraudFlagId: string
+      findingId: string
+      cancellationRequestId: string
+    }>(`/fraud-flags/${fraudFlagId}/confirm`, { json: input })
+  }
+
   moderateReview(reviewId: string, status: "APPROVED" | "REJECTED") {
     return this.client.patch(
       `/admin/marketplace/reviews/${reviewId}/moderate`,
@@ -2016,122 +2066,60 @@ export class AdminService {
   }
 
   // -- Support --
-  // Phase 6.6: admin endpoints delegate to the channel-aware SupportService.
-  // The participant matrix (Finance read-only on PLATFORM, INTERNAL notes
-  // staff-only, OPS limited to their assigned tickets) is enforced server-side.
-  listTickets(params?: {
-    status?: string
-    search?: string
-    channel?: "PLATFORM" | "PUBLISHER"
-    assignedToUserId?: string | "UNASSIGNED"
-    page?: number
-    limit?: number
-  }) {
-    return this.client.get<{
-      items: Array<{
-        id: string
-        subject: string
-        status: TicketStatus
-        fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
-        assignedTo: { id: string; name: string | null } | null
-        assignedPublisher: { id: string; name: string | null } | null
-        customer: { id: string; name: string | null; email: string }
-        organization: { id: string; name: string } | null
-        order: {
-          id: string
-          title: string | null
-          status: string
-          type: string
-          fulfillmentChannel: string | null
-        } | null
-        messageCount: number
-        createdAt: string
-        updatedAt: string
-      }>
-      total: number
-      page: number
-      limit: number
-      totalPages: number
-    }>("/admin/support/tickets", {
-      params: params as Record<string, string | number | undefined>,
+  // The participant matrix (Super Admin plus scoped Operations; no Finance
+  // access) is enforced server-side and rechecked inside every mutation.
+  listTickets(params?: StaffSupportListFilters) {
+    return this.client.get<StaffTicketListResponse>("/admin/support/tickets", {
+      params,
     })
   }
 
-  getTicketDetail(id: string) {
-    return this.client.get<{
-      id: string
-      subject: string
-      description: string | null
-      status: TicketStatus
-      fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
-      assignedTo: { id: string; name: string | null } | null
-      assignedPublisher: { id: string; name: string | null } | null
-      user: { id: string; name: string | null; email: string; userType: string }
-      organization: { id: string; name: string } | null
-      order: {
-        id: string
-        title: string | null
-        status: string
-        type: string
-        fulfillmentChannel: string | null
-      } | null
-      messages: Array<{
-        id: string
-        content: string
-        visibility: "PUBLIC" | "INTERNAL"
-        // Phase 6.6.1: role-at-write-time + message classification snapshot.
-        participantRole: "CUSTOMER" | "PUBLISHER" | "OPS" | "ADMIN" | "FINANCE"
-        messageType: "MESSAGE" | "INTERNAL_NOTE" | "SYSTEM_EVENT"
-        // Phase 6.6.2: uncollapsed role snapshot for forensic queries.
-        // Nullable on pre-migration rows.
-        actorSnapshot: {
-          kind: "CUSTOMER" | "PUBLISHER" | "STAFF"
-          staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
-          organizationRole: "OWNER" | "MEMBER" | null
-          publisherRole: "PUBLISHER_OWNER" | "PUBLISHER_MEMBER" | null
-        } | null
-        createdAt: string
-        user: {
-          id: string
-          name: string | null
-          email: string
-          userType: string
-        } | null
-      }>
-      createdAt: string
-      updatedAt: string
-    }>(`/admin/support/tickets/${id}`)
+  getTicketDetail(id: string, params?: TicketDetailQuery) {
+    return this.client.get<StaffTicketDetail>(`/admin/support/tickets/${id}`, {
+      params: params ? { messageCursor: params.messageCursor } : undefined,
+    })
   }
 
   updateTicketStatus(ticketId: string, status: TicketStatus) {
-    return this.client.patch(`/admin/support/tickets/${ticketId}/status`, {
-      json: { status },
-    })
+    return this.client.patch<TicketStatusMutationResponse>(
+      `/admin/support/tickets/${ticketId}/status`,
+      { json: { status } },
+    )
   }
 
   // Phase 6.6: visibility is optional; defaults to PUBLIC. Staff frontends
   // pass "INTERNAL" to leave a note that's invisible to the customer and
   // publisher.
-  addTicketMessage(
-    ticketId: string,
-    data: { content: string; visibility?: "PUBLIC" | "INTERNAL" },
-  ) {
-    return this.client.post(`/admin/support/tickets/${ticketId}/messages`, {
-      json: data,
-    })
+  addTicketMessage(ticketId: string, data: AddTicketMessageInput) {
+    return this.client.post<TicketMessageDto>(
+      `/admin/support/tickets/${ticketId}/messages`,
+      {
+        json: {
+          content: data.content,
+          clientMessageId: data.clientMessageId,
+          visibility: data.visibility,
+        },
+      },
+    )
   }
 
-  reassignTicket(
-    ticketId: string,
-    body: {
-      assignedToUserId?: string | null
-      assignedPublisherId?: string | null
-      reason?: string
-    },
-  ) {
-    return this.client.patch(`/support/tickets/${ticketId}/reassign`, {
-      json: body,
-    })
+  reassignTicket(ticketId: string, body: ReassignTicketInput) {
+    return this.client.patch<TicketAssignmentMutationResponse>(
+      `/support/tickets/${ticketId}/reassign`,
+      {
+        json: {
+          assignedToUserId: body.assignedToUserId,
+          expectedAssignedToUserId: body.expectedAssignedToUserId,
+          reason: body.reason,
+        },
+      },
+    )
+  }
+
+  claimTicket(ticketId: string) {
+    return this.client.patch<TicketAssignmentMutationResponse>(
+      `/admin/support/tickets/${ticketId}/claim`,
+    )
   }
 
   // -- Audit Logs --

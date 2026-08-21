@@ -2424,7 +2424,7 @@ export class BillingService {
         include,
       })
       if (!wallet) throw new NotFoundException("Wallet is not provisioned")
-      return wallet
+      return this.projectCustomerWallet(wallet)
     }
 
     // Legacy customer accounts without an active organization use a personal
@@ -2437,18 +2437,56 @@ export class BillingService {
       include,
     })
     if (!wallet) throw new NotFoundException("Wallet is not provisioned")
-    return wallet
+    return this.projectCustomerWallet(wallet)
   }
 
   async listTransactions(organizationId: string | null, userId: string) {
-    const wallet = await this.getWallet(organizationId, userId)
+    const wallet = organizationId
+      ? await this.prisma.wallet.findUnique({
+          where: { organizationId },
+          select: { id: true },
+        })
+      : await this.prisma.wallet.findFirst({
+          where: { userId, organizationId: null },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: { id: true },
+        })
     if (!wallet) throw new NotFoundException("Wallet not found")
 
-    return this.prisma.transaction.findMany({
+    const transactions = await this.prisma.transaction.findMany({
       where: { walletId: wallet.id },
       orderBy: { createdAt: "desc" },
       take: 100,
     })
+    return transactions.map((transaction: any) =>
+      this.projectCustomerTransaction(transaction),
+    )
+  }
+
+  /**
+   * Old refund rows may contain free-form Ops/Finance rationale. Wallet APIs
+   * are customer-facing, so never return that legacy text; derive the label
+   * only from structured, tenant-owned transaction fields.
+   */
+  private projectCustomerTransaction(transaction: any) {
+    if (transaction?.type !== "REFUND") return transaction
+    return {
+      ...transaction,
+      description:
+        typeof transaction.orderId === "string" && transaction.orderId
+          ? `Refund for order ${transaction.orderId}`
+          : "Refund",
+    }
+  }
+
+  private projectCustomerWallet(wallet: any) {
+    if (!Array.isArray(wallet.transactions)) return wallet
+    return {
+      ...wallet,
+      transactions: wallet.transactions.map((transaction: any) =>
+        this.projectCustomerTransaction(transaction),
+      ),
+    }
   }
 
   private async lockOwnedSpendableWallet(tx: any, walletId: string, user: any) {

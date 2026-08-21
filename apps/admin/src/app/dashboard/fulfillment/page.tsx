@@ -76,7 +76,7 @@ const views: Array<{
 ]
 
 const nextActionLabels: Record<string, string> = {
-  CLAIM: "Claim & open",
+  CLAIM: "Open order",
   ACCEPT: "Accept order",
   CONTENT: "Continue content",
   WAITING_CUSTOMER: "View order",
@@ -122,11 +122,21 @@ function OrderAction({
   onClaim: (orderId: string) => void
   claiming: boolean
 }) {
-  if (order.claimable) {
+  if (order.canSelfClaim) {
     return (
       <Button size="sm" onClick={() => onClaim(order.id)} disabled={claiming}>
         <UserPlus className="h-4 w-4" />
         {claiming ? "Claiming..." : "Claim & open"}
+      </Button>
+    )
+  }
+  if (order.canAssign) {
+    return (
+      <Button size="sm" variant="outline" asChild>
+        <Link href={`/dashboard/fulfillment/${order.id}`}>
+          Assign Operations
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </Button>
     )
   }
@@ -191,7 +201,9 @@ function FulfillmentPageInner() {
   const emptyMessage = useMemo(() => {
     if (search.trim()) return "No matching fulfillment orders."
     if (view === "available")
-      return "No platform orders are waiting to be claimed."
+      return user?.staffRole === "OPERATIONS"
+        ? "No platform orders are waiting to be claimed."
+        : "No platform orders are waiting for an Operations assignment."
     if (view === "active")
       return user?.staffRole === "OPERATIONS"
         ? "You have no active fulfillment work."
@@ -244,7 +256,11 @@ function FulfillmentPageInner() {
       <AdminPageHeader
         eyebrow="Live fulfillment queue"
         title={title}
-        description="Assigned platform orders and new work available to claim, prioritized by lifecycle urgency."
+        description={
+          user?.staffRole === "OPERATIONS"
+            ? "Your assigned platform orders and work available to claim, prioritized by lifecycle urgency."
+            : "Oversee platform fulfillment and assign unowned work to an Operations staff member."
+        }
         icon={ClipboardList}
         actions={
           <Button
@@ -358,7 +374,11 @@ function FulfillmentPageInner() {
               </TableHeader>
               <TableBody>
                 {items.map((order) => {
-                  const assignment = order.fulfillmentAssignments[0]
+                  const assignment = order.fulfillmentAssignments.find(
+                    (candidate) =>
+                      candidate.status === "ASSIGNED" ||
+                      candidate.status === "IN_PROGRESS",
+                  )
                   return (
                     <TableRow key={order.id}>
                       <TableCell>

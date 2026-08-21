@@ -35,6 +35,9 @@ describe("OrderDisputeService refund authorization", () => {
         }),
       },
       orderEvent: { create: jest.fn().mockResolvedValue({}) },
+      deliveryFraudFinding: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       $queryRaw: jest.fn().mockResolvedValue([{ id: "order-1" }]),
     }
     const prisma: any = {
@@ -153,6 +156,32 @@ describe("OrderDisputeService refund authorization", () => {
     expect(
       refund.dispatchOrderRefundCommunicationsBestEffort,
     ).toHaveBeenCalledWith("order-1")
+  })
+
+  it("cannot bypass a confirmed-fraud cancellation case through dispute refund", async () => {
+    const { service, tx, refund } = setup()
+    tx.deliveryFraudFinding.findFirst.mockResolvedValue({
+      cancellationRequestId: "fraud-cancellation-1",
+    })
+
+    await expect(
+      service.resolveDispute(
+        "dispute-1",
+        "finance-1",
+        "FINANCE",
+        "Finance reviewed the dispute and confirmed a customer refund.",
+        "REFUND",
+        CancellationResponsibility.SYSTEM,
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "CONFIRMED_FRAUD_FINANCE_WORKFLOW_REQUIRED",
+      }),
+    })
+
+    expect(refund.refundOrderInTransaction).not.toHaveBeenCalled()
+    expect(tx.orderDispute.updateMany).not.toHaveBeenCalled()
+    expect(tx.orderEvent.create).not.toHaveBeenCalled()
   })
 
   it("maps a concurrent duplicate dispute to a domain conflict", async () => {

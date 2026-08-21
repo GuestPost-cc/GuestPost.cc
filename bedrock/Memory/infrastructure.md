@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # Infrastructure
@@ -137,6 +137,41 @@ flags, and the same v2 keyring on all three workloads; build/deploy exact SHA
 `512b851`; verify each workload's SHA, explicit mode, and protected environment;
 canary the realtime service at one replica in locked mode; and only then scale
 or resume schedules deliberately.
+
+## Confirmed-fraud migration cutover contract (2026-08-15)
+
+Migration `20260815120000_delivery_fraud_findings` is additive in table shape
+but mixed-writer incompatible. It installs append-only finding, cancellation,
+and linked-refund guards and changes automated restoration behavior. Its
+release therefore requires a populated Neon branch/clone rehearsal, a rotated
+direct deploy-role connection, a PITR marker, and a hard drain of the API plus
+all Northflank `realtime`, `on-demand`, `scheduled`, and ad-hoc `all` writers.
+A pooled runtime DSN is never a migration connection, and any credential that
+appeared in chat, logs, history, or a ticket is rotated before use.
+
+The migration revokes `DeliveryFraudFinding` from `PUBLIC`. Before the matching
+image starts, the restricted runtime role receives table `SELECT` and
+column-scoped `INSERT` for only the Prisma-generated ID and application-written
+finding facts. `createdAt` remains database-owned. Runtime UPDATE, DELETE,
+TRUNCATE, TRIGGER, trigger-function EXECUTE, schema CREATE/ownership,
+deploy-role inheritance, superuser, and `BYPASSRLS` remain forbidden and are
+verified through the exact pooled API/worker connection.
+
+The no-EXECUTE proof includes the deferred
+`assert_confirmed_fraud_terminal_outcome()` trigger function. Its constraint
+trigger must be enabled, deferrable, and initially deferred on `Order`: the
+canonical refund updates Order first and linked cancellation second, so only
+the complete transaction can be validated. Direct execution is not an
+application call surface.
+
+The matching release starts in `FINANCE_RUNTIME_MODE=recovery_only`. After
+migration status, privilege denial proofs, invariant postflights,
+reconciliation, and audience/outbox canaries pass, returning to server-only
+`normal` is an intentional operator decision; `PAYOUT_EXECUTION_ENABLED`
+remains independently false. Rollback retains the guards and uses an
+evidence-aware forward fix. Once a finding exists an old image is never a
+rollback target; a database-level failure uses the pre-cutover PITR marker
+under incident control rather than a destructive down migration.
 
 
 ## Docker Compose

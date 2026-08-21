@@ -39,7 +39,7 @@ export interface RefundOptions {
 }
 
 export interface PublisherCompensationDecision {
-  amount?: number
+  amount?: string | number
   reason?: string
   // A DISPUTED order temporarily hides the fulfillment milestone that decides
   // whether publisher work has already been performed. Callers resolving a
@@ -454,11 +454,42 @@ export class RefundService {
           "Idempotency key was already used with different refund instructions",
       })
 
+    const publicDescription = `Refund for order ${order.id}`
+    const legacyDescription = `${publicDescription}: ${input.reason}`
     if (
       order.refundResponsibility !== input.responsibility ||
-      refund.description !== `Refund for order ${order.id}: ${input.reason}`
+      (refund.description !== publicDescription &&
+        refund.description !== legacyDescription)
     ) {
       throw mismatch()
+    }
+
+    // New ledger rows deliberately exclude the internal rationale. Bind an
+    // exact replay to the immutable refund event instead. Historical rows are
+    // grandfathered only when their old description contains this exact
+    // reason; a changed reason still fails closed above.
+    if (refund.description === publicDescription) {
+      const event = await tx.orderEvent.findFirst({
+        where: {
+          orderId: order.id,
+          eventType: "REFUND_ISSUED",
+          metadata: { path: ["refundTransactionId"], equals: refund.id },
+        },
+        select: { actorId: true, metadata: true },
+      })
+      const metadata =
+        event?.metadata &&
+        typeof event.metadata === "object" &&
+        !Array.isArray(event.metadata)
+          ? (event.metadata as Record<string, unknown>)
+          : null
+      if (
+        metadata?.reason !== input.reason ||
+        metadata?.responsibility !== input.responsibility ||
+        metadata?.refundTransactionId !== refund.id
+      ) {
+        throw mismatch()
+      }
     }
 
     const persisted = await tx.publisherCompensation.findUnique({
@@ -471,7 +502,8 @@ export class RefundService {
       if (
         input.publisherCompensation?.amount != null ||
         input.publisherCompensation?.reason != null ||
-        input.publisherCompensation?.effectiveOrderStatus != null
+        (input.publisherCompensation?.effectiveOrderStatus != null &&
+          input.responsibility !== "PUBLISHER")
       ) {
         throw mismatch()
       }
@@ -915,6 +947,8 @@ export class RefundService {
               "STAFF_HIGH_VALUE_REFUND",
               "PUBLISHER_DEBT_CREATED",
               "STAFF_PUBLISHER_DEBT_CREATED",
+              "PUBLISHER_COMPENSATION_DECIDED",
+              "STAFF_FRAUD_ALERT",
             ],
           },
         },
@@ -1257,7 +1291,10 @@ export class RefundService {
         orderId: order.id,
         walletId: wallet?.id ?? null,
         reference: idempotencyKey ?? `refund-${order.id}`,
-        description: `Refund for order ${order.id}: ${reason}`,
+        // Ledger descriptions are stakeholder-visible in exports and must not
+        // contain free-form staff or Finance rationale. OrderEvent/AuditLog
+        // retain the exact reason for authorized forensic review.
+        description: `Refund for order ${order.id}`,
       },
     })
     const publisherCompensationRecord = publisherCompensationPlan
@@ -1328,6 +1365,54 @@ export class RefundService {
    * an exact idempotent replay repair communications omitted by older writers
    * without issuing a second refund or financial document.
    */
+  private async recordPublisherCompensationCommunication(
+    tx: any,
+    orderId: string,
+  ): Promise<void> {
+    if (!this.communications) return
+    const compensation = await tx.publisherCompensation.findUnique({
+      where: { orderId },
+      include: {
+        debtRepaymentTransaction: { select: { amount: true } },
+      },
+    })
+    if (!compensation) return
+    const amount = new Decimal(compensation.amount)
+    const debtApplied = compensation.debtRepaymentTransaction
+      ? new Decimal(compensation.debtRepaymentTransaction.amount).abs()
+      : new Decimal(0)
+    const recipients = await this.communications.publisherRecipients(
+      compensation.publisherId,
+      false,
+      tx,
+    )
+    await this.communications.record(
+      {
+        type: "PUBLISHER_COMPENSATION_DECIDED",
+        aggregateType: "Order",
+        aggregateId: orderId,
+        organizationId: null,
+        title: "Publisher financial outcome recorded",
+        message: amount.isZero()
+          ? `No publisher compensation is payable for refunded order ${orderId}.`
+          : `${amount.toFixed(2)} ${compensation.currency} in publisher compensation was recorded for refunded order ${orderId}. Existing debt, if any, was netted before funds became withdrawable.`,
+        actionPath: `/dashboard/orders/${orderId}`,
+        payload: {
+          disposition: compensation.disposition,
+          amount: amount.toFixed(2),
+          currency: compensation.currency,
+          debtApplied: debtApplied.toFixed(2),
+          netPublisherCredit: amount.minus(debtApplied).toFixed(2),
+          responsibility: compensation.responsibility,
+        },
+        dedupKey: `order:${orderId}:publisher-compensation-decided`,
+        recipientUserIds: recipients,
+        actorUserId: compensation.decidedByUserId,
+      },
+      tx,
+    )
+  }
+
   private async recordRefundCommunications(
     tx: any,
     input: {
@@ -1368,6 +1453,39 @@ export class RefundService {
           },
           dedupKey: `order:${input.order.id}:refunded`,
           recipientUserIds: recipients,
+          actorUserId: input.actorUserId,
+        },
+        tx,
+      )
+    }
+    await this.recordPublisherCompensationCommunication(tx, input.order.id)
+    const confirmedFindings = await tx.deliveryFraudFinding.findMany({
+      where: { orderId: input.order.id },
+      select: { id: true },
+    })
+    if (confirmedFindings.length > 0) {
+      const fraudStaffRecipients = await this.communications.staffRecipients(
+        ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
+        tx,
+      )
+      await this.communications.record(
+        {
+          type: "STAFF_FRAUD_ALERT",
+          aggregateType: "Order",
+          aggregateId: input.order.id,
+          organizationId: null,
+          title: "Refund recorded on an order with a confirmed finding",
+          message: `Order ${input.order.id} has both a confirmed delivery-policy finding and an authoritative refund. Review the separate records; this alert does not infer that the finding caused the refund.`,
+          actionPath: `/dashboard/orders/${input.order.id}`,
+          payload: {
+            findingIds: confirmedFindings.map(
+              (finding: { id: string }) => finding.id,
+            ),
+            refundTransactionId: input.refundTransactionId,
+            responsibility: input.responsibility,
+          },
+          dedupKey: `staff:order:${input.order.id}:fraud-enforcement:${input.refundTransactionId}`,
+          recipientUserIds: fraudStaffRecipients,
           actorUserId: input.actorUserId,
         },
         tx,

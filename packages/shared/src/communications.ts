@@ -65,8 +65,10 @@ export const COMMUNICATION_EVENT_TYPES = [
   "ORDER_CANCELLATION_RESOLVED",
   "ORDER_DISPUTE_OPENED",
   "ORDER_DISPUTE_RESOLVED",
+  "ORDER_SECURITY_REVIEW_DECIDED",
   "SETTLEMENT_CREATED",
   "SETTLEMENT_RELEASED",
+  "PUBLISHER_COMPENSATION_DECIDED",
   "PUBLISHER_DEBT_CREATED",
   "PUBLISHER_TIER_CHANGED",
   "PAYOUT_WITHDRAWAL_REQUESTED",
@@ -295,6 +297,12 @@ export const COMMUNICATION_EVENT_POLICIES: Record<
     severity: "WARNING",
     defaultChannels: both,
   },
+  ORDER_SECURITY_REVIEW_DECIDED: {
+    category: "ORDERS",
+    severity: "WARNING",
+    defaultChannels: both,
+    requiredChannels: both,
+  },
   SETTLEMENT_CREATED: {
     category: "SETTLEMENTS",
     severity: "INFO",
@@ -305,6 +313,13 @@ export const COMMUNICATION_EVENT_POLICIES: Record<
     severity: "SUCCESS",
     defaultChannels: both,
     requiredChannels: both,
+  },
+  PUBLISHER_COMPENSATION_DECIDED: {
+    category: "BILLING",
+    severity: "WARNING",
+    defaultChannels: both,
+    requiredChannels: both,
+    actorRecipientPolicy: "INCLUDE_IF_LISTED",
   },
   PUBLISHER_DEBT_CREATED: {
     category: "SETTLEMENTS",

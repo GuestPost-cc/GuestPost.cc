@@ -123,7 +123,9 @@ export async function refundUnacceptedPaidOrderInTransaction(
       orderId: order.id,
       walletId: wallet.id,
       reference: input.reference,
-      description: `Refund for order ${order.id}: ${input.reason}`,
+      // Transaction descriptions may reach stakeholder-facing exports. Keep
+      // free-form operational rationale in the event and audit records only.
+      description: `Refund for order ${order.id}`,
     },
   })
 
@@ -151,6 +153,10 @@ export async function refundUnacceptedPaidOrderInTransaction(
         responsibility: input.responsibility,
         refundTransactionId: transaction.id,
         ...input.auditMetadata,
+        // Do not rely on every caller remembering to duplicate this. The
+        // authoritative audit record must retain the rationale removed from
+        // the public-safe ledger description.
+        reason: input.reason,
       },
       userId: input.actorUserId,
       organizationId: order.organizationId,
