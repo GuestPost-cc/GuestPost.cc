@@ -14,6 +14,7 @@ import {
 import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
+import { ModerationVersionDto } from "../../common/dto/moderation-command.dto"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import {
@@ -305,11 +306,16 @@ export class MarketplaceController {
   @ActorType("PUBLISHER")
   @MemberRoles("PUBLISHER_OWNER")
   @Post("listings/:id/submit")
-  async submitListing(@Param("id") id: string, @CurrentUser() user: any) {
+  async submitListing(
+    @Param("id") id: string,
+    @Body() body: ModerationVersionDto,
+    @CurrentUser() user: any,
+  ) {
     return this.marketplaceService.submitListingForReview(
       user.id,
       user.publisherId,
       id,
+      body.expectedVersion,
     )
   }
 
@@ -317,24 +323,51 @@ export class MarketplaceController {
   @ActorType("PUBLISHER")
   @MemberRoles("PUBLISHER_OWNER")
   @Post("listings/:id/pause")
-  async pauseListing(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.marketplaceService.pauseListing(user.id, user.publisherId, id)
+  async pauseListing(
+    @Param("id") id: string,
+    @Body() body: ModerationVersionDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplaceService.pauseListing(
+      user.id,
+      user.publisherId,
+      id,
+      body.expectedVersion,
+    )
   }
 
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("PUBLISHER")
   @MemberRoles("PUBLISHER_OWNER")
   @Post("listings/:id/unpause")
-  async unpauseListing(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.marketplaceService.unpauseListing(user.id, user.publisherId, id)
+  async unpauseListing(
+    @Param("id") id: string,
+    @Body() body: ModerationVersionDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplaceService.unpauseListing(
+      user.id,
+      user.publisherId,
+      id,
+      body.expectedVersion,
+    )
   }
 
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("PUBLISHER")
   @MemberRoles("PUBLISHER_OWNER")
   @Post("listings/:id/archive")
-  async archiveListing(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.marketplaceService.archiveListing(user.id, user.publisherId, id)
+  async archiveListing(
+    @Param("id") id: string,
+    @Body() body: ModerationVersionDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplaceService.archiveListing(
+      user.id,
+      user.publisherId,
+      id,
+      body.expectedVersion,
+    )
   }
 
   // ── Per-service endpoints (publisher path) ──────────────────────────────

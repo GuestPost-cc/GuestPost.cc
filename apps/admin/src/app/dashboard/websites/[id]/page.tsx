@@ -5,6 +5,12 @@ import type {
   AdminPlatformWebsiteResponse,
   Category,
   IntegrationListResponse,
+  ModerationAction,
+  ModerationCommand,
+} from "@guestpost/api-client"
+import {
+  moderationActionLabel,
+  moderationReasonLabel,
 } from "@guestpost/api-client"
 import {
   LISTING_LINK_TYPE_LABELS,
@@ -57,6 +63,10 @@ import {
   AdminPage,
   AdminPageHeader,
 } from "../../../../components/admin-workspace"
+import {
+  ModerationActionDialog,
+  moderationActionIsDestructive,
+} from "../../../../components/moderation-action-dialog"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
@@ -186,6 +196,8 @@ function PlatformWebsiteDetailPageInner({
   const queryClient = useQueryClient()
   const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
   const canManageAssignedSite = isSuperAdmin || user?.staffRole === "OPERATIONS"
+  const [selectedWebsiteAction, setSelectedWebsiteAction] =
+    useState<ModerationAction | null>(null)
 
   const websiteQ = useQuery({
     queryKey: ["admin", "platform-website", id],
@@ -205,6 +217,16 @@ function PlatformWebsiteDetailPageInner({
     queryClient.invalidateQueries({ queryKey: ["admin", "platform-websites"] })
     queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
   }
+  const websiteModerationMut = useMutation({
+    mutationFn: (command: ModerationCommand) =>
+      api.admin.moderateWebsite(id, command),
+    onSuccess: (_, command) => {
+      setSelectedWebsiteAction(null)
+      invalidateWebsite()
+      toast.success(`${moderationActionLabel(command.action)} recorded`)
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
 
   if (websiteQ.isLoading) {
     return (
@@ -272,6 +294,91 @@ function PlatformWebsiteDetailPageInner({
           </>
         }
       />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Domain moderation</CardTitle>
+          <CardDescription>
+            Domain availability is independent from listing publication. Every
+            action is version checked and appended to the audit history.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {website.moderation.allowedActions.map((action) => (
+              <Button
+                key={action}
+                size="sm"
+                variant={
+                  moderationActionIsDestructive(action)
+                    ? "destructive"
+                    : "outline"
+                }
+                disabled={websiteModerationMut.isPending}
+                onClick={() => setSelectedWebsiteAction(action)}
+              >
+                {moderationActionLabel(action)}
+              </Button>
+            ))}
+            {website.moderation.allowedActions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No domain action is currently available.
+              </p>
+            ) : null}
+          </div>
+          {website.moderation.active ? (
+            <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+              <p className="font-medium">
+                {website.moderation.active.reasonCode
+                  ? moderationReasonLabel(website.moderation.active.reasonCode)
+                  : "Reason unavailable"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {moderationActionLabel(website.moderation.active.action)} by{" "}
+                {website.moderation.active.authority
+                  ? website.moderation.active.authority
+                      .replaceAll("_", " ")
+                      .toLowerCase()
+                  : "legacy authority"}
+              </p>
+            </div>
+          ) : null}
+          {(website.moderation.history?.length ?? 0) > 0 ? (
+            <div className="space-y-2 border-t pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Recent history
+              </p>
+              {website.moderation.history!.slice(0, 5).map((event) => (
+                <div
+                  key={event.id}
+                  className="flex flex-col gap-1 rounded-lg border bg-muted/20 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span>
+                    {moderationActionLabel(event.action)} ·{" "}
+                    {moderationReasonLabel(event.reasonCode)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(event.createdAt).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </CardContent>
+        <ModerationActionDialog
+          action={selectedWebsiteAction}
+          scope="WEBSITE"
+          targetLabel={website.name || website.domain || website.url}
+          ownerType={website.ownershipType}
+          version={website.moderation.version}
+          open={selectedWebsiteAction !== null}
+          pending={websiteModerationMut.isPending}
+          onOpenChange={(open) => {
+            if (!open) setSelectedWebsiteAction(null)
+          }}
+          onConfirm={(command) => websiteModerationMut.mutate(command)}
+        />
+      </Card>
 
       <Card>
         <CardHeader>
@@ -362,6 +469,8 @@ function PlatformListingManager({
     turnaroundDays: "",
     revisionRounds: "",
   })
+  const [selectedListingAction, setSelectedListingAction] =
+    useState<ModerationAction | null>(null)
 
   useEffect(() => setDetails(platformListingDetails(listing)), [listing])
 
@@ -404,12 +513,13 @@ function PlatformListingManager({
     })
   }
 
-  const statusMut = useMutation({
-    mutationFn: (status: string) =>
-      api.admin.updateListingStatus(listing.id, status),
-    onSuccess: () => {
+  const listingModerationMut = useMutation({
+    mutationFn: (command: ModerationCommand) =>
+      api.admin.moderateListing(listing.id, command),
+    onSuccess: (_, command) => {
+      setSelectedListingAction(null)
       onChanged()
-      toast.success("Listing status updated")
+      toast.success(`${moderationActionLabel(command.action)} recorded`)
     },
     onError: (error: Error) => toast.error(error.message),
   })
@@ -671,42 +781,46 @@ function PlatformListingManager({
         <div>
           <p className="font-medium">{listing.title}</p>
           <p className="text-sm text-muted-foreground">/{listing.slug}</p>
+          {listing.moderation.active ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {listing.moderation.active.reasonCode
+                ? moderationReasonLabel(listing.moderation.active.reasonCode)
+                : "Reason unavailable"}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline">{listing.status}</Badge>
-          {listing.status !== "APPROVED" && listing.status !== "ARCHIVED" && (
+          {listing.moderation.allowedActions.map((action) => (
             <Button
+              key={action}
               size="sm"
-              onClick={() => statusMut.mutate("APPROVED")}
-              disabled={listing.services.length === 0 || statusMut.isPending}
+              variant={
+                moderationActionIsDestructive(action)
+                  ? "destructive"
+                  : "outline"
+              }
+              onClick={() => setSelectedListingAction(action)}
+              disabled={listingModerationMut.isPending}
             >
-              Approve listing
+              {moderationActionLabel(action)}
             </Button>
-          )}
-          {listing.status !== "REJECTED" &&
-            listing.status !== "APPROVED" &&
-            listing.status !== "ARCHIVED" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => statusMut.mutate("REJECTED")}
-                disabled={statusMut.isPending}
-              >
-                Reject listing
-              </Button>
-            )}
-          {listing.status === "APPROVED" && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => statusMut.mutate("PAUSED")}
-              disabled={statusMut.isPending}
-            >
-              Pause listing
-            </Button>
-          )}
+          ))}
         </div>
       </div>
+      <ModerationActionDialog
+        action={selectedListingAction}
+        scope="LISTING"
+        targetLabel={listing.title}
+        ownerType={website.ownershipType}
+        version={listing.moderation.version}
+        open={selectedListingAction !== null}
+        pending={listingModerationMut.isPending}
+        onOpenChange={(open) => {
+          if (!open) setSelectedListingAction(null)
+        }}
+        onConfirm={(command) => listingModerationMut.mutate(command)}
+      />
 
       <Table>
         <TableHeader>

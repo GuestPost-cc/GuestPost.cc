@@ -20,7 +20,9 @@ describe("OrdersService cart financial integrity", () => {
             paymentStatus: "PENDING",
             currency: "USD",
             websiteId: "website-1",
+            listingId: "listing-1",
             listingServiceId: "service-1",
+            type: "GUEST_POST",
             version: 3,
             targetUrl: null,
             anchorText: null,
@@ -37,9 +39,24 @@ describe("OrdersService cart financial integrity", () => {
       },
       listingService: {
         findUnique: jest.fn().mockResolvedValue({
+          id: "service-1",
+          listingId: "listing-1",
+          serviceType: "GUEST_POST",
           price: new Prisma.Decimal("125.00"),
           availability: "AVAILABLE",
           currency: "USD",
+          listing: {
+            id: "listing-1",
+            websiteId: "website-1",
+            status: "APPROVED",
+            website: {
+              id: "website-1",
+              isActive: true,
+              ownershipType: "PUBLISHER",
+              verificationStatus: "VERIFIED",
+              managedByUserId: null,
+            },
+          },
         }),
       },
       orderEvent: { create: jest.fn().mockResolvedValue({ id: "event-1" }) },
@@ -76,6 +93,73 @@ describe("OrdersService cart financial integrity", () => {
     expect(tx.order.updateMany.mock.calls[0][0].data.amount.toString()).toBe(
       "250",
     )
+  })
+
+  it("blocks cart additions after the snapshotted website becomes inactive", async () => {
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "locked" }]),
+      order: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "order-1",
+          organizationId: "org-1",
+          customerId: "user-1",
+          status: "DRAFT",
+          paymentStatus: "PENDING",
+          currency: "USD",
+          websiteId: "website-1",
+          listingId: "listing-1",
+          listingServiceId: "service-1",
+          type: "GUEST_POST",
+          version: 3,
+        }),
+        updateMany: jest.fn(),
+      },
+      orderItem: {
+        findMany: jest.fn().mockResolvedValue([{ websiteId: "website-1" }]),
+        create: jest.fn(),
+      },
+      listingService: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "service-1",
+          listingId: "listing-1",
+          serviceType: "GUEST_POST",
+          price: new Prisma.Decimal("125.00"),
+          availability: "AVAILABLE",
+          currency: "USD",
+          listing: {
+            id: "listing-1",
+            websiteId: "website-1",
+            status: "APPROVED",
+            website: {
+              id: "website-1",
+              isActive: false,
+              ownershipType: "PUBLISHER",
+              verificationStatus: "VERIFIED",
+              managedByUserId: null,
+            },
+          },
+        }),
+      },
+    }
+    const prisma = {
+      $transaction: jest.fn(async (work: (client: typeof tx) => unknown) =>
+        work(tx),
+      ),
+    }
+
+    await expect(
+      new OrdersService(prisma as any).addOrderItem(
+        "order-1",
+        "org-1",
+        { websiteId: "website-1" },
+        "user-1",
+        "OWNER",
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "WEBSITE_UNAVAILABLE" }),
+    })
+    expect(tx.orderItem.create).not.toHaveBeenCalled()
+    expect(tx.order.updateMany).not.toHaveBeenCalled()
   })
 
   it("refuses to remove the last priced placement", async () => {

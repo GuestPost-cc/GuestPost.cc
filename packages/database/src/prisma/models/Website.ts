@@ -31,6 +31,7 @@ export type WebsiteAvgAggregateOutputType = {
   consecutiveFailures: number | null
   trustScore: number | null
   verificationVersion: number | null
+  moderationVersion: number | null
 }
 
 export type WebsiteSumAggregateOutputType = {
@@ -38,6 +39,7 @@ export type WebsiteSumAggregateOutputType = {
   consecutiveFailures: number | null
   trustScore: number | null
   verificationVersion: number | null
+  moderationVersion: number | null
 }
 
 export type WebsiteMinAggregateOutputType = {
@@ -70,6 +72,12 @@ export type WebsiteMinAggregateOutputType = {
   trustScore: number | null
   verificationVersion: number | null
   importBatchId: string | null
+  activeModerationAction: $Enums.ModerationAction | null
+  activeModerationAuthority: $Enums.ModerationAuthority | null
+  activeModerationReasonCode: $Enums.ModerationReasonCode | null
+  activeModerationMessage: string | null
+  activeModerationPreviousActive: boolean | null
+  moderationVersion: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -104,6 +112,12 @@ export type WebsiteMaxAggregateOutputType = {
   trustScore: number | null
   verificationVersion: number | null
   importBatchId: string | null
+  activeModerationAction: $Enums.ModerationAction | null
+  activeModerationAuthority: $Enums.ModerationAuthority | null
+  activeModerationReasonCode: $Enums.ModerationReasonCode | null
+  activeModerationMessage: string | null
+  activeModerationPreviousActive: boolean | null
+  moderationVersion: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -139,6 +153,12 @@ export type WebsiteCountAggregateOutputType = {
   trustScore: number
   verificationVersion: number
   importBatchId: number
+  activeModerationAction: number
+  activeModerationAuthority: number
+  activeModerationReasonCode: number
+  activeModerationMessage: number
+  activeModerationPreviousActive: number
+  moderationVersion: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -150,6 +170,7 @@ export type WebsiteAvgAggregateInputType = {
   consecutiveFailures?: true
   trustScore?: true
   verificationVersion?: true
+  moderationVersion?: true
 }
 
 export type WebsiteSumAggregateInputType = {
@@ -157,6 +178,7 @@ export type WebsiteSumAggregateInputType = {
   consecutiveFailures?: true
   trustScore?: true
   verificationVersion?: true
+  moderationVersion?: true
 }
 
 export type WebsiteMinAggregateInputType = {
@@ -189,6 +211,12 @@ export type WebsiteMinAggregateInputType = {
   trustScore?: true
   verificationVersion?: true
   importBatchId?: true
+  activeModerationAction?: true
+  activeModerationAuthority?: true
+  activeModerationReasonCode?: true
+  activeModerationMessage?: true
+  activeModerationPreviousActive?: true
+  moderationVersion?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -223,6 +251,12 @@ export type WebsiteMaxAggregateInputType = {
   trustScore?: true
   verificationVersion?: true
   importBatchId?: true
+  activeModerationAction?: true
+  activeModerationAuthority?: true
+  activeModerationReasonCode?: true
+  activeModerationMessage?: true
+  activeModerationPreviousActive?: true
+  moderationVersion?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -258,6 +292,12 @@ export type WebsiteCountAggregateInputType = {
   trustScore?: true
   verificationVersion?: true
   importBatchId?: true
+  activeModerationAction?: true
+  activeModerationAuthority?: true
+  activeModerationReasonCode?: true
+  activeModerationMessage?: true
+  activeModerationPreviousActive?: true
+  moderationVersion?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -380,6 +420,12 @@ export type WebsiteGroupByOutputType = {
   trustScore: number | null
   verificationVersion: number
   importBatchId: string | null
+  activeModerationAction: $Enums.ModerationAction | null
+  activeModerationAuthority: $Enums.ModerationAuthority | null
+  activeModerationReasonCode: $Enums.ModerationReasonCode | null
+  activeModerationMessage: string | null
+  activeModerationPreviousActive: boolean | null
+  moderationVersion: number
   createdAt: Date
   updatedAt: Date
   _count: WebsiteCountAggregateOutputType | null
@@ -438,6 +484,12 @@ export type WebsiteWhereInput = {
   trustScore?: Prisma.IntNullableFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntFilter<"Website"> | number
   importBatchId?: Prisma.StringNullableFilter<"Website"> | string | null
+  activeModerationAction?: Prisma.EnumModerationActionNullableFilter<"Website"> | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.EnumModerationAuthorityNullableFilter<"Website"> | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.EnumModerationReasonCodeNullableFilter<"Website"> | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.StringNullableFilter<"Website"> | string | null
+  activeModerationPreviousActive?: Prisma.BoolNullableFilter<"Website"> | boolean | null
+  moderationVersion?: Prisma.IntFilter<"Website"> | number
   createdAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherNullableScalarRelationFilter, Prisma.PublisherWhereInput> | null
@@ -448,6 +500,7 @@ export type WebsiteWhereInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationListRelationFilter
   metricsHistory?: Prisma.WebsiteMetricListRelationFilter
   importBatch?: Prisma.XOR<Prisma.WebsiteImportBatchNullableScalarRelationFilter, Prisma.WebsiteImportBatchWhereInput> | null
+  moderationEvents?: Prisma.ModerationEventListRelationFilter
 }
 
 export type WebsiteOrderByWithRelationInput = {
@@ -481,6 +534,12 @@ export type WebsiteOrderByWithRelationInput = {
   trustScore?: Prisma.SortOrderInput | Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   importBatchId?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationPreviousActive?: Prisma.SortOrderInput | Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   publisher?: Prisma.PublisherOrderByWithRelationInput
@@ -491,6 +550,7 @@ export type WebsiteOrderByWithRelationInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationOrderByRelationAggregateInput
   metricsHistory?: Prisma.WebsiteMetricOrderByRelationAggregateInput
   importBatch?: Prisma.WebsiteImportBatchOrderByWithRelationInput
+  moderationEvents?: Prisma.ModerationEventOrderByRelationAggregateInput
 }
 
 export type WebsiteWhereUniqueInput = Prisma.AtLeast<{
@@ -527,6 +587,12 @@ export type WebsiteWhereUniqueInput = Prisma.AtLeast<{
   trustScore?: Prisma.IntNullableFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntFilter<"Website"> | number
   importBatchId?: Prisma.StringNullableFilter<"Website"> | string | null
+  activeModerationAction?: Prisma.EnumModerationActionNullableFilter<"Website"> | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.EnumModerationAuthorityNullableFilter<"Website"> | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.EnumModerationReasonCodeNullableFilter<"Website"> | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.StringNullableFilter<"Website"> | string | null
+  activeModerationPreviousActive?: Prisma.BoolNullableFilter<"Website"> | boolean | null
+  moderationVersion?: Prisma.IntFilter<"Website"> | number
   createdAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherNullableScalarRelationFilter, Prisma.PublisherWhereInput> | null
@@ -537,6 +603,7 @@ export type WebsiteWhereUniqueInput = Prisma.AtLeast<{
   websiteIntegrations?: Prisma.WebsiteIntegrationListRelationFilter
   metricsHistory?: Prisma.WebsiteMetricListRelationFilter
   importBatch?: Prisma.XOR<Prisma.WebsiteImportBatchNullableScalarRelationFilter, Prisma.WebsiteImportBatchWhereInput> | null
+  moderationEvents?: Prisma.ModerationEventListRelationFilter
 }, "id" | "url">
 
 export type WebsiteOrderByWithAggregationInput = {
@@ -570,6 +637,12 @@ export type WebsiteOrderByWithAggregationInput = {
   trustScore?: Prisma.SortOrderInput | Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   importBatchId?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationPreviousActive?: Prisma.SortOrderInput | Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.WebsiteCountOrderByAggregateInput
@@ -613,6 +686,12 @@ export type WebsiteScalarWhereWithAggregatesInput = {
   trustScore?: Prisma.IntNullableWithAggregatesFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntWithAggregatesFilter<"Website"> | number
   importBatchId?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
+  activeModerationAction?: Prisma.EnumModerationActionNullableWithAggregatesFilter<"Website"> | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.EnumModerationAuthorityNullableWithAggregatesFilter<"Website"> | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.EnumModerationReasonCodeNullableWithAggregatesFilter<"Website"> | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
+  activeModerationPreviousActive?: Prisma.BoolNullableWithAggregatesFilter<"Website"> | boolean | null
+  moderationVersion?: Prisma.IntWithAggregatesFilter<"Website"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Website"> | Date | string
 }
@@ -645,6 +724,12 @@ export type WebsiteCreateInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
@@ -655,6 +740,7 @@ export type WebsiteCreateInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
   importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUncheckedCreateInput = {
@@ -688,6 +774,12 @@ export type WebsiteUncheckedCreateInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
@@ -695,6 +787,7 @@ export type WebsiteUncheckedCreateInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUpdateInput = {
@@ -725,6 +818,12 @@ export type WebsiteUpdateInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
@@ -735,6 +834,7 @@ export type WebsiteUpdateInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
   importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateInput = {
@@ -768,6 +868,12 @@ export type WebsiteUncheckedUpdateInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
@@ -775,6 +881,7 @@ export type WebsiteUncheckedUpdateInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateManyInput = {
@@ -808,6 +915,12 @@ export type WebsiteCreateManyInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -840,6 +953,12 @@ export type WebsiteUpdateManyMutationInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -875,6 +994,12 @@ export type WebsiteUncheckedUpdateManyInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -920,6 +1045,12 @@ export type WebsiteCountOrderByAggregateInput = {
   trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   importBatchId?: Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrder
+  activeModerationPreviousActive?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -929,6 +1060,7 @@ export type WebsiteAvgOrderByAggregateInput = {
   consecutiveFailures?: Prisma.SortOrder
   trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
 }
 
 export type WebsiteMaxOrderByAggregateInput = {
@@ -961,6 +1093,12 @@ export type WebsiteMaxOrderByAggregateInput = {
   trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   importBatchId?: Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrder
+  activeModerationPreviousActive?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -995,6 +1133,12 @@ export type WebsiteMinOrderByAggregateInput = {
   trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   importBatchId?: Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrder
+  activeModerationPreviousActive?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -1004,6 +1148,7 @@ export type WebsiteSumOrderByAggregateInput = {
   consecutiveFailures?: Prisma.SortOrder
   trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
 }
 
 export type WebsiteScalarRelationFilter = {
@@ -1128,6 +1273,22 @@ export type NullableIntFieldUpdateOperationsInput = {
   divide?: number
 }
 
+export type NullableEnumModerationActionFieldUpdateOperationsInput = {
+  set?: $Enums.ModerationAction | null
+}
+
+export type NullableEnumModerationAuthorityFieldUpdateOperationsInput = {
+  set?: $Enums.ModerationAuthority | null
+}
+
+export type NullableEnumModerationReasonCodeFieldUpdateOperationsInput = {
+  set?: $Enums.ModerationReasonCode | null
+}
+
+export type NullableBoolFieldUpdateOperationsInput = {
+  set?: boolean | null
+}
+
 export type WebsiteCreateNestedOneWithoutMetricsHistoryInput = {
   create?: Prisma.XOR<Prisma.WebsiteCreateWithoutMetricsHistoryInput, Prisma.WebsiteUncheckedCreateWithoutMetricsHistoryInput>
   connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutMetricsHistoryInput
@@ -1232,6 +1393,22 @@ export type WebsiteUpdateOneWithoutMarketplaceListingsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WebsiteUpdateToOneWithWhereWithoutMarketplaceListingsInput, Prisma.WebsiteUpdateWithoutMarketplaceListingsInput>, Prisma.WebsiteUncheckedUpdateWithoutMarketplaceListingsInput>
 }
 
+export type WebsiteCreateNestedOneWithoutModerationEventsInput = {
+  create?: Prisma.XOR<Prisma.WebsiteCreateWithoutModerationEventsInput, Prisma.WebsiteUncheckedCreateWithoutModerationEventsInput>
+  connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutModerationEventsInput
+  connect?: Prisma.WebsiteWhereUniqueInput
+}
+
+export type WebsiteUpdateOneWithoutModerationEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.WebsiteCreateWithoutModerationEventsInput, Prisma.WebsiteUncheckedCreateWithoutModerationEventsInput>
+  connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutModerationEventsInput
+  upsert?: Prisma.WebsiteUpsertWithoutModerationEventsInput
+  disconnect?: Prisma.WebsiteWhereInput | boolean
+  delete?: Prisma.WebsiteWhereInput | boolean
+  connect?: Prisma.WebsiteWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WebsiteUpdateToOneWithWhereWithoutModerationEventsInput, Prisma.WebsiteUpdateWithoutModerationEventsInput>, Prisma.WebsiteUncheckedUpdateWithoutModerationEventsInput>
+}
+
 export type WebsiteCreateNestedOneWithoutWebsiteIntegrationsInput = {
   create?: Prisma.XOR<Prisma.WebsiteCreateWithoutWebsiteIntegrationsInput, Prisma.WebsiteUncheckedCreateWithoutWebsiteIntegrationsInput>
   connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutWebsiteIntegrationsInput
@@ -1274,6 +1451,12 @@ export type WebsiteCreateWithoutManagedByInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
@@ -1283,6 +1466,7 @@ export type WebsiteCreateWithoutManagedByInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
   importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUncheckedCreateWithoutManagedByInput = {
@@ -1315,6 +1499,12 @@ export type WebsiteUncheckedCreateWithoutManagedByInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
@@ -1322,6 +1512,7 @@ export type WebsiteUncheckedCreateWithoutManagedByInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutManagedByInput = {
@@ -1384,6 +1575,12 @@ export type WebsiteScalarWhereInput = {
   trustScore?: Prisma.IntNullableFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntFilter<"Website"> | number
   importBatchId?: Prisma.StringNullableFilter<"Website"> | string | null
+  activeModerationAction?: Prisma.EnumModerationActionNullableFilter<"Website"> | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.EnumModerationAuthorityNullableFilter<"Website"> | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.EnumModerationReasonCodeNullableFilter<"Website"> | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.StringNullableFilter<"Website"> | string | null
+  activeModerationPreviousActive?: Prisma.BoolNullableFilter<"Website"> | boolean | null
+  moderationVersion?: Prisma.IntFilter<"Website"> | number
   createdAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Website"> | Date | string
 }
@@ -1416,6 +1613,12 @@ export type WebsiteCreateWithoutPublisherInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   managedBy?: Prisma.UserCreateNestedOneWithoutManagedWebsitesInput
@@ -1425,6 +1628,7 @@ export type WebsiteCreateWithoutPublisherInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
   importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUncheckedCreateWithoutPublisherInput = {
@@ -1457,6 +1661,12 @@ export type WebsiteUncheckedCreateWithoutPublisherInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
@@ -1464,6 +1674,7 @@ export type WebsiteUncheckedCreateWithoutPublisherInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutPublisherInput = {
@@ -1520,6 +1731,12 @@ export type WebsiteCreateWithoutMetricsHistoryInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
@@ -1529,6 +1746,7 @@ export type WebsiteCreateWithoutMetricsHistoryInput = {
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
   importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUncheckedCreateWithoutMetricsHistoryInput = {
@@ -1562,12 +1780,19 @@ export type WebsiteUncheckedCreateWithoutMetricsHistoryInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutMetricsHistoryInput = {
@@ -1614,6 +1839,12 @@ export type WebsiteUpdateWithoutMetricsHistoryInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
@@ -1623,6 +1854,7 @@ export type WebsiteUpdateWithoutMetricsHistoryInput = {
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
   importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutMetricsHistoryInput = {
@@ -1656,12 +1888,19 @@ export type WebsiteUncheckedUpdateWithoutMetricsHistoryInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateWithoutImportBatchInput = {
@@ -1692,6 +1931,12 @@ export type WebsiteCreateWithoutImportBatchInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
@@ -1701,6 +1946,7 @@ export type WebsiteCreateWithoutImportBatchInput = {
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUncheckedCreateWithoutImportBatchInput = {
@@ -1733,6 +1979,12 @@ export type WebsiteUncheckedCreateWithoutImportBatchInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
@@ -1740,6 +1992,7 @@ export type WebsiteUncheckedCreateWithoutImportBatchInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutImportBatchInput = {
@@ -1796,6 +2049,12 @@ export type WebsiteCreateWithoutOrdersInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
@@ -1805,6 +2064,7 @@ export type WebsiteCreateWithoutOrdersInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
   importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUncheckedCreateWithoutOrdersInput = {
@@ -1838,12 +2098,19 @@ export type WebsiteUncheckedCreateWithoutOrdersInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutOrdersInput = {
@@ -1890,6 +2157,12 @@ export type WebsiteUpdateWithoutOrdersInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
@@ -1899,6 +2172,7 @@ export type WebsiteUpdateWithoutOrdersInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
   importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutOrdersInput = {
@@ -1932,12 +2206,19 @@ export type WebsiteUncheckedUpdateWithoutOrdersInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateWithoutOrderItemsInput = {
@@ -1968,6 +2249,12 @@ export type WebsiteCreateWithoutOrderItemsInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
@@ -1977,6 +2264,7 @@ export type WebsiteCreateWithoutOrderItemsInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
   importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUncheckedCreateWithoutOrderItemsInput = {
@@ -2010,12 +2298,19 @@ export type WebsiteUncheckedCreateWithoutOrderItemsInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutOrderItemsInput = {
@@ -2062,6 +2357,12 @@ export type WebsiteUpdateWithoutOrderItemsInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
@@ -2071,6 +2372,7 @@ export type WebsiteUpdateWithoutOrderItemsInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
   importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutOrderItemsInput = {
@@ -2104,12 +2406,19 @@ export type WebsiteUncheckedUpdateWithoutOrderItemsInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateWithoutMarketplaceListingsInput = {
@@ -2140,6 +2449,12 @@ export type WebsiteCreateWithoutMarketplaceListingsInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
@@ -2149,6 +2464,7 @@ export type WebsiteCreateWithoutMarketplaceListingsInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
   importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUncheckedCreateWithoutMarketplaceListingsInput = {
@@ -2182,12 +2498,19 @@ export type WebsiteUncheckedCreateWithoutMarketplaceListingsInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutMarketplaceListingsInput = {
@@ -2234,6 +2557,12 @@ export type WebsiteUpdateWithoutMarketplaceListingsInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
@@ -2243,6 +2572,7 @@ export type WebsiteUpdateWithoutMarketplaceListingsInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
   importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutMarketplaceListingsInput = {
@@ -2276,10 +2606,217 @@ export type WebsiteUncheckedUpdateWithoutMarketplaceListingsInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutWebsiteNestedInput
+}
+
+export type WebsiteCreateWithoutModerationEventsInput = {
+  id?: string
+  url: string
+  domain?: string | null
+  name?: string | null
+  category?: string | null
+  language?: string | null
+  country?: string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: boolean
+  ownershipType?: $Enums.WebsiteOwnershipType
+  verificationStatus?: $Enums.WebsiteVerificationStatus
+  verificationMethod?: $Enums.VerificationMethod | null
+  verificationToken?: string | null
+  activeVerifiedToken?: string | null
+  verifiedAt?: Date | string | null
+  lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
+  verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
+  verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
+  managedBy?: Prisma.UserCreateNestedOneWithoutManagedWebsitesInput
+  orders?: Prisma.OrderCreateNestedManyWithoutWebsiteInput
+  orderItems?: Prisma.OrderItemCreateNestedManyWithoutWebsiteInput
+  marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+  importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+}
+
+export type WebsiteUncheckedCreateWithoutModerationEventsInput = {
+  id?: string
+  url: string
+  domain?: string | null
+  name?: string | null
+  category?: string | null
+  language?: string | null
+  country?: string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: boolean
+  publisherId?: string | null
+  ownershipType?: $Enums.WebsiteOwnershipType
+  managedByUserId?: string | null
+  verificationStatus?: $Enums.WebsiteVerificationStatus
+  verificationMethod?: $Enums.VerificationMethod | null
+  verificationToken?: string | null
+  activeVerifiedToken?: string | null
+  verifiedAt?: Date | string | null
+  lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
+  verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
+  verificationVersion?: number
+  importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
+  orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+}
+
+export type WebsiteCreateOrConnectWithoutModerationEventsInput = {
+  where: Prisma.WebsiteWhereUniqueInput
+  create: Prisma.XOR<Prisma.WebsiteCreateWithoutModerationEventsInput, Prisma.WebsiteUncheckedCreateWithoutModerationEventsInput>
+}
+
+export type WebsiteUpsertWithoutModerationEventsInput = {
+  update: Prisma.XOR<Prisma.WebsiteUpdateWithoutModerationEventsInput, Prisma.WebsiteUncheckedUpdateWithoutModerationEventsInput>
+  create: Prisma.XOR<Prisma.WebsiteCreateWithoutModerationEventsInput, Prisma.WebsiteUncheckedCreateWithoutModerationEventsInput>
+  where?: Prisma.WebsiteWhereInput
+}
+
+export type WebsiteUpdateToOneWithWhereWithoutModerationEventsInput = {
+  where?: Prisma.WebsiteWhereInput
+  data: Prisma.XOR<Prisma.WebsiteUpdateWithoutModerationEventsInput, Prisma.WebsiteUncheckedUpdateWithoutModerationEventsInput>
+}
+
+export type WebsiteUpdateWithoutModerationEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  url?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ownershipType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
+  verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
+  verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
+  verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
+  managedBy?: Prisma.UserUpdateOneWithoutManagedWebsitesNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutWebsiteNestedInput
+  orderItems?: Prisma.OrderItemUpdateManyWithoutWebsiteNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+  importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+}
+
+export type WebsiteUncheckedUpdateWithoutModerationEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  url?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownershipType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  managedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
+  verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
+  verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
+  verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
+  orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
 }
@@ -2312,6 +2849,12 @@ export type WebsiteCreateWithoutWebsiteIntegrationsInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
@@ -2321,6 +2864,7 @@ export type WebsiteCreateWithoutWebsiteIntegrationsInput = {
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
   importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUncheckedCreateWithoutWebsiteIntegrationsInput = {
@@ -2354,12 +2898,19 @@ export type WebsiteUncheckedCreateWithoutWebsiteIntegrationsInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutWebsiteIntegrationsInput = {
@@ -2406,6 +2957,12 @@ export type WebsiteUpdateWithoutWebsiteIntegrationsInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
@@ -2415,6 +2972,7 @@ export type WebsiteUpdateWithoutWebsiteIntegrationsInput = {
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
   importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutWebsiteIntegrationsInput = {
@@ -2448,12 +3006,19 @@ export type WebsiteUncheckedUpdateWithoutWebsiteIntegrationsInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateManyManagedByInput = {
@@ -2486,6 +3051,12 @@ export type WebsiteCreateManyManagedByInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2518,6 +3089,12 @@ export type WebsiteUpdateWithoutManagedByInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
@@ -2527,6 +3104,7 @@ export type WebsiteUpdateWithoutManagedByInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
   importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutManagedByInput = {
@@ -2559,6 +3137,12 @@ export type WebsiteUncheckedUpdateWithoutManagedByInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
@@ -2566,6 +3150,7 @@ export type WebsiteUncheckedUpdateWithoutManagedByInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateManyWithoutManagedByInput = {
@@ -2598,6 +3183,12 @@ export type WebsiteUncheckedUpdateManyWithoutManagedByInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2632,6 +3223,12 @@ export type WebsiteCreateManyPublisherInput = {
   trustScore?: number | null
   verificationVersion?: number
   importBatchId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2664,6 +3261,12 @@ export type WebsiteUpdateWithoutPublisherInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   managedBy?: Prisma.UserUpdateOneWithoutManagedWebsitesNestedInput
@@ -2673,6 +3276,7 @@ export type WebsiteUpdateWithoutPublisherInput = {
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
   importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutPublisherInput = {
@@ -2705,6 +3309,12 @@ export type WebsiteUncheckedUpdateWithoutPublisherInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
@@ -2712,6 +3322,7 @@ export type WebsiteUncheckedUpdateWithoutPublisherInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateManyWithoutPublisherInput = {
@@ -2744,6 +3355,12 @@ export type WebsiteUncheckedUpdateManyWithoutPublisherInput = {
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2778,6 +3395,12 @@ export type WebsiteCreateManyImportBatchInput = {
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousActive?: boolean | null
+  moderationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2810,6 +3433,12 @@ export type WebsiteUpdateWithoutImportBatchInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
@@ -2819,6 +3448,7 @@ export type WebsiteUpdateWithoutImportBatchInput = {
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutImportBatchInput = {
@@ -2851,6 +3481,12 @@ export type WebsiteUncheckedUpdateWithoutImportBatchInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
@@ -2858,6 +3494,7 @@ export type WebsiteUncheckedUpdateWithoutImportBatchInput = {
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
   metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateManyWithoutImportBatchInput = {
@@ -2890,6 +3527,12 @@ export type WebsiteUncheckedUpdateManyWithoutImportBatchInput = {
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousActive?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2905,6 +3548,7 @@ export type WebsiteCountOutputType = {
   marketplaceListings: number
   websiteIntegrations: number
   metricsHistory: number
+  moderationEvents: number
 }
 
 export type WebsiteCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2913,6 +3557,7 @@ export type WebsiteCountOutputTypeSelect<ExtArgs extends runtime.Types.Extension
   marketplaceListings?: boolean | WebsiteCountOutputTypeCountMarketplaceListingsArgs
   websiteIntegrations?: boolean | WebsiteCountOutputTypeCountWebsiteIntegrationsArgs
   metricsHistory?: boolean | WebsiteCountOutputTypeCountMetricsHistoryArgs
+  moderationEvents?: boolean | WebsiteCountOutputTypeCountModerationEventsArgs
 }
 
 /**
@@ -2960,6 +3605,13 @@ export type WebsiteCountOutputTypeCountMetricsHistoryArgs<ExtArgs extends runtim
   where?: Prisma.WebsiteMetricWhereInput
 }
 
+/**
+ * WebsiteCountOutputType without action
+ */
+export type WebsiteCountOutputTypeCountModerationEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ModerationEventWhereInput
+}
+
 
 export type WebsiteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2992,6 +3644,12 @@ export type WebsiteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   trustScore?: boolean
   verificationVersion?: boolean
   importBatchId?: boolean
+  activeModerationAction?: boolean
+  activeModerationAuthority?: boolean
+  activeModerationReasonCode?: boolean
+  activeModerationMessage?: boolean
+  activeModerationPreviousActive?: boolean
+  moderationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
@@ -3002,6 +3660,7 @@ export type WebsiteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   websiteIntegrations?: boolean | Prisma.Website$websiteIntegrationsArgs<ExtArgs>
   metricsHistory?: boolean | Prisma.Website$metricsHistoryArgs<ExtArgs>
   importBatch?: boolean | Prisma.Website$importBatchArgs<ExtArgs>
+  moderationEvents?: boolean | Prisma.Website$moderationEventsArgs<ExtArgs>
   _count?: boolean | Prisma.WebsiteCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["website"]>
 
@@ -3036,6 +3695,12 @@ export type WebsiteSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   trustScore?: boolean
   verificationVersion?: boolean
   importBatchId?: boolean
+  activeModerationAction?: boolean
+  activeModerationAuthority?: boolean
+  activeModerationReasonCode?: boolean
+  activeModerationMessage?: boolean
+  activeModerationPreviousActive?: boolean
+  moderationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
@@ -3074,6 +3739,12 @@ export type WebsiteSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   trustScore?: boolean
   verificationVersion?: boolean
   importBatchId?: boolean
+  activeModerationAction?: boolean
+  activeModerationAuthority?: boolean
+  activeModerationReasonCode?: boolean
+  activeModerationMessage?: boolean
+  activeModerationPreviousActive?: boolean
+  moderationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
@@ -3112,11 +3783,17 @@ export type WebsiteSelectScalar = {
   trustScore?: boolean
   verificationVersion?: boolean
   importBatchId?: boolean
+  activeModerationAction?: boolean
+  activeModerationAuthority?: boolean
+  activeModerationReasonCode?: boolean
+  activeModerationMessage?: boolean
+  activeModerationPreviousActive?: boolean
+  moderationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type WebsiteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "url" | "domain" | "name" | "category" | "language" | "country" | "metrics" | "isActive" | "publisherId" | "ownershipType" | "managedByUserId" | "verificationStatus" | "verificationMethod" | "verificationToken" | "activeVerifiedToken" | "verifiedAt" | "lastVerificationCheckAt" | "lastSuccessfulVerificationAt" | "lastVerificationRequestAt" | "verificationCheckCount" | "consecutiveFailures" | "verificationFailureReason" | "verificationOverrideExpiresAt" | "verificationOverrideReason" | "verifiedByUserId" | "canonicalDomain" | "trustScore" | "verificationVersion" | "importBatchId" | "createdAt" | "updatedAt", ExtArgs["result"]["website"]>
+export type WebsiteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "url" | "domain" | "name" | "category" | "language" | "country" | "metrics" | "isActive" | "publisherId" | "ownershipType" | "managedByUserId" | "verificationStatus" | "verificationMethod" | "verificationToken" | "activeVerifiedToken" | "verifiedAt" | "lastVerificationCheckAt" | "lastSuccessfulVerificationAt" | "lastVerificationRequestAt" | "verificationCheckCount" | "consecutiveFailures" | "verificationFailureReason" | "verificationOverrideExpiresAt" | "verificationOverrideReason" | "verifiedByUserId" | "canonicalDomain" | "trustScore" | "verificationVersion" | "importBatchId" | "activeModerationAction" | "activeModerationAuthority" | "activeModerationReasonCode" | "activeModerationMessage" | "activeModerationPreviousActive" | "moderationVersion" | "createdAt" | "updatedAt", ExtArgs["result"]["website"]>
 export type WebsiteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
   managedBy?: boolean | Prisma.Website$managedByArgs<ExtArgs>
@@ -3126,6 +3803,7 @@ export type WebsiteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   websiteIntegrations?: boolean | Prisma.Website$websiteIntegrationsArgs<ExtArgs>
   metricsHistory?: boolean | Prisma.Website$metricsHistoryArgs<ExtArgs>
   importBatch?: boolean | Prisma.Website$importBatchArgs<ExtArgs>
+  moderationEvents?: boolean | Prisma.Website$moderationEventsArgs<ExtArgs>
   _count?: boolean | Prisma.WebsiteCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WebsiteIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3150,6 +3828,7 @@ export type $WebsitePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     websiteIntegrations: Prisma.$WebsiteIntegrationPayload<ExtArgs>[]
     metricsHistory: Prisma.$WebsiteMetricPayload<ExtArgs>[]
     importBatch: Prisma.$WebsiteImportBatchPayload<ExtArgs> | null
+    moderationEvents: Prisma.$ModerationEventPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3182,6 +3861,12 @@ export type $WebsitePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     trustScore: number | null
     verificationVersion: number
     importBatchId: string | null
+    activeModerationAction: $Enums.ModerationAction | null
+    activeModerationAuthority: $Enums.ModerationAuthority | null
+    activeModerationReasonCode: $Enums.ModerationReasonCode | null
+    activeModerationMessage: string | null
+    activeModerationPreviousActive: boolean | null
+    moderationVersion: number
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["website"]>
@@ -3586,6 +4271,7 @@ export interface Prisma__WebsiteClient<T, Null = never, ExtArgs extends runtime.
   websiteIntegrations<T extends Prisma.Website$websiteIntegrationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Website$websiteIntegrationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebsiteIntegrationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   metricsHistory<T extends Prisma.Website$metricsHistoryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Website$metricsHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebsiteMetricPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   importBatch<T extends Prisma.Website$importBatchArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Website$importBatchArgs<ExtArgs>>): Prisma.Prisma__WebsiteImportBatchClient<runtime.Types.Result.GetResult<Prisma.$WebsiteImportBatchPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  moderationEvents<T extends Prisma.Website$moderationEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Website$moderationEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ModerationEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3645,6 +4331,12 @@ export interface WebsiteFieldRefs {
   readonly trustScore: Prisma.FieldRef<"Website", 'Int'>
   readonly verificationVersion: Prisma.FieldRef<"Website", 'Int'>
   readonly importBatchId: Prisma.FieldRef<"Website", 'String'>
+  readonly activeModerationAction: Prisma.FieldRef<"Website", 'ModerationAction'>
+  readonly activeModerationAuthority: Prisma.FieldRef<"Website", 'ModerationAuthority'>
+  readonly activeModerationReasonCode: Prisma.FieldRef<"Website", 'ModerationReasonCode'>
+  readonly activeModerationMessage: Prisma.FieldRef<"Website", 'String'>
+  readonly activeModerationPreviousActive: Prisma.FieldRef<"Website", 'Boolean'>
+  readonly moderationVersion: Prisma.FieldRef<"Website", 'Int'>
   readonly createdAt: Prisma.FieldRef<"Website", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Website", 'DateTime'>
 }
@@ -4222,6 +4914,30 @@ export type Website$importBatchArgs<ExtArgs extends runtime.Types.Extensions.Int
    */
   include?: Prisma.WebsiteImportBatchInclude<ExtArgs> | null
   where?: Prisma.WebsiteImportBatchWhereInput
+}
+
+/**
+ * Website.moderationEvents
+ */
+export type Website$moderationEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ModerationEvent
+   */
+  select?: Prisma.ModerationEventSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ModerationEvent
+   */
+  omit?: Prisma.ModerationEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ModerationEventInclude<ExtArgs> | null
+  where?: Prisma.ModerationEventWhereInput
+  orderBy?: Prisma.ModerationEventOrderByWithRelationInput | Prisma.ModerationEventOrderByWithRelationInput[]
+  cursor?: Prisma.ModerationEventWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ModerationEventScalarFieldEnum | Prisma.ModerationEventScalarFieldEnum[]
 }
 
 /**

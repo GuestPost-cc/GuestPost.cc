@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: marketplace
 project: guestpost-platform
-updated: 2026-08-02
+updated: 2026-08-21
 ---
 
 # Marketplace
@@ -29,7 +29,7 @@ A listing stores exactly one controlled primary language. Search can select mult
 
 Buyer cards/details expose categories, primary language, link policy, and current source-specific metrics. Filters are multi-select for categories, languages, backlink count, link type, and validity, plus Any/Yes/No selectors for boolean policies. Public projections never expose raw provider rows.
 
-GSC and GA4 metrics are quarantined as untrusted history because property ownership did not prove exact marketplace-domain binding. OAuth initiation/callback, discovery, linking, sync, schedules, daily writes, denormalized summaries, and public projection all fail closed with `GOOGLE_METRICS_DISABLED`; PostgreSQL also rejects stale-writer metric inserts. Marketplace traffic/DR projection, filtering, sorting, ranking, and recommendations require current, unexpired, provider/key-matched evidence from the explicit algorithm-source allowlist. `PUBLISHER_MANUAL` and unknown future sources are excluded; publisher-entered Ahrefs/Moz values remain visible only through source-labelled `Publisher Reported` projections and never through unlabelled legacy scalars. Re-enabling Google metrics requires the append-only property/stream/domain evidence contract in `docs/DOMAIN_METRICS_AND_PUBLISHER_IMPORT.md` and ADR 0008.
+GSC and GA4 metrics are quarantined as untrusted history because property ownership did not prove exact marketplace-domain binding. OAuth initiation/callback, discovery, linking, sync, schedules, daily writes, denormalized summaries, and public projection all fail closed with `GOOGLE_METRICS_DISABLED`; PostgreSQL also rejects stale-writer metric inserts. Marketplace projection, filtering, sorting, ranking, and recommendations require a current, unexpired, value-valid, exact metric-key/provider/direct-source match. Ahrefs DR accepts Ahrefs free or paid API evidence, Ahrefs organic traffic accepts paid API evidence only, Moz DA accepts Moz paid API evidence, and OpenPageRank fields accept OpenPageRank API evidence. `PUBLISHER_MANUAL`, `STAFF_MANUAL`, `ADMIN_IMPORT`, expired rows, mismatched providers, and unknown future sources remain available to authorized internal workflows but never appear in buyer responses or influence buyer discovery.
 
 ## Lifecycle phase (derived UI state)
 
@@ -41,9 +41,45 @@ GSC and GA4 metrics are quarantined as untrusted history because property owners
 - PLATFORM + DRAFT + ≥1 AVAILABLE → `READY_TO_PUBLISH`
 - APPROVED → `PUBLISHED` ; PAUSED → `PAUSED` ; REJECTED → `REJECTED` ; ARCHIVED → `ARCHIVED`
 
-Publisher lifecycle endpoints (all version-via-status-guarded, audit-logged):
-`POST /marketplace/listings/:id/{submit,pause,unpause,archive}`. `submit` gates on website VERIFIED + ≥1 AVAILABLE service.
-**2026-06-28: `submitListingForReview` now accepts REJECTED → PENDING_REVIEW** (resubmit flow), not just DRAFT.
+Publisher lifecycle endpoints use an explicit `expectedVersion`, locked revalidation,
+and the same moderation policy as staff commands:
+`POST /marketplace/listings/:id/{submit,pause,unpause,archive}`. Submission gates
+on an active, VERIFIED website and at least one AVAILABLE service. A publisher can
+restore only its own pause, and can resubmit after a staff request-changes/archive
+decision only when staff explicitly allowed resubmission. Publisher website aliases
+use the same versioned policy rather than an independent status writer.
+
+## Moderation authority and history (2026-08-21)
+
+`ListingStatus` remains the customer lifecycle state, while `ModerationEvent` is
+the append-only authority/history record for both listing and website decisions.
+Each target has a current-event pointer plus `moderationVersion`; commands require
+the expected version, lock Website before MarketplaceListing, update the target and
+projection, append the event, and record audit/communication outbox evidence in one
+transaction. Notifications are dispatched only after commit.
+
+The shared fail-closed transition matrix computes server-side `allowedActions`.
+Finance receives none. Operations may moderate publisher inventory and assigned
+platform inventory; Super Admin has global archive/reopen and emergency authority.
+Publishers cannot overwrite Operations or Super Admin holds, restore another
+authority's pause, or escape an archive unless resubmission is explicitly enabled.
+Website pause/archive changes domain availability only and never guesses or rewrites
+the listing lifecycle. Legacy paused/archived/inactive records are conservatively
+backfilled as `LEGACY_ORIGIN_UNKNOWN` with no invented prior state.
+
+## Buyer availability and public projection (2026-08-21)
+
+Buyer discovery and orderability require all three facts: listing `APPROVED`,
+website `isActive = true`, and website verification `VERIFIED`. The same predicate
+is applied to Prisma and raw-SQL search, detail/related, favorites, saved lists,
+service discovery, recommendations, trending/statistics, and checkout. Order
+creation locks Website, MarketplaceListing, then ListingService and revalidates the
+predicate so moderation cannot race a purchase.
+
+Buyer DTOs are true allowlist projections. Deposit-gated URLs, internal organization
+and publisher identifiers, staff moderation evidence, metric storage fields,
+publisher tier/trust data, raw review actors, and service fulfillment settings are
+not returned. Publisher and staff DTOs use separate source-complete projections.
 
 ## Per-service brief (Phase 6)
 
@@ -87,7 +123,7 @@ The July platform-management update makes this assignment an access boundary: OP
 
 Publisher inventory now follows the same aggregate boundary as platform inventory: the Enlist Website flow creates the publisher website and its single DRAFT listing atomically. The form captures URL/location, buyer-facing title, 1–7 required marketplace categories, one primary language, every placement-policy value, a description of at most 500 characters, and an optional first service. Manual Ahrefs organic traffic and Moz DA are persisted with provenance; Google metrics remain quarantined. It redirects to the website workspace rather than exposing a second standalone listing-creation path.
 
-The publisher website detail page is the management home for its listing. It combines listing metadata, review-readiness checks, DNS ownership status, lifecycle actions, and the complete service menu. Service price, turnaround, revisions, warranty, currency, and availability remain version-guarded per row; historical orders retain their checkout snapshot. Submission requires a verified domain, category, 1–500 character description, and at least one AVAILABLE service. DRAFT, REJECTED, and ARCHIVED listings can enter moderation.
+The publisher website detail page is the management home for its listing. It combines listing metadata, review-readiness checks, DNS ownership status, lifecycle actions, and the complete service menu. Service price, turnaround, revisions, warranty, currency, and availability remain version-guarded per row; historical orders retain their checkout snapshot. Submission requires an active verified domain, category, 1–500 character description, and at least one AVAILABLE service. DRAFT listings can enter moderation; REJECTED or ARCHIVED listings can re-enter only when the active moderation decision explicitly allows resubmission (publisher self-archive remains reversible).
 
 The Listings page is a searchable overview with status, service, and category filters plus readiness and service-count summaries. It links into the website workspace for edits. Publisher metadata updates are server-allowlisted to title, description, categories, primary language, placement policy, tags, do-follow policy, and sample URL; publishers cannot change moderation status, featured/verified state, ownership, website association, metrics, or services through the general metadata endpoint.
 

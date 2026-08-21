@@ -69,6 +69,8 @@ import {
   ForceVerifyWebsitesDto,
   MarkPlatformPublishedDto,
   MarkVerifiedDto,
+  ModerateListingDto,
+  ModerateWebsiteDto,
   PauseWebsiteDto,
   PayoutOperatorReasonDto,
   PreviewWebsiteImportDto,
@@ -1233,7 +1235,22 @@ export class AdminController {
     @Body() body: UpdateListingStatusDto,
     @CurrentUser() user: any,
   ) {
-    return this.admin.updateListingStatus(id, body.status, user, body.force)
+    return this.admin.updateListingStatus(id, body.status, user, body.force, {
+      reasonCode: body.reasonCode,
+      publisherMessage: body.publisherMessage,
+      internalNote: body.internalNote,
+      expectedVersion: body.expectedVersion,
+    })
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Post("marketplace/listings/:id/moderate")
+  moderateListing(
+    @Param("id") id: string,
+    @Body() body: ModerateListingDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.admin.moderateListing(id, body, user)
   }
 
   @StaffRoles("SUPER_ADMIN")
@@ -1390,7 +1407,17 @@ export class AdminController {
     return this.admin.getWebsite(id, user)
   }
 
-  @StaffRoles("SUPER_ADMIN")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Post("websites/:id/moderate")
+  moderateWebsite(
+    @Param("id") id: string,
+    @Body() body: ModerateWebsiteDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.admin.moderateWebsite(id, body, user)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Patch("websites/:id/pause")
   pauseWebsite(
     @Param("id") id: string,
@@ -1398,7 +1425,12 @@ export class AdminController {
     @CurrentUser() user: any,
   ) {
     const paused = body.paused
-    return this.admin.pauseWebsite(id, paused, user)
+    return this.admin.pauseWebsite(id, paused, user, {
+      reasonCode: body.reasonCode,
+      publisherMessage: body.publisherMessage,
+      internalNote: body.internalNote,
+      expectedVersion: body.expectedVersion,
+    })
   }
 
   @StaffRoles("SUPER_ADMIN")

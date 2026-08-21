@@ -49,6 +49,7 @@ import {
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../lib/api"
+import { PublisherModerationNotice } from "./moderation-notice"
 
 const SERVICE_TYPES = [
   ["GUEST_POST", "Guest post"],
@@ -270,11 +271,25 @@ export function PublisherListingManager({
 
   const lifecycleMut = useMutation({
     mutationFn: (action: "submit" | "pause" | "unpause" | "archive") => {
-      if (action === "submit") return api.marketplace.submitListing(listing.id)
-      if (action === "pause") return api.marketplace.pauseListing(listing.id)
+      if (action === "submit")
+        return api.marketplace.submitListing(
+          listing.id,
+          listing.moderation.version,
+        )
+      if (action === "pause")
+        return api.marketplace.pauseListing(
+          listing.id,
+          listing.moderation.version,
+        )
       if (action === "unpause")
-        return api.marketplace.unpauseListing(listing.id)
-      return api.marketplace.archiveListing(listing.id)
+        return api.marketplace.unpauseListing(
+          listing.id,
+          listing.moderation.version,
+        )
+      return api.marketplace.archiveListing(
+        listing.id,
+        listing.moderation.version,
+      )
     },
     onSuccess: (_, action) => {
       onChanged()
@@ -326,6 +341,7 @@ export function PublisherListingManager({
             </div>
             <LifecycleActions
               status={listing.status}
+              allowedActions={listing.moderation.allowedActions}
               readyForReview={readyForReview}
               pending={lifecycleMut.isPending}
               onAction={(action) => lifecycleMut.mutate(action)}
@@ -333,6 +349,12 @@ export function PublisherListingManager({
           </div>
         </CardHeader>
         <CardContent className="grid gap-6 pt-6 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="lg:col-span-2">
+            <PublisherModerationNotice
+              moderation={listing.moderation}
+              subject="listing"
+            />
+          </div>
           <div className="space-y-5">
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Listing title">
@@ -800,21 +822,23 @@ function Field({
 
 function LifecycleActions({
   status,
+  allowedActions,
   readyForReview,
   pending,
   onAction,
 }: {
   status: string
+  allowedActions: PublisherWebsiteListing["moderation"]["allowedActions"]
   readyForReview: boolean
   pending: boolean
   onAction: (action: "submit" | "pause" | "unpause" | "archive") => void
 }) {
-  if (status === "PENDING_REVIEW") {
+  if (status === "PENDING_REVIEW" && allowedActions.length === 0) {
     return <Badge variant="secondary">Moderation in progress</Badge>
   }
   return (
     <div className="flex flex-wrap gap-2">
-      {["DRAFT", "REJECTED", "ARCHIVED"].includes(status) && (
+      {allowedActions.includes("SUBMIT_FOR_REVIEW") && (
         <Button
           size="sm"
           disabled={!readyForReview || pending}
@@ -824,7 +848,7 @@ function LifecycleActions({
           {status === "REJECTED" ? "Resubmit" : "Submit for review"}
         </Button>
       )}
-      {status === "APPROVED" && (
+      {allowedActions.includes("PAUSE") && (
         <Button
           size="sm"
           variant="outline"
@@ -834,7 +858,7 @@ function LifecycleActions({
           Pause listing
         </Button>
       )}
-      {status === "PAUSED" && (
+      {allowedActions.includes("RESTORE") && (
         <Button
           size="sm"
           variant="outline"
@@ -842,6 +866,16 @@ function LifecycleActions({
           onClick={() => onAction("unpause")}
         >
           Resume listing
+        </Button>
+      )}
+      {allowedActions.includes("ARCHIVE") && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending}
+          onClick={() => onAction("archive")}
+        >
+          Archive listing
         </Button>
       )}
     </div>

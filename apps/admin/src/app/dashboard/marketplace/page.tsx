@@ -1,6 +1,12 @@
 "use client"
 
-import type { AdminMarketplaceListingRow } from "@guestpost/api-client"
+import {
+  type AdminMarketplaceListingRow,
+  type ModerationAction,
+  type ModerationCommand,
+  moderationActionLabel,
+  moderationReasonLabel,
+} from "@guestpost/api-client"
 import type { ListingStatus } from "@guestpost/database"
 import {
   Badge,
@@ -53,6 +59,7 @@ import {
   AdminPage,
   AdminPageHeader,
 } from "../../../components/admin-workspace"
+import { ModerationActionDialog } from "../../../components/moderation-action-dialog"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
@@ -144,11 +151,13 @@ function AdminMarketplacePageInner() {
     queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
     queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
   }
-  const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      api.admin.updateListingStatus(id, status),
-    onSuccess: () => {
-      toast.success("Listing status updated")
+  const moderationMutation = useMutation({
+    mutationFn: ({ id, command }: { id: string; command: ModerationCommand }) =>
+      api.admin.moderateListing(id, command),
+    onSuccess: (_, variables) => {
+      toast.success(
+        `${moderationActionLabel(variables.command.action)} recorded`,
+      )
       invalidate()
     },
     onError: (error: Error) => toast.error(error.message),
@@ -346,9 +355,9 @@ function AdminMarketplacePageInner() {
                       key={listing.id}
                       listing={listing}
                       canModerate={canModerate}
-                      busy={statusMutation.isPending}
-                      onStatus={(status) =>
-                        statusMutation.mutate({ id: listing.id, status })
+                      busy={moderationMutation.isPending}
+                      onModerate={(command) =>
+                        moderationMutation.mutate({ id: listing.id, command })
                       }
                     />
                   ))}
@@ -373,9 +382,12 @@ function AdminMarketplacePageInner() {
                           key={listing.id}
                           listing={listing}
                           canModerate={canModerate}
-                          busy={statusMutation.isPending}
-                          onStatus={(status) =>
-                            statusMutation.mutate({ id: listing.id, status })
+                          busy={moderationMutation.isPending}
+                          onModerate={(command) =>
+                            moderationMutation.mutate({
+                              id: listing.id,
+                              command,
+                            })
                           }
                         />
                       ))}
@@ -421,61 +433,69 @@ function ListingActions({
   listing,
   canModerate,
   busy,
-  onStatus,
+  onModerate,
 }: {
   listing: AdminMarketplaceListingRow
   canModerate: boolean
   busy: boolean
-  onStatus: (status: string) => void
+  onModerate: (command: ModerationCommand) => void
 }) {
+  const [selectedAction, setSelectedAction] = useState<ModerationAction | null>(
+    null,
+  )
+  const allowedActions = canModerate ? listing.moderation.allowedActions : []
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Actions for ${listing.title}`}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link href={`/dashboard/marketplace/${listing.slug}`}>
-            <Eye className="mr-2 h-4 w-4" /> View details
-          </Link>
-        </DropdownMenuItem>
-        {canModerate && listing.status === "PENDING_REVIEW" ? (
-          <>
-            <DropdownMenuItem
-              disabled={busy}
-              onClick={() => onStatus("APPROVED")}
-            >
-              Approve
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={busy}
-              onClick={() => onStatus("REJECTED")}
-            >
-              Reject
-            </DropdownMenuItem>
-          </>
-        ) : null}
-        {canModerate && listing.status === "APPROVED" ? (
-          <DropdownMenuItem disabled={busy} onClick={() => onStatus("PAUSED")}>
-            Pause listing
-          </DropdownMenuItem>
-        ) : null}
-        {canModerate && listing.status === "PAUSED" ? (
-          <DropdownMenuItem
-            disabled={busy}
-            onClick={() => onStatus("APPROVED")}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Actions for ${listing.title}`}
           >
-            Restore listing
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href={`/dashboard/marketplace/${listing.slug}`}>
+              <Eye className="mr-2 h-4 w-4" /> View details
+            </Link>
           </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {allowedActions.map((action) => (
+            <DropdownMenuItem
+              key={action}
+              disabled={busy}
+              className={
+                ["REQUEST_CHANGES", "PAUSE", "ARCHIVE"].includes(action)
+                  ? "text-destructive focus:text-destructive"
+                  : undefined
+              }
+              onClick={() => setSelectedAction(action)}
+            >
+              {moderationActionLabel(action)}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ModerationActionDialog
+        action={selectedAction}
+        scope="LISTING"
+        targetLabel={listing.title}
+        ownerType={listing.ownerType}
+        version={listing.moderation.version}
+        open={selectedAction !== null}
+        pending={busy}
+        onOpenChange={(open) => {
+          if (!open) setSelectedAction(null)
+        }}
+        onConfirm={(command) => {
+          onModerate(command)
+          setSelectedAction(null)
+        }}
+      />
+    </>
   )
 }
 
@@ -483,12 +503,12 @@ function ListingRow({
   listing,
   canModerate,
   busy,
-  onStatus,
+  onModerate,
 }: {
   listing: AdminMarketplaceListingRow
   canModerate: boolean
   busy: boolean
-  onStatus: (status: string) => void
+  onModerate: (command: ModerationCommand) => void
 }) {
   const presentation = getListingStatusPresentation(
     listing.status as ListingStatus,
@@ -581,13 +601,20 @@ function ListingRow({
             ?.replaceAll("_", " ")
             .toLowerCase() || "unknown"}
         </p>
+        {listing.moderation.active ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {listing.moderation.active.reasonCode
+              ? moderationReasonLabel(listing.moderation.active.reasonCode)
+              : "Reason unavailable"}
+          </p>
+        ) : null}
       </TableCell>
       <TableCell>
         <ListingActions
           listing={listing}
           canModerate={canModerate}
           busy={busy}
-          onStatus={onStatus}
+          onModerate={onModerate}
         />
       </TableCell>
     </TableRow>
@@ -598,7 +625,7 @@ function ListingCard(props: {
   listing: AdminMarketplaceListingRow
   canModerate: boolean
   busy: boolean
-  onStatus: (status: string) => void
+  onModerate: (command: ModerationCommand) => void
 }) {
   const { listing } = props
   const presentation = getListingStatusPresentation(

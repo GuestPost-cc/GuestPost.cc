@@ -8,9 +8,95 @@ import {
   assertManualMetricValues,
   assertMeasurementDate,
   manualMetricFreshAfter,
+  serializeMarketplaceDomainMetrics,
+  serializePublicMarketplaceDomainMetrics,
   upsertWebsiteMetric,
   WebsiteMetricsService,
 } from "../website-metrics.service"
+
+describe("marketplace metric serializers", () => {
+  const measuredAt = new Date("2026-07-22T00:00:00Z")
+  const collectedAt = new Date("2026-07-22T01:00:00Z")
+
+  it("preserves manual provenance internally while hiding it from customers", () => {
+    const manualMetric = {
+      key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+      provider: WebsiteMetricProvider.AHREFS,
+      source: WebsiteMetricSource.PUBLISHER_MANUAL,
+      status: "CURRENT",
+      value: 1200,
+      measuredAt,
+      collectedAt,
+      expiresAt: null,
+    }
+
+    expect(
+      serializeMarketplaceDomainMetrics([manualMetric])?.ahrefs.organicTraffic,
+    ).toEqual(
+      expect.objectContaining({ value: 1200, source: "PUBLISHER_MANUAL" }),
+    )
+    expect(
+      serializePublicMarketplaceDomainMetrics([manualMetric]),
+    ).toBeUndefined()
+  })
+
+  it("returns only display-safe fields for an authoritative provider metric", () => {
+    const projected = serializePublicMarketplaceDomainMetrics([
+      {
+        key: WebsiteMetricKey.AHREFS_DOMAIN_RATING,
+        provider: WebsiteMetricProvider.AHREFS,
+        source: WebsiteMetricSource.AHREFS_FREE_API,
+        status: "CURRENT",
+        value: 73,
+        measuredAt,
+        collectedAt,
+        expiresAt: new Date("2099-01-01T00:00:00Z"),
+        enteredByUserId: "internal-user",
+        importBatchId: "internal-batch",
+      },
+    ])
+
+    expect(projected?.ahrefs.domainRating).toEqual({
+      value: 73,
+      source: "AHREFS_FREE_API",
+      status: "CURRENT",
+      measuredAt: measuredAt.toISOString(),
+      collectedAt: collectedAt.toISOString(),
+    })
+    expect(JSON.stringify(projected)).not.toMatch(
+      /expiresAt|enteredByUserId|importBatchId|internal-/,
+    )
+  })
+
+  it.each([
+    ["out-of-range value", { value: 101 }],
+    ["invalid expiration", { expiresAt: "not-a-date" }],
+    ["invalid measurement date", { measuredAt: "not-a-date" }],
+    [
+      "expiration at the projection boundary",
+      { expiresAt: new Date("2026-08-21T00:00:00Z") },
+    ],
+  ])("fails closed for an authoritative metric with %s", (_label, patch) => {
+    const projected = serializePublicMarketplaceDomainMetrics(
+      [
+        {
+          key: WebsiteMetricKey.AHREFS_DOMAIN_RATING,
+          provider: WebsiteMetricProvider.AHREFS,
+          source: WebsiteMetricSource.AHREFS_FREE_API,
+          status: "CURRENT",
+          value: 73,
+          measuredAt,
+          collectedAt,
+          expiresAt: new Date("2099-01-01T00:00:00Z"),
+          ...patch,
+        },
+      ],
+      new Date("2026-08-21T00:00:00Z"),
+    )
+
+    expect(projected).toBeUndefined()
+  })
+})
 
 describe("manual metric validation", () => {
   beforeEach(() => {

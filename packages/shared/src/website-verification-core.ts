@@ -251,20 +251,20 @@ export interface SweepResult {
   warned: number
 }
 
-// Revocation enforcement: a REVOKED domain's marketplace listings are hidden
-// (PAUSED) so it can no longer sell, take new orders, or be approved/edited.
-// Completed orders, settlements, and historical reporting are untouched.
+// Revocation enforcement: marketplace visibility and checkout fail closed on
+// Website.verificationStatus, so revocation does not rewrite the listing's
+// independent business lifecycle. Reverification can therefore restore domain
+// availability without silently approving/reclassifying any listing.
 export async function enforceRevocation(
   prisma: any,
   website: any,
   organizationId: string | null,
 ) {
-  const hidden = await prisma.marketplaceListing.updateMany({
+  const listingsHidden = await prisma.marketplaceListing.count({
     where: {
       websiteId: website.id,
-      status: { in: ["APPROVED", "PENDING_REVIEW", "DRAFT", "PAUSED"] },
+      status: "APPROVED",
     },
-    data: { status: "PAUSED" },
   })
   await prisma.auditLog.create({
     data: {
@@ -275,7 +275,7 @@ export async function enforceRevocation(
         domain: website.domain,
         publisherId: website.publisherId,
         organizationId,
-        listingsHidden: hidden.count,
+        listingsHidden,
       },
       userId: null,
       organizationId,
@@ -291,9 +291,9 @@ export async function enforceRevocation(
   await notifyOps(
     prisma,
     "WEBSITE_REVOKED_ENFORCEMENT",
-    `Revocation enforced on ${website.domain ?? website.url}: ${hidden.count} listing(s) hidden.`,
+    `Revocation enforced on ${website.domain ?? website.url}: ${listingsHidden} listing(s) hidden.`,
   )
-  return hidden.count
+  return listingsHidden
 }
 
 // Periodic ownership health check (default 30 days). Transient DNS outages must

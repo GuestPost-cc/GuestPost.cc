@@ -456,6 +456,7 @@ export const ModelName = {
   MarketplaceCategory: 'MarketplaceCategory',
   MarketplaceTag: 'MarketplaceTag',
   MarketplaceListing: 'MarketplaceListing',
+  ModerationEvent: 'ModerationEvent',
   MarketplaceListingCategory: 'MarketplaceListingCategory',
   ListingService: 'ListingService',
   MarketplaceListingTag: 'MarketplaceListingTag',
@@ -496,7 +497,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "billingProfile" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "publisherCompensation" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryUrlClaimFence" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "depositCreditRecovery" | "depositCreditEvidence" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "communicationEvent" | "communicationDelivery" | "financialDocument" | "notificationPreference" | "emailSuppression" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "billingProfile" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "publisherCompensation" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryUrlClaimFence" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "depositCreditRecovery" | "depositCreditEvidence" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "communicationEvent" | "communicationDelivery" | "financialDocument" | "notificationPreference" | "emailSuppression" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "moderationEvent" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -5828,6 +5829,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ModerationEvent: {
+      payload: Prisma.$ModerationEventPayload<ExtArgs>
+      fields: Prisma.ModerationEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ModerationEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ModerationEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload>
+        }
+        findFirst: {
+          args: Prisma.ModerationEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ModerationEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload>
+        }
+        findMany: {
+          args: Prisma.ModerationEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload>[]
+        }
+        create: {
+          args: Prisma.ModerationEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload>
+        }
+        createMany: {
+          args: Prisma.ModerationEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ModerationEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload>[]
+        }
+        delete: {
+          args: Prisma.ModerationEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload>
+        }
+        update: {
+          args: Prisma.ModerationEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.ModerationEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ModerationEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ModerationEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.ModerationEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ModerationEventPayload>
+        }
+        aggregate: {
+          args: Prisma.ModerationEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateModerationEvent>
+        }
+        groupBy: {
+          args: Prisma.ModerationEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ModerationEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ModerationEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ModerationEventCountAggregateOutputType> | number
+        }
+      }
+    }
     MarketplaceListingCategory: {
       payload: Prisma.$MarketplaceListingCategoryPayload<ExtArgs>
       fields: Prisma.MarketplaceListingCategoryFieldRefs
@@ -7934,6 +8009,12 @@ export const WebsiteScalarFieldEnum = {
   trustScore: 'trustScore',
   verificationVersion: 'verificationVersion',
   importBatchId: 'importBatchId',
+  activeModerationAction: 'activeModerationAction',
+  activeModerationAuthority: 'activeModerationAuthority',
+  activeModerationReasonCode: 'activeModerationReasonCode',
+  activeModerationMessage: 'activeModerationMessage',
+  activeModerationPreviousActive: 'activeModerationPreviousActive',
+  moderationVersion: 'moderationVersion',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -9133,6 +9214,13 @@ export const MarketplaceListingScalarFieldEnum = {
   publisherId: 'publisherId',
   websiteId: 'websiteId',
   organizationId: 'organizationId',
+  activeModerationAction: 'activeModerationAction',
+  activeModerationAuthority: 'activeModerationAuthority',
+  activeModerationReasonCode: 'activeModerationReasonCode',
+  activeModerationMessage: 'activeModerationMessage',
+  activeModerationPreviousStatus: 'activeModerationPreviousStatus',
+  moderationResubmissionAllowed: 'moderationResubmissionAllowed',
+  moderationVersion: 'moderationVersion',
   publishedAt: 'publishedAt',
   expiresAt: 'expiresAt',
   createdAt: 'createdAt',
@@ -9140,6 +9228,31 @@ export const MarketplaceListingScalarFieldEnum = {
 } as const
 
 export type MarketplaceListingScalarFieldEnum = (typeof MarketplaceListingScalarFieldEnum)[keyof typeof MarketplaceListingScalarFieldEnum]
+
+
+export const ModerationEventScalarFieldEnum = {
+  id: 'id',
+  scope: 'scope',
+  listingId: 'listingId',
+  websiteId: 'websiteId',
+  action: 'action',
+  reasonCode: 'reasonCode',
+  publisherMessage: 'publisherMessage',
+  internalNote: 'internalNote',
+  actorUserId: 'actorUserId',
+  actorStaffRole: 'actorStaffRole',
+  authority: 'authority',
+  previousStatus: 'previousStatus',
+  resultingStatus: 'resultingStatus',
+  previousModerationAction: 'previousModerationAction',
+  resultingModerationAction: 'resultingModerationAction',
+  previousWebsiteActive: 'previousWebsiteActive',
+  resultingWebsiteActive: 'resultingWebsiteActive',
+  resubmissionAllowed: 'resubmissionAllowed',
+  createdAt: 'createdAt'
+} as const
+
+export type ModerationEventScalarFieldEnum = (typeof ModerationEventScalarFieldEnum)[keyof typeof ModerationEventScalarFieldEnum]
 
 
 export const MarketplaceListingCategoryScalarFieldEnum = {
@@ -9779,6 +9892,48 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+
+
+
+/**
+ * Reference to a field of type 'ModerationAction'
+ */
+export type EnumModerationActionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ModerationAction'>
+
+
+
+/**
+ * Reference to a field of type 'ModerationAction[]'
+ */
+export type ListEnumModerationActionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ModerationAction[]'>
+
+
+
+/**
+ * Reference to a field of type 'ModerationAuthority'
+ */
+export type EnumModerationAuthorityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ModerationAuthority'>
+
+
+
+/**
+ * Reference to a field of type 'ModerationAuthority[]'
+ */
+export type ListEnumModerationAuthorityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ModerationAuthority[]'>
+
+
+
+/**
+ * Reference to a field of type 'ModerationReasonCode'
+ */
+export type EnumModerationReasonCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ModerationReasonCode'>
+
+
+
+/**
+ * Reference to a field of type 'ModerationReasonCode[]'
+ */
+export type ListEnumModerationReasonCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ModerationReasonCode[]'>
 
 
 
@@ -10721,6 +10876,20 @@ export type ListEnumListingLinkValidityFieldRefInput<$PrismaModel> = FieldRefInp
 
 
 /**
+ * Reference to a field of type 'ModerationScope'
+ */
+export type EnumModerationScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ModerationScope'>
+
+
+
+/**
+ * Reference to a field of type 'ModerationScope[]'
+ */
+export type ListEnumModerationScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ModerationScope[]'>
+
+
+
+/**
  * Reference to a field of type 'ServiceAvailability'
  */
 export type EnumServiceAvailabilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ServiceAvailability'>
@@ -11041,6 +11210,7 @@ export type GlobalOmitConfig = {
   marketplaceCategory?: Prisma.MarketplaceCategoryOmit
   marketplaceTag?: Prisma.MarketplaceTagOmit
   marketplaceListing?: Prisma.MarketplaceListingOmit
+  moderationEvent?: Prisma.ModerationEventOmit
   marketplaceListingCategory?: Prisma.MarketplaceListingCategoryOmit
   listingService?: Prisma.ListingServiceOmit
   marketplaceListingTag?: Prisma.MarketplaceListingTagOmit

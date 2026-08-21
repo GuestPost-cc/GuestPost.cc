@@ -378,6 +378,11 @@ export type MarketplaceTag = Prisma.MarketplaceTagModel
  */
 export type MarketplaceListing = Prisma.MarketplaceListingModel
 /**
+ * Model ModerationEvent
+ *
+ */
+export type ModerationEvent = Prisma.ModerationEventModel
+/**
  * Model MarketplaceListingCategory
  *
  */

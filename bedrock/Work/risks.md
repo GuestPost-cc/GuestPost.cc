@@ -1,17 +1,34 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-08-14
+updated: 2026-08-21
 ---
 
 # Risks
 
-Updated 2026-08-14 after the controlled Neon cutover and worker-fleet
-containment. Historical audit Views are snapshots, not current status;
+Updated 2026-08-21 after the marketplace trust-boundary implementation and the
+controlled Neon cutover/worker-fleet containment. Historical audit Views are
+snapshots, not current status;
 `Work/backlog.md` is the canonical open-work register and this file is the
 canonical launch-risk register.
 
 ## Current production-hold risk
+
+- **The marketplace moderation migration is not yet deployed.** Migration
+  `20260821120000_marketplace_moderation` introduces append-only moderation
+  history, current projections, versioned commands, and conservative legacy
+  hold backfill. Old writers do not understand these authority boundaries.
+  Rehearse on a populated clone, verify backfill counts/pointers, drain old API
+  writers, apply the migration before the matching application image, and use a
+  forward fix rather than dropping immutability guards. The production runtime
+  role must remain DML-only and lack TRUNCATE/DDL privileges.
+
+- **Buyer metrics intentionally disappear when authoritative evidence is
+  absent or stale.** Publisher/staff/imported values remain available for
+  internal review but cannot fill buyer cards, filters, sorting, ranking, or
+  recommendations. This fail-closed behavior can reduce apparent inventory
+  until provider collection succeeds; do not restore compatibility scalars or
+  manual-source allowlists as an availability shortcut.
 
 - **The schema cutover succeeded, but the worker hard drain missed one workload.**
   All 75 migrations are committed on Neon and exact SHA `512b851` is live on

@@ -7,7 +7,11 @@ import type {
   WithdrawalStatus,
 } from "@guestpost/shared"
 import type { HttpClient, RequestOptions } from "../client"
-import type { PublicDomainMetrics } from "./marketplace"
+import type {
+  ModerationCommand,
+  ModerationCommandResponse,
+  ModerationProjection,
+} from "../marketplace-moderation"
 import type {
   CancellationMutationData,
   CancellationPreviewResponse,
@@ -868,6 +872,38 @@ export interface AdminPlatformListingServiceResponse {
   version: number
 }
 
+/** Staff-only metric provenance. Public marketplace metric types are narrower. */
+export type AdminDomainMetricSource =
+  | "AHREFS_FREE_API"
+  | "AHREFS_PAID_API"
+  | "MOZ_PAID_API"
+  | "OPEN_PAGE_RANK_API"
+  | "PUBLISHER_MANUAL"
+  | "STAFF_MANUAL"
+  | "ADMIN_IMPORT"
+
+export interface AdminDomainMetricValue {
+  value: number
+  source: AdminDomainMetricSource
+  status: "CURRENT" | "STALE" | "UNAVAILABLE"
+  measuredAt: string
+  collectedAt: string
+  expiresAt?: string | null
+}
+
+export interface AdminDomainMetrics {
+  ahrefs: {
+    domainRating?: AdminDomainMetricValue
+    organicTraffic?: AdminDomainMetricValue
+  }
+  moz: { domainAuthority?: AdminDomainMetricValue }
+  openPageRank: {
+    pageRank?: AdminDomainMetricValue
+    globalRank?: AdminDomainMetricValue
+    referringDomains?: AdminDomainMetricValue
+  }
+}
+
 export interface AdminPlatformWebsiteResponse {
   id: string
   url: string
@@ -877,6 +913,7 @@ export interface AdminPlatformWebsiteResponse {
   language: string | null
   country: string | null
   isActive: boolean
+  moderation: ModerationProjection
   ownershipType: "PLATFORM" | "PUBLISHER"
   managedByUserId: string | null
   managedBy: { id: string; name: string | null; email: string } | null
@@ -905,6 +942,7 @@ export interface AdminPlatformWebsiteResponse {
     markedSponsored?: boolean | null
     foreignLanguageAllowed?: boolean | null
     services: AdminPlatformListingServiceResponse[]
+    moderation: ModerationProjection
   } | null
   integrations: Array<{
     id: string
@@ -967,12 +1005,15 @@ export interface AdminMarketplaceListingRow {
   websiteVerifiedAt: string | null
   websiteDomain: string | null
   websiteUrl: string | null
+  websiteActive: boolean
+  websiteModeration: ModerationProjection | null
   websiteManagedBy: {
     id: string
     name: string | null
     email?: string
   } | null
-  domainMetrics?: PublicDomainMetrics
+  domainMetrics?: AdminDomainMetrics
+  moderation: ModerationProjection
   services: AdminMarketplaceServiceRow[]
   createdAt: string
 }
@@ -984,6 +1025,8 @@ export interface AdminMarketplaceListingDetail
     | "websiteVerifiedAt"
     | "websiteDomain"
     | "websiteManagedBy"
+    | "websiteActive"
+    | "websiteModeration"
   > {
   description: string
   shortDescription?: string | null
@@ -1007,6 +1050,7 @@ export interface AdminMarketplaceListingDetail
     url: string
     domain: string | null
     ownershipType: "PUBLISHER" | "PLATFORM"
+    isActive: boolean
     verificationStatus: string
     verifiedAt: string | null
     managedBy: {
@@ -1020,6 +1064,7 @@ export interface AdminMarketplaceListingDetail
       integrationStatus: string
       syncedAt: string | null
     }>
+    moderation: ModerationProjection
   } | null
   reviews: Array<{
     id: string
@@ -1654,10 +1699,25 @@ export class AdminService {
     return this.client.get<AdminOpsStaffResponse[]>("/admin/staff/operations")
   }
 
+  /** @deprecated Use moderateListing so authority, reason and version are audited. */
   updateListingStatus(listingId: string, status: string, force?: boolean) {
     return this.client.patch(
       `/admin/marketplace/listings/${listingId}/status`,
       { json: { status, force } },
+    )
+  }
+
+  moderateListing(listingId: string, command: ModerationCommand) {
+    return this.client.post<ModerationCommandResponse>(
+      `/admin/marketplace/listings/${listingId}/moderate`,
+      { json: command as unknown as Record<string, unknown> },
+    )
+  }
+
+  moderateWebsite(websiteId: string, command: ModerationCommand) {
+    return this.client.post<ModerationCommandResponse>(
+      `/admin/websites/${websiteId}/moderate`,
+      { json: command as unknown as Record<string, unknown> },
     )
   }
 

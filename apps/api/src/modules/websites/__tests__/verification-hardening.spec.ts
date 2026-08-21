@@ -137,6 +137,7 @@ describe("runWebsiteReverifySweep health check", () => {
         findMany: jest.fn().mockResolvedValue([{ userId: "s1" }]),
       },
       marketplaceListing: {
+        count: jest.fn().mockResolvedValue(2),
         updateMany: jest.fn().mockResolvedValue({ count: 2 }),
       },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
@@ -209,9 +210,10 @@ describe("runWebsiteReverifySweep health check", () => {
         }),
       }),
     )
-    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "PAUSED" } }),
-    )
+    expect(prisma.marketplaceListing.count).toHaveBeenCalledWith({
+      where: { websiteId: "w1", status: "APPROVED" },
+    })
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
   })
 
   it("transient resolver error never counts as a failure", async () => {
@@ -228,10 +230,11 @@ describe("runWebsiteReverifySweep health check", () => {
 
 // ── Revocation enforcement (direct) ────────────────────────────────────────
 describe("enforceRevocation", () => {
-  it("pauses active listings + audits + notifies", async () => {
+  it("hides approved inventory without rewriting listing lifecycle", async () => {
     const prisma: any = {
       marketplaceListing: {
-        updateMany: jest.fn().mockResolvedValue({ count: 3 }),
+        count: jest.fn().mockResolvedValue(3),
+        updateMany: jest.fn(),
       },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       publisherMembership: {
@@ -248,9 +251,10 @@ describe("enforceRevocation", () => {
       "o1",
     )
     expect(hidden).toBe(3)
-    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "PAUSED" } }),
-    )
+    expect(prisma.marketplaceListing.count).toHaveBeenCalledWith({
+      where: { websiteId: "w1", status: "APPROVED" },
+    })
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

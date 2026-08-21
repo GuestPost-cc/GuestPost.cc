@@ -17,3 +17,4 @@ node_modules
 !/src/prisma/models/PublisherCompensation.ts
 !/src/prisma/models/DepositCreditRecovery.ts
 !/src/prisma/models/DepositCreditEvidence.ts
+!/src/prisma/models/ModerationEvent.ts

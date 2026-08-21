@@ -1,5 +1,10 @@
 "use client"
 
+import {
+  moderationReasonLabel,
+  type PublisherModerationProjection,
+  type PublisherWebsiteResponse,
+} from "@guestpost/api-client"
 import { MARKETPLACE_LANGUAGES } from "@guestpost/shared"
 import {
   Badge,
@@ -35,6 +40,7 @@ import {
   Globe,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -66,7 +72,7 @@ interface Website {
   language?: (typeof MARKETPLACE_LANGUAGES)[number]
   price?: number
   niche?: string
-  status: "ACTIVE" | "ARCHIVED" | "PENDING"
+  status: "ACTIVE" | "PAUSED" | "ARCHIVED"
   verificationStatus?:
     | "PENDING_VERIFICATION"
     | "VERIFIED"
@@ -76,6 +82,8 @@ interface Website {
   verificationFailureReason?: string | null
   marketplaceStatus?: string
   serviceCount?: number
+  moderation: PublisherModerationProjection
+  listingModeration?: PublisherModerationProjection
 }
 
 interface VerifyInstructions {
@@ -83,6 +91,11 @@ interface VerifyInstructions {
   host: string
   value: string
   note?: string
+}
+
+function websiteStatus(site: PublisherWebsiteResponse): Website["status"] {
+  if (site.isActive) return "ACTIVE"
+  return site.moderation.active?.action === "ARCHIVE" ? "ARCHIVED" : "PAUSED"
 }
 
 const VERIFY_BADGE: Record<string, { label: string; variant: any; Icon: any }> =
@@ -235,6 +248,7 @@ export default function WebsitesPage() {
   const [showArchived, setShowArchived] = useState(false)
   const [verificationFilter, setVerificationFilter] = useState("all")
   const [verifyTarget, setVerifyTarget] = useState<Website | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<Website | null>(null)
   const [verifyInstructions, setVerifyInstructions] =
     useState<VerifyInstructions | null>(null)
   const queryClient = useQueryClient()
@@ -249,32 +263,37 @@ export default function WebsitesPage() {
     queryKey: ["publisher-websites", publisherId],
     queryFn: async () => {
       if (!publisherId) return []
-      const sites = (await api.publishers.getWebsites(publisherId)) as any[]
-      return sites.map((s: any) => {
-        const listing = s.marketplaceListings?.[0]
+      const sites = await api.publishers.getWebsites(publisherId)
+      return sites.map((site): Website => {
+        const listing = site.marketplaceListings?.[0] ?? site.listing
         const availableServices = (listing?.services ?? []).filter(
-          (service: any) => service.availability === "AVAILABLE",
+          (service) => service.availability === "AVAILABLE",
         )
-        const prices = availableServices.map((service: any) =>
-          Number(service.price),
+        const prices = availableServices.map((service) => Number(service.price))
+        const language = MARKETPLACE_LANGUAGES.includes(
+          site.language as (typeof MARKETPLACE_LANGUAGES)[number],
         )
+          ? (site.language as (typeof MARKETPLACE_LANGUAGES)[number])
+          : undefined
         return {
-          id: s.id,
-          url: s.url || "",
-          domainRating: s.domainMetrics?.ahrefsDomainRating?.value,
-          monthlyTraffic: s.domainMetrics?.ahrefsOrganicTraffic?.value,
-          country: s.country || "",
-          language: s.language || undefined,
+          id: site.id,
+          url: site.url || "",
+          domainRating: site.domainMetrics?.ahrefsDomainRating?.value,
+          monthlyTraffic: site.domainMetrics?.ahrefsOrganicTraffic?.value,
+          country: site.country || "",
+          language,
           price: prices.length > 0 ? Math.min(...prices) : 0,
-          niche: listing?.category?.name || s.category || "",
-          status: s.isActive ? "ACTIVE" : "ARCHIVED",
+          niche: listing?.category?.name || site.category || "",
+          status: websiteStatus(site),
           marketplaceStatus: listing?.status || "DRAFT",
           serviceCount: listing?.services?.length ?? 0,
-          verificationStatus: s.verificationStatus || "PENDING_VERIFICATION",
-          verifiedAt: s.verifiedAt || null,
-          verificationFailureReason: s.verificationFailureReason || null,
+          verificationStatus: site.verificationStatus || "PENDING_VERIFICATION",
+          verifiedAt: site.verifiedAt || null,
+          verificationFailureReason: site.verificationFailureReason || null,
+          moderation: site.moderation,
+          listingModeration: listing?.moderation,
         }
-      }) as Website[]
+      })
     },
   })
 
@@ -298,9 +317,15 @@ export default function WebsitesPage() {
   })
 
   const submitMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({
+      id,
+      expectedVersion,
+    }: {
+      id: string
+      expectedVersion: number
+    }) => {
       if (!publisherId) throw new Error("Not authenticated")
-      return api.publishers.submitForReview(publisherId, id)
+      return api.publishers.submitForReview(publisherId, id, expectedVersion)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
@@ -331,11 +356,18 @@ export default function WebsitesPage() {
   })
 
   const archiveMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({
+      id,
+      expectedVersion,
+    }: {
+      id: string
+      expectedVersion: number
+    }) => {
       if (!publisherId) throw new Error("Not authenticated")
-      return api.publishers.deleteWebsite(publisherId, id)
+      return api.publishers.archiveWebsite(publisherId, id, expectedVersion)
     },
     onSuccess: () => {
+      setArchiveTarget(null)
       queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
       toast.success("Website archived")
     },
@@ -343,12 +375,33 @@ export default function WebsitesPage() {
       toast.error("Failed to archive website")
     },
   })
+  const reopenMutation = useMutation({
+    mutationFn: async ({
+      id,
+      expectedVersion,
+    }: {
+      id: string
+      expectedVersion: number
+    }) => {
+      if (!publisherId) throw new Error("Not authenticated")
+      return api.publishers.reopenWebsite(publisherId, id, expectedVersion)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
+      toast.success(
+        "Website reopened. Its listing remains unavailable until review.",
+      )
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to reopen website")
+    },
+  })
 
   const filteredWebsites = websites.filter((site) => {
     const matchesSearch =
       site.url.toLowerCase().includes(search.toLowerCase()) ||
       site.niche?.toLowerCase().includes(search.toLowerCase())
-    const matchesArchived = showArchived ? true : site.status === "ACTIVE"
+    const matchesArchived = showArchived ? true : site.status !== "ARCHIVED"
     const matchesVerification =
       verificationFilter === "all" ||
       site.verificationStatus === verificationFilter
@@ -510,6 +563,30 @@ export default function WebsitesPage() {
                       <span className="text-xs text-muted-foreground">
                         {site.niche}
                       </span>
+                      <Badge
+                        className="mt-1 w-fit"
+                        variant={
+                          site.status === "ACTIVE"
+                            ? "success"
+                            : site.status === "PAUSED"
+                              ? "warning"
+                              : "secondary"
+                        }
+                      >
+                        Domain {site.status.toLowerCase()}
+                      </Badge>
+                      {site.moderation.active ? (
+                        <span className="mt-1 max-w-56 text-xs text-muted-foreground">
+                          {site.moderation.active.reasonCode
+                            ? moderationReasonLabel(
+                                site.moderation.active.reasonCode,
+                              )
+                            : "Reason unavailable"}
+                          {site.moderation.active.publisherMessage
+                            ? `: ${site.moderation.active.publisherMessage}`
+                            : ""}
+                        </span>
+                      ) : null}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -543,6 +620,15 @@ export default function WebsitesPage() {
                     >
                       {(site.marketplaceStatus ?? "DRAFT").replace(/_/g, " ")}
                     </Badge>
+                    {site.listingModeration?.active ? (
+                      <p className="mt-1 max-w-44 text-xs text-muted-foreground">
+                        {site.listingModeration.active.reasonCode
+                          ? moderationReasonLabel(
+                              site.listingModeration.active.reasonCode,
+                            )
+                          : "Reason unavailable"}
+                      </p>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     {(() => {
@@ -578,7 +664,9 @@ export default function WebsitesPage() {
                           <ShieldCheck className="h-4 w-4" />
                         </Button>
                       )}
-                      {site.marketplaceStatus === "DRAFT" && (
+                      {site.listingModeration?.allowedActions.includes(
+                        "SUBMIT_FOR_REVIEW",
+                      ) && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -593,7 +681,10 @@ export default function WebsitesPage() {
                           }
                           onClick={(e) => {
                             e.stopPropagation()
-                            submitMutation.mutate(site.id)
+                            submitMutation.mutate({
+                              id: site.id,
+                              expectedVersion: site.listingModeration!.version,
+                            })
                           }}
                         >
                           <CheckCircle className="h-4 w-4" />
@@ -609,16 +700,36 @@ export default function WebsitesPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          archiveMutation.mutate(site.id)
-                        }}
-                      >
-                        <Archive className="h-4 w-4" />
-                      </Button>
+                      {site.moderation.allowedActions.includes("ARCHIVE") ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Archive website"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setArchiveTarget(site)
+                          }}
+                        >
+                          <Archive className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                      {site.moderation.allowedActions.includes("REOPEN") ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Reopen website"
+                          disabled={reopenMutation.isPending}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            reopenMutation.mutate({
+                              id: site.id,
+                              expectedVersion: site.moderation.version,
+                            })
+                          }}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -645,6 +756,51 @@ export default function WebsitesPage() {
             : undefined
         }
       />
+
+      <Dialog
+        open={archiveTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setArchiveTarget(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archive website</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>
+              Archive <span className="font-medium">{archiveTarget?.url}</span>?
+            </p>
+            <p className="text-muted-foreground">
+              The domain and its listing will be unavailable to new buyers.
+              Reopening the domain or submitting its listing again starts a
+              fresh review; it never restores buyer visibility directly.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={archiveMutation.isPending}
+              onClick={() => setArchiveTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!archiveTarget || archiveMutation.isPending}
+              onClick={() =>
+                archiveTarget &&
+                archiveMutation.mutate({
+                  id: archiveTarget.id,
+                  expectedVersion: archiveTarget.moderation.version,
+                })
+              }
+            >
+              {archiveMutation.isPending ? "Archiving…" : "Archive website"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={!!verifyInstructions}

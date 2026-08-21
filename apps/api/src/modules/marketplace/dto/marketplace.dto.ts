@@ -1,7 +1,6 @@
 import {
   ListingLinkType,
   ListingLinkValidity,
-  ListingStatus,
   ServiceType,
 } from "@guestpost/database"
 import {
@@ -346,10 +345,6 @@ export class CreateListingDto {
   @IsString()
   type?: string
 
-  @IsOptional()
-  @IsEnum(ListingStatus)
-  status?: ListingStatus = ListingStatus.DRAFT
-
   // Phase 7: also optional; per-service prices live on `services[]`.
   @IsOptional()
   @Type(() => Number)
@@ -407,14 +402,6 @@ export class CreateListingDto {
   @IsNumber()
   @Min(1)
   revisionRounds?: number
-
-  @IsOptional()
-  @IsBoolean()
-  featured?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  verified?: boolean
 
   // allowGuestPost / allowNicheEdit removed in Phase 5 cleanup — multi-service
   // listings encode this via the presence of a ListingService row for each

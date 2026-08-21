@@ -1,6 +1,9 @@
 "use client"
 
-import type { MarketplaceListing } from "@guestpost/api-client"
+import type {
+  MarketplaceListing,
+  PublisherModerationProjection,
+} from "@guestpost/api-client"
 import {
   Badge,
   Button,
@@ -39,8 +42,15 @@ import {
 import Link from "next/link"
 import { useDeferredValue, useMemo, useState } from "react"
 import { toast } from "sonner"
+import { PublisherModerationNotice } from "../../../components/marketplace/moderation-notice"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
+
+type PublisherMarketplaceListing = MarketplaceListing & {
+  moderation?: PublisherModerationProjection
+}
+
+type PublisherLifecycleAction = "submit" | "pause" | "unpause" | "archive"
 
 const SERVICE_TYPES = [
   ["GUEST_POST", "Guest post"],
@@ -114,7 +124,7 @@ function formatMoney(value: number, currency = "USD") {
   }).format(Number(value))
 }
 
-function listingPhase(listing: MarketplaceListing) {
+function listingPhase(listing: PublisherMarketplaceListing) {
   return listing.lifecyclePhase ?? listing.status
 }
 
@@ -133,7 +143,7 @@ export default function PublisherListingsPage() {
     queryFn: () => api.marketplace.getPublisherListings(publisherId!),
     enabled: !!publisherId,
   })
-  const listings = listingsQ.data ?? []
+  const listings = (listingsQ.data ?? []) as PublisherMarketplaceListing[]
 
   const categories = useMemo(() => {
     const values = new Map<string, string>()
@@ -223,13 +233,19 @@ export default function PublisherListingsPage() {
     mutationFn: ({
       listingId,
       action,
+      expectedVersion,
     }: {
       listingId: string
-      action: "submit" | "pause" | "unpause"
+      action: PublisherLifecycleAction
+      expectedVersion: number
     }) => {
-      if (action === "submit") return api.marketplace.submitListing(listingId)
-      if (action === "pause") return api.marketplace.pauseListing(listingId)
-      return api.marketplace.unpauseListing(listingId)
+      if (action === "submit")
+        return api.marketplace.submitListing(listingId, expectedVersion)
+      if (action === "pause")
+        return api.marketplace.pauseListing(listingId, expectedVersion)
+      if (action === "unpause")
+        return api.marketplace.unpauseListing(listingId, expectedVersion)
+      return api.marketplace.archiveListing(listingId, expectedVersion)
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
@@ -239,7 +255,9 @@ export default function PublisherListingsPage() {
           ? "Listing submitted for review"
           : variables.action === "pause"
             ? "Listing paused"
-            : "Listing is live again",
+            : variables.action === "unpause"
+              ? "Listing is live again"
+              : "Listing archived",
       )
     },
     onError: (error: Error) => toast.error(error.message),
@@ -432,7 +450,11 @@ export default function PublisherListingsPage() {
                 listing={listing}
                 lifecyclePending={lifecycleMut.isPending}
                 onLifecycle={(action) =>
-                  lifecycleMut.mutate({ listingId: listing.id, action })
+                  lifecycleMut.mutate({
+                    listingId: listing.id,
+                    action,
+                    expectedVersion: listing.moderation!.version,
+                  })
                 }
               />
             ))}
@@ -502,9 +524,9 @@ function PublisherListingCard({
   lifecyclePending,
   onLifecycle,
 }: {
-  listing: MarketplaceListing
+  listing: PublisherMarketplaceListing
   lifecyclePending: boolean
-  onLifecycle: (action: "submit" | "pause" | "unpause") => void
+  onLifecycle: (action: PublisherLifecycleAction) => void
 }) {
   const phase = listingPhase(listing)
   const phaseInfo = PHASES[phase] ?? {
@@ -577,6 +599,10 @@ function PublisherListingCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-5 pt-5">
+        <PublisherModerationNotice
+          moderation={listing.moderation}
+          subject="listing"
+        />
         <div className="rounded-xl border bg-muted/20 p-4">
           <p className="text-sm font-medium">{phaseInfo.label}</p>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
@@ -625,26 +651,24 @@ function PublisherListingCard({
         </div>
         <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t pt-4">
           <div className="flex gap-2">
-            {phase === "READY_FOR_REVIEW" && (
+            {listing.moderation?.allowedActions.includes(
+              "SUBMIT_FOR_REVIEW",
+            ) && (
               <Button
                 size="sm"
-                disabled={lifecyclePending}
+                disabled={
+                  lifecyclePending ||
+                  !["READY_FOR_REVIEW", "REJECTED", "ARCHIVED"].includes(phase)
+                }
                 onClick={() => onLifecycle("submit")}
               >
-                <Send className="mr-2 h-3.5 w-3.5" /> Submit
+                <Send className="mr-2 h-3.5 w-3.5" />
+                {["REJECTED", "ARCHIVED"].includes(phase)
+                  ? "Resubmit"
+                  : "Submit"}
               </Button>
             )}
-            {phase === "REJECTED" && (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={lifecyclePending}
-                onClick={() => onLifecycle("submit")}
-              >
-                <RefreshCw className="mr-2 h-3.5 w-3.5" /> Resubmit
-              </Button>
-            )}
-            {phase === "PUBLISHED" && (
+            {listing.moderation?.allowedActions.includes("PAUSE") && (
               <Button
                 size="sm"
                 variant="outline"
@@ -654,7 +678,7 @@ function PublisherListingCard({
                 <Pause className="mr-2 h-3.5 w-3.5" /> Pause
               </Button>
             )}
-            {phase === "PAUSED" && (
+            {listing.moderation?.allowedActions.includes("RESTORE") && (
               <Button
                 size="sm"
                 variant="outline"
@@ -662,6 +686,16 @@ function PublisherListingCard({
                 onClick={() => onLifecycle("unpause")}
               >
                 Resume
+              </Button>
+            )}
+            {listing.moderation?.allowedActions.includes("ARCHIVE") && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={lifecyclePending}
+                onClick={() => onLifecycle("archive")}
+              >
+                <Archive className="mr-2 h-3.5 w-3.5" /> Archive
               </Button>
             )}
           </div>

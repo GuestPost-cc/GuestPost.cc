@@ -309,6 +309,7 @@ describe("runWebsiteReverifySweep", () => {
         findMany: jest.fn().mockResolvedValue([{ userId: "s1" }]),
       },
       marketplaceListing: {
+        count: jest.fn().mockResolvedValue(1),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       notification: { create: jest.fn().mockResolvedValue({}) },
@@ -467,7 +468,10 @@ describe("runWebsiteReverifySweep", () => {
         data: expect.objectContaining({ verificationStatus: "REVOKED" }),
       }),
     )
-    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalled()
+    expect(prisma.marketplaceListing.count).toHaveBeenCalledWith({
+      where: { websiteId: "w1", status: "APPROVED" },
+    })
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -635,6 +639,8 @@ describe("WebsitesService.submitForReview verification gate", () => {
 
   beforeEach(() => {
     prisma = {
+      $transaction: jest.fn((callback) => callback(prisma)),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "locked" }]),
       publisher: {
         findUnique: jest
           .fn()
@@ -645,12 +651,26 @@ describe("WebsitesService.submitForReview verification gate", () => {
           id: "w1",
           domain: "example.com",
           publisherId: "pub1",
+          isActive: true,
           verificationStatus: "VERIFIED",
         }),
       },
       marketplaceListing: {
         findFirst: jest.fn().mockResolvedValue({
           id: "l1",
+          publisherId: "pub1",
+          websiteId: "w1",
+          organizationId: "org1",
+          title: "Listing",
+          status: "DRAFT",
+          ownerType: "PUBLISHER",
+          moderationVersion: 0,
+          activeModerationAction: null,
+          activeModerationAuthority: null,
+          activeModerationReasonCode: null,
+          activeModerationMessage: null,
+          activeModerationPreviousStatus: null,
+          moderationResubmissionAllowed: false,
           categories: [{ categoryId: "category-1" }],
           language: "English",
           sportsGamingAllowed: false,
@@ -665,7 +685,39 @@ describe("WebsitesService.submitForReview verification gate", () => {
           description: "A complete buyer-facing marketplace description.",
           services: [{ id: "service-1" }],
         }),
-        update: jest.fn().mockResolvedValue({ id: "l1" }),
+        findUnique: jest.fn().mockImplementation(() =>
+          Promise.resolve({
+            id: "l1",
+            publisherId: "pub1",
+            websiteId: "w1",
+            status: "DRAFT",
+            ownerType: "PUBLISHER",
+            moderationVersion: 0,
+            activeModerationAction: null,
+            activeModerationAuthority: null,
+            activeModerationReasonCode: null,
+            activeModerationMessage: null,
+            activeModerationPreviousStatus: null,
+            moderationResubmissionAllowed: false,
+            categories: [{ categoryId: "category-1" }],
+            services: [{ id: "service-1" }],
+            language: "English",
+            sportsGamingAllowed: false,
+            pharmacyAllowed: false,
+            cryptoAllowed: false,
+            backlinkCount: 1,
+            linkType: "DOFOLLOW",
+            linkValidity: "PERMANENT",
+            googleNews: false,
+            markedSponsored: false,
+            foreignLanguageAllowed: false,
+            description: "A complete buyer-facing marketplace description.",
+          }),
+        ),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      moderationEvent: {
+        create: jest.fn().mockResolvedValue({ id: "event-1" }),
       },
       websiteMetric: {
         findMany: jest
@@ -686,25 +738,37 @@ describe("WebsitesService.submitForReview verification gate", () => {
       id: "w1",
       domain: "example.com",
       publisherId: "pub1",
+      isActive: true,
       verificationStatus: "PENDING_VERIFICATION",
     })
 
     await expect(
       service.submitForReview("pub1", "org1", "w1", user),
     ).rejects.toMatchObject({ response: { code: "WEBSITE_NOT_VERIFIED" } })
-    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
   })
 
   it("submits a draft listing after DNS ownership is verified", async () => {
     await expect(
       service.submitForReview("pub1", "org1", "w1", user),
     ).resolves.toEqual({ success: true })
-    expect(prisma.marketplaceListing.update).toHaveBeenCalledWith({
-      where: { id: "l1" },
-      data: { status: "PENDING_REVIEW" },
+    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalledWith({
+      where: { id: "l1", status: "DRAFT", moderationVersion: 0 },
+      data: expect.objectContaining({
+        status: "PENDING_REVIEW",
+        activeModerationAction: "SUBMIT_FOR_REVIEW",
+        activeModerationAuthority: "PUBLISHER",
+        moderationVersion: { increment: 1 },
+      }),
     })
+    expect(prisma.moderationEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: "SUBMIT_FOR_REVIEW" }),
+      }),
+    )
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({ action: "WEBSITE_SUBMITTED_FOR_REVIEW" }),
+      prisma,
     )
   })
 
@@ -716,7 +780,7 @@ describe("WebsitesService.submitForReview verification gate", () => {
     await expect(
       service.submitForReview("pub1", "org1", "w1", user),
     ).rejects.toMatchObject({ response: { code: "MANUAL_METRICS_REQUIRED" } })
-    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
   })
 })
 
@@ -730,7 +794,16 @@ describe("AdminService.updateListingStatus verification gate", () => {
   function makeListing(websiteStatus: string | null) {
     return {
       id: "l1",
+      websiteId: websiteStatus ? "w1" : null,
       status: "PENDING_REVIEW",
+      ownerType: websiteStatus ? "PUBLISHER" : "PLATFORM",
+      moderationVersion: 0,
+      activeModerationAction: "SUBMIT_FOR_REVIEW",
+      activeModerationAuthority: "PUBLISHER",
+      activeModerationReasonCode: "INITIAL_SUBMISSION",
+      activeModerationMessage: null,
+      activeModerationPreviousStatus: "DRAFT",
+      moderationResubmissionAllowed: false,
       title: "Listing",
       organizationId: "org1",
       publisherId: "pub1",
@@ -748,7 +821,12 @@ describe("AdminService.updateListingStatus verification gate", () => {
       markedSponsored: false,
       foreignLanguageAllowed: false,
       website: websiteStatus
-        ? { verificationStatus: websiteStatus, domain: "example.com" }
+        ? {
+            verificationStatus: websiteStatus,
+            domain: "example.com",
+            isActive: true,
+            managedByUserId: null,
+          }
         : null,
     }
   }
@@ -762,6 +840,9 @@ describe("AdminService.updateListingStatus verification gate", () => {
           .fn()
           .mockResolvedValue({ id: "l1", status: "APPROVED" }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      moderationEvent: {
+        create: jest.fn().mockResolvedValue({ id: "moderation-event-1" }),
       },
       $transaction: jest.fn(async (work: (tx: unknown) => unknown) =>
         work(prisma),
@@ -789,7 +870,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
     await expect(
       admin.updateListingStatus("l1", "APPROVED", {
         id: "admin1",
-        role: "OPERATIONS",
+        staffRole: "OPERATIONS",
       }),
     ).rejects.toMatchObject({ response: { code: "WEBSITE_NOT_VERIFIED" } })
     expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
@@ -801,7 +882,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
     )
     const res = await admin.updateListingStatus("l1", "APPROVED", {
       id: "admin1",
-      role: "OPERATIONS",
+      staffRole: "SUPER_ADMIN",
     })
     expect(res.status).toBe("APPROVED")
     expect(prisma.marketplaceListing.updateMany).toHaveBeenCalled()
@@ -811,7 +892,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
     prisma.marketplaceListing.findUnique.mockResolvedValue(makeListing(null))
     const res = await admin.updateListingStatus("l1", "APPROVED", {
       id: "admin1",
-      role: "OPERATIONS",
+      staffRole: "SUPER_ADMIN",
     })
     expect(res.status).toBe("APPROVED")
   })
@@ -824,7 +905,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
     await expect(
       admin.updateListingStatus("l1", "APPROVED", {
         id: "admin1",
-        staffRole: "OPERATIONS",
+        staffRole: "SUPER_ADMIN",
       }),
     ).rejects.toMatchObject({ response: { code: "NO_AVAILABLE_SERVICES" } })
     expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()

@@ -1,52 +1,47 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-08-14
+updated: 2026-08-21
 ---
 
 # Current focus
 
-The 2026-08-12 correctness and security hardening batch is merged and deployed
-at `main` SHA `512b851`. Neon production is fully migrated and the matching
-Render API is live in finance-locked mode. The complete Northflank worker fleet
-is intentionally stopped: the continuous realtime service is scaled to zero
-and both jobs have inactive schedules. None may resume until its protected
-environment and old deployment are replaced with the matching locked release.
-`Work/backlog.md` owns open work; `Work/risks.md`
-owns launch risks. Historical PR and rollout diaries were moved to
-`History/NOW-through-2026-08-11.md`.
+The 2026-08-21 marketplace trust-boundary hardening is implemented and locally
+verified, pending PR review and deployment. It separates moderation authority
+from listing lifecycle, keeps website availability independent, makes buyer
+metric provenance authoritative-only, and applies one active+verified+approved
+catalog predicate from discovery through order locking.
+
+The prior 2026-08-12 correctness/security release remains deployed at `main`
+SHA `512b851`; Neon is fully migrated for that release and Render remains live
+in finance-locked mode. The Northflank worker fleet remains intentionally
+stopped until its protected environment and old deployment are replaced with
+the matching locked release. `Work/backlog.md` owns open work and
+`Work/risks.md` owns launch risks.
 
 ## Implemented in the active batch
 
-- Removed phantom `OrderStatus.SETTLED`; `COMPLETED` is the sole successful
-  terminal order status. Settlement approval, return-to-review, and release now
-  have distinct relationally bound events.
-- Added server-computed settlement eligibility for Finance and aligned release
-  ordering and Decimal-only balance invariants.
-- Made emergency cancellation serializable and order-locked. Unpaid reservation
-  release now writes exact ledger evidence and reconciliation checks it.
-- Post-publication publisher refunds require an explicit compensation
-  disposition, including `NONE`, with immutable ledger/event evidence and debt
-  netting.
-- Added authenticated Stripe deposit recovery with fenced leases, append-only
-  bounded evidence, and the same serializable finalizer as signed webhooks.
-- Added payout-encryption v2 envelopes with immutable-context AAD, key identity,
-  legacy decrypt-only reads, resumable CAS rotation, verification, and a
-  deployment runbook.
-- Made the 30-second auth projection presentation-only. Every protected request
-  resolves durable tenant, membership, role, and permission authority; money
-  mutations recheck relevant membership inside their locked transaction.
-- Quarantined Wise completely from runtime registration and legacy polling.
-- Replaced duplicated order-transition writers with one mandatory status/version
-  CAS and modeled payment capture/submission as one externally visible command.
-- Replaced worker source-string contracts with typed runtime plans and
-  dependency-injected behavioral boot/shutdown tests.
-- Added strict shared browser API-origin resolution and a self-starting,
-  CI-gated Chromium onboarding harness. Existing financial API integration
-  suites remain the money-invariant system tests.
-- Added missing CSRF compatibility-path tests; the reported missing-Origin
-  bypass was not present because the primary middleware already rejects missing
-  Origin and Referer for unsafe cookie-authenticated requests.
+- Added immutable `ModerationEvent` history plus current projections and
+  optimistic versions for listings and websites. The migration conservatively
+  backfills legacy holds without guessing their prior state.
+- Replaced generic lifecycle mutations with explicit, locked staff/publisher
+  policies. Operations is assignment-bounded, Finance is read-only, Super Admin
+  owns exceptional reopen/archive authority, and publishers cannot clear staff
+  holds unless resubmission is explicitly enabled.
+- Made website pause/archive independent of listing status, and required
+  APPROVED + active + VERIFIED across every buyer discovery path and checkout.
+  Orderability is revalidated while locking Website, MarketplaceListing, then
+  ListingService.
+- Restricted buyer metrics to current exact provider/key/direct-source evidence.
+  Manual, staff, import, stale, mismatched, and unknown values remain available
+  to authorized internal workflows only.
+- Replaced broad public spreads with explicit allowlist serializers, including
+  reduced review/publisher/service shapes and deposit-gated URLs.
+- Added typed moderation commands/projections and capability-driven admin and
+  publisher UI with reasons, messages, version conflicts, confirmations, and
+  publisher-safe history.
+- Removed publisher create-time status/featured/verified injection and routed
+  legacy archive paths through the same moderation authority.
 
 ## Deliberately deferred
 
@@ -72,15 +67,20 @@ owns launch risks. Historical PR and rollout diaries were moved to
 
 ## Validation state
 
-The frozen-lockfile install is clean and does not change `pnpm-lock.yaml`.
-Repository type, format, lint, dependency-policy, health, API, worker, shared,
-auth, integrations, API-client, and UI gates pass. PR #100, PR #101, and final
-`main` push CI run `31729969759` passed migration apply/status, the populated
-historical-data rehearsal, integration-template migration, all database-backed
-financial suites, every production build, UI coverage, and Chromium E2E.
-Neon production has all 75 migrations; the exact-clone and production
-postflights matched with zero anomaly findings. Render API readiness reports
-database and Redis healthy on exact SHA `512b851`.
+The marketplace batch passes all 1,693 API unit tests, all 459 shared tests,
+all 90 API-client tests, API Nest build, Prisma format/validate/generate,
+TypeScript checks for API/database/shared/API-client/admin/portal/publisher,
+full ESLint for the three affected apps, Biome for every changed source file,
+and `git diff --check`. The new migration has not been applied to a live
+database; PR CI and a populated-clone migration rehearsal remain the next gates.
+
+For the preceding production release, the frozen-lockfile install remained
+clean. PR #100, PR #101, and final `main` push CI run `31729969759` passed
+migration apply/status, the populated historical-data rehearsal,
+integration-template migration, all database-backed financial suites, every
+production build, UI coverage, and Chromium E2E. Neon production has all 75
+pre-marketplace migrations; Render API readiness reports database and Redis
+healthy on exact SHA `512b851`.
 
 The final topology audit found the continuous Northflank `guestpost-worker`
 still running one replica of incompatible SHA `0e68af7` after the migration.
@@ -95,13 +95,18 @@ image safe to restart.
 
 ## Next actions
 
-1. Restore/upgrade Upstash request capacity, then re-authenticate Northflank and
+1. Review and merge the marketplace hardening PR only after CI passes. Rehearse
+   `20260821120000_marketplace_moderation` on a populated clone, verify legacy
+   PAUSED/ARCHIVED/inactive backfill counts and current-event pointers, hard-drain
+   incompatible writers, deploy the migration before the matching API/apps, and
+   monitor moderation conflicts/outbox delivery and unavailable-order rejection.
+2. Restore/upgrade Upstash request capacity, then re-authenticate Northflank and
    configure the protected locked-mode environment for `guestpost-worker`,
    `guestpost-on-demand`, and `guestpost-maintenance-dispatch`. Deploy exact SHA
    `512b851`, verify each workload's SHA/mode/environment, canary realtime at one
    replica before scaling, and only then resume schedules one at a time.
-2. Monitor Render readiness and Upstash usage; keep finance, payouts, and new
+3. Monitor Render readiness and Upstash usage; keep finance, payouts, and new
    deposits disabled until the operational/provider gates are explicitly met.
-3. Keep staff governance and managed KMS/HSM as explicit follow-up gates rather
+4. Keep staff governance and managed KMS/HSM as explicit follow-up gates rather
    than silently treating this schema/application cutover as paid-launch
    approval.

@@ -584,6 +584,7 @@ model User {
   suspensionsIssued             User[]                        @relation("UserSuspensionsIssued")
   websiteImportBatches          WebsiteImportBatch[]
   publisherCompensationsDecided PublisherCompensation[]       @relation("PublisherCompensationDecider")
+  moderationEvents              ModerationEvent[]             @relation("ModerationEventActor")
 
   @@index([userType, banned])
   @@index([suspendedByUserId])
@@ -926,6 +927,16 @@ model Website {
   verificationVersion           Int                       @default(0)
   importBatchId                 String?
 
+  // Active staff/publisher intervention projection. Listing lifecycle is
+  // intentionally not overloaded with domain availability: pausing a domain
+  // leaves every associated listing in its legitimate business state.
+  activeModerationAction         ModerationAction?
+  activeModerationAuthority      ModerationAuthority?
+  activeModerationReasonCode     ModerationReasonCode?
+  activeModerationMessage        String?               @db.VarChar(2000)
+  activeModerationPreviousActive Boolean?
+  moderationVersion              Int                   @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -937,6 +948,7 @@ model Website {
   websiteIntegrations WebsiteIntegration[]
   metricsHistory      WebsiteMetric[]
   importBatch         WebsiteImportBatch?  @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  moderationEvents    ModerationEvent[]
 
   @@index([publisherId])
   @@index([isActive])
@@ -2751,6 +2763,54 @@ enum ListingStatus {
   ARCHIVED
 }
 
+// ListingStatus remains the commercial lifecycle. These enums describe who
+// imposed a moderation intervention and why, so a publisher lifecycle command
+// can never clear a staff decision merely because the visible status matches.
+enum ModerationAction {
+  SUBMIT_FOR_REVIEW
+  APPROVE
+  REQUEST_CHANGES
+  PAUSE
+  RESTORE
+  ARCHIVE
+  REOPEN
+  ALLOW_RESUBMISSION
+  DENY_RESUBMISSION
+}
+
+enum ModerationScope {
+  LISTING
+  WEBSITE
+}
+
+enum ModerationAuthority {
+  PUBLISHER
+  OPERATIONS
+  SUPER_ADMIN
+}
+
+enum ModerationReasonCode {
+  INITIAL_SUBMISSION
+  CORRECTIONS_COMPLETE
+  APPROVED_AFTER_REVIEW
+  INCOMPLETE_POLICY
+  INCOMPLETE_LISTING
+  CONTENT_QUALITY
+  PRICING_OR_SERVICE
+  DOMAIN_VERIFICATION
+  POLICY_VIOLATION
+  SECURITY_RISK
+  FRAUD_RISK
+  INVENTORY_UNAVAILABLE
+  OPERATIONAL_HOLD
+  PUBLISHER_REQUEST
+  ISSUE_RESOLVED
+  EMERGENCY_OVERRIDE
+  DUPLICATE_OR_INVALID
+  OTHER
+  LEGACY_ORIGIN_UNKNOWN
+}
+
 enum ListingFulfillmentType {
   INTERNAL
   PUBLISHER
@@ -2878,6 +2938,16 @@ model MarketplaceListing {
   // Organization reference (for INTERNAL and publisher listings)
   organizationId String?
 
+  // Current intervention projection. The append-only ModerationEvent rows are
+  // the forensic history; these columns are the fast authorization boundary.
+  activeModerationAction         ModerationAction?
+  activeModerationAuthority      ModerationAuthority?
+  activeModerationReasonCode     ModerationReasonCode?
+  activeModerationMessage        String?               @db.VarChar(2000)
+  activeModerationPreviousStatus ListingStatus?
+  moderationResubmissionAllowed  Boolean               @default(false)
+  moderationVersion              Int                   @default(0)
+
   // Timestamps
   publishedAt DateTime?
   expiresAt   DateTime?
@@ -2889,17 +2959,18 @@ model MarketplaceListing {
   organization Organization?                @relation(fields: [organizationId], references: [id])
   categories   MarketplaceListingCategory[]
 
-  tags       MarketplaceListingTag[]
-  images     MarketplaceListingImage[]
+  tags             MarketplaceListingTag[]
+  images           MarketplaceListingImage[]
   // pricingTiers removed in Phase 5 — replaced by per-service prices on the
   // ListingService child table.
-  reviews    MarketplaceReview[]
-  favorites  MarketplaceFavorite[]
-  savedLists MarketplaceSavedListItem[]
-  views      MarketplaceListingView[]
-  clicks     MarketplaceListingClick[]
-  services   ListingService[]
-  orders     Order[]
+  reviews          MarketplaceReview[]
+  favorites        MarketplaceFavorite[]
+  savedLists       MarketplaceSavedListItem[]
+  views            MarketplaceListingView[]
+  clicks           MarketplaceListingClick[]
+  services         ListingService[]
+  orders           Order[]
+  moderationEvents ModerationEvent[]
 
   // Phase X: Partial unique index `MarketplaceListing_websiteId_active_key`
   // exists at the DB level via custom migration 20260713120000. Not represented
@@ -2916,6 +2987,41 @@ model MarketplaceListing {
   // Sorting/filtering by price now hits the ListingService(availability,
   // serviceType, price) composite index.
   @@index([ownerType, status])
+  @@index([activeModerationAuthority, activeModerationAction])
+}
+
+// Immutable moderation evidence. Runtime and database guards reject UPDATE or
+// DELETE; a later decision is represented by a new row and a new active
+// projection on MarketplaceListing or Website.
+model ModerationEvent {
+  id                        String               @id @default(cuid())
+  scope                     ModerationScope
+  listingId                 String?
+  websiteId                 String?
+  action                    ModerationAction
+  reasonCode                ModerationReasonCode
+  publisherMessage          String?              @db.VarChar(2000)
+  internalNote              String?              @db.VarChar(2000)
+  actorUserId               String?
+  actorStaffRole            StaffRole?
+  authority                 ModerationAuthority
+  previousStatus            ListingStatus?
+  resultingStatus           ListingStatus?
+  previousModerationAction  ModerationAction?
+  resultingModerationAction ModerationAction?
+  previousWebsiteActive     Boolean?
+  resultingWebsiteActive    Boolean?
+  resubmissionAllowed       Boolean              @default(false)
+  createdAt                 DateTime             @default(now())
+
+  actor   User?               @relation("ModerationEventActor", fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  listing MarketplaceListing? @relation(fields: [listingId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  website Website?            @relation(fields: [websiteId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([listingId, createdAt])
+  @@index([websiteId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([scope, action, createdAt])
 }
 
 // A site can cover several niches, but marketplace quality controls cap the

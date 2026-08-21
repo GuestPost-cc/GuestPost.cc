@@ -1,6 +1,10 @@
 import {
   isMarketplaceAlgorithmicMetricSource,
+  isMarketplaceAuthoritativeMetric,
+  isMarketplaceAuthoritativeMetricSource,
   MARKETPLACE_ALGORITHMIC_METRIC_SOURCES,
+  MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES,
+  marketplaceAuthoritativeMetricSourcesFor,
   websiteMetricSourceDisclosure,
 } from "../website-metric-provenance"
 
@@ -54,10 +58,90 @@ describe("marketplace algorithmic metric source policy", () => {
 
   it.each([
     "PUBLISHER_MANUAL",
+    "STAFF_MANUAL",
+    "ADMIN_IMPORT",
     "FUTURE_UNREVIEWED_SOURCE",
     null,
     undefined,
   ])("fails closed for %s", (source) => {
     expect(isMarketplaceAlgorithmicMetricSource(source)).toBe(false)
+  })
+})
+
+describe("authoritative public marketplace metric policy", () => {
+  it("keeps public display and algorithmic source allowlists identical", () => {
+    expect(MARKETPLACE_ALGORITHMIC_METRIC_SOURCES).toBe(
+      MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES,
+    )
+  })
+
+  it.each(
+    MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES,
+  )("recognizes direct provider source %s", (source) => {
+    expect(isMarketplaceAuthoritativeMetricSource(source)).toBe(true)
+  })
+
+  it.each([
+    {
+      key: "AHREFS_DOMAIN_RATING",
+      provider: "AHREFS",
+      source: "AHREFS_FREE_API",
+    },
+    {
+      key: "AHREFS_DOMAIN_RATING",
+      provider: "AHREFS",
+      source: "AHREFS_PAID_API",
+    },
+    {
+      key: "AHREFS_ORGANIC_TRAFFIC",
+      provider: "AHREFS",
+      source: "AHREFS_PAID_API",
+    },
+    {
+      key: "MOZ_DOMAIN_AUTHORITY",
+      provider: "MOZ",
+      source: "MOZ_PAID_API",
+    },
+    {
+      key: "OPEN_PAGE_RANK_REFERRING_DOMAINS",
+      provider: "OPEN_PAGE_RANK",
+      source: "OPEN_PAGE_RANK_API",
+    },
+  ])("accepts reviewed identity $key/$provider/$source", (metric) => {
+    expect(isMarketplaceAuthoritativeMetric(metric)).toBe(true)
+  })
+
+  it.each([
+    {
+      key: "AHREFS_ORGANIC_TRAFFIC",
+      provider: "AHREFS",
+      source: "AHREFS_FREE_API",
+    },
+    {
+      key: "AHREFS_DOMAIN_RATING",
+      provider: "MOZ",
+      source: "AHREFS_FREE_API",
+    },
+    {
+      key: "MOZ_DOMAIN_AUTHORITY",
+      provider: "MOZ",
+      source: "PUBLISHER_MANUAL",
+    },
+    {
+      key: "FUTURE_METRIC",
+      provider: "AHREFS",
+      source: "AHREFS_PAID_API",
+    },
+  ])("rejects unreviewed identity $key/$provider/$source", (metric) => {
+    expect(isMarketplaceAuthoritativeMetric(metric)).toBe(false)
+  })
+
+  it("returns no sources for a mismatched provider", () => {
+    expect(
+      marketplaceAuthoritativeMetricSourcesFor(
+        "MOZ_DOMAIN_AUTHORITY",
+        "AHREFS",
+      ),
+    ).toEqual([])
   })
 })

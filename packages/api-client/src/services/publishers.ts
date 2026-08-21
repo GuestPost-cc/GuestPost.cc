@@ -1,4 +1,5 @@
 import type { HttpClient } from "../client"
+import type { PublisherModerationProjection } from "../marketplace-moderation"
 
 export interface PublisherWebsiteService {
   id: string
@@ -38,6 +39,7 @@ export interface PublisherWebsiteListing {
   markedSponsored?: boolean | null
   foreignLanguageAllowed?: boolean | null
   services: PublisherWebsiteService[]
+  moderation: PublisherModerationProjection
   createdAt?: string
   updatedAt?: string
 }
@@ -53,6 +55,7 @@ export interface PublisherWebsiteResponse {
   metrics?: { dr?: number; traffic?: number } | null
   domainMetrics?: WebsiteDomainMetrics
   isActive: boolean
+  moderation: PublisherModerationProjection
   verificationStatus:
     | "PENDING_VERIFICATION"
     | "VERIFIED"
@@ -176,15 +179,43 @@ export class PublishersService {
     })
   }
 
+  /** @deprecated Use archiveWebsite so the audited versioned command is used. */
   deleteWebsite(publisherId: string, websiteId: string): Promise<any> {
     return this.client.delete(
       `/publishers/${publisherId}/websites/${websiteId}`,
     )
   }
 
-  submitForReview(publisherId: string, websiteId: string): Promise<any> {
-    return this.client.post(
+  archiveWebsite(
+    publisherId: string,
+    websiteId: string,
+    expectedVersion: number,
+  ): Promise<PublisherWebsiteResponse> {
+    return this.client.post<PublisherWebsiteResponse>(
+      `/publishers/${publisherId}/websites/${websiteId}/archive`,
+      { json: { expectedVersion } },
+    )
+  }
+
+  reopenWebsite(
+    publisherId: string,
+    websiteId: string,
+    expectedVersion: number,
+  ): Promise<PublisherWebsiteResponse> {
+    return this.client.post<PublisherWebsiteResponse>(
+      `/publishers/${publisherId}/websites/${websiteId}/reopen`,
+      { json: { expectedVersion } },
+    )
+  }
+
+  submitForReview(
+    publisherId: string,
+    websiteId: string,
+    expectedVersion: number,
+  ): Promise<PublisherWebsiteResponse> {
+    return this.client.post<PublisherWebsiteResponse>(
       `/publishers/${publisherId}/websites/${websiteId}/submit`,
+      { json: { expectedVersion } },
     )
   }
 

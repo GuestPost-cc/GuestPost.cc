@@ -123,6 +123,7 @@ export const ModelName = {
   MarketplaceCategory: 'MarketplaceCategory',
   MarketplaceTag: 'MarketplaceTag',
   MarketplaceListing: 'MarketplaceListing',
+  ModerationEvent: 'ModerationEvent',
   MarketplaceListingCategory: 'MarketplaceListingCategory',
   ListingService: 'ListingService',
   MarketplaceListingTag: 'MarketplaceListingTag',
@@ -383,6 +384,12 @@ export const WebsiteScalarFieldEnum = {
   trustScore: 'trustScore',
   verificationVersion: 'verificationVersion',
   importBatchId: 'importBatchId',
+  activeModerationAction: 'activeModerationAction',
+  activeModerationAuthority: 'activeModerationAuthority',
+  activeModerationReasonCode: 'activeModerationReasonCode',
+  activeModerationMessage: 'activeModerationMessage',
+  activeModerationPreviousActive: 'activeModerationPreviousActive',
+  moderationVersion: 'moderationVersion',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1582,6 +1589,13 @@ export const MarketplaceListingScalarFieldEnum = {
   publisherId: 'publisherId',
   websiteId: 'websiteId',
   organizationId: 'organizationId',
+  activeModerationAction: 'activeModerationAction',
+  activeModerationAuthority: 'activeModerationAuthority',
+  activeModerationReasonCode: 'activeModerationReasonCode',
+  activeModerationMessage: 'activeModerationMessage',
+  activeModerationPreviousStatus: 'activeModerationPreviousStatus',
+  moderationResubmissionAllowed: 'moderationResubmissionAllowed',
+  moderationVersion: 'moderationVersion',
   publishedAt: 'publishedAt',
   expiresAt: 'expiresAt',
   createdAt: 'createdAt',
@@ -1589,6 +1603,31 @@ export const MarketplaceListingScalarFieldEnum = {
 } as const
 
 export type MarketplaceListingScalarFieldEnum = (typeof MarketplaceListingScalarFieldEnum)[keyof typeof MarketplaceListingScalarFieldEnum]
+
+
+export const ModerationEventScalarFieldEnum = {
+  id: 'id',
+  scope: 'scope',
+  listingId: 'listingId',
+  websiteId: 'websiteId',
+  action: 'action',
+  reasonCode: 'reasonCode',
+  publisherMessage: 'publisherMessage',
+  internalNote: 'internalNote',
+  actorUserId: 'actorUserId',
+  actorStaffRole: 'actorStaffRole',
+  authority: 'authority',
+  previousStatus: 'previousStatus',
+  resultingStatus: 'resultingStatus',
+  previousModerationAction: 'previousModerationAction',
+  resultingModerationAction: 'resultingModerationAction',
+  previousWebsiteActive: 'previousWebsiteActive',
+  resultingWebsiteActive: 'resultingWebsiteActive',
+  resubmissionAllowed: 'resubmissionAllowed',
+  createdAt: 'createdAt'
+} as const
+
+export type ModerationEventScalarFieldEnum = (typeof ModerationEventScalarFieldEnum)[keyof typeof ModerationEventScalarFieldEnum]
 
 
 export const MarketplaceListingCategoryScalarFieldEnum = {

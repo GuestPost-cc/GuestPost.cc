@@ -1,5 +1,8 @@
 import {
   ListingStatus,
+  ModerationAction,
+  ModerationAuthority,
+  ModerationReasonCode,
   Prisma,
   ServiceAvailability,
   type ServiceType,
@@ -8,15 +11,20 @@ import {
   WebsiteMetricStatus,
 } from "@guestpost/database"
 import {
+  buildModerationProjection,
   computeListingPhase,
-  isMarketplaceAlgorithmicMetricSource,
-  MARKETPLACE_ALGORITHMIC_METRIC_SOURCES,
+  getPublisherListingLifecycleActions,
+  getStaffListingModerationActions,
+  getStaffWebsiteModerationActions,
+  isMarketplaceAuthoritativeMetric,
+  marketplaceAuthoritativeMetricSourcesFor,
   normalizePositiveUsdMoney,
   QUEUES,
   USD_CURRENCY,
 } from "@guestpost/shared"
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -30,7 +38,10 @@ import {
 } from "../../common/utils/marketplace-categories"
 import { slugify } from "../../common/utils/slugify"
 import { QueueService } from "../queues/queue.service"
-import { serializeMarketplaceDomainMetrics } from "../websites/website-metrics.service"
+import {
+  serializeMarketplaceDomainMetrics,
+  serializePublicMarketplaceDomainMetrics,
+} from "../websites/website-metrics.service"
 import {
   AddToSavedListDto,
   CreateListingDto,
@@ -61,8 +72,23 @@ const publicWebsiteInclude = {
 
 const MAX_CANONICAL_ORGANIC_TRAFFIC = 2_147_483_647
 const MAX_CANONICAL_DOMAIN_RATING = 100
-const MARKETPLACE_ALGORITHMIC_METRIC_SOURCE_SQL = Prisma.join(
-  MARKETPLACE_ALGORITHMIC_METRIC_SOURCES.map(
+const AUTHORITATIVE_ORGANIC_TRAFFIC_SOURCES =
+  marketplaceAuthoritativeMetricSourcesFor(
+    WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+    WebsiteMetricProvider.AHREFS,
+  )
+const AUTHORITATIVE_DOMAIN_RATING_SOURCES =
+  marketplaceAuthoritativeMetricSourcesFor(
+    WebsiteMetricKey.AHREFS_DOMAIN_RATING,
+    WebsiteMetricProvider.AHREFS,
+  )
+const AUTHORITATIVE_ORGANIC_TRAFFIC_SOURCE_SQL = Prisma.join(
+  AUTHORITATIVE_ORGANIC_TRAFFIC_SOURCES.map(
+    (source) => Prisma.sql`${source}::"WebsiteMetricSource"`,
+  ),
+)
+const AUTHORITATIVE_DOMAIN_RATING_SOURCE_SQL = Prisma.join(
+  AUTHORITATIVE_DOMAIN_RATING_SOURCES.map(
     (source) => Prisma.sql`${source}::"WebsiteMetricSource"`,
   ),
 )
@@ -108,7 +134,14 @@ export class MarketplaceService {
     return new Prisma.Decimal(normalized)
   }
 
-  private projectDomainMetrics(website: any) {
+  private projectPublicDomainMetrics(website: any, asOf = new Date()) {
+    const metrics = Array.isArray(website?.metricsHistory)
+      ? website.metricsHistory
+      : []
+    return serializePublicMarketplaceDomainMetrics(metrics, asOf)
+  }
+
+  private projectInternalDomainMetrics(website: any) {
     const metrics = Array.isArray(website?.metricsHistory)
       ? website.metricsHistory
       : []
@@ -119,7 +152,7 @@ export class MarketplaceService {
     return {
       key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
       provider: WebsiteMetricProvider.AHREFS,
-      source: { in: [...MARKETPLACE_ALGORITHMIC_METRIC_SOURCES] },
+      source: { in: [...AUTHORITATIVE_ORGANIC_TRAFFIC_SOURCES] },
       status: WebsiteMetricStatus.CURRENT,
       value: {
         gte: minValue,
@@ -137,7 +170,7 @@ export class MarketplaceService {
     return {
       key: WebsiteMetricKey.AHREFS_DOMAIN_RATING,
       provider: WebsiteMetricProvider.AHREFS,
-      source: { in: [...MARKETPLACE_ALGORITHMIC_METRIC_SOURCES] },
+      source: { in: [...AUTHORITATIVE_DOMAIN_RATING_SOURCES] },
       status: WebsiteMetricStatus.CURRENT,
       value: { gte: minValue, lte: maxValue },
       OR: [{ expiresAt: null }, { expiresAt: { gt: asOf } }],
@@ -158,7 +191,7 @@ export class MarketplaceService {
       WHERE metric."websiteId" = ${websiteId}
         AND metric."key" = ${WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC}::"WebsiteMetricKey"
         AND metric."provider" = ${WebsiteMetricProvider.AHREFS}::"WebsiteMetricProvider"
-        AND metric."source" IN (${MARKETPLACE_ALGORITHMIC_METRIC_SOURCE_SQL})
+        AND metric."source" IN (${AUTHORITATIVE_ORGANIC_TRAFFIC_SOURCE_SQL})
         AND metric."status" = ${WebsiteMetricStatus.CURRENT}::"WebsiteMetricStatus"
         AND (metric."expiresAt" IS NULL OR metric."expiresAt" > ${asOf})
         AND metric."value" BETWEEN 0 AND ${MAX_CANONICAL_ORGANIC_TRAFFIC}
@@ -181,7 +214,7 @@ export class MarketplaceService {
       WHERE metric."websiteId" = ${websiteId}
         AND metric."key" = ${WebsiteMetricKey.AHREFS_DOMAIN_RATING}::"WebsiteMetricKey"
         AND metric."provider" = ${WebsiteMetricProvider.AHREFS}::"WebsiteMetricProvider"
-        AND metric."source" IN (${MARKETPLACE_ALGORITHMIC_METRIC_SOURCE_SQL})
+        AND metric."source" IN (${AUTHORITATIVE_DOMAIN_RATING_SOURCE_SQL})
         AND metric."status" = ${WebsiteMetricStatus.CURRENT}::"WebsiteMetricStatus"
         AND (metric."expiresAt" IS NULL OR metric."expiresAt" > ${asOf})
         AND metric."value" BETWEEN 0 AND ${MAX_CANONICAL_DOMAIN_RATING}
@@ -198,7 +231,7 @@ export class MarketplaceService {
           (item: any) =>
             item.key === WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC &&
             item.provider === WebsiteMetricProvider.AHREFS &&
-            isMarketplaceAlgorithmicMetricSource(item.source) &&
+            isMarketplaceAuthoritativeMetric(item) &&
             item.status === WebsiteMetricStatus.CURRENT &&
             (!item.expiresAt ||
               new Date(item.expiresAt).getTime() > asOf.getTime()),
@@ -222,37 +255,59 @@ export class MarketplaceService {
     websiteUnlocked = false,
     metricsAsOf = new Date(),
   ) {
-    const {
-      websiteUrl,
-      sampleUrl,
-      signupUrl,
-      organizationId,
-      publisherId,
-      semrushData,
-      metricsData,
-      trafficData,
-      domainRating: _legacyDomainRating,
-      domainAuthority: _legacyDomainAuthority,
-      referringDomains: _legacyReferringDomains,
-      spamScore: _legacySpamScore,
-      publisher,
-      ownerType,
-      services,
-      website,
-      status,
-      categories: categoryLinks,
-      ...rest
-    } = listing
-
-    const categories = Array.isArray(categoryLinks)
-      ? categoryLinks.map((link: any) => link.category ?? link)
+    const categories = Array.isArray(listing.categories)
+      ? listing.categories.map((link: any) => {
+          const category = link.category ?? link
+          return {
+            id: category.id,
+            name: category.name,
+            slug: category.slug,
+          }
+        })
       : []
+    const tags = Array.isArray(listing.tags)
+      ? listing.tags.map((link: any) => {
+          const tag = link.tag ?? link
+          return { id: tag.id, name: tag.name, slug: tag.slug }
+        })
+      : []
+    const images = Array.isArray(listing.images)
+      ? listing.images.map((image: any) => ({
+          url: image.url,
+          alt: image.alt ?? null,
+          isPrimary: Boolean(image.isPrimary),
+          sortOrder: image.sortOrder ?? 0,
+        }))
+      : []
+    const reviews = Array.isArray(listing.reviews)
+      ? listing.reviews
+          .filter(
+            (review: any) =>
+              typeof review.id === "string" &&
+              typeof review.rating === "number" &&
+              typeof review.content === "string",
+          )
+          .map((review: any) => ({
+            id: review.id,
+            rating: review.rating,
+            title: review.title ?? null,
+            content: review.content,
+            createdAt: review.createdAt,
+            user: {
+              name: review.user?.name ?? null,
+              image: review.user?.image ?? null,
+            },
+          }))
+      : []
+    const ownerType = listing.ownerType ?? "PUBLISHER"
+    const website = listing.website
+    const status = listing.status
 
     // Phase 6 derived UI phase. Computed from (status, ownerType, website
     // verification, count of AVAILABLE services) — single source of truth
     // for "what state is this listing in" across all three apps.
-    const availableServices = Array.isArray(services)
-      ? services.filter((s: any) => s.availability === "AVAILABLE")
+    const availableServices = Array.isArray(listing.services)
+      ? listing.services.filter((s: any) => s.availability === "AVAILABLE")
       : []
     const lifecyclePhase = computeListingPhase({
       status: status as any,
@@ -272,19 +327,64 @@ export class MarketplaceService {
       new Set(availableServices.map((s: any) => s.serviceType)),
     )
     return {
-      ...rest,
+      // This is an intentional allowlist. Never spread a Prisma listing row at
+      // a customer boundary: new moderation, ownership, metric, or fulfillment
+      // columns must be reviewed before they can become public API fields.
+      id: listing.id,
+      title: listing.title,
+      slug: listing.slug,
+      description: listing.description,
+      shortDescription: listing.shortDescription ?? null,
+      status,
+      fulfillmentType: listing.fulfillmentType,
+      ownerType,
+      currency: listing.currency,
+      priceType: listing.priceType,
+      minPrice: listing.minPrice == null ? null : Number(listing.minPrice),
+      maxPrice: listing.maxPrice == null ? null : Number(listing.maxPrice),
+      country: listing.country ?? null,
+      language: listing.language ?? null,
+      countries: Array.isArray(listing.countries) ? listing.countries : [],
+      languages: Array.isArray(listing.languages) ? listing.languages : [],
+      featured: Boolean(listing.featured),
+      verified: Boolean(listing.verified),
+      doFollowOnly: Boolean(listing.doFollowOnly),
+      sportsGamingAllowed: listing.sportsGamingAllowed ?? null,
+      pharmacyAllowed: listing.pharmacyAllowed ?? null,
+      cryptoAllowed: listing.cryptoAllowed ?? null,
+      backlinkCount: listing.backlinkCount ?? null,
+      linkType: listing.linkType ?? null,
+      linkValidity: listing.linkValidity ?? null,
+      googleNews: listing.googleNews ?? null,
+      markedSponsored: listing.markedSponsored ?? null,
+      foreignLanguageAllowed: listing.foreignLanguageAllowed ?? null,
+      websiteId: listing.websiteId ?? null,
+      publishedAt: listing.publishedAt ?? null,
+      expiresAt: listing.expiresAt ?? null,
+      createdAt: listing.createdAt,
+      updatedAt: listing.updatedAt,
+      tags,
+      images,
+      reviews,
+      image: typeof listing.image === "string" ? listing.image : null,
+      avgRating:
+        typeof listing.avgRating === "number" ? listing.avgRating : null,
+      reviewCount:
+        typeof listing.reviewCount === "number"
+          ? listing.reviewCount
+          : reviews.length,
+      isFavorited: Boolean(listing.isFavorited),
       // Never surface a legacy GA4-derived listing.traffic value. The only
       // public traffic fact during the Google quarantine is the normalized
       // source-aware Ahrefs metric tied to this Website.
       traffic: this.projectCanonicalOrganicTraffic(website, metricsAsOf),
-      websiteUrl: websiteUnlocked ? websiteUrl : null,
-      sampleUrl: websiteUnlocked ? sampleUrl : null,
-      signupUrl: websiteUnlocked ? signupUrl : null,
+      websiteUrl: websiteUnlocked ? (listing.websiteUrl ?? null) : null,
+      sampleUrl: websiteUnlocked ? (listing.sampleUrl ?? null) : null,
+      signupUrl: websiteUnlocked ? (listing.signupUrl ?? null) : null,
       websiteAccess: {
         unlocked: websiteUnlocked,
         reason: websiteUnlocked ? "DEPOSIT_VERIFIED" : "FIRST_DEPOSIT_REQUIRED",
       },
-      status,
       lifecyclePhase,
       priceFrom,
       serviceTypes,
@@ -296,38 +396,38 @@ export class MarketplaceService {
       // denormalized JSON or even an apparently ACTIVE link until the binding
       // model carries verifiable canonical-domain evidence.
       siteMetrics: undefined,
-      domainMetrics: this.projectDomainMetrics(website),
+      domainMetrics: this.projectPublicDomainMetrics(website, metricsAsOf),
       // Listing-level attribution: PLATFORM-owned listings render as
       // "Listed by GuestPost.cc"; PUBLISHER-owned expose the publisher card.
-      ownerType,
       attribution:
         ownerType === "PLATFORM"
           ? { kind: "PLATFORM", label: "Listed by GuestPost.cc" }
-          : { kind: "PUBLISHER", label: publisher?.name ?? "Publisher" },
+          : {
+              kind: "PUBLISHER",
+              label: listing.publisher?.name ?? "Publisher",
+            },
       // Service menu — N service rows per listing, each its own price / TAT
       // / requirements / availability. fulfillmentSettings is internal and
       // never exposed publicly.
-      services: Array.isArray(services)
-        ? services.map((s: any) => this.toPublicListingService(s))
+      services: Array.isArray(listing.services)
+        ? listing.services.map((s: any) => this.toPublicListingService(s))
         : undefined,
       // Publisher reduced to display-safe fields; email/tier/org never exposed.
       // Platform-owned listings return null to avoid leaking the internal org.
       publisher:
         ownerType === "PLATFORM"
           ? null
-          : publisher
+          : listing.publisher
             ? {
-                id: publisher.id,
-                name: publisher.name,
-                tier: publisher.tier ?? null,
-                profile: publisher.profile
+                id: listing.publisher.id,
+                name: listing.publisher.name,
+                profile: listing.publisher.profile
                   ? {
-                      bio: publisher.profile.bio ?? null,
-                      rating: publisher.profile.rating ?? null,
-                      totalReviews: publisher.profile.totalReviews ?? null,
-                      responseTime: publisher.profile.responseTime ?? null,
-                      completionRate: publisher.profile.completionRate ?? null,
-                      trustScore: publisher.profile.trustScore ?? null,
+                      rating: listing.publisher.profile.rating ?? null,
+                      totalReviews:
+                        listing.publisher.profile.totalReviews ?? null,
+                      responseTime:
+                        listing.publisher.profile.responseTime ?? null,
                     }
                   : null,
               }
@@ -338,34 +438,82 @@ export class MarketplaceService {
   // Public projection of a ListingService row. fulfillmentSettings is internal
   // (autoAccept, internalSlaHours, …) and must never leave the API surface.
   private toPublicListingService(service: any) {
-    const { fulfillmentSettings, ...rest } = service
-    return { ...rest, price: Number(rest.price) }
+    return {
+      id: service.id,
+      serviceType: service.serviceType,
+      price: Number(service.price),
+      currency: service.currency,
+      turnaroundDays: service.turnaroundDays,
+      revisionRounds: service.revisionRounds,
+      warrantyDays: service.warrantyDays ?? null,
+      requirements: service.requirements ?? null,
+      availability: service.availability,
+      version: service.version,
+    }
+  }
+
+  private toPublisherListing(
+    listing: any,
+    websiteUnlocked = false,
+    metricsAsOf = new Date(),
+  ) {
+    const safeListing = this.toPublicListing(
+      listing,
+      websiteUnlocked,
+      metricsAsOf,
+    )
+    const history = Array.isArray(listing.moderationEvents)
+      ? listing.moderationEvents.map((event: any) => ({
+          id: event.id,
+          scope: event.scope,
+          action: event.action,
+          authority: event.authority,
+          reasonCode: event.reasonCode,
+          publisherMessage: event.publisherMessage,
+          resubmissionAllowed: event.resubmissionAllowed,
+          previousStatus: event.previousStatus,
+          resultingStatus: event.resultingStatus,
+          previousWebsiteActive: event.previousWebsiteActive,
+          resultingWebsiteActive: event.resultingWebsiteActive,
+          createdAt: event.createdAt,
+        }))
+      : []
+    return {
+      ...safeListing,
+      moderation: {
+        ...buildModerationProjection(
+          listing,
+          getPublisherListingLifecycleActions(listing),
+        ),
+        history,
+      },
+    }
   }
 
   private withCategoryProjection(listing: any) {
-    const {
-      metricsData: _quarantinedSearchConsoleData,
-      trafficData: _quarantinedAnalyticsData,
-      traffic: _quarantinedDenormalizedTraffic,
-      domainRating: _quarantinedLegacyDomainRating,
-      domainAuthority: _quarantinedLegacyDomainAuthority,
-      referringDomains: _quarantinedLegacyReferringDomains,
-      spamScore: _quarantinedLegacySpamScore,
-      ...safeListing
-    } = listing
-    const categories = Array.isArray(listing?.categories)
-      ? listing.categories.map((link: any) => link.category ?? link)
-      : []
-    // These lightweight projections do not load source-aware WebsiteMetric
-    // rows, so they cannot prove an organic-traffic value came from Ahrefs.
-    // Omit raw Google payloads and fail closed instead of returning legacy
-    // denormalized traffic from a potentially mismatched Google property.
+    // Lightweight customer queries are already restricted to active, verified
+    // websites but do not load the Website relation. Supply only that proven
+    // eligibility fact, then reuse the canonical allowlisted serializer. This
+    // keeps URLs locked and service fulfillment settings private on every
+    // saved-list/services/recommendation response.
+    return this.toPublicListing({
+      ...listing,
+      website: listing.website ?? {
+        verificationStatus: "VERIFIED",
+        metricsHistory: [],
+      },
+    })
+  }
+
+  /**
+   * Public marketplace inventory is available only while its domain is both
+   * enabled and currently verified. Keep this separate from ListingStatus:
+   * domain availability can change without rewriting the listing lifecycle.
+   */
+  private buyerAvailableWebsiteWhere() {
     return {
-      ...safeListing,
-      traffic: null,
-      siteMetrics: undefined,
-      categories,
-      category: categories[0] ?? null,
+      isActive: true,
+      verificationStatus: "VERIFIED" as const,
     }
   }
 
@@ -380,13 +528,21 @@ export class MarketplaceService {
         id: true,
         status: true,
         ownerType: true,
+        website: {
+          select: { isActive: true, verificationStatus: true },
+        },
         services: {
           where: { availability: { in: ["AVAILABLE", "WAITLIST"] } },
           orderBy: [{ availability: "asc" }, { price: "asc" }],
         },
       },
     })
-    if (!listing || listing.status !== ListingStatus.APPROVED) {
+    if (
+      !listing ||
+      listing.status !== ListingStatus.APPROVED ||
+      listing.website?.isActive !== true ||
+      listing.website.verificationStatus !== "VERIFIED"
+    ) {
       throw new NotFoundException("Listing not found")
     }
     return {
@@ -450,7 +606,8 @@ export class MarketplaceService {
       }
     }
 
-    const websiteFilter: Record<string, unknown> = {}
+    const websiteFilter: Record<string, unknown> =
+      this.buyerAvailableWebsiteWhere()
     const websiteMetricConditions: Record<string, unknown>[] = []
     if (ownershipType) websiteFilter.ownershipType = ownershipType as any
 
@@ -512,7 +669,7 @@ export class MarketplaceService {
     }
     if (websiteMetricConditions.length > 0)
       websiteFilter.AND = websiteMetricConditions
-    if (Object.keys(websiteFilter).length > 0) where.website = websiteFilter
+    where.website = websiteFilter
 
     if (tags && tags.length > 0) {
       where.tags = {
@@ -670,6 +827,13 @@ export class MarketplaceService {
   ): Promise<string[]> {
     const listingConditions: Prisma.Sql[] = [
       Prisma.sql`listing."status" = ${ListingStatus.APPROVED}::"ListingStatus"`,
+      Prisma.sql`EXISTS (
+        SELECT 1
+        FROM "Website" availability_website
+        WHERE availability_website."id" = listing."websiteId"
+          AND availability_website."isActive" = TRUE
+          AND availability_website."verificationStatus" = 'VERIFIED'::"WebsiteVerificationStatus"
+      )`,
     ]
     const serviceConditions: Prisma.Sql[] = [
       Prisma.sql`service."availability" = ${ServiceAvailability.AVAILABLE}::"ServiceAvailability"`,
@@ -894,6 +1058,20 @@ export class MarketplaceService {
           include: {
             ...publicWebsiteInclude,
             managedBy: { select: { id: true, name: true, email: true } },
+            moderationEvents: {
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 50,
+              include: {
+                actor: { select: { id: true, name: true, email: true } },
+              },
+            },
+          },
+        },
+        moderationEvents: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 50,
+          include: {
+            actor: { select: { id: true, name: true, email: true } },
           },
         },
         // Staff sees ALL services regardless of availability, so reviewers
@@ -907,8 +1085,42 @@ export class MarketplaceService {
       (service) => service.availability === "AVAILABLE",
     )
     const isSuperAdmin = user.staffRole === "SUPER_ADMIN"
-    const canModerate = user.staffRole !== "FINANCE"
     const website = listing.website
+    const listingModerationActions = getStaffListingModerationActions(
+      {
+        ...listing,
+        managedByUserId: website?.managedByUserId ?? null,
+      },
+      user,
+    )
+    const websiteModerationActions = website
+      ? getStaffWebsiteModerationActions(website, user)
+      : []
+    const projectHistory = (events: any[] = []) =>
+      events.map((event) => ({
+        id: event.id,
+        scope: event.scope,
+        action: event.action,
+        authority: event.authority,
+        reasonCode: event.reasonCode,
+        publisherMessage: event.publisherMessage,
+        ...(user.staffRole !== "FINANCE" && {
+          internalNote: event.internalNote,
+          actor: event.actor
+            ? {
+                id: event.actor.id,
+                name: event.actor.name,
+                ...(isSuperAdmin && { email: event.actor.email }),
+              }
+            : null,
+        }),
+        resubmissionAllowed: event.resubmissionAllowed,
+        previousStatus: event.previousStatus,
+        resultingStatus: event.resultingStatus,
+        previousWebsiteActive: event.previousWebsiteActive,
+        resultingWebsiteActive: event.resultingWebsiteActive,
+        createdAt: event.createdAt,
+      }))
     const canManageServices =
       isSuperAdmin ||
       (user.staffRole === "OPERATIONS" &&
@@ -956,7 +1168,11 @@ export class MarketplaceService {
         url: image.url,
         isPrimary: image.isPrimary,
       })),
-      domainMetrics: this.projectDomainMetrics(website),
+      domainMetrics: this.projectInternalDomainMetrics(website),
+      moderation: {
+        ...buildModerationProjection(listing, listingModerationActions),
+        history: projectHistory(listing.moderationEvents),
+      },
       publisher:
         listing.ownerType === "PLATFORM" || !listing.publisher
           ? null
@@ -984,6 +1200,11 @@ export class MarketplaceService {
             ownershipType: website.ownershipType,
             verificationStatus: website.verificationStatus,
             verifiedAt: website.verifiedAt,
+            isActive: website.isActive,
+            moderation: {
+              ...buildModerationProjection(website, websiteModerationActions),
+              history: projectHistory(website.moderationEvents),
+            },
             managedBy:
               user.staffRole === "FINANCE" || !website.managedBy
                 ? null
@@ -1022,7 +1243,7 @@ export class MarketplaceService {
       updatedAt: listing.updatedAt,
       access: {
         role: user.staffRole,
-        canModerate,
+        canModerate: listingModerationActions.length > 0,
         canManageGlobalFlags: isSuperAdmin,
         canManageServices,
       },
@@ -1066,9 +1287,13 @@ export class MarketplaceService {
       throw new NotFoundException("Listing not found")
     }
 
-    // Non-APPROVED listings are visible only to a member of the owning publisher.
-    // Everyone else gets 404 — do not reveal existence of draft/rejected/paused/archived.
-    if (listing.status !== ListingStatus.APPROVED) {
+    // Non-public listings are visible only to a member of the owning publisher.
+    // Everyone else gets 404 — do not reveal lifecycle or domain availability.
+    const buyerVisible =
+      listing.status === ListingStatus.APPROVED &&
+      listing.website?.isActive === true &&
+      listing.website.verificationStatus === "VERIFIED"
+    if (!buyerVisible) {
       const isOwner =
         userId && listing.publisherId
           ? await this.verifyPublisherAccess(userId, listing.publisherId)
@@ -1094,6 +1319,7 @@ export class MarketplaceService {
       where: {
         id: { not: listing.id },
         status: ListingStatus.APPROVED,
+        website: this.buyerAvailableWebsiteWhere(),
         OR: [
           ...(ownCategoryIds.length > 0
             ? [
@@ -1267,6 +1493,17 @@ export class MarketplaceService {
     }
 
     const data: any = { ...dto }
+    // Defence in depth for direct service callers: publisher input can never
+    // choose its own lifecycle state, even if it bypasses HTTP validation.
+    delete data.status
+    delete data.featured
+    delete data.verified
+    // Accepted only as release-compatibility no-ops. These listing-level
+    // columns were removed; purchasable terms live on ListingService rows.
+    delete data.type
+    delete data.price
+    delete data.turnaroundDays
+    delete data.revisionRounds
     delete data.tags
     delete data.services
     delete data.categoryIds
@@ -1285,7 +1522,9 @@ export class MarketplaceService {
         publisherId,
         organizationId: publisher.organizationId,
         ownerType: "PUBLISHER",
-        status: dto.status || ListingStatus.DRAFT,
+        status: ListingStatus.DRAFT,
+        featured: false,
+        verified: false,
         tags: dto.tags
           ? {
               create: dto.tags.map((tagId) => ({
@@ -1815,114 +2054,211 @@ export class MarketplaceService {
     userId: string,
     _activePublisherId: string | null,
     listingId: string,
+    expectedVersion?: number,
   ) {
-    const listing = await this.assertPublisherOwnedListing(userId, listingId)
-
+    const observed = await this.assertPublisherOwnedListing(userId, listingId)
     if (
-      listing.status !== ListingStatus.DRAFT &&
-      listing.status !== ListingStatus.REJECTED &&
-      listing.status !== ListingStatus.ARCHIVED
+      expectedVersion !== undefined &&
+      observed.moderationVersion !== expectedVersion
     ) {
-      throw new BadRequestException(
-        "Only draft, rejected, or archived listings can be submitted for review.",
+      throw new ConflictException({
+        code: "MODERATION_VERSION_CONFLICT",
+        message: "Listing moderation changed; refresh and retry.",
+        currentVersion: observed.moderationVersion,
+      })
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Match staff moderation's global aggregate lock order: website first,
+      // then listing. A domain pause or staff decision therefore wins cleanly
+      // instead of racing a publisher resubmission.
+      if (observed.websiteId) {
+        await tx.$queryRaw`
+          SELECT "id"
+          FROM "Website"
+          WHERE "id" = ${observed.websiteId}
+          FOR SHARE
+        `
+      }
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "MarketplaceListing"
+        WHERE "id" = ${listingId}
+        FOR UPDATE
+      `
+
+      const listing = await tx.marketplaceListing.findUnique({
+        where: { id: listingId },
+        include: {
+          website: {
+            select: {
+              isActive: true,
+              verificationStatus: true,
+              ownershipType: true,
+            },
+          },
+          categories: { select: { categoryId: true } },
+        },
+      })
+      if (
+        !listing ||
+        listing.publisherId !== observed.publisherId ||
+        listing.websiteId !== observed.websiteId ||
+        listing.status !== observed.status ||
+        listing.moderationVersion !== observed.moderationVersion
+      ) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Listing moderation changed; refresh and retry.",
+        })
+      }
+
+      if (
+        !getPublisherListingLifecycleActions(listing).includes(
+          "SUBMIT_FOR_REVIEW",
+        )
+      ) {
+        throw new BadRequestException({
+          code: "MODERATION_HOLD",
+          message:
+            "This listing cannot be submitted while a staff moderation decision is active.",
+        })
+      }
+      if (listing.website?.isActive !== true) {
+        throw new BadRequestException({
+          code: "WEBSITE_INACTIVE",
+          message: "Cannot submit: restore this website first.",
+        })
+      }
+      if (listing.website.verificationStatus !== "VERIFIED") {
+        throw new BadRequestException({
+          code: "WEBSITE_NOT_VERIFIED",
+          message: "Cannot submit: verify domain ownership first.",
+        })
+      }
+      const availableCount = await tx.listingService.count({
+        where: { listingId, availability: "AVAILABLE" },
+      })
+      if (availableCount === 0) {
+        throw new BadRequestException({
+          code: "NO_AVAILABLE_SERVICES",
+          message:
+            "Add at least one available service before submitting for review.",
+        })
+      }
+      if (listing.categories.length < 1 || listing.categories.length > 7) {
+        throw new BadRequestException({
+          code: "LISTING_CATEGORIES_REQUIRED",
+          message:
+            "Choose between 1 and 7 marketplace categories before submitting for review.",
+        })
+      }
+      if (
+        !isMarketplaceLanguage(listing.language) ||
+        !hasCompleteListingPolicy(listing)
+      ) {
+        throw new BadRequestException({
+          code: "LISTING_POLICY_REQUIRED",
+          message:
+            "Choose a primary language and complete every listing policy before submitting for review.",
+        })
+      }
+      if (!listing.description.trim() || listing.description.length > 500) {
+        throw new BadRequestException({
+          code: "LISTING_DESCRIPTION_REQUIRED",
+          message:
+            "Add a buyer-facing listing description of no more than 500 characters before submitting.",
+        })
+      }
+      const manualMetrics = await tx.websiteMetric.findMany({
+        where: {
+          websiteId: listing.websiteId!,
+          key: {
+            in: [
+              WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+              WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
+            ],
+          },
+          source: { in: ["PUBLISHER_MANUAL", "ADMIN_IMPORT"] },
+          status: "CURRENT",
+          measuredAt: { gte: new Date(Date.now() - 90 * 86_400_000) },
+        },
+        select: { key: true },
+      })
+      if (new Set(manualMetrics.map((metric) => metric.key)).size < 2) {
+        throw new BadRequestException({
+          code: "MANUAL_METRICS_REQUIRED",
+          message:
+            "Add current Ahrefs organic traffic and Moz Domain Authority before submitting.",
+        })
+      }
+
+      const reasonCode =
+        listing.status === ListingStatus.DRAFT
+          ? ("INITIAL_SUBMISSION" as const)
+          : ("CORRECTIONS_COMPLETE" as const)
+      const transition = await tx.marketplaceListing.updateMany({
+        where: {
+          id: listingId,
+          status: listing.status,
+          moderationVersion: listing.moderationVersion,
+        },
+        data: {
+          status: ListingStatus.PENDING_REVIEW,
+          activeModerationAction: "SUBMIT_FOR_REVIEW",
+          activeModerationAuthority: "PUBLISHER",
+          activeModerationReasonCode: reasonCode,
+          activeModerationMessage: null,
+          activeModerationPreviousStatus: listing.status,
+          moderationResubmissionAllowed: false,
+          moderationVersion: { increment: 1 },
+        },
+      })
+      if (transition.count !== 1) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Listing moderation changed; refresh and retry.",
+        })
+      }
+
+      const moderationEvent = await tx.moderationEvent.create({
+        data: {
+          scope: "LISTING",
+          listingId,
+          action: "SUBMIT_FOR_REVIEW",
+          reasonCode,
+          publisherMessage: null,
+          internalNote: null,
+          actorUserId: userId,
+          actorStaffRole: null,
+          authority: "PUBLISHER",
+          previousStatus: listing.status,
+          resultingStatus: ListingStatus.PENDING_REVIEW,
+          previousModerationAction: listing.activeModerationAction,
+          resultingModerationAction: "SUBMIT_FOR_REVIEW",
+          resubmissionAllowed: false,
+        },
+      })
+
+      await this.createAuditLog(
+        userId,
+        listing.organizationId,
+        "LISTING_SUBMITTED_FOR_REVIEW",
+        listingId,
+        {
+          title: listing.title,
+          websiteId: listing.websiteId,
+          previousStatus: listing.status,
+          resultingStatus: ListingStatus.PENDING_REVIEW,
+          moderationEventId: moderationEvent.id,
+          moderationVersion: listing.moderationVersion + 1,
+        },
+        tx,
       )
-    }
-    if (listing.website?.verificationStatus !== "VERIFIED") {
-      throw new BadRequestException({
-        code: "WEBSITE_NOT_VERIFIED",
-        message: "Cannot submit: verify domain ownership first.",
-      })
-    }
-    const availableCount = await this.prisma.listingService.count({
-      where: { listingId, availability: "AVAILABLE" },
-    })
-    if (availableCount === 0) {
-      throw new BadRequestException({
-        code: "NO_AVAILABLE_SERVICES",
-        message:
-          "Add at least one available service before submitting for review.",
-      })
-    }
-    if (listing.categories.length < 1 || listing.categories.length > 7) {
-      throw new BadRequestException({
-        code: "LISTING_CATEGORIES_REQUIRED",
-        message:
-          "Choose between 1 and 7 marketplace categories before submitting for review.",
-      })
-    }
-    if (
-      !isMarketplaceLanguage(listing.language) ||
-      !hasCompleteListingPolicy(listing)
-    ) {
-      throw new BadRequestException({
-        code: "LISTING_POLICY_REQUIRED",
-        message:
-          "Choose a primary language and complete every listing policy before submitting for review.",
-      })
-    }
-    if (!listing.description.trim() || listing.description.length > 500) {
-      throw new BadRequestException({
-        code: "LISTING_DESCRIPTION_REQUIRED",
-        message:
-          "Add a buyer-facing listing description of no more than 500 characters before submitting.",
-      })
-    }
-    const manualMetrics = await this.prisma.websiteMetric.findMany({
-      where: {
-        websiteId: listing.websiteId!,
-        key: {
-          in: [
-            WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
-            WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
-          ],
-        },
-        source: { in: ["PUBLISHER_MANUAL", "ADMIN_IMPORT"] },
-        status: "CURRENT",
-        measuredAt: { gte: new Date(Date.now() - 90 * 86_400_000) },
-      },
-      select: { key: true },
-    })
-    if (new Set(manualMetrics.map((metric) => metric.key)).size < 2) {
-      throw new BadRequestException({
-        code: "MANUAL_METRICS_REQUIRED",
-        message:
-          "Add current Ahrefs organic traffic and Moz Domain Authority before submitting.",
-      })
-    }
 
-    const res = await this.prisma.marketplaceListing.updateMany({
-      where: {
-        id: listingId,
-        status: {
-          in: [
-            ListingStatus.DRAFT,
-            ListingStatus.REJECTED,
-            ListingStatus.ARCHIVED,
-          ],
-        },
-      },
-      data: { status: ListingStatus.PENDING_REVIEW },
-    })
-    if (res.count === 0) {
-      throw new BadRequestException({
-        code: "STATUS_CONFLICT",
-        message: "Listing was modified — reload and retry.",
+      return tx.marketplaceListing.findUniqueOrThrow({
+        where: { id: listingId },
       })
-    }
-
-    await this.createAuditLog(
-      userId,
-      listing.organizationId,
-      "LISTING_SUBMITTED_FOR_REVIEW",
-      listingId,
-      {
-        title: listing.title,
-        websiteId: listing.websiteId,
-      },
-    )
-
-    return this.prisma.marketplaceListing.findUniqueOrThrow({
-      where: { id: listingId },
     })
   }
 
@@ -1930,93 +2266,206 @@ export class MarketplaceService {
     userId: string,
     _activePublisherId: string | null,
     listingId: string,
+    expectedVersion?: number,
   ) {
-    const listing = await this.assertPublisherOwnedListing(userId, listingId)
-    if (listing.status !== ListingStatus.APPROVED) {
-      throw new BadRequestException(
-        `Only APPROVED listings can be paused (currently ${listing.status})`,
-      )
-    }
-    const res = await this.prisma.marketplaceListing.updateMany({
-      where: { id: listingId, status: ListingStatus.APPROVED },
-      data: { status: ListingStatus.PAUSED },
-    })
-    if (res.count === 0)
-      throw new BadRequestException({
-        code: "STATUS_CONFLICT",
-        message: "Listing was modified — reload and retry.",
-      })
-    await this.createAuditLog(
+    return this.publisherLifecycleCommand(
       userId,
-      listing.organizationId,
-      "LISTING_PAUSED",
       listingId,
-      { title: listing.title },
+      ModerationAction.PAUSE,
+      expectedVersion,
     )
-    return this.prisma.marketplaceListing.findUniqueOrThrow({
-      where: { id: listingId },
-    })
   }
 
   async unpauseListing(
     userId: string,
     _activePublisherId: string | null,
     listingId: string,
+    expectedVersion?: number,
   ) {
-    const listing = await this.assertPublisherOwnedListing(userId, listingId)
-    if (listing.status !== ListingStatus.PAUSED) {
-      throw new BadRequestException(
-        `Only PAUSED listings can be unpaused (currently ${listing.status})`,
-      )
-    }
-    const res = await this.prisma.marketplaceListing.updateMany({
-      where: { id: listingId, status: ListingStatus.PAUSED },
-      data: { status: ListingStatus.APPROVED },
-    })
-    if (res.count === 0)
-      throw new BadRequestException({
-        code: "STATUS_CONFLICT",
-        message: "Listing was modified — reload and retry.",
-      })
-    await this.createAuditLog(
+    return this.publisherLifecycleCommand(
       userId,
-      listing.organizationId,
-      "LISTING_UNPAUSED",
       listingId,
-      { title: listing.title },
+      ModerationAction.RESTORE,
+      expectedVersion,
     )
-    return this.prisma.marketplaceListing.findUniqueOrThrow({
-      where: { id: listingId },
-    })
   }
 
   async archiveListing(
     userId: string,
     _activePublisherId: string | null,
     listingId: string,
+    expectedVersion?: number,
   ) {
-    const listing = await this.assertPublisherOwnedListing(userId, listingId)
-    if (listing.status === ListingStatus.ARCHIVED) {
-      throw new BadRequestException("Listing is already archived")
-    }
-    const res = await this.prisma.marketplaceListing.updateMany({
-      where: { id: listingId, status: listing.status },
-      data: { status: ListingStatus.ARCHIVED },
-    })
-    if (res.count === 0)
-      throw new BadRequestException({
-        code: "STATUS_CONFLICT",
-        message: "Listing was modified — reload and retry.",
-      })
-    await this.createAuditLog(
+    return this.publisherLifecycleCommand(
       userId,
-      listing.organizationId,
-      "LISTING_ARCHIVED",
       listingId,
-      { title: listing.title, fromStatus: listing.status },
+      ModerationAction.ARCHIVE,
+      expectedVersion,
     )
-    return this.prisma.marketplaceListing.findUniqueOrThrow({
-      where: { id: listingId },
+  }
+
+  private async publisherLifecycleCommand(
+    userId: string,
+    listingId: string,
+    action:
+      | typeof ModerationAction.PAUSE
+      | typeof ModerationAction.RESTORE
+      | typeof ModerationAction.ARCHIVE,
+    expectedVersion?: number,
+  ) {
+    const observed = await this.assertPublisherOwnedListing(userId, listingId)
+    if (
+      expectedVersion !== undefined &&
+      observed.moderationVersion !== expectedVersion
+    ) {
+      throw new ConflictException({
+        code: "MODERATION_VERSION_CONFLICT",
+        message: "Listing moderation changed; refresh and retry.",
+        currentVersion: observed.moderationVersion,
+      })
+    }
+    return this.prisma.$transaction(async (tx) => {
+      if (observed.websiteId) {
+        await tx.$queryRaw`
+          SELECT "id"
+          FROM "Website"
+          WHERE "id" = ${observed.websiteId}
+          FOR SHARE
+        `
+      }
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "MarketplaceListing"
+        WHERE "id" = ${listingId}
+        FOR UPDATE
+      `
+      const listing = await tx.marketplaceListing.findUnique({
+        where: { id: listingId },
+        include: {
+          website: {
+            select: {
+              isActive: true,
+              verificationStatus: true,
+              ownershipType: true,
+            },
+          },
+          categories: { select: { categoryId: true } },
+        },
+      })
+      if (
+        !listing ||
+        listing.publisherId !== observed.publisherId ||
+        listing.websiteId !== observed.websiteId ||
+        listing.status !== observed.status ||
+        listing.moderationVersion !== observed.moderationVersion
+      ) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Listing moderation changed; refresh and retry.",
+        })
+      }
+      const membership = await tx.publisherMembership.findFirst({
+        where: { userId, publisherId: listing.publisherId! },
+        select: { id: true },
+      })
+      if (!membership) {
+        throw new ForbiddenException("You don't have access to this listing")
+      }
+      const allowedActions = getPublisherListingLifecycleActions(listing)
+      if (!allowedActions.includes(action)) {
+        throw new BadRequestException({
+          code: "MODERATION_HOLD",
+          message:
+            "This action is not available while the current moderation decision is active.",
+          allowedActions,
+        })
+      }
+
+      const resultingStatus =
+        action === ModerationAction.PAUSE
+          ? ListingStatus.PAUSED
+          : action === ModerationAction.RESTORE
+            ? ListingStatus.APPROVED
+            : ListingStatus.ARCHIVED
+      const clearsDecision = action === ModerationAction.RESTORE
+      const resultingAction = clearsDecision ? null : action
+      const resultingAuthority = clearsDecision
+        ? null
+        : ModerationAuthority.PUBLISHER
+      const resultingReason = clearsDecision
+        ? null
+        : ModerationReasonCode.PUBLISHER_REQUEST
+      const resultingPreviousStatus = clearsDecision ? null : listing.status
+      const resubmissionAllowed = action === ModerationAction.ARCHIVE
+
+      const transition = await tx.marketplaceListing.updateMany({
+        where: {
+          id: listingId,
+          status: listing.status,
+          moderationVersion: listing.moderationVersion,
+        },
+        data: {
+          status: resultingStatus,
+          activeModerationAction: resultingAction,
+          activeModerationAuthority: resultingAuthority,
+          activeModerationReasonCode: resultingReason,
+          activeModerationMessage: null,
+          activeModerationPreviousStatus: resultingPreviousStatus,
+          moderationResubmissionAllowed: resubmissionAllowed,
+          moderationVersion: { increment: 1 },
+        },
+      })
+      if (transition.count !== 1) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Listing moderation changed; refresh and retry.",
+        })
+      }
+
+      const event = await tx.moderationEvent.create({
+        data: {
+          scope: "LISTING",
+          listingId,
+          action,
+          reasonCode:
+            action === ModerationAction.RESTORE
+              ? ModerationReasonCode.ISSUE_RESOLVED
+              : ModerationReasonCode.PUBLISHER_REQUEST,
+          actorUserId: userId,
+          actorStaffRole: null,
+          authority: ModerationAuthority.PUBLISHER,
+          previousStatus: listing.status,
+          resultingStatus,
+          previousModerationAction: listing.activeModerationAction,
+          resultingModerationAction: resultingAction,
+          resubmissionAllowed,
+        },
+      })
+      await this.createAuditLog(
+        userId,
+        listing.organizationId,
+        `LISTING_${action}`,
+        listingId,
+        {
+          title: listing.title,
+          previousStatus: listing.status,
+          resultingStatus,
+          moderationEventId: event.id,
+          previousVersion: listing.moderationVersion,
+          resultingVersion: listing.moderationVersion + 1,
+        },
+        tx,
+      )
+      const updated = await tx.marketplaceListing.findUniqueOrThrow({
+        where: { id: listingId },
+      })
+      return {
+        ...updated,
+        moderation: buildModerationProjection(
+          updated,
+          getPublisherListingLifecycleActions(updated),
+        ),
+      }
     })
   }
 
@@ -2026,7 +2475,13 @@ export class MarketplaceService {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id: listingId },
       include: {
-        website: { select: { verificationStatus: true, ownershipType: true } },
+        website: {
+          select: {
+            isActive: true,
+            verificationStatus: true,
+            ownershipType: true,
+          },
+        },
         categories: { select: { categoryId: true } },
       },
     })
@@ -2050,35 +2505,10 @@ export class MarketplaceService {
     _activePublisherId: string | null,
     listingId: string,
   ) {
-    const listing = await this.prisma.marketplaceListing.findUnique({
-      where: { id: listingId },
-    })
-
-    if (!listing) {
-      throw new NotFoundException("Listing not found")
-    }
-    if (!listing.publisherId) {
-      throw new ForbiddenException("You don't have access to this listing")
-    }
-    const hasAccess = await this.verifyPublisherAccess(
+    await this.publisherLifecycleCommand(
       userId,
-      listing.publisherId,
-    )
-    if (!hasAccess) {
-      throw new ForbiddenException("You don't have access to this listing")
-    }
-
-    await this.prisma.marketplaceListing.update({
-      where: { id: listingId },
-      data: { status: ListingStatus.ARCHIVED },
-    })
-
-    await this.createAuditLog(
-      userId,
-      listing.organizationId,
-      "LISTING_DELETED",
       listingId,
-      { title: listing.title },
+      ModerationAction.ARCHIVE,
     )
   }
 
@@ -2172,7 +2602,13 @@ export class MarketplaceService {
 
   async getFavorites(userId: string) {
     const favorites = await this.prisma.marketplaceFavorite.findMany({
-      where: { userId, listing: { status: ListingStatus.APPROVED } },
+      where: {
+        userId,
+        listing: {
+          status: ListingStatus.APPROVED,
+          website: this.buyerAvailableWebsiteWhere(),
+        },
+      },
       include: {
         listing: {
           include: {
@@ -2232,8 +2668,12 @@ export class MarketplaceService {
     listingId: string,
     serviceType: ServiceType | null = null,
   ) {
-    const listing = await this.prisma.marketplaceListing.findUnique({
-      where: { id: listingId },
+    const listing = await this.prisma.marketplaceListing.findFirst({
+      where: {
+        id: listingId,
+        status: ListingStatus.APPROVED,
+        website: this.buyerAvailableWebsiteWhere(),
+      },
     })
     if (!listing) {
       throw new NotFoundException("Listing not found")
@@ -2328,6 +2768,14 @@ export class MarketplaceService {
       where: { userId },
       include: {
         items: {
+          // Retain saved-list membership in storage, but fail closed in the
+          // buyer projection while a listing or its domain is unavailable.
+          where: {
+            listing: {
+              status: ListingStatus.APPROVED,
+              website: this.buyerAvailableWebsiteWhere(),
+            },
+          },
           include: {
             listing: {
               include: {
@@ -2372,8 +2820,12 @@ export class MarketplaceService {
       throw new NotFoundException("List not found")
     }
 
-    const listing = await this.prisma.marketplaceListing.findUnique({
-      where: { id: dto.listingId },
+    const listing = await this.prisma.marketplaceListing.findFirst({
+      where: {
+        id: dto.listingId,
+        status: ListingStatus.APPROVED,
+        website: this.buyerAvailableWebsiteWhere(),
+      },
     })
     if (!listing) {
       throw new NotFoundException("Listing not found")
@@ -2417,6 +2869,7 @@ export class MarketplaceService {
     const listings = await this.prisma.marketplaceListing.findMany({
       where: {
         status: ListingStatus.APPROVED,
+        website: this.buyerAvailableWebsiteWhere(),
         fulfillmentType: "INTERNAL",
         services: { some: { availability: "AVAILABLE" } },
       },
@@ -2443,10 +2896,13 @@ export class MarketplaceService {
       ? await this.verifyPublisherAccess(userId, publisherId)
       : false
 
-    const where: any = {
-      publisherId,
-      status: hasAccess ? undefined : ListingStatus.APPROVED,
-    }
+    const where: any = hasAccess
+      ? { publisherId }
+      : {
+          publisherId,
+          status: ListingStatus.APPROVED,
+          website: this.buyerAvailableWebsiteWhere(),
+        }
 
     // Search across listing title, description, and website domain.
     if (search) {
@@ -2464,9 +2920,28 @@ export class MarketplaceService {
         images: { where: { isPrimary: true }, take: 1 },
         tags: { include: { tag: true } },
         reviews: { where: { status: "APPROVED" }, select: { rating: true } },
+        moderationEvents: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 20,
+          select: {
+            id: true,
+            scope: true,
+            action: true,
+            authority: true,
+            reasonCode: true,
+            publisherMessage: true,
+            resubmissionAllowed: true,
+            previousStatus: true,
+            resultingStatus: true,
+            previousWebsiteActive: true,
+            resultingWebsiteActive: true,
+            createdAt: true,
+          },
+        },
         publisher: { include: { profile: true } },
         website: {
           select: {
+            isActive: true,
             verificationStatus: true,
             verifiedAt: true,
             domain: true,
@@ -2494,8 +2969,8 @@ export class MarketplaceService {
       return b.createdAt.getTime() - a.createdAt.getTime()
     })
 
-    return listings.map((l) =>
-      this.toPublicListing({
+    return listings.map((l) => {
+      const projected = {
         ...l,
         tags: l.tags.map((t) => t.tag),
         image: l.images[0]?.url ?? null,
@@ -2504,8 +2979,11 @@ export class MarketplaceService {
           l.reviews.length > 0
             ? l.reviews.reduce((sum, r) => sum + r.rating, 0) / l.reviews.length
             : null,
-      }),
-    )
+      }
+      return hasAccess
+        ? this.toPublisherListing(projected)
+        : this.toPublicListing(projected)
+    })
   }
 
   // =============================================================================
@@ -2532,8 +3010,12 @@ export class MarketplaceService {
       // Phase 7: pull the offered serviceTypes off the source listing's
       // child services so we can match recommendations on service overlap
       // instead of the deprecated listing-level `type` column.
-      const listing = await this.prisma.marketplaceListing.findUnique({
-        where: { id: listingId },
+      const listing = await this.prisma.marketplaceListing.findFirst({
+        where: {
+          id: listingId,
+          status: ListingStatus.APPROVED,
+          website: this.buyerAvailableWebsiteWhere(),
+        },
         include: {
           categories: { select: { categoryId: true } },
           services: {
@@ -2578,6 +3060,13 @@ export class MarketplaceService {
           FROM "MarketplaceListing" candidate
           WHERE candidate."id" <> ${listingId}
             AND candidate."status" = ${ListingStatus.APPROVED}::"ListingStatus"
+            AND EXISTS (
+              SELECT 1
+              FROM "Website" availability_website
+              WHERE availability_website."id" = candidate."websiteId"
+                AND availability_website."isActive" = TRUE
+                AND availability_website."verificationStatus" = 'VERIFIED'::"WebsiteVerificationStatus"
+            )
             AND (${Prisma.join(recommendationMatches, " OR ")})
           ORDER BY ${canonicalTraffic} DESC NULLS LAST,
                    candidate."createdAt" DESC,
@@ -2591,6 +3080,7 @@ export class MarketplaceService {
         where: {
           id: { in: rankedIds.map((row) => row.id) },
           status: ListingStatus.APPROVED,
+          website: this.buyerAvailableWebsiteWhere(),
         },
         include: {
           categories: { include: { category: true } },
@@ -2612,7 +3102,6 @@ export class MarketplaceService {
           ? [
               {
                 ...this.withCategoryProjection(recommendation),
-                tags: recommendation.tags.map((tag) => tag.tag),
                 image: recommendation.images[0]?.url || null,
               },
             ]
@@ -2635,6 +3124,7 @@ export class MarketplaceService {
       where: {
         id: { in: trendingIds.map((t) => t.listingId) },
         status: ListingStatus.APPROVED,
+        website: this.buyerAvailableWebsiteWhere(),
       },
       include: {
         categories: { include: { category: true } },
@@ -2650,7 +3140,6 @@ export class MarketplaceService {
         if (!listing) return null
         return {
           ...this.withCategoryProjection(listing),
-          tags: listing.tags.map((tag) => tag.tag),
           image: listing.images[0]?.url || null,
         }
       })
@@ -2662,6 +3151,10 @@ export class MarketplaceService {
   // =============================================================================
 
   async getMarketplaceStats() {
+    const buyerVisibleListing = {
+      status: ListingStatus.APPROVED,
+      website: this.buyerAvailableWebsiteWhere(),
+    }
     const [
       totalListings,
       activeListings,
@@ -2671,26 +3164,36 @@ export class MarketplaceService {
       activeServices,
       servicesByTypeRaw,
     ] = await Promise.all([
-      this.prisma.marketplaceListing.count(),
+      this.prisma.marketplaceListing.count({ where: buyerVisibleListing }),
       this.prisma.marketplaceListing.count({
-        where: { status: ListingStatus.APPROVED },
+        where: buyerVisibleListing,
       }),
-      this.prisma.marketplaceReview.count({ where: { status: "APPROVED" } }),
+      this.prisma.marketplaceReview.count({
+        where: { status: "APPROVED", listing: buyerVisibleListing },
+      }),
       this.prisma.marketplaceReview.aggregate({
         _avg: { rating: true },
-        where: { status: "APPROVED" },
+        where: { status: "APPROVED", listing: buyerVisibleListing },
       }),
       // Phase 6: surface service-level cardinality. A listing with 3
       // services counts as 1 above but 3 here, so per-service revenue
       // dashboards have a denominator that matches the buyer-side
       // inventory shape.
-      this.prisma.listingService.count(),
       this.prisma.listingService.count({
-        where: { availability: "AVAILABLE" },
+        where: { listing: buyerVisibleListing },
+      }),
+      this.prisma.listingService.count({
+        where: {
+          availability: "AVAILABLE",
+          listing: buyerVisibleListing,
+        },
       }),
       this.prisma.listingService.groupBy({
         by: ["serviceType"],
-        where: { availability: "AVAILABLE" },
+        where: {
+          availability: "AVAILABLE",
+          listing: buyerVisibleListing,
+        },
         _count: { id: true },
         _avg: { price: true },
       }),
@@ -2698,7 +3201,7 @@ export class MarketplaceService {
 
     const topCategories = await this.prisma.marketplaceListingCategory.groupBy({
       by: ["categoryId"],
-      where: { listing: { status: ListingStatus.APPROVED } },
+      where: { listing: buyerVisibleListing },
       _count: { listingId: true },
       orderBy: { _count: { listingId: "desc" } },
       take: 5,

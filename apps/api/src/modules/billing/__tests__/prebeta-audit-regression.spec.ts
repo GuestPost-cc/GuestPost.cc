@@ -1386,10 +1386,13 @@ describe("F-3: tenant-scoped order idempotency", () => {
       availability: "AVAILABLE",
       turnaroundDays: 7,
       listing: {
+        id: "listing-B",
+        websiteId: "site-B",
         status: "APPROVED",
         ownerType: "PUBLISHER",
         website: {
           id: "site-B",
+          isActive: true,
           ownershipType: "PUBLISHER",
           verificationStatus: "VERIFIED",
           managedByUserId: null,

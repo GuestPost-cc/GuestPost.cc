@@ -30,6 +30,7 @@ import {
 } from "@guestpost/ui"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
+  Archive,
   ArrowLeft,
   Copy,
   ExternalLink,
@@ -37,6 +38,7 @@ import {
   Loader2,
   Plug,
   RefreshCw,
+  RotateCcw,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
@@ -46,6 +48,7 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { PublisherModerationNotice } from "../../../../components/marketplace/moderation-notice"
 import { PublisherListingManager } from "../../../../components/marketplace/publisher-listing-manager"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
@@ -95,6 +98,7 @@ export default function WebsiteDetailPage() {
   const publisherId = user?.publisherId
 
   const [showLinkDialog, setShowLinkDialog] = useState(false)
+  const [showArchiveWebsite, setShowArchiveWebsite] = useState(false)
   const [selectedResource, setSelectedResource] = useState<string | null>(null)
   const [showDisconnect, setShowDisconnect] = useState(false)
   const [verifyInstructions, setVerifyInstructions] =
@@ -180,6 +184,32 @@ export default function WebsiteDetailPage() {
     },
     onError: (error: Error) =>
       toast.error(error.message || "Failed to update metrics"),
+  })
+  const websiteLifecycleMutation = useMutation({
+    mutationFn: ({
+      action,
+      expectedVersion,
+    }: {
+      action: "ARCHIVE" | "REOPEN"
+      expectedVersion: number
+    }) => {
+      if (!publisherId) throw new Error("Not authenticated")
+      return action === "ARCHIVE"
+        ? api.publishers.archiveWebsite(publisherId, websiteId, expectedVersion)
+        : api.publishers.reopenWebsite(publisherId, websiteId, expectedVersion)
+    },
+    onSuccess: (_, variables) => {
+      setShowArchiveWebsite(false)
+      queryClient.invalidateQueries({ queryKey: ["website", websiteId] })
+      queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
+      queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
+      toast.success(
+        variables.action === "ARCHIVE"
+          ? "Website archived"
+          : "Website reopened. Its listing still requires review.",
+      )
+    },
+    onError: (error: Error) => toast.error(error.message),
   })
 
   useEffect(() => {
@@ -384,7 +414,39 @@ export default function WebsiteDetailPage() {
             </a>
           </div>
         </div>
+        <div className="flex flex-wrap gap-2">
+          {website.moderation.allowedActions.includes("ARCHIVE") ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={websiteLifecycleMutation.isPending}
+              onClick={() => setShowArchiveWebsite(true)}
+            >
+              <Archive className="mr-2 h-4 w-4" /> Archive domain
+            </Button>
+          ) : null}
+          {website.moderation.allowedActions.includes("REOPEN") ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={websiteLifecycleMutation.isPending}
+              onClick={() =>
+                websiteLifecycleMutation.mutate({
+                  action: "REOPEN",
+                  expectedVersion: website.moderation.version,
+                })
+              }
+            >
+              <RotateCcw className="mr-2 h-4 w-4" /> Reopen domain
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      <PublisherModerationNotice
+        moderation={website.moderation}
+        subject="domain"
+      />
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Domain metrics</h2>
@@ -1028,6 +1090,42 @@ export default function WebsiteDetailPage() {
       )}
 
       {/* Link Property Dialog */}
+      <Dialog open={showArchiveWebsite} onOpenChange={setShowArchiveWebsite}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archive domain?</DialogTitle>
+            <DialogDescription>
+              The domain and its listing will be unavailable to new buyers.
+              Reopening later does not restore the listing directly; it must
+              pass through review again.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={websiteLifecycleMutation.isPending}
+              onClick={() => setShowArchiveWebsite(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={websiteLifecycleMutation.isPending}
+              onClick={() =>
+                websiteLifecycleMutation.mutate({
+                  action: "ARCHIVE",
+                  expectedVersion: website.moderation.version,
+                })
+              }
+            >
+              {websiteLifecycleMutation.isPending
+                ? "Archiving…"
+                : "Archive domain"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
