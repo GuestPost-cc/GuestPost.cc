@@ -53,6 +53,12 @@ describe("confirmed delivery-fraud finding migration contract", () => {
     expect(sql).toContain(
       'CREATE UNIQUE INDEX "DeliveryFraudFinding_decidedByUserId_idempotencyKey_key"',
     )
+    expect(sql).toContain(
+      'CREATE UNIQUE INDEX "OrderCancellationRequest_refundTransactionId_key"',
+    )
+    expect(sql).toContain(
+      "a refund transaction cannot be linked to more than one cancellation request",
+    )
     expect(sql).toMatch(
       /FOREIGN KEY \("fraudFlagId"\) REFERENCES public\."DeliveryFraudFlag"\("id"\)[\s\S]*ON DELETE RESTRICT/,
     )

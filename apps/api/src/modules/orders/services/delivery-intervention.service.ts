@@ -236,6 +236,24 @@ export class DeliveryInterventionService {
   }
 
   /**
+   * Preserve the lifecycle state that existed before an open dispute. Finance
+   * compensation policy is based on whether fulfilment had already happened,
+   * not on the temporary DISPUTED wrapper state.
+   */
+  private cancellationPreviousOrderStatus(order: {
+    status: string
+    dispute?: { previousStatus?: string | null } | null
+  }): string {
+    if (order.status !== "DISPUTED") return order.status
+    if (order.dispute?.previousStatus) return order.dispute.previousStatus
+    throw new ConflictException({
+      code: "DELIVERY_FRAUD_DISPUTE_STATE_INCONSISTENT",
+      message:
+        "The disputed order has no recoverable pre-dispute status and requires reconciliation before fraud can be confirmed.",
+    })
+  }
+
+  /**
    * Enter a confirmed operational finding into the existing cancellation
    * review workflow without making a financial decision. The enclosing Order
    * lock serializes this with customer/publisher cancellation writers, while
@@ -332,7 +350,7 @@ export class DeliveryInterventionService {
         reasonCode: "LEGAL_OR_SECURITY_EMERGENCY",
         note: FRAUD_CANCELLATION_NOTE,
         status: "ESCALATED",
-        previousOrderStatus: order.status,
+        previousOrderStatus: this.cancellationPreviousOrderStatus(order),
         fulfillmentChannel,
         responsibility: "UNDETERMINED",
         requestedResolution: "FULL_REFUND",
@@ -605,6 +623,9 @@ export class DeliveryInterventionService {
                 version: true,
                 fulfillmentChannel: true,
                 activeDeliveryVersionId: true,
+                dispute: {
+                  select: { previousStatus: true },
+                },
                 website: {
                   select: { publisherId: true, ownershipType: true },
                 },

@@ -181,8 +181,10 @@ export function OrderStakeholderUpdates({
       <CardContent>
         <ol className="space-y-3" aria-label="Official order decisions">
           {ordered.map((update) => {
-            const severity = severityPresentation[update.severity]
-            const status = statusPresentation[update.status]
+            const severity =
+              severityPresentation[update.severity] ?? severityPresentation.INFO
+            const status =
+              statusPresentation[update.status] ?? statusPresentation.PENDING
             const Icon = severity.icon
             return (
               <li key={update.id}>

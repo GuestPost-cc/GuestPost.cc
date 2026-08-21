@@ -139,20 +139,22 @@ describe("AdminVerificationQueueService", () => {
             },
             {
               status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
-              fraudHolds: {
-                some: { fraudFlag: { finding: { is: null } } },
-              },
-            },
-            {
-              status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
-              fraudHolds: {
-                some: { fraudFlag: { finding: { isNot: null } } },
-              },
+              fraudHolds: { some: {} },
             },
           ],
         },
       }),
     )
+
+    const operations = await service.listQueue("OPERATIONS")
+    const finance = await service.listQueue("FINANCE")
+    const operationsFinding =
+      operations[0].deliveryVersion?.fraudFlags[0].finding
+    const financeFinding = finance[0].deliveryVersion?.fraudFlags[0].finding
+    expect(operationsFinding).not.toHaveProperty("reason")
+    expect(financeFinding).toMatchObject({
+      reason: "The immutable evidence confirms intentional URL reuse.",
+    })
   })
 
   it("delegates approval to the canonical fraud-aware intervention path", async () => {

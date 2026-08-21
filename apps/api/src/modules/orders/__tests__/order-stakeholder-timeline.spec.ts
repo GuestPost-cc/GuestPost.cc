@@ -42,6 +42,9 @@ describe("order stakeholder timeline", () => {
     const serialized = JSON.stringify(timeline)
 
     expect(serialized).not.toContain("Internal cross-order")
+    expect(serialized).not.toContain("refund-1")
+    expect(serialized).not.toContain("finding-1")
+    expect(serialized).not.toContain("compensation-1")
     expect(serialized).not.toContain("publisherCompensation")
     expect(serialized).not.toContain("debtApplied")
     expect(
@@ -123,9 +126,8 @@ describe("order stakeholder timeline", () => {
     )
 
     expect(
-      timeline.find(
-        (entry) => entry.id === "fraud-resolution:cleared-resolution",
-      )?.summary,
+      timeline.find((entry) => entry.kind === "SECURITY_REVIEW_CLEARED")
+        ?.summary,
     ).toContain("another security review still blocks")
   })
 
@@ -160,9 +162,8 @@ describe("order stakeholder timeline", () => {
     )
 
     expect(
-      timeline.find(
-        (entry) => entry.id === "fraud-resolution:cleared-resolution",
-      )?.summary,
+      timeline.find((entry) => entry.kind === "SECURITY_REVIEW_CLEARED")
+        ?.summary,
     ).toContain("No security holds remain")
   })
 })

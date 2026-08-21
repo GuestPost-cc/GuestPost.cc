@@ -109,8 +109,22 @@ BEGIN
       ERRCODE = '23514',
       MESSAGE = 'cancellation refund evidence contains an orphan transaction reference';
   END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM public."OrderCancellationRequest"
+    WHERE "refundTransactionId" IS NOT NULL
+    GROUP BY "refundTransactionId"
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'a refund transaction cannot be linked to more than one cancellation request';
+  END IF;
 END
 $cancellation_refund_preflight$;
+
+CREATE UNIQUE INDEX "OrderCancellationRequest_refundTransactionId_key"
+  ON public."OrderCancellationRequest"("refundTransactionId");
 
 ALTER TABLE public."OrderCancellationRequest"
   ADD CONSTRAINT "OrderCancellationRequest_refundTransactionId_fkey"

@@ -38,13 +38,7 @@ export class AdminVerificationQueueService {
           {
             status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
             fraudHolds: {
-              some: { fraudFlag: { finding: { is: null } } },
-            },
-          },
-          {
-            status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
-            fraudHolds: {
-              some: { fraudFlag: { finding: { isNot: null } } },
+              some: {},
             },
           },
         ],
@@ -186,7 +180,9 @@ export class AdminVerificationQueueService {
                       id: f.finding.id,
                       cancellationRequestId: f.finding.cancellationRequestId,
                       outcome: f.finding.outcome,
-                      reason: f.finding.internalReason,
+                      ...(canViewFinancials && {
+                        reason: f.finding.internalReason,
+                      }),
                       decidedByRole: f.finding.decidedByRole,
                       createdAt: f.finding.createdAt,
                     }

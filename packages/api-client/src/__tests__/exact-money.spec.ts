@@ -21,8 +21,16 @@ describe("exact non-negative money", () => {
     "1.001",
     "1e3",
     "NaN",
+    0.01,
+    1.5,
+    {},
   ])("rejects the non-canonical input %s", (input) => {
     expect(normalizeExactNonNegativeMoney(input)).toBeNull()
+  })
+
+  it("accepts safe whole-number inputs", () => {
+    expect(normalizeExactNonNegativeMoney(0)).toBe("0.00")
+    expect(normalizeExactNonNegativeMoney(42)).toBe("42.00")
   })
 
   it("compares exact minor units beyond Number's safe range", () => {

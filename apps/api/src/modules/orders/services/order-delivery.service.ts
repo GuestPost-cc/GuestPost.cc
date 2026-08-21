@@ -332,9 +332,11 @@ export class OrderDeliveryService {
       capabilities: {
         canConfirm: false,
         canManualAccept: false,
-        blockedReason: securityReview
-          ? ("SECURITY_REVIEW" as const)
-          : ("NO_DELIVERY" as const),
+        blockedReason: !access.organizationId
+          ? null
+          : securityReview
+            ? ("SECURITY_REVIEW" as const)
+            : ("NO_DELIVERY" as const),
       },
     }
     if (!order.activeDeliveryVersionId) return unavailableDelivery
@@ -388,13 +390,15 @@ export class OrderDeliveryService {
       capabilities: {
         canConfirm,
         canManualAccept,
-        blockedReason: securityReview
-          ? ("SECURITY_REVIEW" as const)
-          : canConfirm || canManualAccept
-            ? null
-            : ["PENDING", "RETRYING"].includes(version.verificationStatus)
-              ? ("VERIFICATION_PENDING" as const)
-              : ("WRONG_STATUS" as const),
+        blockedReason: !isCustomer
+          ? null
+          : securityReview
+            ? ("SECURITY_REVIEW" as const)
+            : canConfirm || canManualAccept
+              ? null
+              : ["PENDING", "RETRYING"].includes(version.verificationStatus)
+                ? ("VERIFICATION_PENDING" as const)
+                : ("WRONG_STATUS" as const),
       },
     }
   }

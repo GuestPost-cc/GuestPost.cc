@@ -302,6 +302,21 @@ describe("DeliveryInterventionService", () => {
       )
     })
 
+    it("preserves the pre-dispute lifecycle state for Finance compensation policy", async () => {
+      prepareConfirmation()
+      prisma.order.findUnique.mockResolvedValueOnce({
+        ...order,
+        status: "DISPUTED",
+        dispute: { previousStatus: "DELIVERED" },
+      })
+
+      await svc.confirmFraudFlag("flag-1", "u1", "OPERATIONS", confirmation)
+
+      expect(prisma.orderCancellationRequest.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ previousOrderStatus: "DELIVERED" }),
+      })
+    })
+
     it.each([
       ["REQUESTED", "ESCALATED", true],
       ["UNDER_REVIEW", "ESCALATED", true],

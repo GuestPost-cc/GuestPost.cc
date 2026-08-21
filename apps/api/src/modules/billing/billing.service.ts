@@ -2441,7 +2441,16 @@ export class BillingService {
   }
 
   async listTransactions(organizationId: string | null, userId: string) {
-    const wallet = await this.getWallet(organizationId, userId)
+    const wallet = organizationId
+      ? await this.prisma.wallet.findUnique({
+          where: { organizationId },
+          select: { id: true },
+        })
+      : await this.prisma.wallet.findFirst({
+          where: { userId, organizationId: null },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: { id: true },
+        })
     if (!wallet) throw new NotFoundException("Wallet not found")
 
     const transactions = await this.prisma.transaction.findMany({

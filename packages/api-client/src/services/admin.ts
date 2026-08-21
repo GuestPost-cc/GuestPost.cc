@@ -673,7 +673,7 @@ export interface AdminOrderDetailResponse {
   }
   publisherCompensationPolicy?: {
     required: boolean
-    maximumAmount: string | number
+    maximumAmount: string
     currency: string
     effectiveOrderStatus: string
   }

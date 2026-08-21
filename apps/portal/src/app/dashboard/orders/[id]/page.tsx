@@ -430,7 +430,7 @@ export default function OrderDetailPage({
       enabled: Boolean(order),
     })
 
-  const { data: proof } = useQuery({
+  const { data: proof, isLoading: isProofLoading } = useQuery({
     queryKey: ["order-proof", resolvedParams.id],
     queryFn: () => api.orders.deliveryProof(resolvedParams.id),
     enabled:
@@ -970,6 +970,7 @@ export default function OrderDetailPage({
 
       {order.status === "VERIFIED" &&
         order.autoAcceptAt &&
+        !isProofLoading &&
         proof?.securityReview == null && (
           <Card>
             <CardContent className="pt-6">

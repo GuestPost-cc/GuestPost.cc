@@ -36,7 +36,8 @@ describe("[INTEGRATION] Financial — confirmed delivery fraud persistence backs
   })
 
   async function waitForDatabaseLock(pid: number) {
-    for (let attempt = 0; attempt < 100; attempt += 1) {
+    const deadline = Date.now() + 15_000
+    while (Date.now() < deadline) {
       const rows = await prisma.$queryRawUnsafe(
         `SELECT "wait_event_type" AS "waitEventType"
          FROM pg_catalog.pg_stat_activity
@@ -63,7 +64,6 @@ describe("[INTEGRATION] Financial — confirmed delivery fraud persistence backs
       }
       seen.add(value)
       for (const key of Object.getOwnPropertyNames(value)) {
-        facts.push(key)
         try {
           visit((value as Record<string, unknown>)[key], depth + 1)
         } catch {

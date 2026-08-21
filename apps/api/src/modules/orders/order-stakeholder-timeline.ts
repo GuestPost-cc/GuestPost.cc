@@ -51,8 +51,10 @@ function decimalDifference(left: unknown, right: unknown): string {
     .padStart(scale + 1, "0")
   if (scale === 0) return `${negative ? "-" : ""}${absolute}`
   const whole = absolute.slice(0, -scale)
-  const fraction = absolute.slice(-scale).replace(/0+$/, "")
-  return `${negative ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`
+  // Preserve the canonical input scale so adjacent exact-money values line up
+  // in the stakeholder UI (for example, 500.00 rather than 500).
+  const fraction = absolute.slice(-scale)
+  return `${negative ? "-" : ""}${whole}.${fraction}`
 }
 
 function isPositiveDecimal(value: unknown): boolean {
@@ -66,6 +68,20 @@ function evidenceDisposition(resolution: any): string | null {
     return null
   }
   return typeof evidence.disposition === "string" ? evidence.disposition : null
+}
+
+/**
+ * Produces a UI-only stable key without exposing an internal database id to
+ * customer or publisher clients. The ordinal disambiguates same-timestamp
+ * entries within one ordered aggregate.
+ */
+function timelineEntryId(
+  kind: string,
+  occurredAt: Date | string,
+  ordinal: number,
+) {
+  const time = new Date(occurredAt).getTime()
+  return `${kind}:${Number.isFinite(time) ? time : "unknown"}:${ordinal}`
 }
 
 function confirmedSummary(
@@ -111,9 +127,9 @@ export function buildOrderStakeholderTimeline(
     (flag: any) => flag.hold != null,
   )
 
-  for (const flag of order.fraudFlags ?? []) {
+  for (const [flagIndex, flag] of (order.fraudFlags ?? []).entries()) {
     entries.push({
-      id: `fraud:${flag.id}:opened`,
+      id: timelineEntryId("fraud-opened", flag.createdAt, flagIndex),
       kind: "SECURITY_REVIEW_OPENED",
       occurredAt: flag.createdAt,
       status: flag.finding || flag.resolution ? "COMPLETED" : "PENDING",
@@ -129,7 +145,7 @@ export function buildOrderStakeholderTimeline(
 
     if (flag.finding) {
       entries.push({
-        id: `fraud-finding:${flag.finding.id}`,
+        id: timelineEntryId("fraud-finding", flag.finding.createdAt, flagIndex),
         kind: "SECURITY_VIOLATION_CONFIRMED",
         occurredAt: flag.finding.createdAt,
         status: orderTerminal ? "COMPLETED" : "ACTION_REQUIRED",
@@ -145,7 +161,11 @@ export function buildOrderStakeholderTimeline(
       const acceptedRisk =
         disposition === "AUTHORIZED_REUSE" || disposition === "RISK_ACCEPTED"
       entries.push({
-        id: `fraud-resolution:${flag.resolution.id}`,
+        id: timelineEntryId(
+          "fraud-resolution",
+          flag.resolution.createdAt,
+          flagIndex,
+        ),
         kind: "SECURITY_REVIEW_CLEARED",
         occurredAt: flag.resolution.createdAt,
         status: "COMPLETED",
@@ -169,13 +189,13 @@ export function buildOrderStakeholderTimeline(
     }
   }
 
-  for (const refund of (order.transactions ?? []).filter(
-    (transaction: any) => transaction.type === "REFUND",
-  )) {
+  for (const [refundIndex, refund] of (order.transactions ?? [])
+    .filter((transaction: any) => transaction.type === "REFUND")
+    .entries()) {
     const showAmount =
       viewer === "CUSTOMER" || viewer === "FINANCE" || viewer === "SUPER_ADMIN"
     entries.push({
-      id: `refund:${refund.id}`,
+      id: timelineEntryId("refund", refund.createdAt, refundIndex),
       kind: "CUSTOMER_REFUND_COMPLETED",
       occurredAt: refund.createdAt,
       status: "COMPLETED",
@@ -208,7 +228,7 @@ export function buildOrderStakeholderTimeline(
     const showAmount =
       viewer === "PUBLISHER" || viewer === "FINANCE" || viewer === "SUPER_ADMIN"
     entries.push({
-      id: `publisher-compensation:${compensation.id}`,
+      id: timelineEntryId("publisher-compensation", compensation.createdAt, 0),
       kind: "PUBLISHER_COMPENSATION_DECIDED",
       occurredAt: compensation.createdAt,
       status: "COMPLETED",

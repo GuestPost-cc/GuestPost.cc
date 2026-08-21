@@ -963,8 +963,7 @@ describe("BillingService", () => {
     it("redacts legacy internal refund rationale from the full transaction list", async () => {
       const secret = "OPS_CASE_SECRET_a82f"
       prismaMock.wallet.findUnique.mockResolvedValue({
-        ...mockWallet,
-        transactions: [],
+        id: mockWallet.id,
       })
       prismaMock.transaction.findMany.mockResolvedValue([
         {
@@ -980,6 +979,10 @@ describe("BillingService", () => {
 
       expect(result[0].description).toBe("Refund for order order-2")
       expect(JSON.stringify(result)).not.toContain(secret)
+      expect(prismaMock.wallet.findUnique).toHaveBeenCalledWith({
+        where: { organizationId: "org-1" },
+        select: { id: true },
+      })
     })
   })
 

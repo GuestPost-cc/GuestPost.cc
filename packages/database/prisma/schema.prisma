@@ -1284,7 +1284,7 @@ model OrderCancellationRequest {
   financeApprovedByUserId String?
   resolution              CancellationResolution?
   resolutionReason        String?
-  refundTransactionId     String?
+  refundTransactionId     String?                    @unique
   idempotencyKey          String?
   resolvedAt              DateTime?
   createdAt               DateTime                   @default(now())

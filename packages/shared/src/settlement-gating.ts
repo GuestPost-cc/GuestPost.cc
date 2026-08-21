@@ -150,7 +150,7 @@ export function evaluateSettlementEligibility(
   if (snapshot.fraudFlagCount > 0) {
     block(
       "UNRESOLVED_FRAUD",
-      `Order has ${snapshot.fraudFlagCount} unresolved fraud flag(s)`,
+      `Order has ${snapshot.fraudFlagCount} active fraud hold(s)`,
     )
   }
 

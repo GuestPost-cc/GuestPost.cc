@@ -422,12 +422,21 @@ status must be current and the following migration row must exist exactly once
 with `finished=true` and `not_rolled_back=true`:
 
 ```sql
-SELECT
-  "migration_name",
-  "finished_at" IS NOT NULL AS finished,
-  "rolled_back_at" IS NULL AS not_rolled_back
-FROM public."_prisma_migrations"
-WHERE "migration_name" = '20260815120000_delivery_fraud_findings';
+-- Run through psql with -v ON_ERROR_STOP=1. A missing, duplicated, failed, or
+-- rolled-back migration is a release failure, not merely an empty result set.
+DO $$
+BEGIN
+  IF (
+    SELECT COUNT(*)
+    FROM public."_prisma_migrations"
+    WHERE "migration_name" = '20260815120000_delivery_fraud_findings'
+      AND "finished_at" IS NOT NULL
+      AND "rolled_back_at" IS NULL
+  ) <> 1 THEN
+    RAISE EXCEPTION 'expected exactly one completed delivery-fraud migration';
+  END IF;
+END
+$$;
 ```
 
 The deferred terminal-outcome backstop must also return exactly one enabled,
@@ -436,15 +445,22 @@ refund changes the Order before it finalizes the linked cancellation inside the
 same transaction, and the complete aggregate is validated at commit.
 
 ```sql
-SELECT
-  trigger_row.tgname,
-  trigger_row.tgenabled,
-  trigger_row.tgdeferrable,
-  trigger_row.tginitdeferred
-FROM pg_catalog.pg_trigger AS trigger_row
-WHERE trigger_row.tgrelid = 'public."Order"'::regclass
-  AND trigger_row.tgname = 'Order_confirmed_fraud_terminal_outcome_guard'
-  AND NOT trigger_row.tgisinternal;
+DO $$
+BEGIN
+  IF (
+    SELECT COUNT(*)
+    FROM pg_catalog.pg_trigger AS trigger_row
+    WHERE trigger_row.tgrelid = 'public."Order"'::regclass
+      AND trigger_row.tgname = 'Order_confirmed_fraud_terminal_outcome_guard'
+      AND trigger_row.tgenabled = 'O'
+      AND trigger_row.tgdeferrable
+      AND trigger_row.tginitdeferred
+      AND NOT trigger_row.tgisinternal
+  ) <> 1 THEN
+    RAISE EXCEPTION 'expected exactly one enabled deferred confirmed-fraud terminal trigger';
+  END IF;
+END
+$$;
 ```
 
 Run the following read-only integrity checks after the matching image is up.

@@ -463,7 +463,9 @@ export class AdminController {
     @Param("id") id: string,
     @CurrentAuthority() user: DurableCurrentAuthority,
   ) {
-    return this.admin.getOrder(id, user)
+    // Keep this defensive even though StaffRolesGuard normally guarantees the
+    // role: a missing authority role must never inherit Super Admin access.
+    return this.admin.getOrder(id, { ...user, staffRole: user.staffRole ?? "" })
   }
 
   @Post("orders/:id/manual-verify")

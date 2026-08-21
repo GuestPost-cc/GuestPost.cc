@@ -120,6 +120,41 @@ describe("OrderCancellationService cancellation queue reads", () => {
     expect(result.items[0]).not.toHaveProperty("fraudFindings")
   })
 
+  it("returns the financial allowlist to Finance without exposing staff-only fields", async () => {
+    const { service } = setup()
+
+    const result = await service.listRequests({
+      requestId,
+      role: "FINANCE",
+    })
+
+    expect(result.items[0].order).toMatchObject({
+      amount: "120.00",
+      currency: "USD",
+      customer: {
+        id: "customer-1",
+        name: "Customer",
+      },
+    })
+    expect(result.items[0].order.customer).not.toHaveProperty("email")
+    expect(result.items[0].order).not.toHaveProperty("paymentStatus")
+    expect(result.items[0].order).not.toHaveProperty("targetUrl")
+    expect(result.items[0].order).not.toHaveProperty("briefData")
+  })
+
+  it("returns customer email only to Super Admin", async () => {
+    const { service } = setup()
+
+    const result = await service.listRequests({
+      requestId,
+      role: "SUPER_ADMIN",
+    })
+
+    expect(result.items[0].order.customer).toMatchObject({
+      email: "customer@example.test",
+    })
+  })
+
   it.each([
     "",
     "../cancel-1",

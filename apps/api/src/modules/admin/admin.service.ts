@@ -1909,6 +1909,9 @@ export class AdminService {
   }
 
   async getOrder(id: string, user?: any) {
+    if (user && !VALID_STAFF_ROLES.includes(user.staffRole as StaffRole)) {
+      throw new ForbiddenException("A current staff role is required")
+    }
     const order = await this.prisma.order.findFirst({
       where: {
         id,
@@ -2044,10 +2047,14 @@ export class AdminService {
       },
     })
     if (!order) throw new NotFoundException(`Order ${id} not found`)
+    // Internal callers that deliberately omit an actor retain the historical
+    // system projection. Request-bound callers above fail closed instead.
     const role: StaffRole = user?.staffRole ?? "SUPER_ADMIN"
     const isSuperAdmin = role === "SUPER_ADMIN"
     const canViewFinancials = role !== "OPERATIONS"
     const canViewOrderContent = role === "OPERATIONS" || isSuperAdmin
+    const canViewInvestigatorDetails =
+      role === "FINANCE" || role === "SUPER_ADMIN"
 
     const approverIds = [
       ...new Set(
@@ -2136,8 +2143,8 @@ export class AdminService {
         publisherCompensationPolicy: {
           required: publisherCompensationRequired,
           maximumAmount: publisherCompensationRequired
-            ? (activeSettlement?.publisherAmount ?? order.amount ?? 0)
-            : 0,
+            ? String(activeSettlement?.publisherAmount ?? order.amount ?? 0)
+            : "0",
           currency: activeSettlement?.currency ?? order.currency,
           effectiveOrderStatus: effectiveRefundStatus,
         },
@@ -2279,7 +2286,9 @@ export class AdminService {
                 ? {
                     id: flag.finding.id,
                     outcome: flag.finding.outcome,
-                    reason: flag.finding.internalReason,
+                    ...(canViewInvestigatorDetails && {
+                      reason: flag.finding.internalReason,
+                    }),
                     decidedByRole: flag.finding.decidedByRole,
                     ...(isSuperAdmin && {
                       decidedByUserId: flag.finding.decidedByUserId,

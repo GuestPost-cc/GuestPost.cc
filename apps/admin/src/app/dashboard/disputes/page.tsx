@@ -358,7 +358,7 @@ export default function DisputesPage() {
                                             ?.required === true,
                                         publisherCompensationMaximum:
                                           d.order?.publisherCompensationPolicy
-                                            ?.maximumAmount ?? 0,
+                                            ?.maximumAmount ?? "0",
                                         publisherCompensationCurrency:
                                           d.order?.publisherCompensationPolicy
                                             ?.currency ?? d.order?.currency,

@@ -45,6 +45,8 @@ import { RefundService } from "./refund.service"
 
 const TERMINAL_ORDER_STATUSES = ["CANCELLED", "REFUNDED"] as const
 const CANCELLATION_REQUEST_LOOKUP_ID = /^[A-Za-z0-9_-]{1,128}$/
+const FINANCE_CANCELLATION_APPROVED_EVENT_MESSAGE =
+  "Cancellation refund approved by Finance"
 
 export interface CancellationActorContext {
   userId: string
@@ -926,7 +928,7 @@ export class OrderCancellationService {
             orderId: request.orderId,
             eventType: "CANCELLATION_RESOLVED",
             actorId: financeUserId,
-            message: "Cancellation refund approved by Finance",
+            message: FINANCE_CANCELLATION_APPROVED_EVENT_MESSAGE,
             metadata: {
               requestId,
               responsibility,
@@ -1086,7 +1088,7 @@ export class OrderCancellationService {
       const metadata = this.objectMetadata(event.metadata)
       return (
         event.actorId === expected.financeUserId &&
-        event.message === "Cancellation refund approved by Finance" &&
+        event.message === FINANCE_CANCELLATION_APPROVED_EVENT_MESSAGE &&
         metadata?.requestId === request.id &&
         metadata?.responsibility === expected.responsibility &&
         metadata?.refundTransactionId === expected.refundTransactionId
@@ -1277,15 +1279,22 @@ export class OrderCancellationService {
           effectiveOrderStatus: request.previousOrderStatus,
           hasSettlement: Boolean(activeSettlement),
         })
-        const {
-          settlements: _settlements,
-          customer,
-          amount: _amount,
-          currency: _currency,
-          ...nonFinancialOrder
-        } = request.order
+        const customer = request.order.customer
         const order = {
-          ...nonFinancialOrder,
+          // This is a role-scoped API contract. Never spread a Prisma Order
+          // record here: new scalar fields are otherwise silently exposed to
+          // Operations as the schema evolves.
+          id: request.order.id,
+          title: request.order.title,
+          status: request.order.status,
+          fulfillmentChannel: request.order.fulfillmentChannel,
+          website: request.order.website
+            ? {
+                id: request.order.website.id,
+                domain: request.order.website.domain,
+                publisherId: request.order.website.publisherId,
+              }
+            : null,
           ...(canViewFinancials && {
             amount: request.order.amount,
             currency: request.order.currency,

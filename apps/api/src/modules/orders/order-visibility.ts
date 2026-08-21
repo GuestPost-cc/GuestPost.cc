@@ -82,6 +82,11 @@ const FINANCIAL_EVENT_MESSAGES: Record<
     PUBLISHER: "Order refund completed",
     OPERATIONS: "Order refund completed",
   },
+  PUBLISHER_COMPENSATION_RECORDED: {
+    CUSTOMER: "Publisher financial outcome recorded",
+    PUBLISHER: "Publisher financial outcome recorded",
+    OPERATIONS: "Publisher financial outcome recorded",
+  },
 }
 
 const PUBLIC_EVENT_MESSAGES: Record<string, string> = {
@@ -111,6 +116,7 @@ const PUBLIC_EVENT_MESSAGES: Record<string, string> = {
   SETTLEMENT_RETURNED_TO_REVIEW: "Order settlement returned to review",
   SETTLEMENT_RELEASED: "Order settlement funds released",
   REFUNDED: "Order refund completed",
+  PUBLISHER_COMPENSATION_RECORDED: "Publisher financial outcome recorded",
   VERIFICATION_ESCALATED: "Delivery verification requires staff review",
   AUTO_ACCEPTED: "Delivery automatically accepted",
   REVIEW_REMINDER: "Order review reminder",
@@ -204,6 +210,9 @@ const PUBLIC_EVENT_METADATA_KEYS: Record<string, ReadonlySet<string>> = {
   SETTLEMENT_RETURNED_TO_REVIEW: new Set(["version"]),
   SETTLEMENT_RELEASED: new Set(["currency", "publisherAmount", "version"]),
   REFUNDED: new Set(["amount", "currency", "customerAmount", "refundAmount"]),
+  // Operations can see that Finance recorded an outcome, but never the
+  // compensation amount, debt, transaction references, or responsibility.
+  PUBLISHER_COMPENSATION_RECORDED: new Set(["currency"]),
   VERIFICATION_ESCALATED: new Set([
     "reasonCode",
     "verificationStatus",
