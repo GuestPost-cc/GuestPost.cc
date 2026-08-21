@@ -27,6 +27,7 @@ import {
   Input,
   Label,
   OrderLifecycleProgress,
+  OrderStakeholderUpdates,
   Select,
   SelectContent,
   SelectItem,
@@ -429,7 +430,7 @@ export default function OrderDetailPage({
       enabled: Boolean(order),
     })
 
-  const { data: proof } = useQuery<any>({
+  const { data: proof, isLoading: isProofLoading } = useQuery({
     queryKey: ["order-proof", resolvedParams.id],
     queryFn: () => api.orders.deliveryProof(resolvedParams.id),
     enabled:
@@ -689,20 +690,16 @@ export default function OrderDetailPage({
     (order.status === "DRAFT" || order.status === "PENDING_PAYMENT")
   const canApproveContent = actorCanMutate && order.status === "CUSTOMER_REVIEW"
   const _canRequestRevision = canApproveContent
-  // Platform verified the live placement — customer confirms to complete + settle
-  const canConfirmDelivery = actorCanMutate && order.status === "VERIFIED"
-  // System check is primary; manual accept is the fallback only when the
-  // automated check failed or needs review (and not already accepted).
-  const autoUnverified =
-    proof?.hasDelivery &&
-    ["FAILED", "MANUAL_REVIEW"].includes(proof.verificationStatus) &&
-    proof.interventionStatus === "NONE"
+  // The API revalidates order, delivery, security-hold, and viewer state as one
+  // authoritative projection. Do not reconstruct money-adjacent eligibility
+  // from lifecycle or verification labels in the browser.
+  const canConfirmDelivery =
+    actorCanMutate && proof?.capabilities.canConfirm === true
   const canManualAccept =
-    actorCanMutate && order.status === "PUBLISHED" && autoUnverified
+    actorCanMutate && proof?.capabilities.canManualAccept === true
   const verifyInProgress =
-    order.status === "PUBLISHED" &&
     proof?.hasDelivery &&
-    ["PENDING", "RETRYING"].includes(proof.verificationStatus)
+    proof.capabilities.blockedReason === "VERIFICATION_PENDING"
   const canCancel = Boolean(
     cancellationPreview?.actorCanMutate &&
       ["CANCEL_NOW", "REQUEST_CANCELLATION"].includes(
@@ -828,6 +825,8 @@ export default function OrderDetailPage({
           <OrderLifecycleProgress status={order.status} />
         </CardContent>
       </Card>
+
+      <OrderStakeholderUpdates updates={order.stakeholderTimeline ?? []} />
 
       {cancellationPreview?.activeRequest?.status === "REQUESTED" &&
         cancellationPreview.activeRequest.requesterType !== "CUSTOMER" && (
@@ -969,41 +968,44 @@ export default function OrderDetailPage({
         </Card>
       )}
 
-      {order.status === "VERIFIED" && order.autoAcceptAt && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-blue-600" />
-                  <p className="font-medium">
-                    Review window open until{" "}
-                    {format(new Date(order.autoAcceptAt), "PPp")}
+      {order.status === "VERIFIED" &&
+        order.autoAcceptAt &&
+        !isProofLoading &&
+        proof?.securityReview == null && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-blue-600" />
+                    <p className="font-medium">
+                      Review window open until{" "}
+                      {format(new Date(order.autoAcceptAt), "PPp")}
+                    </p>
+                  </div>
+                  <p className="text-sm text-muted-foreground ml-7">
+                    {(() => {
+                      const remaining = Math.ceil(
+                        (new Date(order.autoAcceptAt).getTime() - Date.now()) /
+                          (1000 * 60 * 60 * 24),
+                      )
+                      if (remaining > 0) {
+                        return `If you take no action, this order will be automatically accepted in ${remaining} day(s).`
+                      }
+                      return "Auto-accepting shortly — the review window has ended."
+                    })()}
                   </p>
                 </div>
-                <p className="text-sm text-muted-foreground ml-7">
-                  {(() => {
-                    const remaining = Math.ceil(
-                      (new Date(order.autoAcceptAt).getTime() - Date.now()) /
-                        (1000 * 60 * 60 * 24),
-                    )
-                    if (remaining > 0) {
-                      return `If you take no action, this order will be automatically accepted in ${remaining} day(s).`
-                    }
-                    return "Auto-accepting shortly — the review window has ended."
-                  })()}
-                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDisputeDialog(true)}
+                >
+                  Report Issue
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => setShowDisputeDialog(true)}
-              >
-                Report Issue
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
 
       {canManualAccept && (
         <Card className="border-amber-300 bg-amber-50">
@@ -1019,7 +1021,7 @@ export default function OrderDetailPage({
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              {proof?.publishedUrl && (
+              {proof?.hasDelivery && (
                 <Button variant="outline" asChild>
                   <a
                     href={proof.publishedUrl}

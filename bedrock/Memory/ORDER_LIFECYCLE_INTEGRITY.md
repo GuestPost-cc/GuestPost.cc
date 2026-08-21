@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: orders-fulfillment
 project: guestpost-platform
-updated: 2026-08-12
+updated: 2026-08-15
 ---
 
 # Order Lifecycle Integrity
@@ -42,6 +42,17 @@ The durable engineering and operations guide is
   metadata only.
 - Event metadata is allowlisted recursively so future server metadata fails
   closed instead of becoming public automatically.
+
+Confirmed delivery fraud uses a typed stakeholder timeline rather than raw
+lifecycle messages. Customers see safe review/final-result copy and their own
+canonical refund; publishers see safe outcome copy and their own
+compensation/debt/net result; Operations sees operational evidence without
+money amounts; Finance sees the internal finding reason and canonical money
+facts without delivery-intervention controls; Super Admin sees both. The
+projector reads immutable flag/finding/resolution evidence and canonical REFUND
+and publisher-compensation records. It never projects free-form
+`OrderEvent.message`, cancellation notes, audit text, support identifiers, or
+provider metadata.
 
 ## Financial reconciliation
 

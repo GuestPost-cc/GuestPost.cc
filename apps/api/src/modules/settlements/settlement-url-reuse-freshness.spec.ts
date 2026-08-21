@@ -72,6 +72,9 @@ describe("settlement URL reuse freshness", () => {
         }),
         count: jest.fn().mockImplementation(async () => unresolvedFlags.length),
       },
+      deliveryFraudHold: {
+        count: jest.fn().mockImplementation(async () => unresolvedFlags.length),
+      },
       orderDispute: { findFirst: jest.fn().mockResolvedValue(null) },
       revision: { findFirst: jest.fn().mockResolvedValue(null) },
       orderCancellationRequest: {

@@ -1,3 +1,5 @@
+import { buildOrderStakeholderTimeline } from "./order-stakeholder-timeline"
+
 type ExternalOrderActor = "CUSTOMER" | "PUBLISHER"
 
 const PUBLIC_EVENT_TYPES = new Set([
@@ -80,6 +82,48 @@ const FINANCIAL_EVENT_MESSAGES: Record<
     PUBLISHER: "Order refund completed",
     OPERATIONS: "Order refund completed",
   },
+  PUBLISHER_COMPENSATION_RECORDED: {
+    CUSTOMER: "Publisher financial outcome recorded",
+    PUBLISHER: "Publisher financial outcome recorded",
+    OPERATIONS: "Publisher financial outcome recorded",
+  },
+}
+
+const PUBLIC_EVENT_MESSAGES: Record<string, string> = {
+  ORDER_CREATED: "Order created",
+  ITEM_ADDED: "Order item added",
+  ITEM_REMOVED: "Order item removed",
+  PAYMENT_SUBMITTED: "Order payment submitted",
+  ORDER_SUBMITTED: "Order submitted",
+  PAYMENT_CAPTURED: "Order payment received",
+  ORDER_ACCEPTED: "Order accepted",
+  CONTENT_REQUESTED: "Content requested",
+  CONTENT_SUBMITTED: "Content submitted",
+  CONTENT_MARKED_READY: "Content marked ready",
+  CONTENT_SUBMITTED_FOR_REVIEW: "Content submitted for review",
+  CONTENT_APPROVED: "Content approved",
+  REVISION_REQUESTED: "Content revision requested",
+  PUBLICATION_MARKED: "Publication recorded",
+  VERIFIED_AUTO: "Delivery automatically verified",
+  VERIFIED_MANUAL: "Delivery manually verified",
+  DELIVERY_CONFIRMED: "Delivery confirmed",
+  DISPUTE_OPENED: "Order dispute opened",
+  DISPUTE_RESOLVED: "Order dispute resolved",
+  ORDER_CANCELLED: "Order cancelled",
+  REFUND_ISSUED: "Order refund processed",
+  SETTLEMENT_CREATED: "Order settlement created",
+  SETTLEMENT_CUSTOMER_APPROVED: "Order settlement customer-approved",
+  SETTLEMENT_RETURNED_TO_REVIEW: "Order settlement returned to review",
+  SETTLEMENT_RELEASED: "Order settlement funds released",
+  REFUNDED: "Order refund completed",
+  PUBLISHER_COMPENSATION_RECORDED: "Publisher financial outcome recorded",
+  VERIFICATION_ESCALATED: "Delivery verification requires staff review",
+  AUTO_ACCEPTED: "Delivery automatically accepted",
+  REVIEW_REMINDER: "Order review reminder",
+  CANCELLATION_REQUESTED: "Cancellation requested",
+  CANCELLATION_RESPONDED: "Cancellation request updated",
+  CANCELLATION_RESOLVED: "Cancellation review completed",
+  ORDER_DECLINED: "Order declined",
 }
 
 const COMMON_PUBLIC_EVENT_KEYS = new Set([
@@ -91,10 +135,7 @@ const COMMON_PUBLIC_EVENT_KEYS = new Set([
   "httpStatus",
   "linkFound",
   "newStatus",
-  "note",
-  "notes",
   "publishedUrl",
-  "reason",
   "reasonCode",
   "requesterType",
   "responseAction",
@@ -107,6 +148,83 @@ const COMMON_PUBLIC_EVENT_KEYS = new Set([
   "version",
   "warrantyEndsAt",
 ])
+
+// Event metadata is an external API contract, not a generic JSON redaction
+// exercise. A key must be allowed for both the viewer and this exact event
+// type. Free-form staff fields such as reason/notes are intentionally absent.
+const PUBLIC_EVENT_METADATA_KEYS: Record<string, ReadonlySet<string>> = {
+  ORDER_CREATED: new Set(["version"]),
+  ITEM_ADDED: new Set(["action", "version"]),
+  ITEM_REMOVED: new Set(["action", "version"]),
+  PAYMENT_SUBMITTED: new Set(["amount", "currency"]),
+  PAYMENT_CAPTURED: new Set(["amount", "currency"]),
+  ORDER_SUBMITTED: new Set(["fromStatus", "toStatus", "version"]),
+  ORDER_ACCEPTED: new Set(["fromStatus", "toStatus", "version"]),
+  CONTENT_REQUESTED: new Set(["deadline", "version"]),
+  CONTENT_SUBMITTED: new Set(["hasContent", "version"]),
+  CONTENT_MARKED_READY: new Set(["hasContent", "version"]),
+  CONTENT_SUBMITTED_FOR_REVIEW: new Set(["hasContent", "version"]),
+  CONTENT_APPROVED: new Set(["version"]),
+  REVISION_REQUESTED: new Set(["revisionNumber", "version"]),
+  PUBLICATION_MARKED: new Set([
+    "publishedUrl",
+    "url",
+    "version",
+    "warrantyEndsAt",
+  ]),
+  VERIFIED_AUTO: new Set([
+    "anchorFound",
+    "httpStatus",
+    "linkFound",
+    "targetUrlMatched",
+    "verificationMethod",
+    "verificationStatus",
+    "version",
+  ]),
+  VERIFIED_MANUAL: new Set([
+    "verificationMethod",
+    "verificationStatus",
+    "version",
+  ]),
+  DELIVERY_CONFIRMED: new Set([
+    "verificationMethod",
+    "verificationStatus",
+    "version",
+  ]),
+  DISPUTE_OPENED: new Set(["fromStatus", "toStatus", "version"]),
+  DISPUTE_RESOLVED: new Set(["fromStatus", "toStatus", "version"]),
+  ORDER_CANCELLED: new Set(["fromStatus", "reasonCode", "toStatus", "version"]),
+  REFUND_ISSUED: new Set([
+    "amount",
+    "currency",
+    "customerAmount",
+    "refundAmount",
+  ]),
+  SETTLEMENT_CREATED: new Set([
+    "amount",
+    "currency",
+    "customerAmount",
+    "publisherAmount",
+  ]),
+  SETTLEMENT_CUSTOMER_APPROVED: new Set(["version"]),
+  SETTLEMENT_RETURNED_TO_REVIEW: new Set(["version"]),
+  SETTLEMENT_RELEASED: new Set(["currency", "publisherAmount", "version"]),
+  REFUNDED: new Set(["amount", "currency", "customerAmount", "refundAmount"]),
+  // Operations can see that Finance recorded an outcome, but never the
+  // compensation amount, debt, transaction references, or responsibility.
+  PUBLISHER_COMPENSATION_RECORDED: new Set(["currency"]),
+  VERIFICATION_ESCALATED: new Set([
+    "reasonCode",
+    "verificationStatus",
+    "version",
+  ]),
+  AUTO_ACCEPTED: new Set(["verificationMethod", "version"]),
+  REVIEW_REMINDER: new Set(["deadline"]),
+  CANCELLATION_REQUESTED: new Set(["reasonCode", "requesterType", "version"]),
+  CANCELLATION_RESPONDED: new Set(["newStatus", "responseAction", "version"]),
+  CANCELLATION_RESOLVED: new Set(["newStatus", "reasonCode", "version"]),
+  ORDER_DECLINED: new Set(["fromStatus", "reasonCode", "toStatus", "version"]),
+}
 
 const CUSTOMER_PUBLIC_EVENT_KEYS = new Set([
   ...COMMON_PUBLIC_EVENT_KEYS,
@@ -126,17 +244,23 @@ const PUBLISHER_PUBLIC_EVENT_KEYS = new Set([
 function projectEventMetadata(
   metadata: unknown,
   actor: ExternalOrderActor | "OPERATIONS",
+  eventType: string,
 ) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return null
   }
 
-  const allowedKeys =
+  const audienceKeys =
     actor === "CUSTOMER"
       ? CUSTOMER_PUBLIC_EVENT_KEYS
       : actor === "PUBLISHER"
         ? PUBLISHER_PUBLIC_EVENT_KEYS
         : COMMON_PUBLIC_EVENT_KEYS
+  const eventKeys = PUBLIC_EVENT_METADATA_KEYS[eventType]
+  if (!eventKeys) return null
+  const allowedKeys = new Set(
+    [...eventKeys].filter((key) => audienceKeys.has(key)),
+  )
 
   const sanitize = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(sanitize)
@@ -159,12 +283,12 @@ export function projectOrderEvent(
   return {
     id: event.id,
     eventType: event.eventType,
-    message:
-      financialMessage ??
-      (PUBLIC_EVENT_TYPES.has(event.eventType)
-        ? (event.message ?? null)
-        : null),
-    metadata: projectEventMetadata(event.metadata, actor),
+    // Never return a writer-supplied message to external actors. Several
+    // domain writers legitimately embed internal notes, provider errors, or
+    // support references in their event message. Public copy is a closed,
+    // event-specific server contract; unknown types fail closed to null.
+    message: financialMessage ?? PUBLIC_EVENT_MESSAGES[event.eventType] ?? null,
+    metadata: projectEventMetadata(event.metadata, actor, event.eventType),
     createdAt: event.createdAt,
   }
 }
@@ -267,11 +391,9 @@ const EXTERNAL_CANCELLATION_REQUEST_KEYS = [
   "orderId",
   "requesterType",
   "reasonCode",
-  "note",
   "status",
   "responsibility",
   "responseDeadlineAt",
-  "responseNote",
   "createdAt",
 ] as const
 
@@ -309,7 +431,19 @@ function projectExternalOrderItem(value: any, websiteUnlocked: boolean) {
 
 export function projectExternalCancellationRequest(value: any) {
   if (value == null) return value
-  return pickOwnDefined(value, EXTERNAL_CANCELLATION_REQUEST_KEYS)
+  const projected = pickOwnDefined(value, EXTERNAL_CANCELLATION_REQUEST_KEYS)
+  // Customer/publisher-authored request context may be shown back to the
+  // order participants. Staff-authored notes and every response note are
+  // internal evidence, not public copy; status/timeline projections carry the
+  // safe stakeholder decision instead.
+  if (
+    (value.requesterType === "CUSTOMER" ||
+      value.requesterType === "PUBLISHER") &&
+    Object.hasOwn(value, "note")
+  ) {
+    projected.note = value.note
+  }
+  return projected
 }
 
 export function projectExternalOrderDispute(value: any) {
@@ -385,9 +519,16 @@ export function projectExternalOrder(
           projectExternalOrderItem(item, canViewWebsite),
         )
       : [],
+    // Filtering is mandatory. Redacting only message/metadata still leaks the
+    // existence and timing of internal event types to external participants.
     events: Array.isArray(order.events)
-      ? order.events.map((event: any) => projectOrderEvent(event, actor))
+      ? order.events
+          .filter((event: any) => PUBLIC_EVENT_TYPES.has(event.eventType))
+          .map((event: any) => projectOrderEvent(event, actor))
       : [],
+    ...(Object.hasOwn(order, "fraudFlags") && {
+      stakeholderTimeline: buildOrderStakeholderTimeline(order, actor),
+    }),
     settlements:
       actor === "PUBLISHER"
         ? (Array.isArray(order.settlements) ? order.settlements : []).map(

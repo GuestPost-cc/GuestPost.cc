@@ -1,7 +1,7 @@
 ---
 note_type: backlog
 project: guestpost-platform
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # Backlog
@@ -18,6 +18,33 @@ gate and must not be represented as fixed by the current correctness work:
   with actor independence enforced in both application and database policy.
 - [ ] Append-only staff security/finance audit evidence and a rehearsed,
   independently approved break-glass procedure.
+
+## Confirmed delivery-fraud workflow rollout (2026-08-15)
+
+- [x] Implement the role-separated operational handoff: immutable confirmed
+  finding, permanent settlement-deny hold, same-order structured cancellation,
+  exact replay/version semantics, Operations/Super Admin full-refund review,
+  Finance/Super Admin canonical refund approval, database backstops, and
+  audience-safe timeline/outbox projections.
+- [ ] Complete final repository CI and the real PostgreSQL migration suite,
+  including direct UPDATE/DELETE/TRUNCATE denial, incomplete reused-case
+  rejection, force-cancel/dispute-refund bypass denial, deferred terminal-
+  outcome enforcement, full-refund state progression, exact Finance replay,
+  and customer/publisher/Operations/Finance projection privacy.
+- [ ] Rotate every database credential exposed outside approved secret storage
+  and rehearse migration `20260815120000_delivery_fraud_findings` on a populated
+  Neon branch/clone through a direct deploy-role DSN. Prove the exact
+  identifier-safe runtime grant and denial matrix through the pooled
+  API/worker role; never place either DSN in a client build, logs, Bedrock, or
+  repository files.
+- [ ] Execute the hard-drain production cutover: PITR marker, zero Render API
+  and Northflank realtime/on-demand/scheduled/ad-hoc writers, migration status,
+  unchanged deploy, matching image in `recovery_only`, anomaly/reconciliation
+  postflight, and response-loss/audience/outbox canaries.
+- [ ] Return server-only `FINANCE_RUNTIME_MODE` to `normal` only through an
+  intentional, recorded decision after every canary passes. Keep
+  `PAYOUT_EXECUTION_ENABLED=false` until its separate provider and governance
+  gate is approved.
 
 ## Deferred launch-readiness findings (2026-08-11)
 

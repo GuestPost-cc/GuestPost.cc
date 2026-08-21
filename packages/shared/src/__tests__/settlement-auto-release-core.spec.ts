@@ -77,8 +77,10 @@ function makeTx() {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     deliveryFraudFlag: {
-      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
+    },
+    deliveryFraudHold: {
+      count: jest.fn().mockResolvedValue(0),
     },
     deliveryVerificationEvidence: {
       findFirst: jest.fn().mockResolvedValue(successfulEvidence()),
@@ -114,7 +116,7 @@ function makePrisma(tx: ReturnType<typeof makeTx>) {
 describe("runSettlementAutoRelease canonical money boundary", () => {
   it("re-checks all live blockers before approval or money writes", async () => {
     const tx = makeTx()
-    tx.deliveryFraudFlag.count.mockResolvedValue(1)
+    tx.deliveryFraudHold.count.mockResolvedValue(1)
     const prisma = makePrisma(tx)
 
     const result = await runSettlementAutoRelease(prisma as any, {

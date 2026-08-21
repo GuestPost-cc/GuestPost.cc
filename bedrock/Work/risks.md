@@ -1,17 +1,41 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # Risks
 
-Updated 2026-08-14 after the controlled Neon cutover and worker-fleet
-containment. Historical audit Views are snapshots, not current status;
+Updated 2026-08-15 for the active confirmed-fraud change set. Historical audit
+Views are snapshots, not current status;
 `Work/backlog.md` is the canonical open-work register and this file is the
 canonical launch-risk register.
 
 ## Current production-hold risk
+
+- **The confirmed-fraud release is mixed-writer incompatible and is not yet
+  deployed.** Migration `20260815120000_delivery_fraud_findings` makes findings,
+  linked cancellation decisions, and approved REFUND evidence append-only and
+  prevents automated restoration from clearing a confirmed flag. It also adds
+  a deferred Order terminal-outcome constraint that old terminal writers do
+  not understand. An old API,
+  delivery worker, on-demand job, maintenance dispatcher, or ad-hoc writer can
+  fail against these guards or apply behavior that does not understand the
+  permanent hold. Mitigation: rotate exposed credentials, rehearse on a
+  populated Neon clone using a direct deploy-role DSN, provision and prove the
+  exact restricted runtime grants, take a PITR marker, hard-drain API plus all
+  worker modes, migrate once, and start only the matching image in
+  `recovery_only`. After a finding exists, rollback is forward-fix or controlled
+  PITR; never drop guards or restart an older writer.
+
+- **The new table intentionally has no default runtime access.** The migration
+  revokes `DeliveryFraudFinding` from `PUBLIC`. Starting the matching API before
+  granting table SELECT and the exact column-scoped INSERT surface to the
+  restricted runtime role makes confirmation unavailable; granting broad DML,
+  trigger-function EXECUTE, ownership, or schema CREATE would undermine the
+  evidence boundary. The identifier-safe grant and effective `has_*` denial
+  checks in `docs/PRODUCTION_RUNBOOK.md` are mandatory pre-start gates and must
+  include `assert_confirmed_fraud_terminal_outcome()`.
 
 - **Support still needs one real multi-actor browser acceptance journey.** The
   service, API-client, and shared UI have focused coverage, and a disposable

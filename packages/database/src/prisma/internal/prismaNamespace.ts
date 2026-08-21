@@ -420,6 +420,7 @@ export const ModelName = {
   DeliveryFraudFlag: 'DeliveryFraudFlag',
   DeliveryFraudHold: 'DeliveryFraudHold',
   DeliveryFraudFlagResolution: 'DeliveryFraudFlagResolution',
+  DeliveryFraudFinding: 'DeliveryFraudFinding',
   OrderReview: 'OrderReview',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
@@ -496,7 +497,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "billingProfile" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "publisherCompensation" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryUrlClaimFence" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "depositCreditRecovery" | "depositCreditEvidence" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "communicationEvent" | "communicationDelivery" | "financialDocument" | "notificationPreference" | "emailSuppression" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "billingProfile" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "websiteMetric" | "websiteMetricRevision" | "websiteImportBatch" | "websiteImportRow" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "publisherCompensation" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryUrlClaimFence" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "deliveryFraudHold" | "deliveryFraudFlagResolution" | "deliveryFraudFinding" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "publisherProviderAccount" | "payoutProvider" | "payoutExecution" | "payoutExecutionClaim" | "withdrawalAllocation" | "payoutWebhookEvent" | "payoutBatch" | "apiKey" | "contentOrder" | "orderArticleVersion" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "depositAttempt" | "depositCreditRecovery" | "depositCreditEvidence" | "paymentProviderEvent" | "paymentDispute" | "ticket" | "ticketMessage" | "notification" | "communicationEvent" | "communicationDelivery" | "financialDocument" | "notificationPreference" | "emailSuppression" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3161,6 +3162,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.DeliveryFraudFlagResolutionCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.DeliveryFraudFlagResolutionCountAggregateOutputType> | number
+        }
+      }
+    }
+    DeliveryFraudFinding: {
+      payload: Prisma.$DeliveryFraudFindingPayload<ExtArgs>
+      fields: Prisma.DeliveryFraudFindingFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DeliveryFraudFindingFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DeliveryFraudFindingFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload>
+        }
+        findFirst: {
+          args: Prisma.DeliveryFraudFindingFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DeliveryFraudFindingFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload>
+        }
+        findMany: {
+          args: Prisma.DeliveryFraudFindingFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload>[]
+        }
+        create: {
+          args: Prisma.DeliveryFraudFindingCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload>
+        }
+        createMany: {
+          args: Prisma.DeliveryFraudFindingCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DeliveryFraudFindingCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload>[]
+        }
+        delete: {
+          args: Prisma.DeliveryFraudFindingDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload>
+        }
+        update: {
+          args: Prisma.DeliveryFraudFindingUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload>
+        }
+        deleteMany: {
+          args: Prisma.DeliveryFraudFindingDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DeliveryFraudFindingUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DeliveryFraudFindingUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload>[]
+        }
+        upsert: {
+          args: Prisma.DeliveryFraudFindingUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryFraudFindingPayload>
+        }
+        aggregate: {
+          args: Prisma.DeliveryFraudFindingAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDeliveryFraudFinding>
+        }
+        groupBy: {
+          args: Prisma.DeliveryFraudFindingGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryFraudFindingGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DeliveryFraudFindingCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryFraudFindingCountAggregateOutputType> | number
         }
       }
     }
@@ -8362,6 +8437,26 @@ export const DeliveryFraudFlagResolutionScalarFieldEnum = {
 export type DeliveryFraudFlagResolutionScalarFieldEnum = (typeof DeliveryFraudFlagResolutionScalarFieldEnum)[keyof typeof DeliveryFraudFlagResolutionScalarFieldEnum]
 
 
+export const DeliveryFraudFindingScalarFieldEnum = {
+  id: 'id',
+  fraudFlagId: 'fraudFlagId',
+  orderId: 'orderId',
+  deliveryVersionId: 'deliveryVersionId',
+  cancellationRequestId: 'cancellationRequestId',
+  outcome: 'outcome',
+  internalReason: 'internalReason',
+  decidedByUserId: 'decidedByUserId',
+  decidedByRole: 'decidedByRole',
+  expectedOrderVersion: 'expectedOrderVersion',
+  expectedVerificationVersion: 'expectedVerificationVersion',
+  idempotencyKey: 'idempotencyKey',
+  requestFingerprint: 'requestFingerprint',
+  createdAt: 'createdAt'
+} as const
+
+export type DeliveryFraudFindingScalarFieldEnum = (typeof DeliveryFraudFindingScalarFieldEnum)[keyof typeof DeliveryFraudFindingScalarFieldEnum]
+
+
 export const OrderReviewScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
@@ -10231,6 +10326,20 @@ export type ListEnumDeliveryFraudResolutionKindFieldRefInput<$PrismaModel> = Fie
 
 
 /**
+ * Reference to a field of type 'DeliveryFraudFindingOutcome'
+ */
+export type EnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryFraudFindingOutcome'>
+
+
+
+/**
+ * Reference to a field of type 'DeliveryFraudFindingOutcome[]'
+ */
+export type ListEnumDeliveryFraudFindingOutcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryFraudFindingOutcome[]'>
+
+
+
+/**
  * Reference to a field of type 'WithdrawalStatus'
  */
 export type EnumWithdrawalStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WithdrawalStatus'>
@@ -11005,6 +11114,7 @@ export type GlobalOmitConfig = {
   deliveryFraudFlag?: Prisma.DeliveryFraudFlagOmit
   deliveryFraudHold?: Prisma.DeliveryFraudHoldOmit
   deliveryFraudFlagResolution?: Prisma.DeliveryFraudFlagResolutionOmit
+  deliveryFraudFinding?: Prisma.DeliveryFraudFindingOmit
   orderReview?: Prisma.OrderReviewOmit
   publisherBalance?: Prisma.PublisherBalanceOmit
   withdrawal?: Prisma.WithdrawalOmit

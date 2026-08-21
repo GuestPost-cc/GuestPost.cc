@@ -27,6 +27,7 @@ import {
   Input,
   Label,
   OrderLifecycleProgress,
+  OrderStakeholderUpdates,
   Select,
   SelectContent,
   SelectItem,
@@ -379,7 +380,7 @@ export default function OrderDetailPage() {
     enabled: Boolean(order),
   })
 
-  const { data: proof } = useQuery<any>({
+  const { data: proof } = useQuery({
     queryKey: ["order-proof", orderId],
     queryFn: () => api.orders.deliveryProof(orderId),
     enabled:
@@ -660,6 +661,8 @@ export default function OrderDetailPage() {
 
       {/* Progress */}
       <OrderProgress status={s} />
+
+      <OrderStakeholderUpdates updates={order.stakeholderTimeline ?? []} />
 
       {cancellationPreview?.activeRequest?.status === "REQUESTED" &&
         cancellationPreview.activeRequest.requesterType === "CUSTOMER" && (

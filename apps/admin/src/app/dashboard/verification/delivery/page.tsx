@@ -6,11 +6,13 @@ import type {
 } from "@guestpost/api-client"
 import {
   Badge,
+  type BadgeProps,
   Button,
   Card,
   CardContent,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -40,7 +42,7 @@ import {
   Ticket,
 } from "lucide-react"
 import Link from "next/link"
-import { Fragment, useState } from "react"
+import { Fragment, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
   AdminEmptyState,
@@ -50,7 +52,10 @@ import {
 import { api } from "../../../../lib/api"
 import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
 
-const priorityBadge: Record<string, { variant: any; label: string }> = {
+const priorityBadge: Record<
+  string,
+  { variant: BadgeProps["variant"]; label: string }
+> = {
   CRITICAL: { variant: "destructive", label: "Critical" },
   HIGH: { variant: "warning", label: "High" },
   MEDIUM: { variant: "secondary", label: "Medium" },
@@ -70,8 +75,8 @@ type VerificationReason = keyof typeof verificationReasons
 
 const fraudDispositions: Record<DeliveryFraudDisposition, string> = {
   FALSE_POSITIVE: "False positive",
-  AUTHORIZED_REUSE: "Authorized URL reuse (Finance/Super Admin)",
-  RISK_ACCEPTED: "Risk accepted (Finance/Super Admin)",
+  AUTHORIZED_REUSE: "Authorized URL reuse (Finance or Super Admin)",
+  RISK_ACCEPTED: "Risk accepted (Finance or Super Admin)",
 }
 
 export default function DeliveryVerificationQueuePage() {
@@ -94,13 +99,18 @@ function DeliveryVerificationQueuePageInner({
   staffRole: string | null
 }) {
   const canOperate = staffRole === "SUPER_ADMIN" || staffRole === "OPERATIONS"
+  const canResolveFraud = canOperate || staffRole === "FINANCE"
   const qc = useQueryClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [actionDialog, setActionDialog] = useState<{
-    mode: "verify" | "reject" | "resolve-fraud"
+    mode: "verify" | "reject" | "resolve-fraud" | "confirm-fraud"
     id: string
     orderId: string
+    orderVersion: number
+    verificationVersion: number
   } | null>(null)
+  const confirmationIntentId = useRef<string | null>(null)
+  const confirmationReason = useRef<string | null>(null)
   const [reason, setReason] = useState("")
   const [notes, setNotes] = useState("")
   const [verificationReason, setVerificationReason] =
@@ -110,6 +120,24 @@ function DeliveryVerificationQueuePageInner({
   const [evidenceReference, setEvidenceReference] = useState("")
   const [ticketId, setTicketId] = useState("")
   const [reverifyId, setReverifyId] = useState<string | null>(null)
+
+  const closeActionDialog = () => {
+    setActionDialog(null)
+    setReason("")
+    setNotes("")
+    setVerificationReason("CRAWLER_BLOCKED")
+    setFraudDisposition("FALSE_POSITIVE")
+    setEvidenceReference("")
+    confirmationIntentId.current = null
+    confirmationReason.current = null
+  }
+
+  const invalidateDecisionViews = (orderId: string) => {
+    qc.invalidateQueries({ queryKey: ["delivery-verification-queue"] })
+    qc.invalidateQueries({ queryKey: ["admin", "order", orderId] })
+    qc.invalidateQueries({ queryKey: ["admin", "orders"] })
+    qc.invalidateQueries({ queryKey: ["notifications"] })
+  }
 
   const {
     data: queue,
@@ -140,13 +168,10 @@ function DeliveryVerificationQueuePageInner({
         reason: args.reason,
         notes: args.notes,
       }),
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
       toast.success("Order marked as verified")
-      setActionDialog(null)
-      setReason("")
-      setNotes("")
-      setVerificationReason("CRAWLER_BLOCKED")
-      qc.invalidateQueries({ queryKey: ["delivery-verification-queue"] })
+      closeActionDialog()
+      invalidateDecisionViews(variables.id)
     },
     onError: () => toast.error("Failed to mark as verified"),
   })
@@ -154,11 +179,10 @@ function DeliveryVerificationQueuePageInner({
   const reject = useMutation({
     mutationFn: (args: { id: string; reason: string }) =>
       api.admin.rejectVerification(args.id, { reason: args.reason }),
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
       toast.success("Verification rejected")
-      setActionDialog(null)
-      setReason("")
-      qc.invalidateQueries({ queryKey: ["delivery-verification-queue"] })
+      closeActionDialog()
+      invalidateDecisionViews(variables.id)
     },
     onError: () => toast.error("Failed to reject verification"),
   })
@@ -166,11 +190,11 @@ function DeliveryVerificationQueuePageInner({
   const requestReverify = useMutation({
     mutationFn: (args: { id: string; ticketId: string }) =>
       api.admin.requestReverify(args.id, { ticketId: args.ticketId }),
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
       toast.success("Publisher requested to re-verify")
       setReverifyId(null)
       setTicketId("")
-      qc.invalidateQueries({ queryKey: ["delivery-verification-queue"] })
+      invalidateDecisionViews(variables.id)
     },
     onError: () => toast.error("Failed to request re-verification"),
   })
@@ -201,19 +225,51 @@ function DeliveryVerificationQueuePageInner({
       })
     },
     onSuccess: () => {
+      const orderId = actionDialog?.orderId
       toast.success("Fraud hold resolved with staff evidence")
-      setActionDialog(null)
-      setReason("")
-      setFraudDisposition("FALSE_POSITIVE")
-      setEvidenceReference("")
-      qc.invalidateQueries({ queryKey: ["delivery-verification-queue"] })
+      closeActionDialog()
+      if (orderId) invalidateDecisionViews(orderId)
     },
-    onError: () => toast.error("Failed to resolve fraud hold"),
+    onError: (error: Error) =>
+      toast.error(error.message || "Failed to resolve fraud hold"),
+  })
+
+  const confirmFraud = useMutation({
+    mutationFn: (args: {
+      id: string
+      orderId: string
+      reason: string
+      expectedOrderVersion: number
+      expectedVerificationVersion: number
+      idempotencyKey: string
+    }) =>
+      api.admin.confirmDeliveryFraudFlag(args.id, {
+        reason: args.reason,
+        expectedOrderVersion: args.expectedOrderVersion,
+        expectedVerificationVersion: args.expectedVerificationVersion,
+        idempotencyKey: args.idempotencyKey,
+      }),
+    onSuccess: (result, variables) => {
+      toast.success(
+        result.replayed
+          ? "Confirmed fraud decision and review case already recorded"
+          : "Security violation confirmed; cancellation review created without moving money",
+      )
+      closeActionDialog()
+      invalidateDecisionViews(variables.orderId)
+    },
+    onError: (error: Error, variables) => {
+      toast.error(error.message || "Failed to confirm security violation")
+      invalidateDecisionViews(variables.orderId)
+    },
   })
 
   const items = queue ?? []
   const actionPending =
-    markVerified.isPending || reject.isPending || resolveFraud.isPending
+    markVerified.isPending ||
+    reject.isPending ||
+    resolveFraud.isPending ||
+    confirmFraud.isPending
   const actionInvalid =
     actionDialog?.mode === "verify"
       ? notes.length > 800 ||
@@ -402,6 +458,9 @@ function DeliveryVerificationQueuePageInner({
                                         mode: "verify",
                                         id: item.orderId,
                                         orderId: item.orderId,
+                                        orderVersion: item.orderVersion,
+                                        verificationVersion:
+                                          delivery?.verificationVersion ?? 0,
                                       })
                                       setVerificationReason("CRAWLER_BLOCKED")
                                       setNotes("")
@@ -420,6 +479,9 @@ function DeliveryVerificationQueuePageInner({
                                         mode: "reject",
                                         id: item.orderId,
                                         orderId: item.orderId,
+                                        orderVersion: item.orderVersion,
+                                        verificationVersion:
+                                          delivery?.verificationVersion ?? 0,
                                       })
                                     }}
                                   >
@@ -528,9 +590,9 @@ function DeliveryVerificationQueuePageInner({
                               )}
 
                               {delivery && delivery.fraudFlags.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="space-y-3">
                                   <strong className="text-sm">
-                                    Fraud flags:
+                                    Security review findings
                                   </strong>
                                   {delivery.fraudFlags.map((flag) => (
                                     <div
@@ -586,23 +648,127 @@ function DeliveryVerificationQueuePageInner({
                                       <pre className="max-w-xl overflow-auto whitespace-pre-wrap break-all rounded bg-background p-2 text-xs">
                                         {JSON.stringify(flag.details, null, 2)}
                                       </pre>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={resolveFraud.isPending}
-                                        onClick={() => {
-                                          setActionDialog({
-                                            mode: "resolve-fraud",
-                                            id: flag.id,
-                                            orderId: item.orderId,
-                                          })
-                                          setReason("")
-                                          setFraudDisposition("FALSE_POSITIVE")
-                                          setEvidenceReference("")
-                                        }}
-                                      >
-                                        Resolve hold
-                                      </Button>
+                                      {flag.finding ? (
+                                        <div className="space-y-3 rounded-md border border-destructive/40 bg-background p-3">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <Badge variant="destructive">
+                                              Confirmed violation
+                                            </Badge>
+                                            <span className="text-xs text-muted-foreground">
+                                              Decided by{" "}
+                                              {flag.finding.decidedByRole.replaceAll(
+                                                "_",
+                                                " ",
+                                              )}{" "}
+                                              on{" "}
+                                              {format(
+                                                new Date(
+                                                  flag.finding.createdAt,
+                                                ),
+                                                "PPp",
+                                              )}
+                                            </span>
+                                          </div>
+                                          <p
+                                            className="whitespace-pre-wrap break-words text-sm"
+                                            dir="auto"
+                                          >
+                                            {flag.finding.reason}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            This confirmed evidence permanently
+                                            denies settlement for the delivery.
+                                            The separate refund and compensation
+                                            workflow closes the financial case;
+                                            it does not clear or erase this
+                                            finding.
+                                          </p>
+                                          <div className="flex flex-wrap gap-2">
+                                            {canResolveFraud ? (
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                disabled
+                                                title="A confirmed violation cannot be cleared"
+                                              >
+                                                Clear finding
+                                              </Button>
+                                            ) : null}
+                                            <Button size="sm" asChild>
+                                              <Link
+                                                href={`/dashboard/cancellations?requestId=${flag.finding.cancellationRequestId}`}
+                                              >
+                                                Open cancellation review
+                                              </Link>
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : canResolveFraud ? (
+                                        <div className="flex flex-wrap gap-2">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={resolveFraud.isPending}
+                                            onClick={() => {
+                                              setActionDialog({
+                                                mode: "resolve-fraud",
+                                                id: flag.id,
+                                                orderId: item.orderId,
+                                                orderVersion: item.orderVersion,
+                                                verificationVersion:
+                                                  delivery.verificationVersion,
+                                              })
+                                              setReason("")
+                                              setFraudDisposition(
+                                                "FALSE_POSITIVE",
+                                              )
+                                              setEvidenceReference("")
+                                              confirmationIntentId.current =
+                                                null
+                                            }}
+                                          >
+                                            Clear finding
+                                          </Button>
+                                          {canOperate ? (
+                                            <Button
+                                              size="sm"
+                                              variant="destructive"
+                                              disabled={confirmFraud.isPending}
+                                              onClick={() => {
+                                                if (
+                                                  !globalThis.crypto?.randomUUID
+                                                ) {
+                                                  toast.error(
+                                                    "Secure confirmation is unavailable in this browser. Refresh or use a supported browser.",
+                                                  )
+                                                  return
+                                                }
+                                                confirmationIntentId.current =
+                                                  globalThis.crypto.randomUUID()
+                                                confirmationReason.current =
+                                                  null
+                                                setActionDialog({
+                                                  mode: "confirm-fraud",
+                                                  id: flag.id,
+                                                  orderId: item.orderId,
+                                                  orderVersion:
+                                                    item.orderVersion,
+                                                  verificationVersion:
+                                                    flag.deliveryVersion
+                                                      .verificationVersion,
+                                                })
+                                                setReason("")
+                                              }}
+                                            >
+                                              Confirm violation
+                                            </Button>
+                                          ) : null}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                          Awaiting an authorized staff decision.
+                                        </p>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -638,33 +804,44 @@ function DeliveryVerificationQueuePageInner({
 
       <Dialog
         open={actionDialog !== null}
-        onOpenChange={() => {
-          setActionDialog(null)
-          setReason("")
-          setNotes("")
-          setVerificationReason("CRAWLER_BLOCKED")
-          setFraudDisposition("FALSE_POSITIVE")
-          setEvidenceReference("")
-        }}
+        onOpenChange={(open) => !open && closeActionDialog()}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {actionDialog?.mode === "verify"
-                ? "Mark Order as Verified"
+                ? "Mark order as verified"
                 : actionDialog?.mode === "resolve-fraud"
-                  ? "Resolve Fraud Hold"
-                  : "Reject Verification"}
+                  ? "Clear security finding"
+                  : actionDialog?.mode === "confirm-fraud"
+                    ? "Confirm security violation"
+                    : "Reject verification"}
             </DialogTitle>
+            <DialogDescription>
+              {actionDialog?.mode === "verify"
+                ? "Confirm that the delivery has been manually verified. This approves the delivery."
+                : actionDialog?.mode === "resolve-fraud"
+                  ? "Document why this immutable signal is safe to clear. Clearing it does not advance the order or release funds."
+                  : actionDialog?.mode === "confirm-fraud"
+                    ? "This records a durable security decision and keeps the financial hold in place."
+                    : "Reject the delivery verification and require a publisher resubmission."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              {actionDialog?.mode === "verify"
-                ? "Confirm that the delivery has been manually verified. This will approve the order."
-                : actionDialog?.mode === "resolve-fraud"
-                  ? "Document why this specific immutable fraud signal is safe to clear. This does not advance the order or release funds by itself."
-                  : "Reject the delivery verification. This will require the publisher to resubmit."}
-            </p>
+            {actionDialog?.mode === "confirm-fraud" ? (
+              <div
+                className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+                role="alert"
+              >
+                <p className="font-medium">Financial hold remains active</p>
+                <p className="mt-1 text-muted-foreground">
+                  Confirmation does not refund the customer, compensate the
+                  publisher, cancel the order, or release funds. Open the order
+                  after confirming and complete the appropriate financial
+                  workflow.
+                </p>
+              </div>
+            ) : null}
             {actionDialog?.mode === "verify" ? (
               <>
                 <Select
@@ -745,28 +922,32 @@ function DeliveryVerificationQueuePageInner({
                   placeholder="Reason (required, min 20 characters)"
                   value={reason}
                   maxLength={1000}
+                  disabled={
+                    actionDialog?.mode === "confirm-fraud" &&
+                    confirmationReason.current !== null
+                  }
                   onChange={(e) => setReason(e.target.value)}
                 />
+                {actionDialog?.mode === "confirm-fraud" &&
+                confirmationReason.current !== null ? (
+                  <p className="text-xs text-muted-foreground">
+                    This decision text is locked for safe retry. Close and
+                    reopen the dialog to start a different decision.
+                  </p>
+                ) : null}
               </>
             )}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setActionDialog(null)
-                setReason("")
-                setNotes("")
-                setVerificationReason("CRAWLER_BLOCKED")
-                setFraudDisposition("FALSE_POSITIVE")
-                setEvidenceReference("")
-              }}
-            >
+            <Button variant="outline" onClick={closeActionDialog}>
               Cancel
             </Button>
             <Button
               variant={
-                actionDialog?.mode === "verify" ? "default" : "destructive"
+                actionDialog?.mode === "verify" ||
+                actionDialog?.mode === "resolve-fraud"
+                  ? "default"
+                  : "destructive"
               }
               disabled={actionPending || actionInvalid}
               onClick={() => {
@@ -780,23 +961,44 @@ function DeliveryVerificationQueuePageInner({
                 } else if (actionDialog.mode === "resolve-fraud") {
                   resolveFraud.mutate({
                     id: actionDialog.id,
-                    reason,
+                    reason: reason.trim(),
                     disposition: fraudDisposition,
                     evidenceReference: evidenceReference.trim() || undefined,
+                  })
+                } else if (actionDialog.mode === "confirm-fraud") {
+                  if (!canOperate || !confirmationIntentId.current) {
+                    toast.error(
+                      "Secure confirmation expired. Close this dialog and try again.",
+                    )
+                    return
+                  }
+                  const frozenReason =
+                    confirmationReason.current ?? reason.trim()
+                  confirmationReason.current = frozenReason
+                  confirmFraud.mutate({
+                    id: actionDialog.id,
+                    orderId: actionDialog.orderId,
+                    reason: frozenReason,
+                    expectedOrderVersion: actionDialog.orderVersion,
+                    expectedVerificationVersion:
+                      actionDialog.verificationVersion,
+                    idempotencyKey: confirmationIntentId.current,
                   })
                 } else {
                   reject.mutate({
                     id: actionDialog.id,
-                    reason,
+                    reason: reason.trim(),
                   })
                 }
               }}
             >
               {actionDialog?.mode === "verify"
-                ? "Confirm Verify"
+                ? "Confirm verification"
                 : actionDialog?.mode === "resolve-fraud"
-                  ? "Resolve Hold"
-                  : "Reject"}
+                  ? "Clear finding"
+                  : actionDialog?.mode === "confirm-fraud"
+                    ? "Confirm violation"
+                    : "Reject"}
             </Button>
           </DialogFooter>
         </DialogContent>

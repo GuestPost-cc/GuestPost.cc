@@ -14,6 +14,7 @@ import type {
   CancellationRequestResponse,
   CancellationRequestStatus,
   PublisherCompensationDecisionInput,
+  StakeholderTimelineEntry,
 } from "./orders"
 import type {
   AddTicketMessageInput,
@@ -541,13 +542,15 @@ export interface OperationsOrderDetail extends OperationsInboxOrder {
 
 export interface AdminDeliveryVerificationQueueItem {
   orderId: string
+  orderVersion: number
   status: OrderStatus
   title: string | null
-  amount: string | number | null
+  /** Finance and Super Admin only. */
+  amount?: string | number | null
   targetUrl: string | null
   anchorText: string | null
   createdAt: string
-  customer: { id: string; name: string | null; email: string } | null
+  customer: { id: string; name: string | null; email?: string } | null
   website: {
     id: string
     name: string | null
@@ -557,9 +560,9 @@ export interface AdminDeliveryVerificationQueueItem {
   } | null
   publisher: {
     id: string
-    name: string
-    email: string | null
-    tier: string
+    name: string | null
+    email?: string | null
+    tier?: string
   } | null
   deliveryVersion: {
     id: string
@@ -591,11 +594,20 @@ export interface AdminDeliveryVerificationQueueItem {
       type: string
       details: unknown
       createdAt: string
+      finding?: {
+        id: string
+        cancellationRequestId: string
+        outcome: "CONFIRMED_FRAUD"
+        reason: string
+        decidedByRole: "SUPER_ADMIN" | "OPERATIONS"
+        createdAt: string
+      } | null
       deliveryVersion: {
         id: string
         version: number
         publishedUrl: string
         verificationStatus: string
+        verificationVersion: number
         supersededByVersion: number | null
         evidence: {
           httpStatus: number
@@ -661,11 +673,12 @@ export interface AdminOrderDetailResponse {
   }
   publisherCompensationPolicy?: {
     required: boolean
-    maximumAmount: string | number
+    maximumAmount: string
     currency: string
     effectiveOrderStatus: string
   }
   organization?: { id: string; name: string; slug?: string } | null
+  stakeholderTimeline: StakeholderTimelineEntry[]
   events: AdminOrderTimelineEvent[]
   customer?: {
     id: string
@@ -781,14 +794,29 @@ export interface AdminOrderDetailResponse {
 
 export interface AdminCancellationRequestResponse
   extends CancellationRequestResponse {
+  /** True when immutable confirmed-fraud evidence requires a full refund path. */
+  requiresConfirmedFraudFullRefund: boolean
+  publisherCompensationPolicy?: {
+    required: boolean
+    maximumAmount: string
+    currency: string
+    effectiveOrderStatus: string
+  }
   order: {
     id: string
     title: string | null
     status: OrderStatus
-    amount: string | number | null
-    currency: string
+    /** Finance and Super Admin only. */
+    amount?: string | number | null
+    /** Finance and Super Admin only. */
+    currency?: string
     fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
-    customer: { id: string; name: string | null; email: string }
+    customer: {
+      id: string
+      name: string | null
+      /** Super Admin only. */
+      email?: string
+    } | null
     website: { id: string; domain: string; publisherId: string | null } | null
   }
 }
@@ -1310,6 +1338,7 @@ export class AdminService {
 
   listCancellationRequests(params?: {
     status?: CancellationRequestStatus
+    requestId?: string
     take?: number
     skip?: number
   }) {
@@ -1334,10 +1363,16 @@ export class AdminService {
     })
   }
 
-  financeApproveCancellation(id: string, reason: string) {
+  financeApproveCancellation(
+    id: string,
+    data: {
+      reason: string
+      publisherCompensation?: PublisherCompensationDecisionInput
+    },
+  ) {
     return this.client.post(
       `/admin/cancellation-requests/${id}/finance-approve`,
-      { json: { reason } },
+      { json: data },
     )
   }
 
@@ -1896,6 +1931,24 @@ export class AdminService {
     return this.client.post(`/fraud-flags/${fraudFlagId}/resolve`, {
       json: input,
     })
+  }
+
+  confirmDeliveryFraudFlag(
+    fraudFlagId: string,
+    input: {
+      reason: string
+      expectedOrderVersion: number
+      expectedVerificationVersion: number
+      idempotencyKey: string
+    },
+  ) {
+    return this.client.post<{
+      status: "CONFIRMED"
+      replayed: boolean
+      fraudFlagId: string
+      findingId: string
+      cancellationRequestId: string
+    }>(`/fraud-flags/${fraudFlagId}/confirm`, { json: input })
   }
 
   moderateReview(reviewId: string, status: "APPROVED" | "REJECTED") {

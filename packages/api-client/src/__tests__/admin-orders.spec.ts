@@ -121,4 +121,91 @@ describe("AdminService order monitor", () => {
 
     expect(post).toHaveBeenCalledWith("/orders/order-1/claim")
   })
+
+  it("submits a version-bound, idempotent confirmed-fraud decision", async () => {
+    const client = new HttpClient({
+      baseUrl: "https://api.example.test/api/v1",
+    })
+    const service = new AdminService(client)
+    const post = jest.spyOn(client, "post").mockResolvedValueOnce({
+      status: "CONFIRMED",
+      replayed: false,
+      fraudFlagId: "flag-1",
+      findingId: "finding-1",
+      cancellationRequestId: "cancellation-1",
+    })
+
+    await expect(
+      service.confirmDeliveryFraudFlag("flag-1", {
+        reason: "The immutable evidence confirms deliberate URL reuse.",
+        expectedOrderVersion: 7,
+        expectedVerificationVersion: 3,
+        idempotencyKey: "d4f623c4-a063-4f74-8fd4-e7c355e5be86",
+      }),
+    ).resolves.toMatchObject({
+      findingId: "finding-1",
+      cancellationRequestId: "cancellation-1",
+    })
+
+    expect(post).toHaveBeenCalledWith("/fraud-flags/flag-1/confirm", {
+      json: {
+        reason: "The immutable evidence confirms deliberate URL reuse.",
+        expectedOrderVersion: 7,
+        expectedVerificationVersion: 3,
+        idempotencyKey: "d4f623c4-a063-4f74-8fd4-e7c355e5be86",
+      },
+    })
+  })
+
+  it("preserves exact publisher compensation strings in Finance approval", async () => {
+    const client = new HttpClient({
+      baseUrl: "https://api.example.test/api/v1",
+    })
+    const service = new AdminService(client)
+    const post = jest.spyOn(client, "post").mockResolvedValueOnce({})
+
+    await service.financeApproveCancellation("request-1", {
+      reason: "Publication work was completed before the security decision.",
+      publisherCompensation: {
+        amount: "125.40",
+        reason: "Publication work was completed before the security decision.",
+      },
+    })
+
+    expect(post).toHaveBeenCalledWith(
+      "/admin/cancellation-requests/request-1/finance-approve",
+      {
+        json: {
+          reason:
+            "Publication work was completed before the security decision.",
+          publisherCompensation: {
+            amount: "125.40",
+            reason:
+              "Publication work was completed before the security decision.",
+          },
+        },
+      },
+    )
+  })
+
+  it("passes an exact cancellation request filter for durable staff deep links", async () => {
+    const client = new HttpClient({
+      baseUrl: "https://api.example.test/api/v1",
+    })
+    const service = new AdminService(client)
+    const get = jest.spyOn(client, "get").mockResolvedValueOnce({
+      items: [],
+      total: 0,
+      take: 50,
+      skip: 0,
+    })
+
+    await service.listCancellationRequests({
+      requestId: "cm4linkedcancellation123",
+    })
+
+    expect(get).toHaveBeenCalledWith("/admin/cancellation-requests", {
+      params: { requestId: "cm4linkedcancellation123" },
+    })
+  })
 })

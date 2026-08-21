@@ -45,6 +45,7 @@ import {
 } from "../../common/utils/marketplace-categories"
 import { AuditService } from "../audit/audit.service"
 import { CommunicationsService } from "../communications/communications.service"
+import { buildOrderStakeholderTimeline } from "../orders/order-stakeholder-timeline"
 import { QueueService } from "../queues/queue.service"
 import { operationsPlatformSupportWhere } from "../support/support-routing"
 import {
@@ -1908,6 +1909,9 @@ export class AdminService {
   }
 
   async getOrder(id: string, user?: any) {
+    if (user && !VALID_STAFF_ROLES.includes(user.staffRole as StaffRole)) {
+      throw new ForbiddenException("A current staff role is required")
+    }
     const order = await this.prisma.order.findFirst({
       where: {
         id,
@@ -1948,7 +1952,7 @@ export class AdminService {
         activeDeliveryVersion: {
           include: {
             evidence: { orderBy: { createdAt: "desc" } },
-            fraudFlags: { include: { resolution: true } },
+            fraudFlags: { include: { resolution: true, finding: true } },
             snapshots: true,
             adminVerifiedBy: { select: { id: true, name: true, email: true } },
           },
@@ -2009,6 +2013,28 @@ export class AdminService {
         },
         revisions: true,
         platformRevenue: true,
+        fraudFlags: {
+          orderBy: { createdAt: "asc" },
+          include: { resolution: true, finding: true, hold: true },
+        },
+        transactions: {
+          where: { type: "REFUND" },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            type: true,
+            amount: true,
+            currency: true,
+            createdAt: true,
+          },
+        },
+        publisherCompensation: {
+          include: {
+            debtRepaymentTransaction: {
+              select: { id: true, amount: true, currency: true },
+            },
+          },
+        },
         fulfillmentAssignments: {
           select: {
             id: true,
@@ -2021,10 +2047,14 @@ export class AdminService {
       },
     })
     if (!order) throw new NotFoundException(`Order ${id} not found`)
+    // Internal callers that deliberately omit an actor retain the historical
+    // system projection. Request-bound callers above fail closed instead.
     const role: StaffRole = user?.staffRole ?? "SUPER_ADMIN"
     const isSuperAdmin = role === "SUPER_ADMIN"
     const canViewFinancials = role !== "OPERATIONS"
     const canViewOrderContent = role === "OPERATIONS" || isSuperAdmin
+    const canViewInvestigatorDetails =
+      role === "FINANCE" || role === "SUPER_ADMIN"
 
     const approverIds = [
       ...new Set(
@@ -2113,8 +2143,8 @@ export class AdminService {
         publisherCompensationPolicy: {
           required: publisherCompensationRequired,
           maximumAmount: publisherCompensationRequired
-            ? (activeSettlement?.publisherAmount ?? order.amount ?? 0)
-            : 0,
+            ? String(activeSettlement?.publisherAmount ?? order.amount ?? 0)
+            : "0",
           currency: activeSettlement?.currency ?? order.currency,
           effectiveOrderStatus: effectiveRefundStatus,
         },
@@ -2207,6 +2237,7 @@ export class AdminService {
             "SETTLEMENT_RELEASED",
             "REFUND_ISSUED",
             "REFUNDED",
+            "PUBLISHER_COMPENSATION_RECORDED",
           ].includes(event.eventType)
             ? "Financial lifecycle event recorded"
             : event.message,
@@ -2239,8 +2270,30 @@ export class AdminService {
                     id: flag.resolution.id,
                     kind: flag.resolution.kind,
                     reason: flag.resolution.reason,
+                    disposition:
+                      flag.resolution.evidence &&
+                      typeof flag.resolution.evidence === "object" &&
+                      !Array.isArray(flag.resolution.evidence)
+                        ? ((flag.resolution.evidence as Record<string, unknown>)
+                            .disposition ?? null)
+                        : null,
                     resolvedByUserId: flag.resolution.resolvedByUserId,
+                    resolvedByRole: flag.resolution.resolvedByRole,
                     createdAt: flag.resolution.createdAt,
+                  }
+                : null,
+              finding: flag.finding
+                ? {
+                    id: flag.finding.id,
+                    outcome: flag.finding.outcome,
+                    ...(canViewInvestigatorDetails && {
+                      reason: flag.finding.internalReason,
+                    }),
+                    decidedByRole: flag.finding.decidedByRole,
+                    ...(isSuperAdmin && {
+                      decidedByUserId: flag.finding.decidedByUserId,
+                    }),
+                    createdAt: flag.finding.createdAt,
                   }
                 : null,
             })),
@@ -2282,6 +2335,7 @@ export class AdminService {
           }
         : null,
       cancellation: order.cancellationRequests?.[0] ?? null,
+      stakeholderTimeline: buildOrderStakeholderTimeline(order, role),
       activeAssignment: activeAssignment
         ? {
             id: activeAssignment.id,

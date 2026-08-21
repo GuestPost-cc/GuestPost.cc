@@ -28,7 +28,7 @@ function createPrisma(settlement: any) {
     orderCancellationRequest: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
-    deliveryFraudFlag: { count: jest.fn().mockResolvedValue(0) },
+    deliveryFraudHold: { count: jest.fn().mockResolvedValue(0) },
   }
   return {
     tx,

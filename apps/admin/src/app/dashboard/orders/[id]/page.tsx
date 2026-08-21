@@ -3,6 +3,8 @@
 import {
   type AdminOrderDetailResponse,
   type AdminOrderTimelineEvent,
+  isExactMoneyAtMost,
+  normalizeExactNonNegativeMoney,
   type StaffTicketListResponse,
   supportKeys,
 } from "@guestpost/api-client"
@@ -27,6 +29,7 @@ import {
   Input,
   Label,
   OrderLifecycleProgress,
+  OrderStakeholderUpdates,
   Select,
   SelectContent,
   SelectItem,
@@ -337,24 +340,41 @@ export default function OrderDetailPage() {
   }
 
   const intervene = useMutation({
-    mutationFn: ({ reasonText }: { reasonText: string }) =>
-      api.admin.forceCancelOrder(id, {
+    mutationFn: ({ reasonText }: { reasonText: string }) => {
+      const compensationRequired = needsPublisherCompensationDecision(
+        order!,
+        responsibility,
+      )
+      const exactCompensation = normalizeExactNonNegativeMoney(
+        publisherCompensationAmount,
+      )
+      if (
+        compensationRequired &&
+        (!exactCompensation ||
+          !isExactMoneyAtMost(
+            exactCompensation,
+            order!.publisherCompensationPolicy?.maximumAmount,
+          ))
+      ) {
+        throw new Error(
+          "Enter an exact publisher compensation amount within the allowed maximum.",
+        )
+      }
+      return api.admin.forceCancelOrder(id, {
         reasonCode: "LEGAL_OR_SECURITY_EMERGENCY",
         note: reasonText,
         expectedVersion: order!.version,
         idempotencyKey: `admin-${id}-${order!.version}`,
         confirmationOrderId: confirmationOrderId.trim(),
         responsibility,
-        publisherCompensation: needsPublisherCompensationDecision(
-          order!,
-          responsibility,
-        )
+        publisherCompensation: compensationRequired
           ? {
-              amount: Number(publisherCompensationAmount),
+              amount: exactCompensation!,
               reason: publisherCompensationReason.trim(),
             }
           : undefined,
-      }),
+      })
+    },
     onSuccess: () => {
       toast.success("Order force-cancelled")
       setAction(null)
@@ -642,6 +662,8 @@ export default function OrderDetailPage() {
           and evidence below to understand the order’s current state.
         </AdminNotice>
       )}
+
+      <OrderStakeholderUpdates updates={order.stakeholderTimeline ?? []} />
 
       {showCancel ? (
         <div className="flex flex-col justify-between gap-3 rounded-xl border border-red-200/80 bg-red-50/30 p-4 sm:flex-row sm:items-center dark:border-red-900 dark:bg-red-950/10">
@@ -1549,22 +1571,25 @@ export default function OrderDetailPage() {
               </AdminNotice>
               <div className="space-y-2">
                 <Label htmlFor="force-cancel-publisher-compensation">
-                  Publisher compensation (USD)
+                  Publisher compensation (
+                  {order.publisherCompensationPolicy?.currency ??
+                    order.currency}
+                  )
                 </Label>
                 <Input
                   id="force-cancel-publisher-compensation"
-                  type="number"
-                  min="0"
-                  max={Number(
-                    order.publisherCompensationPolicy?.maximumAmount ?? 0,
-                  )}
-                  step="0.01"
+                  type="text"
                   inputMode="decimal"
+                  autoComplete="off"
                   value={publisherCompensationAmount}
                   onChange={(event) =>
                     setPublisherCompensationAmount(event.target.value)
                   }
                 />
+                <p className="text-xs text-muted-foreground">
+                  Maximum: {order.publisherCompensationPolicy?.maximumAmount}{" "}
+                  {order.publisherCompensationPolicy?.currency}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="force-cancel-publisher-compensation-reason">
@@ -1621,16 +1646,10 @@ export default function OrderDetailPage() {
                 reason.trim().length < 20 ||
                 confirmationOrderId.trim() !== order.id ||
                 (needsPublisherCompensationDecision(order, responsibility) &&
-                  (publisherCompensationAmount.trim() === "" ||
-                    !/^\d+(?:\.\d{1,2})?$/.test(
-                      publisherCompensationAmount.trim(),
-                    ) ||
-                    !Number.isFinite(Number(publisherCompensationAmount)) ||
-                    Number(publisherCompensationAmount) < 0 ||
-                    Number(publisherCompensationAmount) >
-                      Number(
-                        order.publisherCompensationPolicy?.maximumAmount ?? 0,
-                      ) ||
+                  (!isExactMoneyAtMost(
+                    publisherCompensationAmount,
+                    order.publisherCompensationPolicy?.maximumAmount,
+                  ) ||
                     publisherCompensationReason.trim().length < 20))
               }
               onClick={() =>

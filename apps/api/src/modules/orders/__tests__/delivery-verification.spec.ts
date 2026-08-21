@@ -216,7 +216,7 @@ describe("buildSettlementEligibilitySnapshot", () => {
       orderCancellationRequest: {
         findFirst: jest.fn().mockResolvedValue(cancellation),
       },
-      deliveryFraudFlag: { count: jest.fn().mockResolvedValue(0) },
+      deliveryFraudHold: { count: jest.fn().mockResolvedValue(0) },
     }
   }
 

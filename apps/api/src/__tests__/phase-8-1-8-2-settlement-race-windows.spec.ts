@@ -55,9 +55,9 @@ function makeTxMock() {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     deliveryFraudFlag: {
-      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    deliveryFraudHold: { count: jest.fn().mockResolvedValue(0) },
     // releaseFundsInternal touches publisherBalance for tier accounting; mocked
     // null + happy-path create so the method reaches the order.updateMany line.
     publisherBalance: {

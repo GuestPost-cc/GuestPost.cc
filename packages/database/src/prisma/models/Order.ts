@@ -564,6 +564,7 @@ export type OrderWhereInput = {
   publisherCompensation?: Prisma.XOR<Prisma.PublisherCompensationNullableScalarRelationFilter, Prisma.PublisherCompensationWhereInput> | null
   fraudHolds?: Prisma.DeliveryFraudHoldListRelationFilter
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionListRelationFilter
+  fraudFindings?: Prisma.DeliveryFraudFindingListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
   review?: Prisma.XOR<Prisma.OrderReviewNullableScalarRelationFilter, Prisma.OrderReviewWhereInput> | null
   cancellationRequests?: Prisma.OrderCancellationRequestListRelationFilter
@@ -638,6 +639,7 @@ export type OrderOrderByWithRelationInput = {
   publisherCompensation?: Prisma.PublisherCompensationOrderByWithRelationInput
   fraudHolds?: Prisma.DeliveryFraudHoldOrderByRelationAggregateInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionOrderByRelationAggregateInput
+  fraudFindings?: Prisma.DeliveryFraudFindingOrderByRelationAggregateInput
   tickets?: Prisma.TicketOrderByRelationAggregateInput
   review?: Prisma.OrderReviewOrderByWithRelationInput
   cancellationRequests?: Prisma.OrderCancellationRequestOrderByRelationAggregateInput
@@ -716,6 +718,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   publisherCompensation?: Prisma.XOR<Prisma.PublisherCompensationNullableScalarRelationFilter, Prisma.PublisherCompensationWhereInput> | null
   fraudHolds?: Prisma.DeliveryFraudHoldListRelationFilter
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionListRelationFilter
+  fraudFindings?: Prisma.DeliveryFraudFindingListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
   review?: Prisma.XOR<Prisma.OrderReviewNullableScalarRelationFilter, Prisma.OrderReviewWhereInput> | null
   cancellationRequests?: Prisma.OrderCancellationRequestListRelationFilter
@@ -882,6 +885,7 @@ export type OrderCreateInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -948,6 +952,7 @@ export type OrderUncheckedCreateInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -1014,6 +1019,7 @@ export type OrderUpdateInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -1080,6 +1086,7 @@ export type OrderUncheckedUpdateInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -1829,6 +1836,20 @@ export type OrderUpdateOneRequiredWithoutFraudFlagResolutionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutFraudFlagResolutionsInput, Prisma.OrderUpdateWithoutFraudFlagResolutionsInput>, Prisma.OrderUncheckedUpdateWithoutFraudFlagResolutionsInput>
 }
 
+export type OrderCreateNestedOneWithoutFraudFindingsInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutFraudFindingsInput, Prisma.OrderUncheckedCreateWithoutFraudFindingsInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutFraudFindingsInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
+export type OrderUpdateOneRequiredWithoutFraudFindingsNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutFraudFindingsInput, Prisma.OrderUncheckedCreateWithoutFraudFindingsInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutFraudFindingsInput
+  upsert?: Prisma.OrderUpsertWithoutFraudFindingsInput
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutFraudFindingsInput, Prisma.OrderUpdateWithoutFraudFindingsInput>, Prisma.OrderUncheckedUpdateWithoutFraudFindingsInput>
+}
+
 export type OrderCreateNestedOneWithoutReviewInput = {
   create?: Prisma.XOR<Prisma.OrderCreateWithoutReviewInput, Prisma.OrderUncheckedCreateWithoutReviewInput>
   connectOrCreate?: Prisma.OrderCreateOrConnectWithoutReviewInput
@@ -2104,6 +2125,7 @@ export type OrderCreateWithoutCustomerInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -2169,6 +2191,7 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -2244,6 +2267,7 @@ export type OrderCreateWithoutAssigneeInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -2309,6 +2333,7 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -2465,6 +2490,7 @@ export type OrderCreateWithoutOrganizationInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -2530,6 +2556,7 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -2621,6 +2648,7 @@ export type OrderCreateWithoutWebsiteInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -2686,6 +2714,7 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -2777,6 +2806,7 @@ export type OrderCreateWithoutCampaignInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -2842,6 +2872,7 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -2933,6 +2964,7 @@ export type OrderCreateWithoutItemsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -2998,6 +3030,7 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -3079,6 +3112,7 @@ export type OrderUpdateWithoutItemsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -3144,6 +3178,7 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -3209,6 +3244,7 @@ export type OrderCreateWithoutEventsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -3274,6 +3310,7 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -3355,6 +3392,7 @@ export type OrderUpdateWithoutEventsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -3420,6 +3458,7 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -3485,6 +3524,7 @@ export type OrderCreateWithoutDisputeInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -3550,6 +3590,7 @@ export type OrderUncheckedCreateWithoutDisputeInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -3631,6 +3672,7 @@ export type OrderUpdateWithoutDisputeInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -3696,6 +3738,7 @@ export type OrderUncheckedUpdateWithoutDisputeInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -3762,6 +3805,7 @@ export type OrderCreateWithoutCancellationRequestsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutOrderInput
@@ -3827,6 +3871,7 @@ export type OrderUncheckedCreateWithoutCancellationRequestsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutOrderInput
@@ -3908,6 +3953,7 @@ export type OrderUpdateWithoutCancellationRequestsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutOrderNestedInput
@@ -3973,6 +4019,7 @@ export type OrderUncheckedUpdateWithoutCancellationRequestsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutOrderNestedInput
@@ -4037,6 +4084,7 @@ export type OrderCreateWithoutPublisherCompensationInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -4102,6 +4150,7 @@ export type OrderUncheckedCreateWithoutPublisherCompensationInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -4183,6 +4232,7 @@ export type OrderUpdateWithoutPublisherCompensationInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -4248,6 +4298,7 @@ export type OrderUncheckedUpdateWithoutPublisherCompensationInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -4313,6 +4364,7 @@ export type OrderCreateWithoutSettlementsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -4378,6 +4430,7 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -4459,6 +4512,7 @@ export type OrderUpdateWithoutSettlementsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -4524,6 +4578,7 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -4589,6 +4644,7 @@ export type OrderCreateWithoutFulfillmentAssignmentsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -4654,6 +4710,7 @@ export type OrderUncheckedCreateWithoutFulfillmentAssignmentsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -4735,6 +4792,7 @@ export type OrderUpdateWithoutFulfillmentAssignmentsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -4800,6 +4858,7 @@ export type OrderUncheckedUpdateWithoutFulfillmentAssignmentsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -4865,6 +4924,7 @@ export type OrderCreateWithoutDeliveryVersionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -4930,6 +4990,7 @@ export type OrderUncheckedCreateWithoutDeliveryVersionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -5000,6 +5061,7 @@ export type OrderCreateWithoutActiveDeliveryVersionInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -5065,6 +5127,7 @@ export type OrderUncheckedCreateWithoutActiveDeliveryVersionInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -5146,6 +5209,7 @@ export type OrderUpdateWithoutDeliveryVersionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -5211,6 +5275,7 @@ export type OrderUncheckedUpdateWithoutDeliveryVersionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -5287,6 +5352,7 @@ export type OrderUpdateWithoutActiveDeliveryVersionInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -5352,6 +5418,7 @@ export type OrderUncheckedUpdateWithoutActiveDeliveryVersionInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -5417,6 +5484,7 @@ export type OrderCreateWithoutFraudFlagsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -5482,6 +5550,7 @@ export type OrderUncheckedCreateWithoutFraudFlagsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -5563,6 +5632,7 @@ export type OrderUpdateWithoutFraudFlagsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -5628,6 +5698,7 @@ export type OrderUncheckedUpdateWithoutFraudFlagsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -5693,6 +5764,7 @@ export type OrderCreateWithoutFraudHoldsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -5758,6 +5830,7 @@ export type OrderUncheckedCreateWithoutFraudHoldsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -5839,6 +5912,7 @@ export type OrderUpdateWithoutFraudHoldsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -5904,6 +5978,7 @@ export type OrderUncheckedUpdateWithoutFraudHoldsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -5969,6 +6044,7 @@ export type OrderCreateWithoutFraudFlagResolutionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -6034,6 +6110,7 @@ export type OrderUncheckedCreateWithoutFraudFlagResolutionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -6115,6 +6192,7 @@ export type OrderUpdateWithoutFraudFlagResolutionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -6180,6 +6258,287 @@ export type OrderUncheckedUpdateWithoutFraudFlagResolutionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutOrderNestedInput
+}
+
+export type OrderCreateWithoutFraudFindingsInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
+  requestFingerprint?: string | null
+  version?: number
+  settlementGateVersion?: number
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  turnaroundDays?: number | null
+  warrantyDays?: number | null
+  revisionRoundsSnapshot?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
+  assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
+  organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
+  campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
+  listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
+  listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
+  contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
+  revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
+  publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
+  fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
+  fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutOrderInput
+}
+
+export type OrderUncheckedCreateWithoutFraudFindingsInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  customerId: string
+  assigneeId?: string | null
+  websiteId?: string | null
+  organizationId: string
+  campaignId?: string | null
+  idempotencyKey?: string | null
+  requestFingerprint?: string | null
+  version?: number
+  settlementGateVersion?: number
+  activeDeliveryVersionId?: string | null
+  listingId?: string | null
+  listingServiceId?: string | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  turnaroundDays?: number | null
+  warrantyDays?: number | null
+  revisionRoundsSnapshot?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
+  revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
+  publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
+  fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
+  fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutOrderInput
+}
+
+export type OrderCreateOrConnectWithoutFraudFindingsInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutFraudFindingsInput, Prisma.OrderUncheckedCreateWithoutFraudFindingsInput>
+}
+
+export type OrderUpsertWithoutFraudFindingsInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutFraudFindingsInput, Prisma.OrderUncheckedUpdateWithoutFraudFindingsInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutFraudFindingsInput, Prisma.OrderUncheckedCreateWithoutFraudFindingsInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutFraudFindingsInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutFraudFindingsInput, Prisma.OrderUncheckedUpdateWithoutFraudFindingsInput>
+}
+
+export type OrderUpdateWithoutFraudFindingsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  settlementGateVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  revisionRoundsSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
+  assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
+  campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
+  listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
+  listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
+  contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
+  publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
+  fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
+  fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutFraudFindingsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  customerId?: Prisma.StringFieldUpdateOperationsInput | string
+  assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestFingerprint?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  settlementGateVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  listingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  revisionRoundsSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
+  publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
+  fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -6246,6 +6605,7 @@ export type OrderCreateWithoutReviewInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutOrderInput
@@ -6311,6 +6671,7 @@ export type OrderUncheckedCreateWithoutReviewInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutOrderInput
@@ -6392,6 +6753,7 @@ export type OrderUpdateWithoutReviewInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutOrderNestedInput
@@ -6457,6 +6819,7 @@ export type OrderUncheckedUpdateWithoutReviewInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutOrderNestedInput
@@ -6522,6 +6885,7 @@ export type OrderCreateWithoutWithdrawalAllocationsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -6587,6 +6951,7 @@ export type OrderUncheckedCreateWithoutWithdrawalAllocationsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -6668,6 +7033,7 @@ export type OrderUpdateWithoutWithdrawalAllocationsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -6733,6 +7099,7 @@ export type OrderUncheckedUpdateWithoutWithdrawalAllocationsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -6797,6 +7164,7 @@ export type OrderCreateWithoutContentOrderInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -6862,6 +7230,7 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -6943,6 +7312,7 @@ export type OrderUpdateWithoutContentOrderInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -7008,6 +7378,7 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -7073,6 +7444,7 @@ export type OrderCreateWithoutArticleVersionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -7138,6 +7510,7 @@ export type OrderUncheckedCreateWithoutArticleVersionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -7219,6 +7592,7 @@ export type OrderUpdateWithoutArticleVersionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -7284,6 +7658,7 @@ export type OrderUncheckedUpdateWithoutArticleVersionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -7349,6 +7724,7 @@ export type OrderCreateWithoutRevisionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -7414,6 +7790,7 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -7495,6 +7872,7 @@ export type OrderUpdateWithoutRevisionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -7560,6 +7938,7 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -7625,6 +8004,7 @@ export type OrderCreateWithoutReportsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -7690,6 +8070,7 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -7771,6 +8152,7 @@ export type OrderUpdateWithoutReportsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -7836,6 +8218,7 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -7901,6 +8284,7 @@ export type OrderCreateWithoutPlatformRevenueInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -7966,6 +8350,7 @@ export type OrderUncheckedCreateWithoutPlatformRevenueInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -8047,6 +8432,7 @@ export type OrderUpdateWithoutPlatformRevenueInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -8112,6 +8498,7 @@ export type OrderUncheckedUpdateWithoutPlatformRevenueInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -8177,6 +8564,7 @@ export type OrderCreateWithoutTransactionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -8242,6 +8630,7 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -8323,6 +8712,7 @@ export type OrderUpdateWithoutTransactionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -8388,6 +8778,7 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -8454,6 +8845,7 @@ export type OrderCreateWithoutTicketsInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutOrderInput
@@ -8519,6 +8911,7 @@ export type OrderUncheckedCreateWithoutTicketsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutOrderInput
@@ -8600,6 +8993,7 @@ export type OrderUpdateWithoutTicketsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutOrderNestedInput
@@ -8665,6 +9059,7 @@ export type OrderUncheckedUpdateWithoutTicketsInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
   withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutOrderNestedInput
@@ -8729,6 +9124,7 @@ export type OrderCreateWithoutListingInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -8794,6 +9190,7 @@ export type OrderUncheckedCreateWithoutListingInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -8885,6 +9282,7 @@ export type OrderCreateWithoutListingServiceInput = {
   publisherCompensation?: Prisma.PublisherCompensationCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
@@ -8950,6 +9348,7 @@ export type OrderUncheckedCreateWithoutListingServiceInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedCreateNestedOneWithoutOrderInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedCreateNestedManyWithoutOrderInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedCreateNestedManyWithoutOrderInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
@@ -9131,6 +9530,7 @@ export type OrderUpdateWithoutCustomerInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -9196,6 +9596,7 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -9306,6 +9707,7 @@ export type OrderUpdateWithoutAssigneeInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -9371,6 +9773,7 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -9526,6 +9929,7 @@ export type OrderUpdateWithoutOrganizationInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -9591,6 +9995,7 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -9746,6 +10151,7 @@ export type OrderUpdateWithoutWebsiteInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -9811,6 +10217,7 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -9966,6 +10373,7 @@ export type OrderUpdateWithoutCampaignInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -10031,6 +10439,7 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -10186,6 +10595,7 @@ export type OrderUpdateWithoutListingInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -10251,6 +10661,7 @@ export type OrderUncheckedUpdateWithoutListingInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -10406,6 +10817,7 @@ export type OrderUpdateWithoutListingServiceInput = {
   publisherCompensation?: Prisma.PublisherCompensationUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
@@ -10471,6 +10883,7 @@ export type OrderUncheckedUpdateWithoutListingServiceInput = {
   publisherCompensation?: Prisma.PublisherCompensationUncheckedUpdateOneWithoutOrderNestedInput
   fraudHolds?: Prisma.DeliveryFraudHoldUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlagResolutions?: Prisma.DeliveryFraudFlagResolutionUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFindings?: Prisma.DeliveryFraudFindingUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
   cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
@@ -10540,6 +10953,7 @@ export type OrderCountOutputType = {
   fraudFlags: number
   fraudHolds: number
   fraudFlagResolutions: number
+  fraudFindings: number
   tickets: number
   cancellationRequests: number
   withdrawalAllocations: number
@@ -10558,6 +10972,7 @@ export type OrderCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   fraudFlags?: boolean | OrderCountOutputTypeCountFraudFlagsArgs
   fraudHolds?: boolean | OrderCountOutputTypeCountFraudHoldsArgs
   fraudFlagResolutions?: boolean | OrderCountOutputTypeCountFraudFlagResolutionsArgs
+  fraudFindings?: boolean | OrderCountOutputTypeCountFraudFindingsArgs
   tickets?: boolean | OrderCountOutputTypeCountTicketsArgs
   cancellationRequests?: boolean | OrderCountOutputTypeCountCancellationRequestsArgs
   withdrawalAllocations?: boolean | OrderCountOutputTypeCountWithdrawalAllocationsArgs
@@ -10660,6 +11075,13 @@ export type OrderCountOutputTypeCountFraudFlagResolutionsArgs<ExtArgs extends ru
 /**
  * OrderCountOutputType without action
  */
+export type OrderCountOutputTypeCountFraudFindingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.DeliveryFraudFindingWhereInput
+}
+
+/**
+ * OrderCountOutputType without action
+ */
 export type OrderCountOutputTypeCountTicketsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.TicketWhereInput
 }
@@ -10747,6 +11169,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   publisherCompensation?: boolean | Prisma.Order$publisherCompensationArgs<ExtArgs>
   fraudHolds?: boolean | Prisma.Order$fraudHoldsArgs<ExtArgs>
   fraudFlagResolutions?: boolean | Prisma.Order$fraudFlagResolutionsArgs<ExtArgs>
+  fraudFindings?: boolean | Prisma.Order$fraudFindingsArgs<ExtArgs>
   tickets?: boolean | Prisma.Order$ticketsArgs<ExtArgs>
   review?: boolean | Prisma.Order$reviewArgs<ExtArgs>
   cancellationRequests?: boolean | Prisma.Order$cancellationRequestsArgs<ExtArgs>
@@ -10934,6 +11357,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   publisherCompensation?: boolean | Prisma.Order$publisherCompensationArgs<ExtArgs>
   fraudHolds?: boolean | Prisma.Order$fraudHoldsArgs<ExtArgs>
   fraudFlagResolutions?: boolean | Prisma.Order$fraudFlagResolutionsArgs<ExtArgs>
+  fraudFindings?: boolean | Prisma.Order$fraudFindingsArgs<ExtArgs>
   tickets?: boolean | Prisma.Order$ticketsArgs<ExtArgs>
   review?: boolean | Prisma.Order$reviewArgs<ExtArgs>
   cancellationRequests?: boolean | Prisma.Order$cancellationRequestsArgs<ExtArgs>
@@ -10988,6 +11412,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     publisherCompensation: Prisma.$PublisherCompensationPayload<ExtArgs> | null
     fraudHolds: Prisma.$DeliveryFraudHoldPayload<ExtArgs>[]
     fraudFlagResolutions: Prisma.$DeliveryFraudFlagResolutionPayload<ExtArgs>[]
+    fraudFindings: Prisma.$DeliveryFraudFindingPayload<ExtArgs>[]
     tickets: Prisma.$TicketPayload<ExtArgs>[]
     review: Prisma.$OrderReviewPayload<ExtArgs> | null
     cancellationRequests: Prisma.$OrderCancellationRequestPayload<ExtArgs>[]
@@ -11455,6 +11880,7 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   publisherCompensation<T extends Prisma.Order$publisherCompensationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$publisherCompensationArgs<ExtArgs>>): Prisma.Prisma__PublisherCompensationClient<runtime.Types.Result.GetResult<Prisma.$PublisherCompensationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   fraudHolds<T extends Prisma.Order$fraudHoldsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$fraudHoldsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudHoldPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   fraudFlagResolutions<T extends Prisma.Order$fraudFlagResolutionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$fraudFlagResolutionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudFlagResolutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  fraudFindings<T extends Prisma.Order$fraudFindingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$fraudFindingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudFindingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tickets<T extends Prisma.Order$ticketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$ticketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   review<T extends Prisma.Order$reviewArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$reviewArgs<ExtArgs>>): Prisma.Prisma__OrderReviewClient<runtime.Types.Result.GetResult<Prisma.$OrderReviewPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   cancellationRequests<T extends Prisma.Order$cancellationRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$cancellationRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderCancellationRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -12407,6 +12833,30 @@ export type Order$fraudFlagResolutionsArgs<ExtArgs extends runtime.Types.Extensi
   take?: number
   skip?: number
   distinct?: Prisma.DeliveryFraudFlagResolutionScalarFieldEnum | Prisma.DeliveryFraudFlagResolutionScalarFieldEnum[]
+}
+
+/**
+ * Order.fraudFindings
+ */
+export type Order$fraudFindingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the DeliveryFraudFinding
+   */
+  select?: Prisma.DeliveryFraudFindingSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the DeliveryFraudFinding
+   */
+  omit?: Prisma.DeliveryFraudFindingOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.DeliveryFraudFindingInclude<ExtArgs> | null
+  where?: Prisma.DeliveryFraudFindingWhereInput
+  orderBy?: Prisma.DeliveryFraudFindingOrderByWithRelationInput | Prisma.DeliveryFraudFindingOrderByWithRelationInput[]
+  cursor?: Prisma.DeliveryFraudFindingWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.DeliveryFraudFindingScalarFieldEnum | Prisma.DeliveryFraudFindingScalarFieldEnum[]
 }
 
 /**

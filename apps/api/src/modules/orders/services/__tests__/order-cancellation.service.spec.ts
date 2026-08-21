@@ -1,5 +1,6 @@
 import {
   CancellationReasonCode,
+  CancellationResolution,
   CancellationResponsibility,
 } from "@guestpost/database"
 import {
@@ -48,13 +49,20 @@ describe("OrderCancellationService", () => {
       },
       orderCancellationRequest: {
         findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         create: jest.fn().mockResolvedValue({
           id: "cancel-1",
           orderId: "order-1",
           status: "REQUESTED",
         }),
+        update: jest.fn().mockResolvedValue({}),
       },
-      orderEvent: { create: jest.fn().mockResolvedValue({}) },
+      orderEvent: {
+        create: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      auditLog: { findMany: jest.fn().mockResolvedValue([]) },
       membership: {
         findUnique: jest.fn().mockResolvedValue({
           role: "MEMBER",
@@ -74,6 +82,13 @@ describe("OrderCancellationService", () => {
           role: "OPERATIONS",
           user: { banned: false, userType: "STAFF" },
         }),
+      },
+      deliveryFraudFinding: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      orderDispute: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: "dispute-1" }),
       },
       fulfillmentAssignment: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -135,6 +150,560 @@ describe("OrderCancellationService", () => {
     expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       refund.refundOrderInTransaction.mock.invocationCallOrder[0],
     )
+  })
+
+  it("cannot bypass a confirmed-fraud Finance case through emergency force-cancel", async () => {
+    prisma.deliveryFraudFinding.findFirst.mockResolvedValue({
+      cancellationRequestId: "fraud-cancellation-1",
+    })
+
+    await expect(
+      service.forceCancel("order-1", "admin-1", {
+        reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
+        expectedVersion: 4,
+        confirmationOrderId: "order-1",
+        responsibility: CancellationResponsibility.SYSTEM,
+        note: "Verified legal emergency requiring an immediate cancellation.",
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "CONFIRMED_FRAUD_FINANCE_WORKFLOW_REQUIRED",
+      }),
+    })
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1)
+    expect(refund.refundOrderInTransaction).not.toHaveBeenCalled()
+    expect(prisma.order.updateMany).not.toHaveBeenCalled()
+    expect(prisma.orderEvent.create).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+  })
+
+  it("passes the locked post-publication compensation decision into Finance approval", async () => {
+    const request = {
+      id: "cancel-1",
+      orderId: order.id,
+      status: "PENDING_FINANCE",
+      responsibility: "PLATFORM",
+      resolution: "FULL_REFUND",
+      resolutionReason: "Operations confirmed the security cancellation.",
+      previousOrderStatus: "PUBLISHED",
+      order: { ...order, status: "PUBLISHED" },
+    }
+    prisma.orderCancellationRequest.findUnique.mockResolvedValue(request)
+    prisma.orderCancellationRequest.findUniqueOrThrow.mockResolvedValue({
+      ...request,
+      status: "APPROVED",
+    })
+    refund.refundOrderInTransaction.mockResolvedValue({
+      order: { ...request.order, status: "REFUNDED" },
+      refundTransactionId: "refund-1",
+    })
+    prisma.$queryRaw.mockResolvedValue([
+      { role: "FINANCE", banned: false, userType: "STAFF" },
+    ])
+
+    await service.financeApprove("cancel-1", "finance-1", "FINANCE", {
+      reason:
+        "Finance verified the fraud evidence and approved the final refund.",
+      publisherCompensation: {
+        amount: "80.25",
+        reason:
+          "Platform-funded compensation for completed publisher delivery work.",
+      },
+    })
+
+    expect(refund.refundOrderInTransaction).toHaveBeenCalledWith(
+      prisma,
+      request.order,
+      expect.stringContaining("Finance verified the fraud evidence"),
+      "finance-1",
+      "cancellation-request:cancel-1",
+      "PLATFORM",
+      {
+        amount: "80.25",
+        reason:
+          "Platform-funded compensation for completed publisher delivery work.",
+        effectiveOrderStatus: "PUBLISHED",
+      },
+    )
+  })
+
+  it.each([
+    ["a concurrent role demotion", "OPERATIONS", false, "STAFF"],
+    ["a concurrent account ban", "FINANCE", true, "STAFF"],
+    ["a concurrent user-type change", "FINANCE", false, "CUSTOMER"],
+  ])("fails closed after %s reaches the locked authority read", async (_label, role, banned, userType) => {
+    prisma.orderCancellationRequest.findUnique.mockResolvedValue({
+      id: "cancel-1",
+      orderId: order.id,
+      status: "PENDING_FINANCE",
+      responsibility: "PLATFORM",
+      previousOrderStatus: "PUBLISHED",
+      order: { ...order, status: "DISPUTED" },
+    })
+    // The first raw query is the canonical Order lock. The second is the
+    // live authority lock/read after a concurrent staff mutation commits.
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: order.id }])
+      .mockResolvedValueOnce([{ role, banned, userType }])
+
+    await expect(
+      service.financeApprove("cancel-1", "finance-1", "FINANCE", {
+        reason: "Finance reviewed the case and approved the customer refund.",
+        publisherCompensation: {
+          amount: "50.00",
+          reason:
+            "Publisher completed contract work before the platform failure.",
+        },
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
+    expect(refund.refundOrderInTransaction).not.toHaveBeenCalled()
+    expect(prisma.orderCancellationRequest.update).not.toHaveBeenCalled()
+  })
+
+  it("replays the exact committed Finance approval and repairs only its audience projections", async () => {
+    const financeReason =
+      "Finance verified the fraud evidence and approved the final refund."
+    const approved = {
+      id: "cancel-1",
+      orderId: order.id,
+      status: "APPROVED",
+      resolution: "FULL_REFUND",
+      responsibility: "PLATFORM",
+      resolutionReason: "Operations confirmed the security cancellation.",
+      previousOrderStatus: "PUBLISHED",
+      financeApprovedByUserId: "finance-1",
+      refundTransactionId: "refund-1",
+      resolvedAt: new Date("2026-08-15T00:00:00.000Z"),
+      order: {
+        ...order,
+        status: "REFUNDED",
+        paymentStatus: "REFUNDED",
+        refundResponsibility: "PLATFORM",
+      },
+    }
+    prisma.orderCancellationRequest.findUnique.mockResolvedValue(approved)
+    prisma.orderCancellationRequest.findUniqueOrThrow.mockResolvedValue(
+      approved,
+    )
+    prisma.$queryRaw.mockResolvedValue([
+      { role: "FINANCE", banned: false, userType: "STAFF" },
+    ])
+    prisma.orderEvent.findMany.mockResolvedValue([
+      {
+        actorId: "finance-1",
+        message: "Cancellation refund approved by Finance",
+        metadata: {
+          requestId: approved.id,
+          responsibility: "PLATFORM",
+          refundTransactionId: "refund-1",
+        },
+      },
+    ])
+    prisma.auditLog.findMany.mockResolvedValue([
+      {
+        metadata: {
+          orderId: order.id,
+          responsibility: "PLATFORM",
+          refundTransactionId: "refund-1",
+          reason: financeReason,
+        },
+      },
+    ])
+    refund.refundOrderInTransaction.mockResolvedValue({
+      order: approved.order,
+      refundTransactionId: "refund-1",
+    })
+    const communications = {
+      customerOrderRecipients: jest.fn().mockResolvedValue(["customer-user-1"]),
+      publisherRecipients: jest.fn().mockResolvedValue(["publisher-user-1"]),
+      record: jest.fn().mockResolvedValue({ eventId: "communication-1" }),
+      dispatchByDedupKeyBestEffort: jest.fn(),
+    }
+    const replayService = new OrderCancellationService(
+      prisma,
+      refund,
+      audit,
+      queue,
+      communications as any,
+    )
+
+    const result = await replayService.financeApprove(
+      approved.id,
+      "finance-1",
+      "FINANCE",
+      {
+        reason: financeReason,
+        publisherCompensation: {
+          amount: "80.25",
+          reason:
+            "Platform-funded compensation for completed publisher delivery work.",
+        },
+      },
+    )
+
+    expect(result).toBe(approved)
+    expect(refund.refundOrderInTransaction).toHaveBeenCalledTimes(1)
+    expect(prisma.orderCancellationRequest.update).not.toHaveBeenCalled()
+    expect(prisma.orderEvent.create).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+    expect(communications.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "ORDER_CANCELLATION_RESOLVED",
+        dedupKey: "cancel-request:cancel-1:order_cancellation_resolved",
+      }),
+      prisma,
+    )
+  })
+
+  it("replays an ordinary non-post-publication approval without inventing a compensation intent", async () => {
+    const financeReason =
+      "Finance verified the cancellation and approved the customer refund."
+    let current: any = {
+      id: "cancel-ordinary",
+      orderId: order.id,
+      status: "PENDING_FINANCE",
+      resolution: "FULL_REFUND",
+      responsibility: "PLATFORM",
+      resolutionReason: "Operations approved the pre-publication cancellation.",
+      previousOrderStatus: "ACCEPTED",
+      fulfillmentChannel: "PUBLISHER",
+      financeApprovedByUserId: null,
+      refundTransactionId: null,
+      resolvedAt: null,
+      order: {
+        ...order,
+        status: "DISPUTED",
+        settlements: [],
+      },
+    }
+    prisma.orderCancellationRequest.findUnique.mockImplementation(() =>
+      Promise.resolve(current),
+    )
+    prisma.orderCancellationRequest.findUniqueOrThrow.mockImplementation(() =>
+      Promise.resolve(current),
+    )
+    prisma.orderCancellationRequest.update.mockImplementation(
+      ({ data }: any) => {
+        current = {
+          ...current,
+          ...data,
+          order: {
+            ...current.order,
+            status: "REFUNDED",
+            paymentStatus: "REFUNDED",
+            refundResponsibility: "PLATFORM",
+          },
+        }
+        return Promise.resolve(current)
+      },
+    )
+    prisma.$queryRaw.mockResolvedValue([
+      { role: "FINANCE", banned: false, userType: "STAFF" },
+    ])
+    refund.refundOrderInTransaction.mockResolvedValue({
+      order: { ...current.order, status: "REFUNDED" },
+      refundTransactionId: "refund-ordinary",
+    })
+
+    await service.financeApprove(current.id, "finance-1", "FINANCE", {
+      reason: financeReason,
+    })
+
+    prisma.orderEvent.findMany.mockResolvedValue([
+      {
+        actorId: "finance-1",
+        message: "Cancellation refund approved by Finance",
+        metadata: {
+          requestId: current.id,
+          responsibility: "PLATFORM",
+          refundTransactionId: "refund-ordinary",
+        },
+      },
+    ])
+    prisma.auditLog.findMany.mockResolvedValue([
+      {
+        metadata: {
+          orderId: order.id,
+          responsibility: "PLATFORM",
+          refundTransactionId: "refund-ordinary",
+          reason: financeReason,
+        },
+      },
+    ])
+
+    const replay = await service.financeApprove(
+      current.id,
+      "finance-1",
+      "FINANCE",
+      { reason: financeReason },
+    )
+
+    expect(replay.status).toBe("APPROVED")
+    expect(refund.refundOrderInTransaction).toHaveBeenCalledTimes(2)
+    for (const call of refund.refundOrderInTransaction.mock.calls) {
+      expect(call[6]).toBeUndefined()
+    }
+    expect(prisma.orderCancellationRequest.update).toHaveBeenCalledTimes(1)
+  })
+
+  it("requires a publisher disposition when a pre-publication snapshot has an active settlement", async () => {
+    const request = {
+      id: "cancel-settled-1",
+      orderId: order.id,
+      status: "PENDING_FINANCE",
+      resolution: "FULL_REFUND",
+      responsibility: "PLATFORM",
+      resolutionReason: "Operations approved cancellation after settlement.",
+      previousOrderStatus: "ACCEPTED",
+      fulfillmentChannel: "PUBLISHER",
+      order: {
+        ...order,
+        status: "DISPUTED",
+        settlements: [{ id: "settlement-1" }],
+      },
+    }
+    prisma.orderCancellationRequest.findUnique.mockResolvedValue(request)
+    prisma.orderCancellationRequest.findUniqueOrThrow.mockResolvedValue({
+      ...request,
+      status: "APPROVED",
+    })
+    prisma.$queryRaw.mockResolvedValue([
+      { role: "FINANCE", banned: false, userType: "STAFF" },
+    ])
+    refund.refundOrderInTransaction.mockResolvedValue({
+      order: { ...request.order, status: "REFUNDED" },
+      refundTransactionId: "refund-settled-1",
+    })
+
+    await service.financeApprove(request.id, "finance-1", "FINANCE", {
+      reason:
+        "Finance verified the settlement and approved the customer refund.",
+      publisherCompensation: {
+        amount: "40.00",
+        reason:
+          "Publisher compensation reflects work represented by the active settlement.",
+      },
+    })
+
+    expect(refund.refundOrderInTransaction).toHaveBeenCalledWith(
+      prisma,
+      request.order,
+      expect.any(String),
+      "finance-1",
+      `cancellation-request:${request.id}`,
+      "PLATFORM",
+      {
+        amount: "40.00",
+        reason:
+          "Publisher compensation reflects work represented by the active settlement.",
+        effectiveOrderStatus: "ACCEPTED",
+      },
+    )
+    expect(prisma.orderCancellationRequest.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          order: expect.objectContaining({
+            include: expect.objectContaining({
+              settlements: expect.objectContaining({
+                where: { status: { not: "CANCELLED" } },
+                take: 1,
+              }),
+            }),
+          }),
+        }),
+      }),
+    )
+  })
+
+  it.each([
+    CancellationResolution.CONTINUE_ORDER,
+    CancellationResolution.ESCALATE_TO_DISPUTE,
+  ])("rejects %s for a cancellation linked to confirmed fraud", async (resolution) => {
+    const request = {
+      id: "cancel-fraud-1",
+      orderId: order.id,
+      status: "UNDER_REVIEW",
+      previousOrderStatus: "ACCEPTED",
+      requestedByUserId: "customer-1",
+      order,
+    }
+    prisma.orderCancellationRequest.findUnique.mockResolvedValue(request)
+    prisma.deliveryFraudFinding.findFirst.mockResolvedValue({
+      id: "finding-1",
+    })
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: order.id }])
+      .mockResolvedValueOnce([
+        { role: "OPERATIONS", banned: false, userType: "STAFF" },
+      ])
+
+    await expect(
+      service.review(request.id, "operations-1", "OPERATIONS", {
+        resolution,
+        responsibility: CancellationResponsibility.PLATFORM,
+        reason:
+          "Confirmed delivery fraud requires a customer financial remedy.",
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: "CONFIRMED_FRAUD_REFUND_REQUIRED",
+      }),
+    })
+
+    expect(prisma.orderCancellationRequest.update).not.toHaveBeenCalled()
+    expect(prisma.deliveryFraudFinding.findFirst).toHaveBeenCalledWith({
+      where: { cancellationRequestId: request.id },
+      select: { id: true },
+    })
+    expect(prisma.orderDispute.create).not.toHaveBeenCalled()
+    expect(prisma.order.updateMany).not.toHaveBeenCalled()
+    expect(prisma.orderEvent.create).not.toHaveBeenCalled()
+  })
+
+  it("advances a confirmed-fraud cancellation only to Finance for a full refund", async () => {
+    const request = {
+      id: "cancel-fraud-1",
+      orderId: order.id,
+      status: "UNDER_REVIEW",
+      previousOrderStatus: "ACCEPTED",
+      requestedByUserId: "customer-1",
+      order,
+    }
+    const pendingFinance = {
+      ...request,
+      status: "PENDING_FINANCE",
+      resolution: "FULL_REFUND",
+      responsibility: "PLATFORM",
+    }
+    prisma.orderCancellationRequest.findUnique.mockResolvedValue(request)
+    prisma.orderCancellationRequest.findUniqueOrThrow.mockResolvedValue(
+      pendingFinance,
+    )
+    prisma.deliveryFraudFinding.findFirst.mockResolvedValue({ id: "finding-1" })
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: order.id }])
+      .mockResolvedValueOnce([
+        { role: "OPERATIONS", banned: false, userType: "STAFF" },
+      ])
+
+    const result = await service.review(
+      request.id,
+      "operations-1",
+      "OPERATIONS",
+      {
+        resolution: CancellationResolution.FULL_REFUND,
+        responsibility: CancellationResponsibility.PLATFORM,
+        reason:
+          "  Confirmed delivery fraud requires a full customer refund review.  ",
+      },
+    )
+
+    expect(result).toBe(pendingFinance)
+    expect(prisma.orderCancellationRequest.update).toHaveBeenCalledWith({
+      where: { id: request.id },
+      data: expect.objectContaining({
+        status: "PENDING_FINANCE",
+        resolution: "FULL_REFUND",
+        responsibility: "PLATFORM",
+        resolutionReason:
+          "Confirmed delivery fraud requires a full customer refund review.",
+      }),
+    })
+  })
+
+  it("returns the exact confirmed-fraud review replay without duplicate evidence", async () => {
+    const reason =
+      "Confirmed delivery fraud requires a full customer refund review."
+    const pendingFinance = {
+      id: "cancel-fraud-1",
+      orderId: order.id,
+      status: "PENDING_FINANCE",
+      previousOrderStatus: "ACCEPTED",
+      reviewedByUserId: "operations-1",
+      resolution: "FULL_REFUND",
+      responsibility: "PLATFORM",
+      resolutionReason: reason,
+      order,
+    }
+    prisma.orderCancellationRequest.findUnique.mockResolvedValue(pendingFinance)
+    prisma.orderCancellationRequest.findUniqueOrThrow.mockResolvedValue(
+      pendingFinance,
+    )
+    prisma.deliveryFraudFinding.findFirst.mockResolvedValue({ id: "finding-1" })
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: order.id }])
+      .mockResolvedValueOnce([
+        { role: "OPERATIONS", banned: false, userType: "STAFF" },
+      ])
+
+    const result = await service.review(
+      pendingFinance.id,
+      "operations-1",
+      "OPERATIONS",
+      {
+        resolution: CancellationResolution.FULL_REFUND,
+        responsibility: CancellationResponsibility.PLATFORM,
+        reason: `  ${reason}  `,
+      },
+    )
+
+    expect(result).toBe(pendingFinance)
+    expect(prisma.orderCancellationRequest.update).not.toHaveBeenCalled()
+    expect(prisma.orderEvent.create).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    "too short",
+    "x".repeat(2001),
+  ])("rejects an invalid normalized cancellation review reason before database work", async (reason) => {
+    await expect(
+      service.review("cancel-fraud-1", "operations-1", "OPERATIONS", {
+        resolution: CancellationResolution.FULL_REFUND,
+        responsibility: CancellationResponsibility.PLATFORM,
+        reason,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+
+    expect(prisma.orderCancellationRequest.findUnique).not.toHaveBeenCalled()
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ["a role demotion", "FINANCE", false, "STAFF"],
+    ["an account ban", "OPERATIONS", true, "STAFF"],
+    ["a user-type change", "OPERATIONS", false, "CUSTOMER"],
+  ])("rejects cancellation review after %s wins the authority race", async (_label, role, banned, userType) => {
+    const request = {
+      id: "cancel-fraud-1",
+      orderId: order.id,
+      status: "ESCALATED",
+      previousOrderStatus: "PUBLISHED",
+      requestedByUserId: "operations-1",
+      order,
+    }
+    prisma.orderCancellationRequest.findUnique.mockResolvedValueOnce(request)
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: order.id }])
+      .mockResolvedValueOnce([{ role, banned, userType }])
+
+    await expect(
+      service.review(request.id, "operations-1", "OPERATIONS", {
+        resolution: CancellationResolution.FULL_REFUND,
+        responsibility: CancellationResponsibility.PLATFORM,
+        reason:
+          "Confirmed delivery fraud requires a full customer refund review.",
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+
+    expect(prisma.orderCancellationRequest.findUnique).toHaveBeenCalledTimes(1)
+    expect(prisma.deliveryFraudFinding.findFirst).not.toHaveBeenCalled()
+    expect(prisma.orderCancellationRequest.update).not.toHaveBeenCalled()
+    expect(prisma.orderEvent.create).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
   })
 
   it("returns a request action after the acceptance boundary", async () => {

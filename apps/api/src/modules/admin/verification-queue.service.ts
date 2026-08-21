@@ -1,5 +1,9 @@
 import { WorkflowDecisionService } from "@guestpost/shared"
-import { Injectable, NotFoundException } from "@nestjs/common"
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { DeliveryInterventionService } from "../orders/services/delivery-intervention.service"
@@ -16,7 +20,12 @@ export class AdminVerificationQueueService {
     this.decision = new WorkflowDecisionService()
   }
 
-  async listQueue() {
+  async listQueue(role: string) {
+    if (!new Set(["SUPER_ADMIN", "OPERATIONS", "FINANCE"]).has(role)) {
+      throw new ForbiddenException("Staff verification access is required")
+    }
+    const canViewFinancials = role !== "OPERATIONS"
+    const canViewIdentity = role === "SUPER_ADMIN"
     const orders = await this.prisma.order.findMany({
       where: {
         OR: [
@@ -26,7 +35,12 @@ export class AdminVerificationQueueService {
               verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
             },
           },
-          { fraudFlags: { some: { resolution: null } } },
+          {
+            status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
+            fraudHolds: {
+              some: {},
+            },
+          },
         ],
       },
       include: {
@@ -52,15 +66,17 @@ export class AdminVerificationQueueService {
           },
         },
         fraudFlags: {
-          where: { resolution: null },
+          where: { hold: { isNot: null } },
           orderBy: { createdAt: "asc" },
           include: {
+            finding: true,
             deliveryVersion: {
               select: {
                 id: true,
                 version: true,
                 publishedUrl: true,
                 verificationStatus: true,
+                verificationVersion: true,
                 supersededByVersion: true,
                 evidence: {
                   orderBy: { checkedAt: "desc" },
@@ -98,13 +114,20 @@ export class AdminVerificationQueueService {
 
       return {
         orderId: order.id,
+        orderVersion: order.version,
         status: order.status,
         title: order.title,
-        amount: order.amount,
+        ...(canViewFinancials && { amount: order.amount }),
         targetUrl: order.targetUrl,
         anchorText: order.anchorText,
         createdAt: order.createdAt,
-        customer: order.customer,
+        customer: order.customer
+          ? {
+              id: order.customer.id,
+              name: order.customer.name,
+              ...(canViewIdentity && { email: order.customer.email }),
+            }
+          : null,
         website: order.website
           ? {
               id: order.website.id,
@@ -118,8 +141,10 @@ export class AdminVerificationQueueService {
           ? {
               id: order.website.publisher.id,
               name: order.website.publisher.name,
-              email: order.website.publisher.email,
-              tier: order.website.publisher.tier,
+              ...(canViewIdentity && {
+                email: order.website.publisher.email,
+                tier: order.website.publisher.tier,
+              }),
             }
           : null,
         deliveryVersion: version
@@ -150,6 +175,18 @@ export class AdminVerificationQueueService {
                 type: f.type,
                 details: f.details,
                 createdAt: f.createdAt,
+                finding: f.finding
+                  ? {
+                      id: f.finding.id,
+                      cancellationRequestId: f.finding.cancellationRequestId,
+                      outcome: f.finding.outcome,
+                      ...(canViewFinancials && {
+                        reason: f.finding.internalReason,
+                      }),
+                      decidedByRole: f.finding.decidedByRole,
+                      createdAt: f.finding.createdAt,
+                    }
+                  : null,
                 deliveryVersion: {
                   ...f.deliveryVersion,
                   evidence: f.deliveryVersion.evidence[0] ?? null,

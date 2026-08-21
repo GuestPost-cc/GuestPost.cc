@@ -58,9 +58,9 @@ function setup() {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     deliveryFraudFlag: {
-      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    deliveryFraudHold: { count: jest.fn().mockResolvedValue(0) },
     settlement: { findFirst: jest.fn().mockResolvedValue(null) },
     listingService: { findUnique: jest.fn().mockResolvedValue(null) },
     transaction: {

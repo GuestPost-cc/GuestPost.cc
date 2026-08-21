@@ -105,9 +105,9 @@ function makeTxMock() {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     deliveryFraudFlag: {
-      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    deliveryFraudHold: { count: jest.fn().mockResolvedValue(0) },
   }
 }
 
@@ -184,7 +184,7 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
   it.each([
     [
       "unresolved fraud",
-      (tx: any) => tx.deliveryFraudFlag.count.mockResolvedValue(1),
+      (tx: any) => tx.deliveryFraudHold.count.mockResolvedValue(1),
     ],
     [
       "active revision",
