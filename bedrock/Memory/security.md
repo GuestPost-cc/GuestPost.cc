@@ -77,6 +77,10 @@ updated: 2026-08-14
   Support ticket, including `RESOLVED`, blocks authority removal. Historical
   `CLOSED` tickets are atomically released to the unassigned queue and the
   released count is retained in the protected role/suspension audit event.
+  Any managed platform Website also blocks authority removal so future orders
+  cannot route to former Operations staff. Platform Website creation and
+  reassignment take the shared staff lock order, revalidate the active target,
+  and commit reassignment plus its audit evidence atomically.
 
 ## Channel Security
 

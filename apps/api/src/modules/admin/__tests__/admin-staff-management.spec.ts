@@ -210,9 +210,10 @@ describe("AdminService staff management", () => {
 
   it("maps exhausted staff-role serialization retries to a stable conflict", async () => {
     prisma.$transaction.mockRejectedValue({
-      code: "P2010",
-      meta: {
-        driverAdapterError: { cause: { originalCode: "40001" } },
+      name: "DriverAdapterError",
+      cause: {
+        kind: "TransactionWriteConflict",
+        originalCode: "40001",
       },
     })
 

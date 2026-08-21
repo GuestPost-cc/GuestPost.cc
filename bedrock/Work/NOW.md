@@ -90,6 +90,13 @@ targets, both append-only guards enabled, and all five moderation constraints
 validated. PR #105 must still pass the combined repository CI matrix; local and
 staging results are not a substitute for that check.
 
+The first post-merge GitHub run passed dependency, migration, static, and API
+unit stages, then exposed a direct Prisma `DriverAdapterError` serialization
+shape in the real support/offboarding race. The structured retry classifier now
+recognizes that exact adapter shape without parsing messages or trusting
+arbitrary nested causes. Focused shared/admin coverage and the API build pass;
+the full GitHub rerun remains the real-database proof.
+
 ## Next actions
 
 1. Push the resolved merge commit to PR #105 and keep the draft PR open until every

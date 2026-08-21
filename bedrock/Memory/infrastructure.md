@@ -271,6 +271,12 @@ Neon, Upstash, Render, R2, Resend, Google, or Sentry deployment credentials.
 - **Pool tuning** lives in `PoolConfig` form (was URL params on the old engine): `{ max: 25, idleTimeoutMillis: 20_000 }` for apps/api NestJS service; default pool for the global singleton.
 - **`createPrismaClient()` / `createPrismaAdapter()` helpers** at `packages/database/src/create-prisma-client.ts`. Dual-helper design: full helper for direct-instantiation sites (the global singleton); adapter helper for NestJS's `PrismaService extends PrismaClient` (must call `super(...)`, can't substitute the full client helper).
 - **Runtime DATABASE_URL guard**: `createPrismaAdapter()` throws `"DATABASE_URL is required"` at construction time if env unset. Converts confusing first-query failures into clear startup errors. `apps/api/jest.setup.js` sets a dummy `DATABASE_URL` so unit specs that transitively import `@guestpost/auth` (which eagerly evaluates the global singleton) don't fail at module-load time.
+- **Transaction retry classification is structured-only**: Prisma 7 can expose
+  PostgreSQL SQLSTATE either through a Prisma wrapper or as an exact
+  `DriverAdapterError` with `cause.originalCode`, especially for raw-query and
+  transaction paths. The shared classifier recognizes both shapes but retries
+  only `P2034`, `40001`, and `40P01`; it never parses messages or recursively
+  trusts arbitrary causes.
 - **`CREATE INDEX CONCURRENTLY` unlocked**: Prisma 6 wrapped every migration in an implicit transaction (prisma#14456); Prisma 7.4+ does NOT wrap single-statement migrations. Confirmed empirically across Phases 7.13.1, 7.13.2A, 7.14.
 
 ### Migration rule: single-statement when combining `* CONCURRENTLY` (Phase 7.13.2B finding)

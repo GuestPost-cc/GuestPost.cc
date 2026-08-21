@@ -1,16 +1,26 @@
 /**
  * Extract only trusted, structured Prisma/PostgreSQL error codes.
  *
- * Prisma 7 driver adapters can wrap a PostgreSQL SQLSTATE under
- * `meta.driverAdapterError.cause.originalCode` while exposing P2010 at the top
- * level. Never inspect free-form messages: doing so can accidentally retry
- * validation, authorization, or constraint failures.
+ * Prisma 7 driver adapters can expose a PostgreSQL SQLSTATE either directly
+ * on a `DriverAdapterError.cause.originalCode` (raw-query/transaction paths)
+ * or under `meta.driverAdapterError.cause.originalCode` while exposing P2010
+ * at the top level. Never inspect free-form messages: doing so can
+ * accidentally retry validation, authorization, or constraint failures.
  */
 export function trustedPrismaErrorCodes(error: unknown): ReadonlySet<string> {
   const codes = new Set<string>()
   if (!isRecord(error)) return codes
 
   if (typeof error.code === "string") codes.add(error.code)
+
+  // This is the same structural discriminator used by Prisma's
+  // `isDriverAdapterError`. Avoid broad recursive `cause` traversal: only the
+  // adapter's named wrapper is trusted to carry a database SQLSTATE here.
+  if (error.name === "DriverAdapterError" && isRecord(error.cause)) {
+    const originalCode = error.cause.originalCode
+    if (typeof originalCode === "string") codes.add(originalCode)
+  }
+
   if (!isRecord(error.meta)) return codes
 
   if (typeof error.meta.code === "string") codes.add(error.meta.code)
