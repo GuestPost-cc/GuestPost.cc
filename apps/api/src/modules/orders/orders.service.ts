@@ -139,6 +139,112 @@ export class OrdersService {
     @Optional() private readonly communications?: CommunicationsService,
   ) {}
 
+  /**
+   * Lock and validate the complete buyer catalog attribution chain. The share
+   * locks remain held for the caller's transaction and conflict with service,
+   * listing, website-pause, and verification writers, preventing a new order
+   * or cart item from being committed from a stale public-availability read.
+   */
+  private async lockOrderableListingService(tx: any, listingServiceId: string) {
+    // Resolve identifiers without trusting this read for availability. The
+    // relationship is re-read and compared after every aggregate row is
+    // locked. Explicit ordering matters: staff and publisher moderation lock
+    // Website before MarketplaceListing, so checkout must do the same instead
+    // of leaving a multi-table FOR SHARE lock order to the query planner.
+    const observed = await tx.listingService.findUnique({
+      where: { id: listingServiceId },
+      select: {
+        id: true,
+        listingId: true,
+        listing: {
+          select: {
+            websiteId: true,
+            website: { select: { id: true } },
+          },
+        },
+      },
+    })
+    const observedWebsiteId =
+      observed?.listing?.websiteId ?? observed?.listing?.website?.id ?? null
+    if (!observed) {
+      throw new ConflictException({
+        code: "SERVICE_UNAVAILABLE",
+        message: "Service is no longer available — refresh and try again",
+      })
+    }
+    if (!observedWebsiteId) {
+      throw new ConflictException({
+        code: "WEBSITE_UNAVAILABLE",
+        message:
+          "Marketplace website is inactive or no longer ownership-verified",
+      })
+    }
+
+    await tx.$queryRaw`
+      SELECT "id" FROM "Website"
+      WHERE "id" = ${observedWebsiteId}
+      FOR SHARE
+    `
+    await tx.$queryRaw`
+      SELECT "id" FROM "MarketplaceListing"
+      WHERE "id" = ${observed.listingId}
+      FOR SHARE
+    `
+    await tx.$queryRaw`
+      SELECT "id" FROM "ListingService"
+      WHERE "id" = ${listingServiceId}
+      FOR SHARE
+    `
+
+    const listingService = await tx.listingService.findUnique({
+      where: { id: listingServiceId },
+      include: {
+        listing: {
+          include: {
+            website: {
+              select: {
+                id: true,
+                isActive: true,
+                ownershipType: true,
+                verificationStatus: true,
+                managedByUserId: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (
+      listingService?.availability !== "AVAILABLE" ||
+      listingService.listingId !== observed.listingId
+    ) {
+      throw new ConflictException({
+        code: "SERVICE_UNAVAILABLE",
+        message: "Service is no longer available — refresh and try again",
+      })
+    }
+    if (listingService.listing.status !== "APPROVED") {
+      throw new ConflictException({
+        code: "LISTING_UNAVAILABLE",
+        message: "Marketplace listing is no longer approved for checkout",
+      })
+    }
+    if (
+      listingService.listing.website?.id !== observedWebsiteId ||
+      listingService.listing.website?.isActive !== true ||
+      listingService.listing.website.verificationStatus !== "VERIFIED"
+    ) {
+      throw new ConflictException({
+        code: "WEBSITE_UNAVAILABLE",
+        message:
+          "Marketplace website is inactive or no longer ownership-verified",
+      })
+    }
+
+    return listingService
+  }
+
   private async runLockedCartTransaction<T>(
     orderId: string,
     operation: (tx: any) => Promise<T>,
@@ -304,47 +410,11 @@ export class OrdersService {
         }
 
         if (data.listingServiceId) {
-          const ls = await tx.listingService.findUnique({
-            where: { id: data.listingServiceId },
-            include: {
-              listing: {
-                include: {
-                  website: {
-                    select: {
-                      id: true,
-                      ownershipType: true,
-                      verificationStatus: true,
-                      managedByUserId: true,
-                    },
-                  },
-                },
-              },
-            },
-          })
-          if (!ls)
-            throw new BadRequestException(
-              `Listing service ${data.listingServiceId} not found`,
-            )
-          if (ls.availability !== "AVAILABLE") {
-            throw new ConflictException({
-              code: "SERVICE_UNAVAILABLE",
-              message: `Service ${ls.serviceType} is ${ls.availability} on this listing`,
-            })
-          }
-          if (ls.listing.status !== "APPROVED") {
-            throw new BadRequestException("Listing is not approved")
-          }
+          const ls = await this.lockOrderableListingService(
+            tx,
+            data.listingServiceId,
+          )
           const site = ls.listing.website
-          if (
-            site?.ownershipType === "PUBLISHER" &&
-            site.verificationStatus === "REVOKED"
-          ) {
-            throw new BadRequestException({
-              code: "WEBSITE_REVOKED",
-              message:
-                "Website ownership is revoked and cannot take new orders",
-            })
-          }
           // The item's websiteId (if present) must agree with the listing's.
           // Mismatches indicate a tampered client payload — reject outright.
           if (
@@ -421,41 +491,59 @@ export class OrdersService {
           // Legacy fallback — try to find a ListingService row matching
           // (websiteId, type) so historical clients still get snapshot columns.
           const listing = await tx.marketplaceListing.findFirst({
-            where: { websiteId: firstItem.websiteId, status: "APPROVED" },
+            // A website may retain archived historical listings alongside its
+            // one active listing. Resolve only the buyer-orderable lifecycle
+            // candidate; lockOrderableListingService performs the authoritative
+            // status/domain/service recheck under the catalog locks below.
+            where: {
+              websiteId: firstItem.websiteId,
+              status: "APPROVED",
+            },
             select: {
               id: true,
-              ownerType: true,
-              website: { select: { managedByUserId: true } },
             },
           })
-          if (listing) {
-            const ls = await tx.listingService.findUnique({
-              where: {
-                listingId_serviceType: {
-                  listingId: listing.id,
-                  serviceType: data.type as any,
-                },
-              },
+          if (!listing) {
+            throw new ConflictException({
+              code: "LISTING_UNAVAILABLE",
+              message: "Marketplace listing is no longer available",
             })
-            if (ls && ls.availability === "AVAILABLE") {
-              snapshot = {
+          }
+          const candidateService = await tx.listingService.findUnique({
+            where: {
+              listingId_serviceType: {
                 listingId: listing.id,
-                listingServiceId: ls.id,
-                fulfillmentChannel:
-                  listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
-                turnaroundDays: ls.turnaroundDays,
-                warrantyDays: ls.warrantyDays,
-                revisionRounds: ls.revisionRounds,
-                snapshotPrice: requirePositiveUsdDecimal(
-                  ls.price,
-                  "Selected listing service price",
-                ),
-                snapshotCurrency: ls.currency,
-                snapshotServiceType: ls.serviceType,
-                websiteId: firstItem.websiteId,
-                managedByUserId: listing.website?.managedByUserId ?? null,
-              }
-            }
+                serviceType: data.type as any,
+              },
+            },
+            select: { id: true },
+          })
+          if (!candidateService) {
+            throw new ConflictException({
+              code: "SERVICE_UNAVAILABLE",
+              message: "The requested marketplace service is unavailable",
+            })
+          }
+          const ls = await this.lockOrderableListingService(
+            tx,
+            candidateService.id,
+          )
+          snapshot = {
+            listingId: ls.listingId,
+            listingServiceId: ls.id,
+            fulfillmentChannel:
+              ls.listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
+            turnaroundDays: ls.turnaroundDays,
+            warrantyDays: ls.warrantyDays,
+            revisionRounds: ls.revisionRounds,
+            snapshotPrice: requirePositiveUsdDecimal(
+              ls.price,
+              "Selected listing service price",
+            ),
+            snapshotCurrency: ls.currency,
+            snapshotServiceType: ls.serviceType,
+            websiteId: ls.listing.website.id,
+            managedByUserId: ls.listing.website.managedByUserId ?? null,
           }
         }
 
@@ -658,25 +746,7 @@ export class OrdersService {
               "Item websiteId does not match the selected service",
             )
           }
-          // Use tx (not this.prisma) — a separate connection here while the
-          // transaction holds its own deadlocks the pool under concurrency.
-          if (snapshot.websiteId) {
-            // Block orders on a revoked domain — defence in depth beyond listing
-            // pause (a REVOKED publisher site may never take new orders).
-            const site = await tx.website.findUnique({
-              where: { id: snapshot.websiteId },
-              select: { verificationStatus: true, ownershipType: true },
-            })
-            if (
-              site?.ownershipType === "PUBLISHER" &&
-              site.verificationStatus === "REVOKED"
-            ) {
-              throw new BadRequestException({
-                code: "WEBSITE_REVOKED",
-                message: `Website ${snapshot.websiteId} ownership is revoked and cannot take new orders`,
-              })
-            }
-          } else {
+          if (!snapshot.websiteId) {
             // Orders without a website are no longer accepted — the
             // listingServiceId snapshot always implies a website.
             throw new BadRequestException(
@@ -899,17 +969,23 @@ export class OrdersService {
           "Order has no listingServiceId — recreate with the new flow",
         )
       }
-      const ls = await tx.listingService.findUnique({
-        where: { id: order.listingServiceId },
-        select: { price: true, availability: true, currency: true },
-      })
-      if (!ls) {
-        throw new BadRequestException(
-          "Order's listing service no longer exists",
-        )
-      }
-      if (ls.availability !== "AVAILABLE") {
-        throw new BadRequestException("Order's service is not available")
+      const ls = await this.lockOrderableListingService(
+        tx,
+        order.listingServiceId,
+      )
+      if (
+        !order.listingId ||
+        ls.listingId !== order.listingId ||
+        ls.listing.id !== order.listingId ||
+        ls.listing.websiteId !== order.websiteId ||
+        ls.listing.website.id !== order.websiteId ||
+        ls.serviceType !== order.type
+      ) {
+        throw new ConflictException({
+          code: "CATALOG_CONTRACT_MISMATCH",
+          message:
+            "Order catalog and website attribution do not match the selected service",
+        })
       }
       assertUsdOrderCurrency(ls.currency, "Order's listing service")
       const price = requirePositiveUsdDecimal(

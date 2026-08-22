@@ -23,6 +23,31 @@ describe("Prisma transaction error classification", () => {
     expect(isRetryablePrismaTransactionError(error)).toBe(true)
   })
 
+  it("recognizes direct Prisma DriverAdapterError transaction failures", () => {
+    const error = {
+      name: "DriverAdapterError",
+      cause: {
+        kind: "TransactionWriteConflict",
+        originalCode: "40001",
+      },
+    }
+
+    expect([...trustedPrismaErrorCodes(error)]).toEqual(["40001"])
+    expect(isRetryablePrismaTransactionError(error)).toBe(true)
+  })
+
+  it("does not trust originalCode on an arbitrary nested cause", () => {
+    const error = {
+      name: "Error",
+      cause: {
+        originalCode: "40001",
+      },
+    }
+
+    expect([...trustedPrismaErrorCodes(error)]).toEqual([])
+    expect(isRetryablePrismaTransactionError(error)).toBe(false)
+  })
+
   it.each([
     "P2034",
     "40001",

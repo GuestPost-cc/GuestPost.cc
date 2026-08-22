@@ -1,12 +1,20 @@
 import {
   ListingFulfillmentType,
   ListingStatus,
+  ModerationAction,
+  ModerationAuthority,
+  ModerationReasonCode,
+  type Prisma,
   WebsiteMetricKey,
   WebsiteMetricProvider,
   WebsiteMetricSource,
 } from "@guestpost/database"
 import {
+  buildModerationProjection,
   generateVerificationToken,
+  getPublisherListingLifecycleActions,
+  getPublisherWebsiteLifecycleActions,
+  projectModerationPublisherMessage,
   QUEUES,
   USD_CURRENCY,
   validateWebsiteEnlistmentInput,
@@ -14,6 +22,7 @@ import {
 } from "@guestpost/shared"
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -37,6 +46,16 @@ import {
   upsertWebsiteMetric,
 } from "./website-metrics.service"
 
+// PostgreSQL preserves enum declaration order and ListingStatus declares
+// ARCHIVED last. Together with the partial unique index allowing at most one
+// non-archived listing per website, this puts the canonical current listing
+// first and otherwise falls back to the newest archived history row.
+const canonicalPublisherWebsiteListingOrder = [
+  { status: "asc" },
+  { createdAt: "desc" },
+  { id: "desc" },
+] satisfies Prisma.MarketplaceListingOrderByWithRelationInput[]
+
 @Injectable()
 export class WebsitesService {
   constructor(
@@ -44,6 +63,70 @@ export class WebsitesService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
   ) {}
+
+  private publisherModerationHistory(events: any[] = []) {
+    return events.map((event) => ({
+      id: event.id,
+      scope: event.scope,
+      action: event.action,
+      authority: event.authority,
+      reasonCode: event.reasonCode,
+      publisherMessage: projectModerationPublisherMessage(event),
+      resubmissionAllowed: event.resubmissionAllowed,
+      previousStatus: event.previousStatus,
+      resultingStatus: event.resultingStatus,
+      previousWebsiteActive: event.previousWebsiteActive,
+      resultingWebsiteActive: event.resultingWebsiteActive,
+      createdAt: event.createdAt,
+    }))
+  }
+
+  private publisherListingProjection(listing: any) {
+    const {
+      activeModerationAction: _activeModerationAction,
+      activeModerationAuthority: _activeModerationAuthority,
+      activeModerationReasonCode: _activeModerationReasonCode,
+      activeModerationMessage: _activeModerationMessage,
+      activeModerationPreviousStatus: _activeModerationPreviousStatus,
+      moderationResubmissionAllowed: _moderationResubmissionAllowed,
+      moderationVersion: _moderationVersion,
+      moderationEvents = [],
+      ...safeListing
+    } = listing
+    return {
+      ...safeListing,
+      moderation: {
+        ...buildModerationProjection(
+          listing,
+          getPublisherListingLifecycleActions(listing),
+        ),
+        history: this.publisherModerationHistory(moderationEvents),
+      },
+    }
+  }
+
+  private publisherWebsiteProjection(website: any) {
+    const {
+      activeModerationAction: _activeModerationAction,
+      activeModerationAuthority: _activeModerationAuthority,
+      activeModerationReasonCode: _activeModerationReasonCode,
+      activeModerationMessage: _activeModerationMessage,
+      activeModerationPreviousActive: _activeModerationPreviousActive,
+      moderationVersion: _moderationVersion,
+      moderationEvents = [],
+      ...safeWebsite
+    } = website
+    return {
+      ...safeWebsite,
+      moderation: {
+        ...buildModerationProjection(
+          website,
+          getPublisherWebsiteLifecycleActions(website),
+        ),
+        history: this.publisherModerationHistory(moderationEvents),
+      },
+    }
+  }
 
   async createWebsite(
     publisherId: string,
@@ -525,6 +608,7 @@ export class WebsitesService {
     publisherId: string,
     organizationId: string,
     websiteId: string,
+    projectedListingId?: string,
   ) {
     const publisher = await this.prisma.publisher.findUnique({
       where: { id: publisherId },
@@ -537,16 +621,25 @@ export class WebsitesService {
       where: { id: websiteId, publisherId },
       include: {
         metricsHistory: { orderBy: { key: "asc" } },
+        moderationEvents: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 20,
+        },
         websiteIntegrations: {
           include: {
             integration: true,
           },
         },
         marketplaceListings: {
-          orderBy: { createdAt: "desc" },
+          ...(projectedListingId ? { where: { id: projectedListingId } } : {}),
+          orderBy: canonicalPublisherWebsiteListingOrder,
           take: 1,
           include: {
             categories: { include: { category: true } },
+            moderationEvents: {
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 20,
+            },
             services: {
               orderBy: [{ availability: "asc" }, { price: "asc" }],
             },
@@ -618,6 +711,13 @@ export class WebsitesService {
       websiteIntegrations,
       marketplaceListings,
       metricsHistory,
+      moderationEvents: _moderationEvents,
+      activeModerationAction: _activeModerationAction,
+      activeModerationAuthority: _activeModerationAuthority,
+      activeModerationReasonCode: _activeModerationReasonCode,
+      activeModerationMessage: _activeModerationMessage,
+      activeModerationPreviousActive: _activeModerationPreviousActive,
+      moderationVersion: _moderationVersion,
       ...rest
     } = website
     const listing = marketplaceListings?.[0]
@@ -645,6 +745,7 @@ export class WebsitesService {
       createdAt: rest.createdAt.toISOString(),
       updatedAt: rest.updatedAt.toISOString(),
       domainMetrics: serializeWebsiteMetrics(metricsHistory),
+      moderation: this.publisherWebsiteProjection(website).moderation,
       websiteIntegrations: websiteIntegrations.map((wi) => ({
         id: wi.id,
         integrationId: wi.integrationId,
@@ -661,7 +762,7 @@ export class WebsitesService {
       })),
       listing: listing
         ? {
-            ...listing,
+            ...this.publisherListingProjection(listing),
             categories: listing.categories.map((item) => item.category),
             category: listing.categories[0]?.category ?? null,
             services: listing.services.map((service) => ({
@@ -698,10 +799,15 @@ export class WebsitesService {
       where: { publisherId },
       include: {
         metricsHistory: { orderBy: { key: "asc" } },
+        moderationEvents: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 20,
+        },
         // Phase 7: legacy price + turnaroundDays selectors were dropped.
         // Surface the AVAILABLE services so callers can render per-service
         // price/TAT directly.
         marketplaceListings: {
+          orderBy: canonicalPublisherWebsiteListingOrder,
           select: {
             id: true,
             title: true,
@@ -709,6 +815,17 @@ export class WebsitesService {
             description: true,
             status: true,
             ownerType: true,
+            activeModerationAction: true,
+            activeModerationAuthority: true,
+            activeModerationReasonCode: true,
+            activeModerationMessage: true,
+            activeModerationPreviousStatus: true,
+            moderationResubmissionAllowed: true,
+            moderationVersion: true,
+            moderationEvents: {
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 20,
+            },
             categories: {
               select: {
                 category: { select: { id: true, name: true, slug: true } },
@@ -732,15 +849,22 @@ export class WebsitesService {
       },
       orderBy: { createdAt: "desc" },
     })
-    return websites.map((website) => ({
-      ...website,
-      domainMetrics: serializeWebsiteMetrics(website.metricsHistory),
-      metricsHistory: undefined,
-      marketplaceListings: website.marketplaceListings.map((listing) => {
-        const categories = listing.categories.map((item) => item.category)
-        return { ...listing, categories, category: categories[0] ?? null }
-      }),
-    }))
+    return websites.map((website) => {
+      const projectedWebsite = this.publisherWebsiteProjection(website)
+      return {
+        ...projectedWebsite,
+        domainMetrics: serializeWebsiteMetrics(website.metricsHistory),
+        metricsHistory: undefined,
+        marketplaceListings: website.marketplaceListings.map((listing) => {
+          const categories = listing.categories.map((item) => item.category)
+          return {
+            ...this.publisherListingProjection(listing),
+            categories,
+            category: categories[0] ?? null,
+          }
+        }),
+      }
+    })
   }
 
   async deleteWebsite(
@@ -749,41 +873,160 @@ export class WebsitesService {
     id: string,
     user: any,
   ) {
+    const website = await this.prisma.website.findFirst({
+      where: { id, publisherId },
+      select: { moderationVersion: true },
+    })
+    if (!website) throw new NotFoundException("Website not found")
+    await this.archiveWebsite(
+      publisherId,
+      organizationId,
+      id,
+      user,
+      website.moderationVersion,
+    )
+    return { success: true }
+  }
+
+  async archiveWebsite(
+    publisherId: string,
+    organizationId: string,
+    id: string,
+    user: any,
+    expectedVersion: number,
+  ) {
+    return this.publisherWebsiteLifecycleCommand(
+      publisherId,
+      organizationId,
+      id,
+      user,
+      expectedVersion,
+      ModerationAction.ARCHIVE,
+    )
+  }
+
+  async reopenWebsite(
+    publisherId: string,
+    organizationId: string,
+    id: string,
+    user: any,
+    expectedVersion: number,
+  ) {
+    return this.publisherWebsiteLifecycleCommand(
+      publisherId,
+      organizationId,
+      id,
+      user,
+      expectedVersion,
+      ModerationAction.REOPEN,
+    )
+  }
+
+  private async publisherWebsiteLifecycleCommand(
+    publisherId: string,
+    organizationId: string,
+    id: string,
+    user: any,
+    expectedVersion: number,
+    action: typeof ModerationAction.ARCHIVE | typeof ModerationAction.REOPEN,
+  ) {
     const publisher = await this.prisma.publisher.findUnique({
       where: { id: publisherId },
     })
     if (!publisher || publisher.organizationId !== organizationId) {
       throw new NotFoundException("Publisher not found")
     }
-    const website = await this.prisma.website.findFirst({
-      where: { id, publisherId },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "Website"
+        WHERE "id" = ${id}
+        FOR UPDATE
+      `
+      const website = await tx.website.findFirst({
+        where: { id, publisherId },
+      })
+      if (!website) throw new NotFoundException("Website not found")
+      if (website.moderationVersion !== expectedVersion) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Website moderation changed; refresh and retry",
+          currentVersion: website.moderationVersion,
+        })
+      }
+      const allowedActions = getPublisherWebsiteLifecycleActions(website)
+      if (!allowedActions.includes(action)) {
+        throw new BadRequestException({
+          code: "MODERATION_HOLD",
+          message: `This website cannot be ${action === ModerationAction.ARCHIVE ? "archived" : "reopened"} while the current moderation decision is active`,
+          allowedActions,
+        })
+      }
+
+      const reopening = action === ModerationAction.REOPEN
+
+      const transition = await tx.website.updateMany({
+        where: { id, publisherId, moderationVersion: expectedVersion },
+        data: {
+          isActive: reopening,
+          activeModerationAction: reopening ? null : ModerationAction.ARCHIVE,
+          activeModerationAuthority: reopening
+            ? null
+            : ModerationAuthority.PUBLISHER,
+          activeModerationReasonCode: reopening
+            ? null
+            : ModerationReasonCode.PUBLISHER_REQUEST,
+          activeModerationMessage: null,
+          activeModerationPreviousActive: reopening ? null : website.isActive,
+          moderationVersion: { increment: 1 },
+        },
+      })
+      if (transition.count !== 1) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Website moderation changed; refresh and retry",
+        })
+      }
+      const event = await tx.moderationEvent.create({
+        data: {
+          scope: "WEBSITE",
+          websiteId: id,
+          action,
+          reasonCode: reopening
+            ? ModerationReasonCode.ISSUE_RESOLVED
+            : ModerationReasonCode.PUBLISHER_REQUEST,
+          actorUserId: user.id,
+          actorStaffRole: null,
+          authority: ModerationAuthority.PUBLISHER,
+          previousWebsiteActive: website.isActive,
+          resultingWebsiteActive: reopening,
+          previousModerationAction: website.activeModerationAction,
+          resultingModerationAction: reopening
+            ? null
+            : ModerationAction.ARCHIVE,
+          resubmissionAllowed: false,
+        },
+      })
+      await this.audit.log(
+        {
+          action: reopening ? "WEBSITE_REOPENED" : "WEBSITE_ARCHIVED",
+          entityType: "Website",
+          entityId: id,
+          metadata: {
+            url: website.url,
+            moderationEventId: event.id,
+            listingLifecyclePreserved: true,
+            previousVersion: website.moderationVersion,
+            resultingVersion: website.moderationVersion + 1,
+          },
+          userId: user.id,
+          organizationId,
+        },
+        tx,
+      )
+      const updated = await tx.website.findUniqueOrThrow({ where: { id } })
+      return this.publisherWebsiteProjection(updated)
     })
-
-    if (!website) {
-      throw new NotFoundException("Website not found")
-    }
-
-    // Instead of hard deleting, we archive the listings and pause the website
-    await this.prisma.website.update({
-      where: { id },
-      data: { isActive: false },
-    })
-
-    await this.prisma.marketplaceListing.updateMany({
-      where: { websiteId: id },
-      data: { status: ListingStatus.ARCHIVED },
-    })
-
-    await this.audit.log({
-      action: "WEBSITE_DELETED",
-      entityType: "Website",
-      entityId: id,
-      metadata: { url: website.url },
-      userId: user.id,
-      organizationId,
-    })
-
-    return { success: true }
   }
 
   async submitForReview(
@@ -791,6 +1034,7 @@ export class WebsitesService {
     organizationId: string,
     id: string,
     user: any,
+    expectedVersion?: number,
   ) {
     const publisher = await this.prisma.publisher.findUnique({
       where: { id: publisherId },
@@ -804,6 +1048,13 @@ export class WebsitesService {
 
     if (!website) {
       throw new NotFoundException("Website not found")
+    }
+
+    if (!website.isActive) {
+      throw new BadRequestException({
+        code: "WEBSITE_INACTIVE",
+        message: "Restore this website before submitting its listing",
+      })
     }
 
     if (website.verificationStatus !== "VERIFIED") {
@@ -814,22 +1065,55 @@ export class WebsitesService {
       })
     }
 
-    const listing = await this.prisma.marketplaceListing.findFirst({
-      where: { websiteId: id, status: ListingStatus.DRAFT },
-      include: {
-        categories: { select: { categoryId: true } },
-        services: {
-          where: { availability: "AVAILABLE" },
-          select: { id: true },
-          take: 1,
-        },
+    const submissionListingInclude = {
+      categories: { select: { categoryId: true } },
+      services: {
+        where: { availability: "AVAILABLE" as const },
+        select: { id: true },
+        take: 1,
       },
+    }
+    let listing = await this.prisma.marketplaceListing.findFirst({
+      where: {
+        websiteId: id,
+        publisherId,
+        status: { not: ListingStatus.ARCHIVED },
+      },
+      orderBy: { createdAt: "asc" },
+      include: submissionListingInclude,
     })
+
+    // The partial unique index guarantees at most one non-archived listing for
+    // a website. When none exists, the newest archived listing is the only
+    // lifecycle candidate; the shared policy below decides whether staff has
+    // explicitly permitted that exact listing to be resubmitted.
+    if (!listing) {
+      listing = await this.prisma.marketplaceListing.findFirst({
+        where: {
+          websiteId: id,
+          publisherId,
+          status: ListingStatus.ARCHIVED,
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        include: submissionListingInclude,
+      })
+    }
 
     if (!listing) {
       throw new BadRequestException({
         code: "LISTING_NOT_READY",
         message: "This website does not have a draft listing to submit",
+      })
+    }
+    if (
+      !getPublisherListingLifecycleActions(listing).includes(
+        "SUBMIT_FOR_REVIEW",
+      )
+    ) {
+      throw new BadRequestException({
+        code: "MODERATION_HOLD",
+        message:
+          "This listing cannot be submitted while a staff moderation decision is active",
       })
     }
     if (listing.services.length === 0) {
@@ -886,19 +1170,204 @@ export class WebsitesService {
       })
     }
 
-    await this.prisma.marketplaceListing.update({
-      where: { id: listing.id },
-      data: { status: ListingStatus.PENDING_REVIEW },
+    const transitionedListingId = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "Website"
+        WHERE "id" = ${id}
+        FOR SHARE
+      `
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "MarketplaceListing"
+        WHERE "id" = ${listing.id}
+        FOR UPDATE
+      `
+
+      const [currentWebsite, currentListing] = await Promise.all([
+        tx.website.findFirst({ where: { id, publisherId } }),
+        tx.marketplaceListing.findUnique({
+          where: { id: listing.id },
+          include: {
+            categories: { select: { categoryId: true } },
+            services: {
+              where: { availability: "AVAILABLE" },
+              select: { id: true },
+              take: 1,
+            },
+          },
+        }),
+      ])
+      if (!currentWebsite || !currentListing) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Listing moderation changed; refresh and retry",
+        })
+      }
+      if (!currentWebsite.isActive) {
+        throw new BadRequestException({
+          code: "WEBSITE_INACTIVE",
+          message: "Restore this website before submitting its listing",
+        })
+      }
+      if (currentWebsite.verificationStatus !== "VERIFIED") {
+        throw new BadRequestException({
+          code: "WEBSITE_NOT_VERIFIED",
+          message:
+            "Verify domain ownership before submitting this website for review",
+        })
+      }
+      if (
+        currentListing.status !== listing.status ||
+        currentListing.moderationVersion !== listing.moderationVersion ||
+        (expectedVersion !== undefined &&
+          currentListing.moderationVersion !== expectedVersion)
+      ) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Listing moderation changed; refresh and retry",
+        })
+      }
+      if (
+        !getPublisherListingLifecycleActions(currentListing).includes(
+          "SUBMIT_FOR_REVIEW",
+        )
+      ) {
+        throw new BadRequestException({
+          code: "MODERATION_HOLD",
+          message:
+            "This listing cannot be submitted while a staff moderation decision is active",
+        })
+      }
+      if (currentListing.services.length === 0) {
+        throw new BadRequestException({
+          code: "NO_AVAILABLE_SERVICES",
+          message: "Add at least one available service before submitting",
+        })
+      }
+      if (
+        currentListing.categories.length < 1 ||
+        currentListing.categories.length > 7
+      ) {
+        throw new BadRequestException({
+          code: "LISTING_CATEGORIES_REQUIRED",
+          message:
+            "Choose between 1 and 7 marketplace categories before submitting",
+        })
+      }
+      if (
+        !isMarketplaceLanguage(currentListing.language) ||
+        !hasCompleteListingPolicy(currentListing)
+      ) {
+        throw new BadRequestException({
+          code: "LISTING_POLICY_REQUIRED",
+          message:
+            "Choose a primary language and complete every listing policy before submitting",
+        })
+      }
+      if (
+        !currentListing.description.trim() ||
+        currentListing.description.length > 500
+      ) {
+        throw new BadRequestException({
+          code: "LISTING_DESCRIPTION_REQUIRED",
+          message:
+            "Add a listing description of no more than 500 characters before submitting",
+        })
+      }
+      const currentManualMetrics = await tx.websiteMetric.findMany({
+        where: {
+          websiteId: id,
+          key: {
+            in: [
+              WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+              WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
+            ],
+          },
+          source: { in: ["PUBLISHER_MANUAL", "ADMIN_IMPORT"] },
+          status: "CURRENT",
+          measuredAt: { gte: manualMetricFreshAfter() },
+        },
+        select: { key: true },
+      })
+      if (new Set(currentManualMetrics.map((metric) => metric.key)).size < 2) {
+        throw new BadRequestException({
+          code: "MANUAL_METRICS_REQUIRED",
+          message:
+            "Add current Ahrefs organic traffic and Moz Domain Authority before submitting",
+        })
+      }
+
+      const reasonCode =
+        currentListing.status === ListingStatus.DRAFT
+          ? ("INITIAL_SUBMISSION" as const)
+          : ("CORRECTIONS_COMPLETE" as const)
+      const updated = await tx.marketplaceListing.updateMany({
+        where: {
+          id: currentListing.id,
+          status: currentListing.status,
+          moderationVersion: currentListing.moderationVersion,
+        },
+        data: {
+          status: ListingStatus.PENDING_REVIEW,
+          activeModerationAction: "SUBMIT_FOR_REVIEW",
+          activeModerationAuthority: "PUBLISHER",
+          activeModerationReasonCode: reasonCode,
+          activeModerationMessage: null,
+          activeModerationPreviousStatus: currentListing.status,
+          moderationResubmissionAllowed: false,
+          moderationVersion: { increment: 1 },
+        },
+      })
+      if (updated.count !== 1) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Listing moderation changed; refresh and retry",
+        })
+      }
+
+      const event = await tx.moderationEvent.create({
+        data: {
+          scope: "LISTING",
+          listingId: currentListing.id,
+          action: "SUBMIT_FOR_REVIEW",
+          reasonCode,
+          actorUserId: user.id,
+          actorStaffRole: null,
+          authority: "PUBLISHER",
+          previousStatus: currentListing.status,
+          resultingStatus: ListingStatus.PENDING_REVIEW,
+          previousModerationAction: currentListing.activeModerationAction,
+          resultingModerationAction: "SUBMIT_FOR_REVIEW",
+          resubmissionAllowed: false,
+        },
+      })
+
+      await this.audit.log(
+        {
+          action: "WEBSITE_SUBMITTED_FOR_REVIEW",
+          entityType: "Website",
+          entityId: id,
+          metadata: {
+            listingId: currentListing.id,
+            previousStatus: currentListing.status,
+            resultingStatus: ListingStatus.PENDING_REVIEW,
+            moderationEventId: event.id,
+            moderationVersion: currentListing.moderationVersion + 1,
+          },
+          userId: user.id,
+          organizationId,
+        },
+        tx,
+      )
+      return currentListing.id
     })
 
-    await this.audit.log({
-      action: "WEBSITE_SUBMITTED_FOR_REVIEW",
-      entityType: "Website",
-      entityId: id,
-      userId: user.id,
+    return this.getWebsiteById(
+      publisherId,
       organizationId,
-    })
-
-    return { success: true }
+      id,
+      transitionedListingId,
+    )
   }
 }

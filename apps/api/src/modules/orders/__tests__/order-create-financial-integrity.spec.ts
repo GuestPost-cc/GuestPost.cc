@@ -3,6 +3,21 @@ import { Prisma } from "@guestpost/database"
 import { OrdersService } from "../orders.service"
 
 describe("OrdersService create financial integrity", () => {
+  function expectCatalogLockOrder(queryRaw: jest.Mock) {
+    const lockedTables = queryRaw.mock.calls
+      .map(([template]) =>
+        Array.isArray(template) ? template.join("") : String(template),
+      )
+      .map((sql) => /FROM\s+"([^"]+)"/.exec(sql)?.[1] ?? null)
+      .filter(Boolean)
+
+    expect(lockedTables.slice(0, 3)).toEqual([
+      "Website",
+      "MarketplaceListing",
+      "ListingService",
+    ])
+  }
+
   const idempotentRequest = {
     type: "GUEST_POST",
     customerId: "customer-1",
@@ -128,6 +143,7 @@ describe("OrdersService create financial integrity", () => {
 
   it("rejects a non-USD listing snapshot before creating an order", async () => {
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "service-eur" }]),
       listingService: {
         findUnique: jest.fn().mockResolvedValue({
           id: "service-eur",
@@ -146,6 +162,7 @@ describe("OrdersService create financial integrity", () => {
             ownerType: "PUBLISHER",
             website: {
               id: "website-1",
+              isActive: true,
               ownershipType: "PUBLISHER",
               verificationStatus: "VERIFIED",
               managedByUserId: null,
@@ -181,6 +198,7 @@ describe("OrdersService create financial integrity", () => {
 
   it("derives one priced item and returns the post-total order snapshot", async () => {
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "service-1" }]),
       order: {
         findUnique: jest.fn(),
         create: jest.fn().mockResolvedValue({
@@ -216,6 +234,7 @@ describe("OrdersService create financial integrity", () => {
             ownerType: "PUBLISHER",
             website: {
               id: "website-1",
+              isActive: true,
               ownershipType: "PUBLISHER",
               verificationStatus: "VERIFIED",
               managedByUserId: null,
@@ -278,6 +297,7 @@ describe("OrdersService create financial integrity", () => {
       where: { id: "order-1" },
       include: { items: true, articleVersions: true },
     })
+    expectCatalogLockOrder(tx.$queryRaw)
     expect(result.amount.toString()).toBe("125")
   })
 
@@ -285,6 +305,7 @@ describe("OrdersService create financial integrity", () => {
     0, 10.001,
   ])("rejects invalid listing-service price %s before writing an order", async (price) => {
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "service-invalid" }]),
       listingService: {
         findUnique: jest.fn().mockResolvedValue({
           id: "service-invalid",
@@ -303,6 +324,7 @@ describe("OrdersService create financial integrity", () => {
             ownerType: "PUBLISHER",
             website: {
               id: "website-1",
+              isActive: true,
               ownershipType: "PUBLISHER",
               verificationStatus: "VERIFIED",
               managedByUserId: null,
@@ -330,6 +352,159 @@ describe("OrdersService create financial integrity", () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({ code: "ORDER_PRICE_INVALID" }),
     })
+    expect(tx.order.create).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    {
+      name: "paused listing",
+      status: "PAUSED",
+      isActive: true,
+      verificationStatus: "VERIFIED",
+      code: "LISTING_UNAVAILABLE",
+    },
+    {
+      name: "inactive website",
+      status: "APPROVED",
+      isActive: false,
+      verificationStatus: "VERIFIED",
+      code: "WEBSITE_UNAVAILABLE",
+    },
+    {
+      name: "unverified website",
+      status: "APPROVED",
+      isActive: true,
+      verificationStatus: "PENDING",
+      code: "WEBSITE_UNAVAILABLE",
+    },
+  ])("fails closed for a $name", async (availabilityCase) => {
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "service-1" }]),
+      listingService: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "service-1",
+          listingId: "listing-1",
+          serviceType: "GUEST_POST",
+          availability: "AVAILABLE",
+          version: 1,
+          price: new Prisma.Decimal(125),
+          currency: "USD",
+          turnaroundDays: 7,
+          warrantyDays: 30,
+          revisionRounds: 2,
+          listing: {
+            id: "listing-1",
+            status: availabilityCase.status,
+            ownerType: "PUBLISHER",
+            website: {
+              id: "website-1",
+              isActive: availabilityCase.isActive,
+              ownershipType: "PUBLISHER",
+              verificationStatus: availabilityCase.verificationStatus,
+              managedByUserId: null,
+            },
+          },
+        }),
+      },
+      order: { create: jest.fn() },
+    }
+    const prisma = {
+      $transaction: jest.fn((work: (client: typeof tx) => unknown) => work(tx)),
+    }
+
+    await expect(
+      new OrdersService(prisma as any).createOrder(
+        {
+          type: "GUEST_POST",
+          customerId: "customer-1",
+          organizationId: "organization-1",
+          listingServiceId: "service-1",
+          briefData: {},
+        },
+        "customer-1",
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: availabilityCase.code }),
+    })
+    expect(tx.order.create).not.toHaveBeenCalled()
+  })
+
+  it("selects the approved legacy listing, locks in order, and rejects an inactive website", async () => {
+    const unavailableService = {
+      id: "service-legacy",
+      listingId: "listing-1",
+      serviceType: "GUEST_POST",
+      availability: "AVAILABLE",
+      version: 1,
+      price: new Prisma.Decimal(125),
+      currency: "USD",
+      turnaroundDays: 7,
+      warrantyDays: 30,
+      revisionRounds: 2,
+      listing: {
+        id: "listing-1",
+        status: "APPROVED",
+        ownerType: "PUBLISHER",
+        website: {
+          id: "website-1",
+          isActive: false,
+          ownershipType: "PUBLISHER",
+          verificationStatus: "VERIFIED",
+          managedByUserId: null,
+        },
+      },
+    }
+    const listings = [
+      { id: "listing-archived", status: "ARCHIVED" },
+      { id: "listing-1", status: "APPROVED" },
+    ]
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "service-legacy" }]),
+      marketplaceListing: {
+        findFirst: jest
+          .fn()
+          .mockImplementation(({ where }) =>
+            Promise.resolve(
+              listings.find(
+                (listing) =>
+                  listing.status === where.status &&
+                  where.websiteId === "website-1",
+              ) ?? null,
+            ),
+          ),
+      },
+      listingService: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({ id: "service-legacy" })
+          .mockResolvedValueOnce(unavailableService)
+          .mockResolvedValueOnce(unavailableService),
+      },
+      order: { create: jest.fn() },
+    }
+    const prisma = {
+      $transaction: jest.fn((work: (client: typeof tx) => unknown) => work(tx)),
+    }
+
+    await expect(
+      new OrdersService(prisma as any).createOrder(
+        {
+          type: "GUEST_POST",
+          customerId: "customer-1",
+          organizationId: "organization-1",
+          items: [{ websiteId: "website-1" }],
+          briefData: {},
+        },
+        "customer-1",
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "WEBSITE_UNAVAILABLE" }),
+    })
+    expect(tx.marketplaceListing.findFirst).toHaveBeenCalledWith({
+      where: { websiteId: "website-1", status: "APPROVED" },
+      select: { id: true },
+    })
+    expectCatalogLockOrder(tx.$queryRaw)
     expect(tx.order.create).not.toHaveBeenCalled()
   })
 })

@@ -199,6 +199,9 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       "reviewDispute",
       "resolveDispute",
       "updateListingStatus",
+      "moderateListing",
+      "moderateWebsite",
+      "pauseWebsite",
       "recomputePublisherTrust",
       "recomputeTrust",
       "bulkRetryVerification",
@@ -245,7 +248,6 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       "toggleListingVerified",
       "deleteListing",
       "updateWebsite",
-      "pauseWebsite",
       "deleteWebsite",
       "assignWebsite",
     ]

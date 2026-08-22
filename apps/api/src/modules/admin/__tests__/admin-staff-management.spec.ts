@@ -51,6 +51,7 @@ describe("AdminService staff management", () => {
         update: jest.fn(),
       },
       fulfillmentAssignment: { findMany: jest.fn(), count: jest.fn() },
+      website: { count: jest.fn().mockResolvedValue(0) },
       ticket: {
         count: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -209,9 +210,10 @@ describe("AdminService staff management", () => {
 
   it("maps exhausted staff-role serialization retries to a stable conflict", async () => {
     prisma.$transaction.mockRejectedValue({
-      code: "P2010",
-      meta: {
-        driverAdapterError: { cause: { originalCode: "40001" } },
+      name: "DriverAdapterError",
+      cause: {
+        kind: "TransactionWriteConflict",
+        originalCode: "40001",
       },
     })
 
@@ -251,6 +253,75 @@ describe("AdminService staff management", () => {
       ),
     ).rejects.toThrow(ConflictException)
     expect(prisma.user.update).not.toHaveBeenCalled()
+  })
+
+  it("prevents demoting Operations staff while platform websites still route orders to them", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "ops-1",
+      userType: "STAFF",
+      banned: false,
+      staffMemberships: [{ id: "membership-1", role: "OPERATIONS" }],
+    })
+    prisma.fulfillmentAssignment.count.mockResolvedValue(0)
+    prisma.website.count.mockResolvedValue(1)
+
+    await expect(
+      service.updateStaffRole("ops-1", "FINANCE", { id: "admin-1" }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        message:
+          "Reassign managed platform websites before changing this Operations role",
+      }),
+    })
+
+    expect(prisma.website.count).toHaveBeenCalledWith({
+      where: {
+        managedByUserId: "ops-1",
+        ownershipType: "PLATFORM",
+      },
+    })
+    expect(prisma.ticket.count).not.toHaveBeenCalled()
+    expect(prisma.staffMembership.update).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
+  })
+
+  it("prevents suspending Operations staff while platform websites still route orders to them", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "ops-1",
+      userType: "STAFF",
+      banned: false,
+      staffMemberships: [{ id: "membership-1", role: "OPERATIONS" }],
+    })
+    prisma.fulfillmentAssignment.count.mockResolvedValue(0)
+    prisma.website.count.mockResolvedValue(1)
+
+    await expect(
+      service.suspendUser(
+        "ops-1",
+        {
+          reasonCode: "STAFF_ACCESS_REMOVAL",
+          internalNote: "Access review requires website reassignment",
+        },
+        { id: "admin-1" },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        message:
+          "Reassign managed platform websites before suspending this Operations user",
+      }),
+    })
+
+    expect(prisma.website.count).toHaveBeenCalledWith({
+      where: {
+        managedByUserId: "ops-1",
+        ownershipType: "PLATFORM",
+      },
+    })
+    expect(prisma.user.update).not.toHaveBeenCalled()
+    expect(prisma.session.deleteMany).not.toHaveBeenCalled()
+    expect(audit.log).not.toHaveBeenCalled()
+    expect(invalidateAuthContext).not.toHaveBeenCalled()
   })
 
   it("prevents demoting Operations staff with non-closed support ownership", async () => {

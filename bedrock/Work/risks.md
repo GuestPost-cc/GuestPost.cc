@@ -1,17 +1,48 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-08-15
+updated: 2026-08-23
 ---
 
 # Risks
 
-Updated 2026-08-15 for the active confirmed-fraud change set. Historical audit
-Views are snapshots, not current status;
+Updated 2026-08-23 for PR #105's marketplace trust-boundary work on top of the
+merged confirmed-fraud/support release and the controlled Neon cutover/worker-
+fleet containment. Historical audit Views are snapshots, not current status;
 `Work/backlog.md` is the canonical open-work register and this file is the
 canonical launch-risk register.
 
 ## Current production-hold risk
+
+- **The marketplace moderation migrations are applied in the authorized Neon
+  staging database, but neither is deployed to production.** Migration
+  `20260821120000_marketplace_moderation` introduces append-only moderation
+  history, current projections, versioned commands, and conservative legacy
+  hold backfill. The forward-only correction changes only exact matching mutable
+  projections and preserves the append-only legacy events. The staging
+  postflight found all 78 migrations current, no failed migration, corrected
+  projections for the one legacy paused listing and one inactive website, two
+  archived-listing projections unchanged, all four immutable legacy events
+  preserved, zero invalid event targets, both append-only guards enabled, and
+  all five moderation constraints present. Old writers still do not understand
+  these authority boundaries.
+  Before production, rehearse on a
+  populated clone, verify backfill counts/projections, drain old API writers,
+  apply the migration before the matching application image, and use a forward
+  fix rather than dropping immutability guards. Because this checksum-pinned
+  migration has already been applied to staging, a later migration cannot
+  retroactively shorten its first-deploy validation or index-build lock window;
+  dropping and recreating validated guards or the index would add risk without
+  fixing that initial lock. Production must therefore prove the duration on a
+  populated clone and retain the hard writer drain for the cutover. The
+  production runtime role must remain DML-only and lack TRUNCATE/DDL privileges.
+
+- **Buyer metrics intentionally disappear when authoritative evidence is
+  absent or stale.** Publisher/staff/imported values remain available for
+  internal review but cannot fill buyer cards, filters, sorting, ranking, or
+  recommendations. This fail-closed behavior can reduce apparent inventory
+  until provider collection succeeds; do not restore compatibility scalars or
+  manual-source allowlists as an availability shortcut.
 
 - **The confirmed-fraud release is mixed-writer incompatible and is not yet
   deployed.** Migration `20260815120000_delivery_fraud_findings` makes findings,

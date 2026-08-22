@@ -1,10 +1,25 @@
-import { ConflictException } from "@nestjs/common"
+import { ConflictException, ForbiddenException } from "@nestjs/common"
 import { AdminService } from "../admin.service"
 
 function listing(status: string) {
   return {
     id: "listing-1",
+    websiteId: null,
     status,
+    ownerType: "PUBLISHER",
+    moderationVersion: status === "PENDING_REVIEW" ? 0 : 1,
+    activeModerationAction:
+      status === "REJECTED" ? "REQUEST_CHANGES" : "SUBMIT_FOR_REVIEW",
+    activeModerationAuthority:
+      status === "REJECTED" ? "SUPER_ADMIN" : "PUBLISHER",
+    activeModerationReasonCode:
+      status === "REJECTED" ? "INCOMPLETE_LISTING" : "INITIAL_SUBMISSION",
+    activeModerationMessage:
+      status === "REJECTED"
+        ? "Please complete the missing listing details."
+        : null,
+    activeModerationPreviousStatus: "DRAFT",
+    moderationResubmissionAllowed: status === "REJECTED",
     title: "Example listing",
     organizationId: "org-1",
     publisherId: "publisher-1",
@@ -42,16 +57,98 @@ function communicationsHarness() {
 }
 
 describe("AdminService committed transition concurrency", () => {
+  it("routes the legacy listing delete alias through explicit archive moderation", async () => {
+    const service = new AdminService({} as any, {} as any, {} as any, {} as any)
+    const updateListingStatus = jest
+      .spyOn(service, "updateListingStatus")
+      .mockResolvedValue({ id: "listing-1", status: "ARCHIVED" } as any)
+    const actor = { id: "admin-1", staffRole: "SUPER_ADMIN" }
+
+    await expect(
+      service.deleteListing("listing-1", actor),
+    ).resolves.toMatchObject({ status: "ARCHIVED" })
+    expect(updateListingStatus).toHaveBeenCalledWith(
+      "listing-1",
+      "ARCHIVED",
+      actor,
+      false,
+      expect.objectContaining({
+        reasonCode: "DUPLICATE_OR_INVALID",
+        publisherMessage: expect.any(String),
+        internalNote: expect.any(String),
+      }),
+    )
+  })
+
+  it("returns the full projected listing for an idempotent status update", async () => {
+    const unchanged = listing("REJECTED")
+    const prisma: any = {
+      marketplaceListing: {
+        findUnique: jest.fn().mockResolvedValue(unchanged),
+      },
+    }
+    const service = new AdminService(prisma, {} as any, {} as any, {} as any)
+
+    await expect(
+      service.updateListingStatus(
+        unchanged.id,
+        unchanged.status,
+        { id: "admin-1", staffRole: "SUPER_ADMIN" },
+        false,
+        { expectedVersion: unchanged.moderationVersion },
+      ),
+    ).resolves.toMatchObject({
+      id: unchanged.id,
+      title: unchanged.title,
+      status: unchanged.status,
+      moderation: { version: unchanged.moderationVersion },
+    })
+    expect(prisma.marketplaceListing.findUnique).toHaveBeenCalledWith({
+      where: { id: unchanged.id },
+      include: { website: { select: { managedByUserId: true } } },
+    })
+  })
+
+  it("rejects an idempotent platform listing update by unassigned Operations", async () => {
+    const unchanged = {
+      ...listing("APPROVED"),
+      websiteId: "website-1",
+      ownerType: "PLATFORM",
+      website: { managedByUserId: "ops-2" },
+    }
+    const prisma: any = {
+      marketplaceListing: {
+        findUnique: jest.fn().mockResolvedValue(unchanged),
+      },
+    }
+    const service = new AdminService(prisma, {} as any, {} as any, {} as any)
+
+    await expect(
+      service.updateListingStatus(
+        unchanged.id,
+        unchanged.status,
+        { id: "ops-1", staffRole: "OPERATIONS" },
+        false,
+        { expectedVersion: unchanged.moderationVersion },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
   it("rejects a distinct listing command when the locked predecessor changed", async () => {
     const prisma: any = {
       $queryRaw: jest.fn().mockResolvedValue([{ id: "listing-1" }]),
       marketplaceListing: {
         findUnique: jest
           .fn()
-          .mockResolvedValueOnce({ status: "PENDING_REVIEW" })
+          .mockResolvedValueOnce({
+            websiteId: null,
+            status: "PENDING_REVIEW",
+            moderationVersion: 0,
+          })
           .mockResolvedValueOnce(listing("APPROVED")),
         updateMany: jest.fn(),
       },
+      moderationEvent: { create: jest.fn() },
       $transaction: jest.fn(async (work: (tx: any) => unknown) => work(prisma)),
     }
     const audit = { log: jest.fn() }
@@ -64,11 +161,15 @@ describe("AdminService committed transition concurrency", () => {
     )
 
     await expect(
-      service.updateListingStatus(
+      service.moderateListing(
         "listing-1",
-        "REJECTED",
+        {
+          action: "REQUEST_CHANGES",
+          reasonCode: "INCOMPLETE_LISTING",
+          publisherMessage: "Please complete the missing listing details.",
+          expectedVersion: 0,
+        } as any,
         { id: "admin-1", staffRole: "SUPER_ADMIN" },
-        false,
       ),
     ).rejects.toBeInstanceOf(ConflictException)
 
@@ -77,16 +178,21 @@ describe("AdminService committed transition concurrency", () => {
     expect(communications.record).not.toHaveBeenCalled()
   })
 
-  it("treats an identical listing command that won concurrently as a no-op", async () => {
+  it("rejects an identical retry with a stale moderation version", async () => {
     const prisma: any = {
       $queryRaw: jest.fn().mockResolvedValue([{ id: "listing-1" }]),
       marketplaceListing: {
         findUnique: jest
           .fn()
-          .mockResolvedValueOnce({ status: "PENDING_REVIEW" })
+          .mockResolvedValueOnce({
+            websiteId: null,
+            status: "REJECTED",
+            moderationVersion: 1,
+          })
           .mockResolvedValueOnce(listing("REJECTED")),
         updateMany: jest.fn(),
       },
+      moderationEvent: { create: jest.fn() },
       $transaction: jest.fn(async (work: (tx: any) => unknown) => work(prisma)),
     }
     const audit = { log: jest.fn() }
@@ -99,45 +205,45 @@ describe("AdminService committed transition concurrency", () => {
     )
 
     await expect(
-      service.updateListingStatus("listing-1", "REJECTED", {
-        id: "admin-1",
-        staffRole: "SUPER_ADMIN",
-      }),
-    ).resolves.toMatchObject({ status: "REJECTED" })
+      service.moderateListing(
+        "listing-1",
+        {
+          action: "REQUEST_CHANGES",
+          reasonCode: "INCOMPLETE_LISTING",
+          publisherMessage: "Please complete the missing listing details.",
+          expectedVersion: 0,
+        } as any,
+        { id: "admin-1", staffRole: "SUPER_ADMIN" },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException)
 
     expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
     expect(audit.log).not.toHaveBeenCalled()
     expect(communications.record).not.toHaveBeenCalled()
   })
 
-  it("uses durable audit identity so a later listing cycle sends a new notice", async () => {
-    let status = "PENDING_REVIEW"
-    let auditSequence = 0
+  it("uses the immutable moderation event identity for one transactional notice", async () => {
     const prisma: any = {
       $queryRaw: jest.fn().mockResolvedValue([{ id: "listing-1" }]),
       marketplaceListing: {
         findUnique: jest
           .fn()
-          .mockImplementation((args: any) =>
-            Promise.resolve(args.select?.status ? { status } : listing(status)),
-          ),
-        updateMany: jest.fn().mockImplementation(({ where, data }: any) => {
-          if (where.status !== status) return Promise.resolve({ count: 0 })
-          status = data.status
-          return Promise.resolve({ count: 1 })
-        }),
-        findUniqueOrThrow: jest
-          .fn()
-          .mockImplementation(() => Promise.resolve(listing(status))),
+          .mockResolvedValueOnce({
+            websiteId: null,
+            status: "PENDING_REVIEW",
+            moderationVersion: 0,
+          })
+          .mockResolvedValueOnce(listing("PENDING_REVIEW")),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(listing("REJECTED")),
+      },
+      moderationEvent: {
+        create: jest.fn().mockResolvedValue({ id: "moderation-event-1" }),
       },
       $transaction: jest.fn(async (work: (tx: any) => unknown) => work(prisma)),
     }
     const audit = {
-      log: jest
-        .fn()
-        .mockImplementation(() =>
-          Promise.resolve({ id: `listing-audit-${++auditSequence}` }),
-        ),
+      log: jest.fn().mockResolvedValue({ id: "audit-1" }),
     }
     const communications = communicationsHarness()
     const service = new AdminService(
@@ -146,23 +252,32 @@ describe("AdminService committed transition concurrency", () => {
       {} as any,
       communications as any,
     )
-    const actor = { id: "admin-1", staffRole: "SUPER_ADMIN" }
-
-    await service.updateListingStatus("listing-1", "REJECTED", actor)
-    await service.updateListingStatus("listing-1", "PENDING_REVIEW", actor)
-    await service.updateListingStatus("listing-1", "REJECTED", actor)
-    await service.updateListingStatus("listing-1", "REJECTED", actor)
+    await service.moderateListing(
+      "listing-1",
+      {
+        action: "REQUEST_CHANGES",
+        reasonCode: "INCOMPLETE_LISTING",
+        publisherMessage: "Please complete the missing listing details.",
+        expectedVersion: 0,
+      } as any,
+      { id: "admin-1", staffRole: "SUPER_ADMIN" },
+    )
 
     const rejectedEvents = communications.record.mock.calls
       .map(([input]) => input)
       .filter((input) => input.type === "MARKETPLACE_LISTING_REJECTED")
-    expect(rejectedEvents).toHaveLength(2)
-    expect(rejectedEvents.map((event) => event.dedupKey)).toEqual([
-      "listing:listing-1:status-transition:listing-audit-1",
-      "listing:listing-1:status-transition:listing-audit-3",
+    expect(rejectedEvents).toHaveLength(1)
+    expect(rejectedEvents[0].dedupKey).toBe(
+      "listing:listing-1:moderation:moderation-event-1",
+    )
+    expect(prisma.moderationEvent.create).toHaveBeenCalledTimes(1)
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "LISTING_MODERATION_REQUEST_CHANGES" }),
+      prisma,
+    )
+    expect(communications.dispatchManyBestEffort).toHaveBeenCalledWith([
+      "event-1",
     ])
-    expect(new Set(rejectedEvents.map((event) => event.dedupKey)).size).toBe(2)
-    expect(audit.log).toHaveBeenCalledTimes(3)
   })
 
   it("rejects a distinct manual tier command after an automatic locked change", async () => {

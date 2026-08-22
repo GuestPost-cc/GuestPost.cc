@@ -1,4 +1,12 @@
-import { CancellationResponsibility } from "@guestpost/database"
+import {
+  CancellationResponsibility,
+  ModerationAction,
+  ModerationReasonCode,
+} from "@guestpost/database"
+import {
+  STAFF_LISTING_MODERATION_ACTIONS,
+  STAFF_WEBSITE_MODERATION_ACTIONS,
+} from "@guestpost/shared"
 import { Transform, Type } from "class-transformer"
 import {
   ArrayMaxSize,
@@ -322,6 +330,60 @@ export class UpdateListingStatusDto {
   @IsOptional()
   @IsBoolean()
   force?: boolean
+
+  @IsOptional()
+  @IsEnum(ModerationReasonCode)
+  reasonCode?: ModerationReasonCode
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2_000)
+  publisherMessage?: string
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2_000)
+  internalNote?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  expectedVersion?: number
+}
+
+export class ModerateListingDto {
+  @IsEnum(ModerationAction)
+  @IsIn(STAFF_LISTING_MODERATION_ACTIONS as unknown as string[])
+  action!: ModerationAction
+
+  @IsEnum(ModerationReasonCode)
+  reasonCode!: ModerationReasonCode
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2_000)
+  publisherMessage?: string
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2_000)
+  internalNote?: string
+
+  @IsInt()
+  @Min(0)
+  expectedVersion!: number
+
+  @IsOptional()
+  @IsBoolean()
+  force?: boolean
 }
 
 export class ToggleListingFeaturedDto {
@@ -357,6 +419,54 @@ export class ReassignWebsiteDto {
 export class PauseWebsiteDto {
   @IsBoolean()
   paused!: boolean
+
+  @IsEnum(ModerationReasonCode)
+  reasonCode!: ModerationReasonCode
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2_000)
+  publisherMessage?: string
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2_000)
+  internalNote?: string
+
+  @IsInt()
+  @Min(0)
+  expectedVersion!: number
+}
+
+export class ModerateWebsiteDto {
+  @IsEnum(ModerationAction)
+  @IsIn(STAFF_WEBSITE_MODERATION_ACTIONS as unknown as string[])
+  action!: ModerationAction
+
+  @IsEnum(ModerationReasonCode)
+  reasonCode!: ModerationReasonCode
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2_000)
+  publisherMessage?: string
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10)
+  @MaxLength(2_000)
+  internalNote?: string
+
+  @IsInt()
+  @Min(0)
+  expectedVersion!: number
 }
 
 export class PreviewWebsiteImportDto {

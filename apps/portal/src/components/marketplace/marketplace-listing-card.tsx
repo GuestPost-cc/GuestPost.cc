@@ -28,6 +28,7 @@ import {
   fulfillmentLabel,
   listingImage,
   metricSourceSummary,
+  publicMarketplaceMetric,
   serviceShortLabel,
   startingPrice,
 } from "./marketplace-ui"
@@ -58,7 +59,11 @@ export function MarketplaceListingCard({
   const price = matchingService?.price ?? startingPrice(listing)
   const categories =
     listing.categories ?? (listing.category ? [listing.category] : [])
-  const organicTraffic = listing.domainMetrics?.ahrefs.organicTraffic
+  const organicTraffic = publicMarketplaceMetric(
+    listing.domainMetrics?.ahrefs.organicTraffic,
+    "AHREFS_ORGANIC_TRAFFIC",
+    "AHREFS",
+  )
 
   return (
     <Link
@@ -163,7 +168,7 @@ export function MarketplaceListingCard({
           </div>
           <div className="px-3">
             <dt className="text-[11px] text-muted-foreground">
-              Reported Ahrefs traffic
+              Ahrefs organic traffic
             </dt>
             <dd className="mt-0.5 inline-flex items-center gap-1 font-semibold">
               <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />

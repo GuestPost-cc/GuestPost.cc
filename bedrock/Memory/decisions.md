@@ -1,7 +1,7 @@
 ---
 note_type: decisions-log
 project: guestpost-platform
-updated: 2026-07-29
+updated: 2026-08-21
 ---
 
 # Decisions
@@ -19,6 +19,37 @@ Use this file for important project decisions.
 **Impact:** What this changes.
 
 **Related files:** Links to relevant Memory or Work items.
+
+---
+
+### 2026-08-21, Marketplace moderation and buyer trust use explicit authority
+
+**Decision:** Keep listing lifecycle, domain availability, moderation authority,
+and metric provenance as separate facts. Moderation is an append-only,
+versioned `ModerationEvent` stream with a current projection; website holds do
+not rewrite listing status. Buyer visibility/orderability requires an approved
+listing on an active, verified website. Buyer metrics require an exact current
+provider/key/direct-source match, and every buyer response uses an allowlist
+projection.
+
+**Why:** Generic status setters, reversible publisher actions, and legacy scalar
+metrics allowed one actor or compatibility field to overwrite another trust
+boundary. Denylist serializers also made newly added internal fields public by
+default. Separate authority plus fail-closed projections prevents both lifecycle
+bypasses and provenance leaks.
+
+**Impact:** Staff and publisher commands carry `expectedVersion`; lock targets
+in Website → MarketplaceListing order; atomically write target, event, audit,
+and communication outbox; and expose server-computed actions. Legacy holds are
+backfilled without inventing prior state. Checkout repeats the same availability
+predicate under locks. Manual/imported metrics remain visible internally but do
+not influence marketplace discovery. Adding a new source or public field now
+requires an explicit policy/serializer change.
+
+**Related files:** [[marketplace]];
+`packages/shared/src/marketplace-moderation.ts`;
+`packages/shared/src/website-metric-provenance.ts`;
+`packages/database/prisma/migrations/20260821120000_marketplace_moderation/migration.sql`.
 
 ---
 

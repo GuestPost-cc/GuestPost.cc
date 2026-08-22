@@ -28,6 +28,25 @@ export {
   isExactMoneyAtMost,
   normalizeExactNonNegativeMoney,
 } from "./exact-money"
+export type {
+  ActiveModerationDecision,
+  ModerationAction,
+  ModerationAuthority,
+  ModerationCommand,
+  ModerationCommandResponse,
+  ModerationEventSummary,
+  ModerationProjection,
+  ModerationReasonCode,
+  ModerationScope,
+  PublisherModerationEventSummary,
+  PublisherModerationProjection,
+} from "./marketplace-moderation"
+export {
+  MODERATION_ACTION_LABELS,
+  MODERATION_REASON_LABELS,
+  moderationActionLabel,
+  moderationReasonLabel,
+} from "./marketplace-moderation"
 export { payoutErrorPresentation } from "./payout-command"
 export type {
   AccountSuspensionMutationResponse,
@@ -38,6 +57,9 @@ export type {
   AdminCommandCenterPriority,
   AdminCommandCenterResponse,
   AdminDeliveryVerificationQueueItem,
+  AdminDomainMetricSource,
+  AdminDomainMetrics,
+  AdminDomainMetricValue,
   AdminFinancePipelineStage,
   AdminFinanceWorkbenchAction,
   AdminFinanceWorkbenchActionType,

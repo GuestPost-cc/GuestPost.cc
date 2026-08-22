@@ -8,37 +8,120 @@ export type WebsiteMetricSourceDisclosure = {
 const UNVERIFIED_SUFFIX = "not independently verified"
 
 /**
- * Sources that may contribute a metric to marketplace filtering, sorting, or
- * recommendations. Keep this as an explicit, reviewed allowlist: deriving the
- * policy by excluding one known-bad source would silently admit a future enum
- * value before its collection and trust semantics have been reviewed.
- *
- * Provider/key checks remain mandatory at each algorithm call site. This list
- * only answers whether the source class itself is eligible.
+ * Sources whose values were collected directly from the named provider and
+ * may cross the customer-marketplace trust boundary. Keep this as an explicit
+ * allowlist: deriving the policy by excluding known manual sources would
+ * silently admit a future enum value before its provenance is reviewed.
  */
-export const MARKETPLACE_ALGORITHMIC_METRIC_SOURCES = Object.freeze([
+export const MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES = Object.freeze([
   "AHREFS_FREE_API",
   "AHREFS_PAID_API",
   "MOZ_PAID_API",
   "OPEN_PAGE_RANK_API",
-  "STAFF_MANUAL",
-  "ADMIN_IMPORT",
 ] as const)
+
+export type MarketplaceAuthoritativeMetricSource =
+  (typeof MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES)[number]
+
+/**
+ * Filtering, sorting, and recommendations use the same trust boundary as the
+ * public projection. This compatibility name is retained for existing callers
+ * while making it impossible for display and ranking policy to drift apart.
+ */
+export const MARKETPLACE_ALGORITHMIC_METRIC_SOURCES =
+  MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES
 
 export type MarketplaceAlgorithmicMetricSource =
   (typeof MARKETPLACE_ALGORITHMIC_METRIC_SOURCES)[number]
 
-const MARKETPLACE_ALGORITHMIC_METRIC_SOURCE_SET = new Set<string>(
-  MARKETPLACE_ALGORITHMIC_METRIC_SOURCES,
+const MARKETPLACE_AUTHORITATIVE_METRIC_SOURCE_SET = new Set<string>(
+  MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES,
 )
+
+export function isMarketplaceAuthoritativeMetricSource(
+  source: unknown,
+): source is MarketplaceAuthoritativeMetricSource {
+  return (
+    typeof source === "string" &&
+    MARKETPLACE_AUTHORITATIVE_METRIC_SOURCE_SET.has(source)
+  )
+}
 
 export function isMarketplaceAlgorithmicMetricSource(
   source: unknown,
 ): source is MarketplaceAlgorithmicMetricSource {
-  return (
-    typeof source === "string" &&
-    MARKETPLACE_ALGORITHMIC_METRIC_SOURCE_SET.has(source)
-  )
+  return isMarketplaceAuthoritativeMetricSource(source)
+}
+
+type MarketplaceMetricIdentity = {
+  key?: unknown
+  provider?: unknown
+  source?: unknown
+}
+
+type MarketplaceAuthoritativeMetricRule = Readonly<{
+  provider: string
+  sources: readonly MarketplaceAuthoritativeMetricSource[]
+}>
+
+const MARKETPLACE_AUTHORITATIVE_METRIC_RULES: Readonly<
+  Record<string, MarketplaceAuthoritativeMetricRule>
+> = Object.freeze({
+  AHREFS_DOMAIN_RATING: Object.freeze({
+    provider: "AHREFS",
+    sources: Object.freeze(["AHREFS_FREE_API", "AHREFS_PAID_API"] as const),
+  }),
+  AHREFS_ORGANIC_TRAFFIC: Object.freeze({
+    provider: "AHREFS",
+    sources: Object.freeze(["AHREFS_PAID_API"] as const),
+  }),
+  MOZ_DOMAIN_AUTHORITY: Object.freeze({
+    provider: "MOZ",
+    sources: Object.freeze(["MOZ_PAID_API"] as const),
+  }),
+  OPEN_PAGE_RANK: Object.freeze({
+    provider: "OPEN_PAGE_RANK",
+    sources: Object.freeze(["OPEN_PAGE_RANK_API"] as const),
+  }),
+  OPEN_PAGE_RANK_GLOBAL_RANK: Object.freeze({
+    provider: "OPEN_PAGE_RANK",
+    sources: Object.freeze(["OPEN_PAGE_RANK_API"] as const),
+  }),
+  OPEN_PAGE_RANK_REFERRING_DOMAINS: Object.freeze({
+    provider: "OPEN_PAGE_RANK",
+    sources: Object.freeze(["OPEN_PAGE_RANK_API"] as const),
+  }),
+})
+
+/**
+ * Returns the reviewed sources for one exact metric/provider pair. An empty
+ * result is the fail-closed answer for unknown keys and mismatched providers.
+ */
+export function marketplaceAuthoritativeMetricSourcesFor(
+  key: unknown,
+  provider: unknown,
+): readonly MarketplaceAuthoritativeMetricSource[] {
+  if (typeof key !== "string") return []
+  const rule = MARKETPLACE_AUTHORITATIVE_METRIC_RULES[key]
+  return rule && rule.provider === provider ? rule.sources : []
+}
+
+/**
+ * Checks the full key/provider/source identity. A source label alone is not
+ * sufficient: for example, Ahrefs' free endpoint currently authorizes Domain
+ * Rating only and must not make an organic-traffic row authoritative.
+ */
+export function isMarketplaceAuthoritativeMetric<
+  T extends MarketplaceMetricIdentity,
+>(
+  metric: T,
+): metric is T & {
+  source: MarketplaceAuthoritativeMetricSource
+} {
+  return marketplaceAuthoritativeMetricSourcesFor(
+    metric.key,
+    metric.provider,
+  ).includes(metric.source as MarketplaceAuthoritativeMetricSource)
 }
 
 /**

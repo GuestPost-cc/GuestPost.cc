@@ -6,7 +6,10 @@ import { ExternalLink, Heart, Star } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { metricSourceSummary } from "../../../../components/marketplace/marketplace-ui"
+import {
+  metricSourceSummary,
+  publicMarketplaceMetric,
+} from "../../../../components/marketplace/marketplace-ui"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
 
@@ -134,111 +137,117 @@ export default function FavoritesPage() {
       </div>
 
       <div className="space-y-4">
-        {favorites.map((fav) => (
-          <div
-            key={fav.id}
-            className="border rounded-lg p-4 flex gap-4 hover:shadow-md transition-shadow"
-          >
-            <Link
-              href={`/dashboard/marketplace/${fav.listing.slug}`}
-              className="flex-shrink-0"
+        {favorites.map((fav) => {
+          const organicTraffic = publicMarketplaceMetric(
+            fav.listing.domainMetrics?.ahrefs.organicTraffic,
+            "AHREFS_ORGANIC_TRAFFIC",
+            "AHREFS",
+          )
+          return (
+            <div
+              key={fav.id}
+              className="border rounded-lg p-4 flex gap-4 hover:shadow-md transition-shadow"
             >
-              <div className="relative w-32 h-24 bg-muted rounded-lg overflow-hidden">
-                {fav.listing.image ? (
-                  <Image
-                    fill
-                    unoptimized
-                    src={fav.listing.image}
-                    alt={fav.listing.title}
-                    className="object-cover"
-                    sizes="128px"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-primary/5">
-                    <span className="text-2xl font-bold text-primary/20">
-                      {fav.listing.title[0]}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </Link>
-            <div className="flex-1 min-w-0">
-              <Link href={`/dashboard/marketplace/${fav.listing.slug}`}>
-                <h3 className="font-semibold hover:text-primary transition-colors">
-                  {fav.listing.title}
-                </h3>
+              <Link
+                href={`/dashboard/marketplace/${fav.listing.slug}`}
+                className="flex-shrink-0"
+              >
+                <div className="relative w-32 h-24 bg-muted rounded-lg overflow-hidden">
+                  {fav.listing.image ? (
+                    <Image
+                      fill
+                      unoptimized
+                      src={fav.listing.image}
+                      alt={fav.listing.title}
+                      className="object-cover"
+                      sizes="128px"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-primary/5">
+                      <span className="text-2xl font-bold text-primary/20">
+                        {fav.listing.title[0]}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </Link>
-              <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                <span>
-                  {(
-                    fav.listing.categories ??
-                    (fav.listing.category ? [fav.listing.category] : [])
-                  )
-                    .map((category) => category.name)
-                    .slice(0, 2)
-                    .join(", ")}
-                </span>
-                {fav.listing.language && <span>• {fav.listing.language}</span>}
-                {/* Phase 7: read service type from the first AVAILABLE
-                    service, fall back to deprecated listing.type. */}
-                <span>
-                  {(
-                    (fav.listing as any).serviceTypes?.[0] ??
-                    fav.listing.type ??
-                    ""
-                  ).replace(/_/g, " ")}
-                </span>
-              </div>
-              <div className="flex items-center gap-4 mt-2">
-                {fav.listing.avgRating && (
-                  <div className="flex items-center gap-1 text-sm">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span>{fav.listing.avgRating.toFixed(1)}</span>
-                    <span className="text-muted-foreground">
-                      ({fav.listing.reviewCount})
-                    </span>
-                  </div>
-                )}
-                {fav.listing.domainMetrics?.ahrefs.organicTraffic?.value !=
-                  null && (
-                  <span className="text-sm text-muted-foreground">
-                    {fav.listing.domainMetrics.ahrefs.organicTraffic.value.toLocaleString()}{" "}
-                    reported Ahrefs traffic
-                    <span className="block text-xs">
-                      {metricSourceSummary(
-                        fav.listing.domainMetrics.ahrefs.organicTraffic,
-                      )}
-                    </span>
+              <div className="flex-1 min-w-0">
+                <Link href={`/dashboard/marketplace/${fav.listing.slug}`}>
+                  <h3 className="font-semibold hover:text-primary transition-colors">
+                    {fav.listing.title}
+                  </h3>
+                </Link>
+                <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                  <span>
+                    {(
+                      fav.listing.categories ??
+                      (fav.listing.category ? [fav.listing.category] : [])
+                    )
+                      .map((category) => category.name)
+                      .slice(0, 2)
+                      .join(", ")}
                   </span>
-                )}
+                  {fav.listing.language && (
+                    <span>• {fav.listing.language}</span>
+                  )}
+                  {/* Phase 7: read service type from the first AVAILABLE
+                    service, fall back to deprecated listing.type. */}
+                  <span>
+                    {(
+                      (fav.listing as any).serviceTypes?.[0] ??
+                      fav.listing.type ??
+                      ""
+                    ).replace(/_/g, " ")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 mt-2">
+                  {fav.listing.avgRating && (
+                    <div className="flex items-center gap-1 text-sm">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span>{fav.listing.avgRating.toFixed(1)}</span>
+                      <span className="text-muted-foreground">
+                        ({fav.listing.reviewCount})
+                      </span>
+                    </div>
+                  )}
+                  {organicTraffic?.value != null && (
+                    <span className="text-sm text-muted-foreground">
+                      {organicTraffic.value.toLocaleString()} Ahrefs organic
+                      traffic
+                      <span className="block text-xs">
+                        {metricSourceSummary(organicTraffic)}
+                      </span>
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col items-end justify-between">
-              {/* Phase 7: prefer priceFrom (min AVAILABLE service price)
+              <div className="flex flex-col items-end justify-between">
+                {/* Phase 7: prefer priceFrom (min AVAILABLE service price)
                   with a graceful fallback to the deprecated flat price. */}
-              <span className="font-bold text-lg">
-                {formatPrice(
-                  (fav.listing as any).priceFrom ?? fav.listing.price ?? 0,
-                  fav.listing.currency,
-                )}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeFavorite(fav.listing.id)}
-                >
-                  Remove
-                </Button>
-                <Button size="sm" asChild>
-                  <Link href={`/dashboard/marketplace/${fav.listing.slug}`}>
-                    View <ExternalLink className="h-3 w-3 ml-1" />
-                  </Link>
-                </Button>
+                <span className="font-bold text-lg">
+                  {formatPrice(
+                    (fav.listing as any).priceFrom ?? fav.listing.price ?? 0,
+                    fav.listing.currency,
+                  )}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFavorite(fav.listing.id)}
+                  >
+                    Remove
+                  </Button>
+                  <Button size="sm" asChild>
+                    <Link href={`/dashboard/marketplace/${fav.listing.slug}`}>
+                      View <ExternalLink className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

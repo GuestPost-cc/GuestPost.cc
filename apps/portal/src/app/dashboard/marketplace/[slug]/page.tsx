@@ -49,6 +49,7 @@ import {
   fulfillmentBadgeClass,
   fulfillmentLabel,
   metricSourceSummary,
+  publicMarketplaceMetric,
   serviceDescription,
   serviceLabel,
 } from "../../../../components/marketplace/marketplace-ui"
@@ -177,6 +178,26 @@ export default function ListingDetailPage() {
     (listing.ownerType === "PLATFORM"
       ? "GuestPost.cc"
       : (listing.publisher?.name ?? "Verified publisher"))
+  const ahrefsDomainRating = publicMarketplaceMetric(
+    listing.domainMetrics?.ahrefs.domainRating,
+    "AHREFS_DOMAIN_RATING",
+    "AHREFS",
+  )
+  const ahrefsOrganicTraffic = publicMarketplaceMetric(
+    listing.domainMetrics?.ahrefs.organicTraffic,
+    "AHREFS_ORGANIC_TRAFFIC",
+    "AHREFS",
+  )
+  const mozDomainAuthority = publicMarketplaceMetric(
+    listing.domainMetrics?.moz.domainAuthority,
+    "MOZ_DOMAIN_AUTHORITY",
+    "MOZ",
+  )
+  const openPageRank = publicMarketplaceMetric(
+    listing.domainMetrics?.openPageRank.pageRank,
+    "OPEN_PAGE_RANK",
+    "OPEN_PAGE_RANK",
+  )
 
   return (
     <div className="mx-auto max-w-[1450px] space-y-7">
@@ -339,66 +360,52 @@ export default function ListingDetailPage() {
                 Domain metrics
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Source-specific authority and reported organic traffic signals.
+                Current authority and organic traffic collected directly from
+                the named providers.
               </p>
             </div>
             <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Metric
                 label="Ahrefs DR"
                 value={
-                  listing.domainMetrics?.ahrefs.domainRating?.value != null
-                    ? formatCompactNumber(
-                        listing.domainMetrics.ahrefs.domainRating.value,
-                      )
+                  ahrefsDomainRating?.value != null
+                    ? formatCompactNumber(ahrefsDomainRating.value)
                     : "—"
                 }
-                note={metricSourceSummary(
-                  listing.domainMetrics?.ahrefs.domainRating,
-                )}
+                note={metricSourceSummary(ahrefsDomainRating)}
               />
               <Metric
                 label="Ahrefs traffic"
                 value={
-                  listing.domainMetrics?.ahrefs.organicTraffic?.value != null
-                    ? formatCompactNumber(
-                        listing.domainMetrics.ahrefs.organicTraffic.value,
-                      )
+                  ahrefsOrganicTraffic?.value != null
+                    ? formatCompactNumber(ahrefsOrganicTraffic.value)
                     : "—"
                 }
-                note={metricSourceSummary(
-                  listing.domainMetrics?.ahrefs.organicTraffic,
-                )}
+                note={metricSourceSummary(ahrefsOrganicTraffic)}
               />
               <Metric
                 label="Moz DA"
                 value={
-                  listing.domainMetrics?.moz.domainAuthority?.value != null
-                    ? formatCompactNumber(
-                        listing.domainMetrics.moz.domainAuthority.value,
-                      )
+                  mozDomainAuthority?.value != null
+                    ? formatCompactNumber(mozDomainAuthority.value)
                     : "—"
                 }
-                note={metricSourceSummary(
-                  listing.domainMetrics?.moz.domainAuthority,
-                )}
+                note={metricSourceSummary(mozDomainAuthority)}
               />
               <Metric
                 label="Open PageRank"
                 value={
-                  listing.domainMetrics?.openPageRank.pageRank?.value != null
-                    ? String(listing.domainMetrics.openPageRank.pageRank.value)
-                    : "—"
+                  openPageRank?.value != null ? String(openPageRank.value) : "—"
                 }
-                note={metricSourceSummary(
-                  listing.domainMetrics?.openPageRank.pageRank,
-                )}
+                note={metricSourceSummary(openPageRank)}
               />
             </dl>
             <p className="mt-4 text-xs text-muted-foreground">
-              Only eligible current metrics can affect marketplace filters and
-              ranking. Publisher Reported traffic is excluded from both;
-              staff-entered and imported values are not independently verified.
-              Review each source before purchasing. {" · "}
+              Only current metrics collected directly from reviewed provider
+              integrations are shown or used for marketplace filters and
+              ranking. Publisher, staff-entered, imported, stale, and unknown
+              values remain internal. Review each provider before purchasing.
+              {" · "}
               <a
                 href="https://ahrefs.com/"
                 target="_blank"

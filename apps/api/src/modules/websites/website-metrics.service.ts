@@ -4,6 +4,7 @@ import {
   WebsiteMetricSource,
   WebsiteMetricStatus,
 } from "@guestpost/database"
+import { isMarketplaceAuthoritativeMetric } from "@guestpost/shared"
 import {
   BadRequestException,
   ForbiddenException,
@@ -186,9 +187,9 @@ export function serializeWebsiteMetrics(metrics: any[]) {
   }
 }
 
-// Display-safe marketplace shape. Raw provider payloads and actor identifiers
-// never leave this projection; publisher- and platform-owned websites use the
-// exact same source/status contract.
+// Internal marketplace shape used by staff review. It intentionally retains
+// manual/imported values and their provenance while excluding actor and import
+// identifiers. Customer routes must use serializePublicMarketplaceDomainMetrics.
 export function serializeMarketplaceDomainMetrics(metrics: any[]) {
   const serialized = serializeWebsiteMetrics(metrics)
   if (Object.values(serialized).every((metric) => metric == null)) {
@@ -204,6 +205,103 @@ export function serializeMarketplaceDomainMetrics(metrics: any[]) {
       pageRank: serialized.openPageRank,
       globalRank: serialized.openPageRankGlobalRank,
       referringDomains: serialized.openPageRankReferringDomains,
+    },
+  }
+}
+
+function isValidPublicMetricValue(key: unknown, value: number): boolean {
+  if (!Number.isFinite(value) || value < 0) return false
+  switch (key) {
+    case WebsiteMetricKey.AHREFS_DOMAIN_RATING:
+    case WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY:
+      return value <= 100
+    case WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC:
+      return Number.isSafeInteger(value) && value <= 2_147_483_647
+    case WebsiteMetricKey.OPEN_PAGE_RANK:
+      return value <= 10
+    case WebsiteMetricKey.OPEN_PAGE_RANK_GLOBAL_RANK:
+    case WebsiteMetricKey.OPEN_PAGE_RANK_REFERRING_DOMAINS:
+      return Number.isSafeInteger(value)
+    default:
+      return false
+  }
+}
+
+function toPublicIsoDate(value: unknown): string | null {
+  if (value == null) return null
+  const date = value instanceof Date ? value : new Date(value as any)
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null
+}
+
+/**
+ * Fail-closed customer marketplace projection. Only current, unexpired values
+ * with an exact reviewed key/provider/direct-source identity cross this
+ * boundary. Manual/imported values remain stored and available through the
+ * internal publisher and staff serializers above.
+ */
+export function serializePublicMarketplaceDomainMetrics(
+  metrics: any[],
+  asOf = new Date(),
+) {
+  if (!Array.isArray(metrics) || !(asOf instanceof Date)) return undefined
+  const asOfTime = asOf.getTime()
+  if (!Number.isFinite(asOfTime)) return undefined
+
+  const project = (key: WebsiteMetricKey) => {
+    const metric = metrics.find((item) => item?.key === key)
+    if (
+      !metric ||
+      metric.status !== WebsiteMetricStatus.CURRENT ||
+      !isMarketplaceAuthoritativeMetric(metric)
+    ) {
+      return undefined
+    }
+    if (metric.expiresAt != null) {
+      const expiresAt = new Date(metric.expiresAt).getTime()
+      if (!Number.isFinite(expiresAt) || expiresAt <= asOfTime) {
+        return undefined
+      }
+    }
+    const value = Number(metric.value)
+    const measuredAt = toPublicIsoDate(metric.measuredAt)
+    const collectedAt = toPublicIsoDate(metric.collectedAt)
+    if (!isValidPublicMetricValue(key, value) || !measuredAt || !collectedAt) {
+      return undefined
+    }
+    return {
+      value,
+      source: metric.source,
+      status: WebsiteMetricStatus.CURRENT,
+      measuredAt,
+      collectedAt,
+    }
+  }
+
+  const projected = {
+    ahrefsDomainRating: project(WebsiteMetricKey.AHREFS_DOMAIN_RATING),
+    ahrefsOrganicTraffic: project(WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC),
+    mozDomainAuthority: project(WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY),
+    openPageRank: project(WebsiteMetricKey.OPEN_PAGE_RANK),
+    openPageRankGlobalRank: project(
+      WebsiteMetricKey.OPEN_PAGE_RANK_GLOBAL_RANK,
+    ),
+    openPageRankReferringDomains: project(
+      WebsiteMetricKey.OPEN_PAGE_RANK_REFERRING_DOMAINS,
+    ),
+  }
+  if (Object.values(projected).every((metric) => metric == null)) {
+    return undefined
+  }
+  return {
+    ahrefs: {
+      domainRating: projected.ahrefsDomainRating,
+      organicTraffic: projected.ahrefsOrganicTraffic,
+    },
+    moz: { domainAuthority: projected.mozDomainAuthority },
+    openPageRank: {
+      pageRank: projected.openPageRank,
+      globalRank: projected.openPageRankGlobalRank,
+      referringDomains: projected.openPageRankReferringDomains,
     },
   }
 }

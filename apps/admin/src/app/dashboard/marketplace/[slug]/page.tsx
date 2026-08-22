@@ -1,8 +1,15 @@
 "use client"
 
 import type {
+  AdminDomainMetricValue,
   AdminMarketplaceListingDetail,
-  PublicDomainMetricValue,
+  ModerationAction,
+  ModerationCommand,
+  ModerationProjection,
+} from "@guestpost/api-client"
+import {
+  moderationActionLabel,
+  moderationReasonLabel,
 } from "@guestpost/api-client"
 import type { ListingStatus } from "@guestpost/database"
 import {
@@ -50,6 +57,10 @@ import {
   AdminPage,
   AdminPageHeader,
 } from "../../../../components/admin-workspace"
+import {
+  ModerationActionDialog,
+  moderationActionIsDestructive,
+} from "../../../../components/moderation-action-dialog"
 import { api } from "../../../../lib/api"
 import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
 
@@ -91,7 +102,7 @@ function MetricCard({
   compact,
 }: {
   label: string
-  metric?: PublicDomainMetricValue
+  metric?: AdminDomainMetricValue
   compact?: boolean
 }) {
   return (
@@ -154,6 +165,10 @@ function AdminListingDetailPageInner({
     turnaroundDays: "7",
     revisionRounds: "2",
   })
+  const [selectedListingAction, setSelectedListingAction] =
+    useState<ModerationAction | null>(null)
+  const [selectedWebsiteAction, setSelectedWebsiteAction] =
+    useState<ModerationAction | null>(null)
 
   const listingQ = useQuery<AdminMarketplaceListingDetail>({
     queryKey: ["admin", "listing-preview", slug],
@@ -168,11 +183,23 @@ function AdminListingDetailPageInner({
     queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
     queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
   }
-  const statusMutation = useMutation({
-    mutationFn: (status: string) =>
-      api.admin.updateListingStatus(listing!.id, status),
-    onSuccess: () => {
-      toast.success("Listing status updated")
+  const moderationMutation = useMutation({
+    mutationFn: ({
+      scope,
+      command,
+    }: {
+      scope: "LISTING" | "WEBSITE"
+      command: ModerationCommand
+    }) =>
+      scope === "LISTING"
+        ? api.admin.moderateListing(listing!.id, command)
+        : api.admin.moderateWebsite(listing!.website!.id, command),
+    onSuccess: (_, variables) => {
+      setSelectedListingAction(null)
+      setSelectedWebsiteAction(null)
+      toast.success(
+        `${moderationActionLabel(variables.command.action)} recorded`,
+      )
       invalidate()
     },
     onError: (error: Error) => toast.error(error.message),
@@ -270,7 +297,7 @@ function AdminListingDetailPageInner({
     listing.status as ListingStatus,
   )
   const busy =
-    statusMutation.isPending ||
+    moderationMutation.isPending ||
     featuredMutation.isPending ||
     verifiedMutation.isPending
   const publisherLabel =
@@ -382,7 +409,7 @@ function AdminListingDetailPageInner({
         />
       </div>
 
-      {listing.access.role === "FINANCE" ? (
+      {!listing.access.canModerate ? (
         <AdminNotice title="Read-only financial context">
           Listing price, ownership, services, publisher profile, and metric
           provenance are visible for order and settlement investigation.
@@ -397,48 +424,69 @@ function AdminListingDetailPageInner({
               readiness gates.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {listing.status === "PENDING_REVIEW" ? (
-              <>
-                <Button
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => statusMutation.mutate("APPROVED")}
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={busy}
-                  onClick={() => statusMutation.mutate("REJECTED")}
-                >
-                  Reject
-                </Button>
-              </>
+          <CardContent className="space-y-5">
+            <section>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Listing
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {listing.moderation.allowedActions.map((action) => (
+                  <Button
+                    key={action}
+                    size="sm"
+                    variant={
+                      moderationActionIsDestructive(action)
+                        ? "destructive"
+                        : "outline"
+                    }
+                    disabled={busy}
+                    onClick={() => setSelectedListingAction(action)}
+                  >
+                    {moderationActionLabel(action)}
+                  </Button>
+                ))}
+                {listing.moderation.allowedActions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No listing action is currently available.
+                  </p>
+                ) : null}
+              </div>
+              <ModerationHistory projection={listing.moderation} />
+            </section>
+
+            {listing.website ? (
+              <section className="border-t pt-5">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Domain
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {listing.website.moderation.allowedActions.map((action) => (
+                    <Button
+                      key={action}
+                      size="sm"
+                      variant={
+                        moderationActionIsDestructive(action)
+                          ? "destructive"
+                          : "outline"
+                      }
+                      disabled={busy}
+                      onClick={() => setSelectedWebsiteAction(action)}
+                    >
+                      {moderationActionLabel(action)}
+                    </Button>
+                  ))}
+                  {listing.website.moderation.allowedActions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No domain action is currently available.
+                    </p>
+                  ) : null}
+                </div>
+                <ModerationHistory projection={listing.website.moderation} />
+              </section>
             ) : null}
-            {listing.status === "APPROVED" ? (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => statusMutation.mutate("PAUSED")}
-              >
-                Pause
-              </Button>
-            ) : null}
-            {listing.status === "PAUSED" ? (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => statusMutation.mutate("APPROVED")}
-              >
-                Restore
-              </Button>
-            ) : null}
+
             {listing.access.canManageGlobalFlags ? (
-              <>
+              <section className="flex flex-wrap gap-2 border-t pt-5">
                 <Button
                   size="sm"
                   variant="outline"
@@ -457,9 +505,41 @@ function AdminListingDetailPageInner({
                   <ShieldCheck className="mr-2 h-4 w-4" />
                   {listing.verified ? "Remove verified" : "Mark verified"}
                 </Button>
-              </>
+              </section>
             ) : null}
           </CardContent>
+          <ModerationActionDialog
+            action={selectedListingAction}
+            scope="LISTING"
+            targetLabel={listing.title}
+            ownerType={listing.ownerType}
+            version={listing.moderation.version}
+            open={selectedListingAction !== null}
+            pending={moderationMutation.isPending}
+            onOpenChange={(open) => {
+              if (!open) setSelectedListingAction(null)
+            }}
+            onConfirm={(command) =>
+              moderationMutation.mutate({ scope: "LISTING", command })
+            }
+          />
+          {listing.website ? (
+            <ModerationActionDialog
+              action={selectedWebsiteAction}
+              scope="WEBSITE"
+              targetLabel={listing.website.domain || listing.website.url}
+              ownerType={listing.website.ownershipType}
+              version={listing.website.moderation.version}
+              open={selectedWebsiteAction !== null}
+              pending={moderationMutation.isPending}
+              onOpenChange={(open) => {
+                if (!open) setSelectedWebsiteAction(null)
+              }}
+              onConfirm={(command) =>
+                moderationMutation.mutate({ scope: "WEBSITE", command })
+              }
+            />
+          ) : null}
         </Card>
       )}
 
@@ -839,6 +919,88 @@ function AdminListingDetailPageInner({
         </div>
       </div>
     </AdminPage>
+  )
+}
+
+function ModerationHistory({
+  projection,
+}: {
+  projection: ModerationProjection
+}) {
+  const events = projection.history ?? []
+  if (events.length === 0 && !projection.active) {
+    return (
+      <p className="mt-3 text-xs text-muted-foreground">
+        No moderation event has been recorded yet.
+      </p>
+    )
+  }
+
+  return (
+    <div className="mt-4 space-y-2">
+      {events.length === 0 && projection.active ? (
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">
+              {moderationActionLabel(projection.active.action)}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              Current decision ·{" "}
+              {projection.active.authority
+                ?.replaceAll("_", " ")
+                .toLowerCase() ?? "legacy authority"}
+            </span>
+          </div>
+          <p className="mt-2 text-sm">
+            {projection.active.reasonCode
+              ? moderationReasonLabel(projection.active.reasonCode)
+              : "Reason unavailable"}
+          </p>
+          {projection.active.publisherMessage ? (
+            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
+              Publisher message: {projection.active.publisherMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {events.slice(0, 5).map((event) => (
+        <div key={event.id} className="rounded-lg border bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">
+              {moderationActionLabel(event.action)}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {event.authority.replaceAll("_", " ").toLowerCase()} ·{" "}
+              {format(new Date(event.createdAt), "PPp")}
+            </span>
+          </div>
+          <p className="mt-2 text-sm">
+            {moderationReasonLabel(event.reasonCode)}
+          </p>
+          {event.publisherMessage ? (
+            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
+              Publisher message: {event.publisherMessage}
+            </p>
+          ) : null}
+          {event.internalNote ? (
+            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
+              Internal note: {event.internalNote}
+            </p>
+          ) : null}
+          {event.actor ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Actor: {event.actor.name ?? event.actor.email ?? "Staff account"}
+            </p>
+          ) : null}
+          {event.resubmissionAllowed != null ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Resubmission{" "}
+              {event.resubmissionAllowed ? "allowed" : "requires staff action"}
+            </p>
+          ) : null}
+        </div>
+      ))}
+    </div>
   )
 }
 

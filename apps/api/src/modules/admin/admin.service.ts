@@ -2,6 +2,9 @@ import { hashPassword } from "@better-auth/utils/password"
 import {
   FulfillmentChannel,
   ListingStatus,
+  ModerationAction,
+  ModerationAuthority,
+  ModerationReasonCode,
   OrderStatus,
   type Prisma,
   WebsiteMetricKey,
@@ -11,15 +14,19 @@ import {
   WebsiteVerificationStatus,
 } from "@guestpost/database"
 import {
+  buildModerationProjection,
   evaluateSettlementReleaseEvidence,
   getOrderLifecycleStage,
   getOrderLifecycleStageIndex,
+  getStaffListingModerationActions,
+  getStaffWebsiteModerationActions,
   isOrderLifecycleException,
   isPostPublicationPublisherOrder,
   platformFeePercentToBasisPoints,
   QUEUES,
   runSerializableTransactionWithRetry,
   StaffRole,
+  staffCanModerateMarketplaceTarget,
   validateWebsiteEnlistmentInput,
 } from "@guestpost/shared"
 import {
@@ -71,6 +78,23 @@ interface SuspendUserInput {
   reasonCode: SuspensionReason
   internalNote: string
   expiresAt?: string
+}
+
+interface ListingModerationCommand {
+  action: ModerationAction
+  reasonCode: ModerationReasonCode
+  publisherMessage?: string
+  internalNote?: string
+  expectedVersion: number
+  force?: boolean
+}
+
+interface WebsiteModerationCommand {
+  action: ModerationAction
+  reasonCode: ModerationReasonCode
+  publisherMessage?: string
+  internalNote?: string
+  expectedVersion: number
 }
 
 type AdminOrderFocus = "all" | "attention" | "active" | "completed"
@@ -539,6 +563,47 @@ export class AdminService {
     }
   }
 
+  private invalidPlatformWebsiteOwner() {
+    return new BadRequestException({
+      code: "INVALID_OWNER",
+      message:
+        "managedByUserId must reference an active OPERATIONS staff member",
+    })
+  }
+
+  /**
+   * Platform-site ownership participates in the staff offboarding lock order.
+   * Re-reading eligibility only after this lock means exactly one side of a
+   * concurrent assignment vs. demotion/suspension can commit:
+   *
+   *   every Staff User (id ASC), target User, then Website
+   */
+  private async lockAndAssertActiveOperationsOwner(tx: any, userId: string) {
+    try {
+      await this.lockStaffAccessMutationScope(tx, userId)
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw this.invalidPlatformWebsiteOwner()
+      }
+      throw error
+    }
+
+    const target = await tx.staffMembership.findUnique({
+      where: { userId },
+      select: {
+        role: true,
+        user: { select: { banned: true, userType: true } },
+      },
+    })
+    if (
+      target?.role !== "OPERATIONS" ||
+      target.user.banned ||
+      target.user.userType !== "STAFF"
+    ) {
+      throw this.invalidPlatformWebsiteOwner()
+    }
+  }
+
   /**
    * Operations authority cannot be removed while work is still routed to the
    * actor. These predicates run after the shared staff/target locks and inside
@@ -563,6 +628,18 @@ export class AdminService {
     if (activeAssignments > 0) {
       throw new ConflictException(
         `Reassign active fulfillment orders before ${action}`,
+      )
+    }
+
+    const managedPlatformWebsites = await tx.website.count({
+      where: {
+        managedByUserId: userId,
+        ownershipType: WebsiteOwnershipType.PLATFORM,
+      },
+    })
+    if (managedPlatformWebsites > 0) {
+      throw new ConflictException(
+        `Reassign managed platform websites before ${action}`,
       )
     }
 
@@ -2446,6 +2523,19 @@ export class AdminService {
       ? Math.min(100, Math.max(1, params.limit!))
       : 20
     const where: any = {}
+    if (params.user?.staffRole === "OPERATIONS") {
+      where.AND = [
+        {
+          OR: [
+            { ownerType: WebsiteOwnershipType.PUBLISHER },
+            {
+              ownerType: WebsiteOwnershipType.PLATFORM,
+              website: { managedByUserId: params.user.id },
+            },
+          ],
+        },
+      ]
+    }
     if (
       params.status &&
       !Object.values(ListingStatus).includes(params.status as ListingStatus)
@@ -2481,15 +2571,18 @@ export class AdminService {
     if (params.ownerType) where.ownerType = params.ownerType
 
     if (params.search) {
-      where.OR = [
-        { title: { contains: params.search, mode: "insensitive" } },
-        { description: { contains: params.search, mode: "insensitive" } },
-        {
-          website: {
-            domain: { contains: params.search, mode: "insensitive" },
+      const search = {
+        OR: [
+          { title: { contains: params.search, mode: "insensitive" } },
+          { description: { contains: params.search, mode: "insensitive" } },
+          {
+            website: {
+              domain: { contains: params.search, mode: "insensitive" },
+            },
           },
-        },
-      ]
+        ],
+      }
+      where.AND = [...(where.AND ?? []), search]
     }
 
     const [listings, total] = await Promise.all([
@@ -2529,7 +2622,14 @@ export class AdminService {
               domain: true,
               verificationStatus: true,
               verifiedAt: true,
+              isActive: true,
               ownershipType: true,
+              activeModerationAction: true,
+              activeModerationAuthority: true,
+              activeModerationReasonCode: true,
+              activeModerationMessage: true,
+              activeModerationPreviousActive: true,
+              moderationVersion: true,
               metricsHistory: true,
               managedByUserId: true,
               managedBy: {
@@ -2597,6 +2697,29 @@ export class AdminService {
                 name: l.website.managedBy.name,
                 ...(isSuperAdmin && { email: l.website.managedBy.email }),
               }
+            : null,
+          websiteActive: l.website?.isActive ?? false,
+          moderation: buildModerationProjection(
+            l,
+            getStaffListingModerationActions(
+              {
+                ...l,
+                managedByUserId: l.website?.managedByUserId ?? null,
+              },
+              {
+                id: params.user?.id ?? "",
+                staffRole: params.user?.staffRole ?? null,
+              },
+            ),
+          ),
+          websiteModeration: l.website
+            ? buildModerationProjection(
+                l.website,
+                getStaffWebsiteModerationActions(l.website, {
+                  id: params.user?.id ?? "",
+                  staffRole: params.user?.staffRole ?? null,
+                }),
+              )
             : null,
           domainMetrics: serializeMarketplaceDomainMetrics(
             l.website?.metricsHistory ?? [],
@@ -2675,29 +2798,147 @@ export class AdminService {
     status: string,
     user: any,
     force = false,
+    details: {
+      reasonCode?: ModerationReasonCode
+      publisherMessage?: string
+      internalNote?: string
+      expectedVersion?: number
+    } = {},
   ) {
     if (!Object.values(ListingStatus).includes(status as ListingStatus)) {
       throw new BadRequestException(`Invalid listing status: ${status}`)
     }
-    const operationsModerationStatuses: ListingStatus[] = [
-      ListingStatus.APPROVED,
-      ListingStatus.REJECTED,
-      ListingStatus.PAUSED,
-    ]
-    if (
-      user?.staffRole === "OPERATIONS" &&
-      !operationsModerationStatuses.includes(status as ListingStatus)
-    ) {
+    if (!user?.id || !["SUPER_ADMIN", "OPERATIONS"].includes(user.staffRole)) {
+      throw new ForbiddenException("Staff moderation access is required")
+    }
+    if (user?.staffRole === "OPERATIONS" && status === ListingStatus.ARCHIVED) {
       throw new ForbiddenException(
-        "Operations can approve, reject, or pause listings but cannot edit their lifecycle history",
+        "Only Super Admin can archive marketplace inventory",
       )
     }
+
+    const current = await this.prisma.marketplaceListing.findUnique({
+      where: { id },
+      include: {
+        website: { select: { managedByUserId: true } },
+      },
+    })
+    if (!current) throw new NotFoundException("Listing not found")
+    const moderationActor = { id: user.id, staffRole: user.staffRole }
+    if (current.status === status) {
+      const listingModerationTarget = {
+        ownerType: current.ownerType,
+        managedByUserId: current.website?.managedByUserId ?? null,
+      }
+      if (
+        !staffCanModerateMarketplaceTarget(
+          listingModerationTarget,
+          moderationActor,
+        )
+      ) {
+        throw new ForbiddenException(
+          "Operations can only moderate assigned platform inventory",
+        )
+      }
+      const { website, ...unchangedListing } = current
+      return {
+        ...unchangedListing,
+        moderation: buildModerationProjection(
+          unchangedListing,
+          getStaffListingModerationActions(
+            {
+              ...unchangedListing,
+              managedByUserId: listingModerationTarget.managedByUserId,
+            },
+            moderationActor,
+          ),
+        ),
+      }
+    }
+
+    const action =
+      status === ListingStatus.APPROVED
+        ? current.status === ListingStatus.PAUSED
+          ? ModerationAction.RESTORE
+          : ModerationAction.APPROVE
+        : status === ListingStatus.REJECTED
+          ? ModerationAction.REQUEST_CHANGES
+          : status === ListingStatus.PAUSED
+            ? ModerationAction.PAUSE
+            : status === ListingStatus.ARCHIVED
+              ? ModerationAction.ARCHIVE
+              : null
+    if (!action) {
+      throw new BadRequestException(
+        "Direct lifecycle writes are disabled; use an explicit moderation action",
+      )
+    }
+
+    const defaultReason =
+      force && action === ModerationAction.APPROVE
+        ? ModerationReasonCode.EMERGENCY_OVERRIDE
+        : action === ModerationAction.APPROVE
+          ? ModerationReasonCode.APPROVED_AFTER_REVIEW
+          : action === ModerationAction.RESTORE
+            ? ModerationReasonCode.ISSUE_RESOLVED
+            : action === ModerationAction.REQUEST_CHANGES
+              ? ModerationReasonCode.INCOMPLETE_LISTING
+              : action === ModerationAction.PAUSE
+                ? ModerationReasonCode.OPERATIONAL_HOLD
+                : ModerationReasonCode.DUPLICATE_OR_INVALID
+
+    return this.moderateListing(
+      id,
+      {
+        action,
+        reasonCode: details.reasonCode ?? defaultReason,
+        publisherMessage:
+          details.publisherMessage ??
+          (action === ModerationAction.REQUEST_CHANGES
+            ? "Changes are required before this listing can be reviewed again."
+            : action === ModerationAction.PAUSE
+              ? "This listing is temporarily paused while GuestPost Operations reviews it."
+              : action === ModerationAction.ARCHIVE
+                ? "This listing has been archived by GuestPost Operations."
+                : undefined),
+        internalNote:
+          details.internalNote ??
+          "Compatibility status endpoint mapped to an explicit moderation action.",
+        expectedVersion:
+          details.expectedVersion ?? current.moderationVersion ?? 0,
+        force,
+      },
+      user,
+    )
+  }
+
+  async moderateListing(
+    id: string,
+    command: ListingModerationCommand,
+    user: any,
+  ) {
+    if (!user?.id || !["SUPER_ADMIN", "OPERATIONS"].includes(user.staffRole)) {
+      throw new ForbiddenException("Staff moderation access is required")
+    }
+
     const result = await this.prisma.$transaction(async (tx: any) => {
       const observedListing = await tx.marketplaceListing.findUnique({
         where: { id },
-        select: { status: true },
+        select: {
+          websiteId: true,
+          status: true,
+          moderationVersion: true,
+        },
       })
       if (!observedListing) throw new NotFoundException("Listing not found")
+      if (observedListing.websiteId) {
+        await tx.$queryRaw`
+          SELECT "id"
+          FROM "Website"
+          WHERE "id" = ${observedListing.websiteId}
+          FOR UPDATE
+        `
+      }
       await tx.$queryRaw`
         SELECT "id"
         FROM "MarketplaceListing"
@@ -2708,7 +2949,14 @@ export class AdminService {
         where: { id },
         include: {
           publisher: { select: { email: true } },
-          website: { select: { verificationStatus: true, domain: true } },
+          website: {
+            select: {
+              verificationStatus: true,
+              domain: true,
+              isActive: true,
+              managedByUserId: true,
+            },
+          },
           categories: { select: { categoryId: true } },
           services: {
             where: { availability: "AVAILABLE" },
@@ -2718,16 +2966,87 @@ export class AdminService {
         },
       })
       if (!listing) throw new NotFoundException("Listing not found")
-      if (listing.status === status) {
-        return { updatedListing: listing, communicationEventIds: [] }
-      }
-      if (listing.status !== observedListing.status) {
+      if (
+        listing.status !== observedListing.status ||
+        listing.moderationVersion !== observedListing.moderationVersion ||
+        listing.websiteId !== observedListing.websiteId
+      ) {
         throw new ConflictException(
-          "Listing status changed concurrently; refresh and retry",
+          "Listing moderation changed concurrently; refresh and retry",
+        )
+      }
+      if (listing.moderationVersion !== command.expectedVersion) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Listing moderation changed; refresh and retry.",
+          currentVersion: listing.moderationVersion,
+        })
+      }
+
+      if (
+        !staffCanModerateMarketplaceTarget(
+          {
+            ownerType: listing.ownerType,
+            managedByUserId: listing.website?.managedByUserId ?? null,
+          },
+          { id: user.id, staffRole: user.staffRole },
+        )
+      ) {
+        throw new ForbiddenException(
+          "Operations can only moderate assigned platform inventory",
         )
       }
 
-      if (status === ListingStatus.APPROVED && listing.services.length === 0) {
+      const allowedActions = getStaffListingModerationActions(
+        {
+          status: listing.status,
+          ownerType: listing.ownerType,
+          managedByUserId: listing.website?.managedByUserId ?? null,
+          activeModerationAction: listing.activeModerationAction,
+          activeModerationAuthority: listing.activeModerationAuthority,
+          activeModerationReasonCode: listing.activeModerationReasonCode,
+          activeModerationMessage: listing.activeModerationMessage,
+          activeModerationPreviousStatus:
+            listing.activeModerationPreviousStatus,
+          moderationResubmissionAllowed: listing.moderationResubmissionAllowed,
+          moderationVersion: listing.moderationVersion,
+        },
+        { id: user.id, staffRole: user.staffRole },
+      )
+      if (!allowedActions.includes(command.action)) {
+        throw new BadRequestException({
+          code: "INVALID_MODERATION_TRANSITION",
+          message: `${command.action} is not allowed from the current listing moderation state.`,
+          allowedActions,
+        })
+      }
+
+      const publisherFacingAction = (
+        [
+          ModerationAction.REQUEST_CHANGES,
+          ModerationAction.PAUSE,
+          ModerationAction.ARCHIVE,
+          ModerationAction.ALLOW_RESUBMISSION,
+          ModerationAction.DENY_RESUBMISSION,
+        ] as ModerationAction[]
+      ).includes(command.action)
+      if (
+        listing.ownerType === WebsiteOwnershipType.PUBLISHER &&
+        publisherFacingAction &&
+        (!command.publisherMessage ||
+          command.publisherMessage.trim().length < 10)
+      ) {
+        throw new BadRequestException({
+          code: "PUBLISHER_MESSAGE_REQUIRED",
+          message:
+            "A clear publisher-facing message is required for this moderation action.",
+        })
+      }
+
+      if (
+        command.action === ModerationAction.APPROVE &&
+        listing.services.length === 0
+      ) {
         throw new BadRequestException({
           code: "NO_AVAILABLE_SERVICES",
           message:
@@ -2735,7 +3054,7 @@ export class AdminService {
         })
       }
       if (
-        status === ListingStatus.APPROVED &&
+        command.action === ModerationAction.APPROVE &&
         (listing.categories.length < 1 ||
           listing.categories.length > 7 ||
           !isMarketplaceLanguage(listing.language) ||
@@ -2753,37 +3072,150 @@ export class AdminService {
       // and pass through. Only SUPER_ADMIN may emergency-override, and the bypass
       // is audited.
       if (
-        status === ListingStatus.APPROVED &&
+        command.action === ModerationAction.APPROVE &&
         listing.website &&
         listing.website.verificationStatus !== "VERIFIED"
       ) {
-        if (!(force && user.staffRole === "SUPER_ADMIN")) {
+        if (!(command.force && user.staffRole === "SUPER_ADMIN")) {
           throw new BadRequestException({
             code: "WEBSITE_NOT_VERIFIED",
             message: `Cannot approve: website ${listing.website.domain ?? ""} is ${listing.website.verificationStatus}, not VERIFIED.`,
           })
         }
+        if (command.reasonCode !== ModerationReasonCode.EMERGENCY_OVERRIDE) {
+          throw new BadRequestException({
+            code: "EMERGENCY_OVERRIDE_REASON_REQUIRED",
+            message:
+              "Emergency verification approval must use the EMERGENCY_OVERRIDE reason.",
+          })
+        }
       }
 
-      // The status predicate is the concurrency fence. Under PostgreSQL READ
-      // COMMITTED, a concurrent loser re-checks it after the winner commits and
-      // observes count=0, so it cannot audit or announce a stale transition.
+      const authority =
+        user.staffRole === "SUPER_ADMIN"
+          ? ModerationAuthority.SUPER_ADMIN
+          : ModerationAuthority.OPERATIONS
+      let resultingStatus = listing.status
+      let resultingAction = listing.activeModerationAction
+      let resultingAuthority = listing.activeModerationAuthority
+      let resultingReason = listing.activeModerationReasonCode
+      let resultingMessage = listing.activeModerationMessage
+      let resultingPreviousStatus = listing.activeModerationPreviousStatus
+      let resultingResubmission: boolean
+
+      switch (command.action) {
+        case ModerationAction.APPROVE:
+          resultingStatus = ListingStatus.APPROVED
+          resultingAction = null
+          resultingAuthority = null
+          resultingReason = null
+          resultingMessage = null
+          resultingPreviousStatus = null
+          resultingResubmission = false
+          break
+        case ModerationAction.REQUEST_CHANGES:
+          resultingStatus = ListingStatus.REJECTED
+          resultingAction = ModerationAction.REQUEST_CHANGES
+          resultingAuthority = authority
+          resultingReason = command.reasonCode
+          resultingMessage = command.publisherMessage?.trim() ?? null
+          resultingPreviousStatus = listing.status
+          resultingResubmission = true
+          break
+        case ModerationAction.PAUSE:
+          resultingStatus = ListingStatus.PAUSED
+          resultingAction = ModerationAction.PAUSE
+          resultingAuthority = authority
+          resultingReason = command.reasonCode
+          resultingMessage = command.publisherMessage?.trim() ?? null
+          resultingPreviousStatus = listing.status
+          resultingResubmission = false
+          break
+        case ModerationAction.RESTORE:
+          resultingStatus = listing.activeModerationPreviousStatus!
+          resultingAction = null
+          resultingAuthority = null
+          resultingReason = null
+          resultingMessage = null
+          resultingPreviousStatus = null
+          resultingResubmission = false
+          break
+        case ModerationAction.ARCHIVE:
+          resultingStatus = ListingStatus.ARCHIVED
+          resultingAction = ModerationAction.ARCHIVE
+          resultingAuthority = authority
+          resultingReason = command.reasonCode
+          resultingMessage = command.publisherMessage?.trim() ?? null
+          resultingPreviousStatus = listing.status
+          resultingResubmission = false
+          break
+        case ModerationAction.REOPEN:
+          resultingStatus = ListingStatus.DRAFT
+          resultingAction = null
+          resultingAuthority = null
+          resultingReason = null
+          resultingMessage = null
+          resultingPreviousStatus = null
+          resultingResubmission = false
+          break
+        case ModerationAction.ALLOW_RESUBMISSION:
+          resultingResubmission = true
+          break
+        case ModerationAction.DENY_RESUBMISSION:
+          resultingResubmission = false
+          break
+        default:
+          throw new BadRequestException("Unsupported listing moderation action")
+      }
+
       const transition = await tx.marketplaceListing.updateMany({
-        where: { id, status: listing.status },
-        data: { status: status as any },
+        where: {
+          id,
+          status: listing.status,
+          moderationVersion: listing.moderationVersion,
+        },
+        data: {
+          status: resultingStatus,
+          activeModerationAction: resultingAction,
+          activeModerationAuthority: resultingAuthority,
+          activeModerationReasonCode: resultingReason,
+          activeModerationMessage: resultingMessage,
+          activeModerationPreviousStatus: resultingPreviousStatus,
+          moderationResubmissionAllowed: resultingResubmission,
+          moderationVersion: { increment: 1 },
+        },
       })
       if (transition.count !== 1) {
         throw new ConflictException(
-          "Listing status changed concurrently; refresh and retry",
+          "Listing moderation changed concurrently; refresh and retry",
         )
       }
+
+      const moderationEvent = await tx.moderationEvent.create({
+        data: {
+          scope: "LISTING",
+          listingId: id,
+          action: command.action,
+          reasonCode: command.reasonCode,
+          publisherMessage: command.publisherMessage?.trim() ?? null,
+          internalNote: command.internalNote?.trim() ?? null,
+          actorUserId: user.id,
+          actorStaffRole: user.staffRole,
+          authority,
+          previousStatus: listing.status,
+          resultingStatus,
+          previousModerationAction: listing.activeModerationAction,
+          resultingModerationAction: resultingAction,
+          resubmissionAllowed: resultingResubmission,
+        },
+      })
 
       const updatedListing = await tx.marketplaceListing.findUniqueOrThrow({
         where: { id },
       })
 
       if (
-        status === ListingStatus.APPROVED &&
+        command.action === ModerationAction.APPROVE &&
         listing.website &&
         listing.website.verificationStatus !== "VERIFIED"
       ) {
@@ -2795,7 +3227,9 @@ export class AdminService {
             metadata: {
               domain: listing.website.domain,
               websiteStatus: listing.website.verificationStatus,
-              reason: "SUPER_ADMIN emergency approval",
+              reasonCode: command.reasonCode,
+              internalNote: command.internalNote ?? null,
+              moderationEventId: moderationEvent.id,
             },
             userId: user.id,
             organizationId: listing.organizationId ?? null,
@@ -2804,36 +3238,40 @@ export class AdminService {
         )
       }
 
-      const transitionAudit = await this.audit.log(
+      await this.audit.log(
         {
-          action: "LISTING_STATUS_UPDATED",
+          action: `LISTING_MODERATION_${command.action}`,
           entityType: "MarketplaceListing",
           entityId: id,
           metadata: {
             previousStatus: listing.status,
-            newStatus: status,
+            newStatus: resultingStatus,
             listingTitle: listing.title,
+            reasonCode: command.reasonCode,
+            publisherMessage: command.publisherMessage ?? null,
+            internalNote: command.internalNote ?? null,
+            previousModerationAction: listing.activeModerationAction,
+            resultingModerationAction: resultingAction,
+            resubmissionAllowed: resultingResubmission,
+            previousVersion: listing.moderationVersion,
+            resultingVersion: listing.moderationVersion + 1,
+            moderationEventId: moderationEvent.id,
           },
           userId: user.id,
           organizationId: listing.organizationId ?? null,
         },
         tx,
       )
-      if (!transitionAudit?.id) {
-        throw new Error("Listing transition audit identity was not persisted")
-      }
 
-      if (
-        status === ListingStatus.APPROVED ||
-        status === ListingStatus.REJECTED
-      ) {
-        const communicationEventIds: string[] = []
-        const message =
-          status === ListingStatus.APPROVED
-            ? `Your listing "${listing.title}" has been approved and is now live in the marketplace.`
-            : `Your listing "${listing.title}" has been rejected.`
-
-        if (this.communications) {
+      const communicationEventIds: string[] = []
+      if (this.communications && listing.publisherId) {
+        const notification = this.listingModerationNotification(
+          command.action,
+          listing.title,
+          command.publisherMessage,
+          resultingResubmission,
+        )
+        if (notification) {
           const recipients = await this.communications.publisherRecipients(
             listing.publisherId,
             false,
@@ -2841,25 +3279,22 @@ export class AdminService {
           )
           const event = await this.communications.record(
             {
-              type:
-                status === ListingStatus.APPROVED
-                  ? "MARKETPLACE_LISTING_APPROVED"
-                  : "MARKETPLACE_LISTING_REJECTED",
+              type: notification.type,
               aggregateType: "MarketplaceListing",
               aggregateId: id,
               organizationId: listing.organizationId,
-              title:
-                status === ListingStatus.APPROVED
-                  ? "Marketplace listing approved"
-                  : "Marketplace listing needs attention",
-              message,
+              title: notification.title,
+              message: notification.message,
               actionPath: "/dashboard/listings",
               payload: {
                 from: listing.status,
-                to: status,
-                transitionId: transitionAudit.id,
+                to: resultingStatus,
+                action: command.action,
+                reasonCode: command.reasonCode,
+                moderationEventId: moderationEvent.id,
+                resubmissionAllowed: resultingResubmission,
               },
-              dedupKey: `listing:${id}:status-transition:${transitionAudit.id}`,
+              dedupKey: `listing:${id}:moderation:${moderationEvent.id}`,
               recipientUserIds: recipients,
               actorUserId: user.id,
             },
@@ -2867,14 +3302,95 @@ export class AdminService {
           )
           communicationEventIds.push(event.eventId)
         }
-        return { updatedListing, communicationEventIds }
       }
-
-      return { updatedListing, communicationEventIds: [] }
+      return {
+        updatedListing: {
+          ...updatedListing,
+          moderation: buildModerationProjection(
+            updatedListing,
+            getStaffListingModerationActions(
+              {
+                ...updatedListing,
+                managedByUserId: listing.website?.managedByUserId ?? null,
+              },
+              { id: user.id, staffRole: user.staffRole },
+            ),
+          ),
+        },
+        communicationEventIds,
+      }
     })
 
     this.communications?.dispatchManyBestEffort(result.communicationEventIds)
     return result.updatedListing
+  }
+
+  private listingModerationNotification(
+    action: ModerationAction,
+    title: string,
+    publisherMessage: string | undefined,
+    resubmissionAllowed: boolean,
+  ): {
+    type:
+      | "MARKETPLACE_LISTING_APPROVED"
+      | "MARKETPLACE_LISTING_REJECTED"
+      | "MARKETPLACE_LISTING_PAUSED"
+      | "MARKETPLACE_LISTING_RESTORED"
+      | "MARKETPLACE_LISTING_ARCHIVED"
+    title: string
+    message: string
+  } | null {
+    switch (action) {
+      case ModerationAction.APPROVE:
+        return {
+          type: "MARKETPLACE_LISTING_APPROVED",
+          title: "Marketplace listing approved",
+          message: `Your listing "${title}" has been approved and is now live in the marketplace.`,
+        }
+      case ModerationAction.REQUEST_CHANGES:
+        return {
+          type: "MARKETPLACE_LISTING_REJECTED",
+          title: "Marketplace listing needs changes",
+          message: publisherMessage!,
+        }
+      case ModerationAction.PAUSE:
+        return {
+          type: "MARKETPLACE_LISTING_PAUSED",
+          title: "Marketplace listing paused",
+          message: publisherMessage!,
+        }
+      case ModerationAction.RESTORE:
+        return {
+          type: "MARKETPLACE_LISTING_RESTORED",
+          title: "Marketplace listing restored",
+          message: `Your listing "${title}" has been restored.`,
+        }
+      case ModerationAction.ARCHIVE:
+        return {
+          type: "MARKETPLACE_LISTING_ARCHIVED",
+          title: "Marketplace listing archived",
+          message: publisherMessage!,
+        }
+      case ModerationAction.REOPEN:
+        return {
+          type: "MARKETPLACE_LISTING_RESTORED",
+          title: "Marketplace listing reopened",
+          message: `Your listing "${title}" has been reopened as a draft. Review it before submitting again.`,
+        }
+      case ModerationAction.ALLOW_RESUBMISSION:
+      case ModerationAction.DENY_RESUBMISSION:
+        return {
+          type: "MARKETPLACE_LISTING_REJECTED",
+          title: "Marketplace resubmission access updated",
+          message:
+            publisherMessage ??
+            (resubmissionAllowed
+              ? "You may update this listing and submit it for review again."
+              : "This listing cannot currently be resubmitted."),
+        }
+      default:
+        return null
+    }
   }
 
   async toggleListingFeatured(id: string, featured: boolean, user: any) {
@@ -2924,26 +3440,16 @@ export class AdminService {
   }
 
   async deleteListing(id: string, user: any) {
-    const listing = await this.prisma.marketplaceListing.findUnique({
-      where: { id },
+    // Compatibility alias only. Archiving must retain the same authority,
+    // optimistic-lock, append-only history, audit, and outbox guarantees as
+    // the explicit moderation command used by current clients.
+    return this.updateListingStatus(id, ListingStatus.ARCHIVED, user, false, {
+      reasonCode: ModerationReasonCode.DUPLICATE_OR_INVALID,
+      publisherMessage:
+        "This listing has been archived by GuestPost Operations.",
+      internalNote:
+        "Legacy delete endpoint mapped to the explicit archive moderation action.",
     })
-    if (!listing) throw new NotFoundException("Listing not found")
-
-    const updated = await this.prisma.marketplaceListing.update({
-      where: { id },
-      data: { status: ListingStatus.ARCHIVED },
-    })
-
-    await this.audit.log({
-      action: "LISTING_DELETED",
-      entityType: "MarketplaceListing",
-      entityId: id,
-      metadata: { listingTitle: listing.title },
-      userId: user.id,
-      organizationId: listing.organizationId ?? null,
-    })
-
-    return updated
   }
 
   // ─── WEBSITE MANAGEMENT ─────────────────────────────
@@ -2999,131 +3505,129 @@ export class AdminService {
     // An Operations-created site is always assigned to its creator. A crafted
     // managedByUserId cannot transfer inventory; only Super Admin can select a
     // different owner or use the separate reassignment workflow.
-    let managedByUserId: string | null = null
-    if (isOperations) {
-      managedByUserId = user.id
-    } else if (dto.managedByUserId) {
-      const target = await this.prisma.staffMembership.findUnique({
-        where: { userId: dto.managedByUserId },
-        select: { role: true, user: { select: { banned: true } } },
-      })
-      if (target?.role !== "OPERATIONS" || target.user.banned) {
-        throw new BadRequestException({
-          code: "INVALID_OWNER",
-          message:
-            "managedByUserId must reference an active OPERATIONS staff member",
-        })
-      }
-      managedByUserId = dto.managedByUserId
-    }
+    const managedByUserId: string | null = isOperations
+      ? user.id
+      : (dto.managedByUserId ?? null)
 
     let website: any
     try {
-      website = await this.prisma.$transaction(async (tx: any) => {
-        const createdWebsite = await tx.website.create({
-          data: {
-            url: dto.url,
-            domain,
-            canonicalDomain,
-            name: dto.name ?? null,
-            country: dto.country ?? null,
-            language: dto.language,
-            category: marketplaceCategories
-              .map((category) => category.name)
-              .join(", "),
-            ownershipType: WebsiteOwnershipType.PLATFORM,
-            isActive: true,
-            managedByUserId,
-            // Platform inventory intentionally bypasses DNS ownership checks.
-            // GSC/GA4 links are performance-data integrations, not ownership
-            // gates, and are managed separately from the listing lifecycle.
-            verificationStatus: WebsiteVerificationStatus.VERIFIED,
-          },
-        })
+      website = await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx: any) => {
+          if (managedByUserId) {
+            await this.lockAndAssertActiveOperationsOwner(tx, managedByUserId)
+          }
 
-        // A platform website and its single draft marketplace listing are one
-        // aggregate. Creating them transactionally prevents orphan sites and
-        // removes the old second listing-creation path from Marketplace.
-        const listing = await tx.marketplaceListing.create({
-          data: {
-            title: dto.listingTitle.trim(),
-            slug: `platform-${createdWebsite.id}`,
-            description: dto.description.trim(),
-            status: ListingStatus.DRAFT,
-            fulfillmentType: "INTERNAL",
-            currency: "USD",
-            country: dto.country ?? null,
-            language: dto.language,
-            websiteUrl: dto.url,
+          const createdWebsite = await tx.website.create({
+            data: {
+              url: dto.url,
+              domain,
+              canonicalDomain,
+              name: dto.name ?? null,
+              country: dto.country ?? null,
+              language: dto.language,
+              category: marketplaceCategories
+                .map((category) => category.name)
+                .join(", "),
+              ownershipType: WebsiteOwnershipType.PLATFORM,
+              isActive: true,
+              managedByUserId,
+              // Platform inventory intentionally bypasses DNS ownership checks.
+              // GSC/GA4 links are performance-data integrations, not ownership
+              // gates, and are managed separately from the listing lifecycle.
+              verificationStatus: WebsiteVerificationStatus.VERIFIED,
+            },
+          })
+
+          // A platform website and its single draft marketplace listing are one
+          // aggregate. Creating them transactionally prevents orphan sites and
+          // removes the old second listing-creation path from Marketplace.
+          const listing = await tx.marketplaceListing.create({
+            data: {
+              title: dto.listingTitle.trim(),
+              slug: `platform-${createdWebsite.id}`,
+              description: dto.description.trim(),
+              status: ListingStatus.DRAFT,
+              fulfillmentType: "INTERNAL",
+              currency: "USD",
+              country: dto.country ?? null,
+              language: dto.language,
+              websiteUrl: dto.url,
+              websiteId: createdWebsite.id,
+              organizationId: null,
+              publisherId: null,
+              ownerType: "PLATFORM",
+              traffic: dto.manualMetrics.ahrefsOrganicTraffic,
+              domainAuthority: dto.manualMetrics.mozDomainAuthority,
+              sportsGamingAllowed: dto.sportsGamingAllowed,
+              pharmacyAllowed: dto.pharmacyAllowed,
+              cryptoAllowed: dto.cryptoAllowed,
+              backlinkCount: dto.backlinkCount,
+              linkType: dto.linkType,
+              linkValidity: dto.linkValidity,
+              googleNews: dto.googleNews,
+              markedSponsored: dto.markedSponsored,
+              foreignLanguageAllowed: dto.foreignLanguageAllowed,
+              categories: {
+                create: marketplaceCategories.map((category) => ({
+                  category: { connect: { id: category.id } },
+                })),
+              },
+            },
+          })
+
+          await upsertWebsiteMetric(tx, {
             websiteId: createdWebsite.id,
-            organizationId: null,
-            publisherId: null,
-            ownerType: "PLATFORM",
-            traffic: dto.manualMetrics.ahrefsOrganicTraffic,
-            domainAuthority: dto.manualMetrics.mozDomainAuthority,
-            sportsGamingAllowed: dto.sportsGamingAllowed,
-            pharmacyAllowed: dto.pharmacyAllowed,
-            cryptoAllowed: dto.cryptoAllowed,
-            backlinkCount: dto.backlinkCount,
-            linkType: dto.linkType,
-            linkValidity: dto.linkValidity,
-            googleNews: dto.googleNews,
-            markedSponsored: dto.markedSponsored,
-            foreignLanguageAllowed: dto.foreignLanguageAllowed,
-            categories: {
-              create: marketplaceCategories.map((category) => ({
-                category: { connect: { id: category.id } },
-              })),
+            key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+            provider: WebsiteMetricProvider.AHREFS,
+            source: WebsiteMetricSource.STAFF_MANUAL,
+            value: dto.manualMetrics.ahrefsOrganicTraffic,
+            measuredAt: ahrefsTrafficAsOf,
+            expiresAt: manualMetricExpiry(ahrefsTrafficAsOf),
+            enteredByUserId: user.id,
+          })
+          await upsertWebsiteMetric(tx, {
+            websiteId: createdWebsite.id,
+            key: WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
+            provider: WebsiteMetricProvider.MOZ,
+            source: WebsiteMetricSource.STAFF_MANUAL,
+            value: dto.manualMetrics.mozDomainAuthority,
+            measuredAt: mozDomainAuthorityAsOf,
+            expiresAt: manualMetricExpiry(mozDomainAuthorityAsOf),
+            enteredByUserId: user.id,
+          })
+          await this.audit.log(
+            {
+              action: "WEBSITE_MANUAL_METRICS_CREATED",
+              entityType: "Website",
+              entityId: createdWebsite.id,
+              metadata: {
+                ahrefsOrganicTraffic: dto.manualMetrics.ahrefsOrganicTraffic,
+                ahrefsTrafficAsOf: ahrefsTrafficAsOf.toISOString(),
+                mozDomainAuthority: dto.manualMetrics.mozDomainAuthority,
+                mozDomainAuthorityAsOf: mozDomainAuthorityAsOf.toISOString(),
+                source: "STAFF_MANUAL",
+              },
+              userId: user.id,
+              organizationId: null,
             },
-          },
-        })
+            tx,
+          )
 
-        await upsertWebsiteMetric(tx, {
-          websiteId: createdWebsite.id,
-          key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
-          provider: WebsiteMetricProvider.AHREFS,
-          source: WebsiteMetricSource.STAFF_MANUAL,
-          value: dto.manualMetrics.ahrefsOrganicTraffic,
-          measuredAt: ahrefsTrafficAsOf,
-          expiresAt: manualMetricExpiry(ahrefsTrafficAsOf),
-          enteredByUserId: user.id,
-        })
-        await upsertWebsiteMetric(tx, {
-          websiteId: createdWebsite.id,
-          key: WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
-          provider: WebsiteMetricProvider.MOZ,
-          source: WebsiteMetricSource.STAFF_MANUAL,
-          value: dto.manualMetrics.mozDomainAuthority,
-          measuredAt: mozDomainAuthorityAsOf,
-          expiresAt: manualMetricExpiry(mozDomainAuthorityAsOf),
-          enteredByUserId: user.id,
-        })
-        await this.audit.log(
-          {
-            action: "WEBSITE_MANUAL_METRICS_CREATED",
-            entityType: "Website",
-            entityId: createdWebsite.id,
-            metadata: {
-              ahrefsOrganicTraffic: dto.manualMetrics.ahrefsOrganicTraffic,
-              ahrefsTrafficAsOf: ahrefsTrafficAsOf.toISOString(),
-              mozDomainAuthority: dto.manualMetrics.mozDomainAuthority,
-              mozDomainAuthorityAsOf: mozDomainAuthorityAsOf.toISOString(),
-              source: "STAFF_MANUAL",
-            },
-            userId: user.id,
-            organizationId: null,
-          },
-          tx,
-        )
-
-        return { ...createdWebsite, listing }
-      })
+          return { ...createdWebsite, listing }
+        },
+      )
     } catch (error: any) {
       if (error?.code === "P2002") {
         throw new BadRequestException({
           code: "DOMAIN_ALREADY_REGISTERED",
           message: `Domain ${canonicalDomain} is already registered`,
         })
+      }
+      if (isRetryablePrismaTransactionError(error)) {
+        throw new ConflictException(
+          "Platform website creation changed concurrently. Review the latest staff and inventory state and try again.",
+        )
       }
       throw error
     }
@@ -3162,58 +3666,67 @@ export class AdminService {
     body: { managedByUserId: string | null; reason?: string },
     user: any,
   ) {
-    const website = await this.prisma.website.findUnique({
-      where: { id: websiteId },
-      select: {
-        id: true,
-        ownershipType: true,
-        managedByUserId: true,
-        url: true,
-      },
-    })
-    if (!website) throw new NotFoundException("Website not found")
-    if (website.ownershipType !== "PLATFORM") {
-      throw new BadRequestException(
-        "Only platform websites have a managed-by owner",
+    const newOwnerId = body.managedByUserId ?? null
+
+    try {
+      return await runSerializableTransactionWithRetry(
+        this.prisma,
+        async (tx: any) => {
+          // Acquire the staff aggregate/target locks before touching Website so
+          // this command has the same lock order as demotion and suspension.
+          if (newOwnerId) {
+            await this.lockAndAssertActiveOperationsOwner(tx, newOwnerId)
+          }
+
+          const website = await tx.website.findUnique({
+            where: { id: websiteId },
+            select: {
+              id: true,
+              ownershipType: true,
+              managedByUserId: true,
+              url: true,
+            },
+          })
+          if (!website) throw new NotFoundException("Website not found")
+          if (website.ownershipType !== "PLATFORM") {
+            throw new BadRequestException(
+              "Only platform websites have a managed-by owner",
+            )
+          }
+
+          await tx.website.update({
+            where: { id: websiteId },
+            data: { managedByUserId: newOwnerId },
+          })
+
+          await this.audit.log(
+            {
+              action: "WEBSITE_OWNERSHIP_REASSIGNED",
+              entityType: "Website",
+              entityId: websiteId,
+              metadata: {
+                url: website.url,
+                fromUserId: website.managedByUserId ?? null,
+                toUserId: newOwnerId,
+                reason: body.reason ?? null,
+              },
+              userId: user.id,
+              organizationId: null,
+            },
+            tx,
+          )
+
+          return { id: websiteId, managedByUserId: newOwnerId }
+        },
       )
-    }
-
-    let newOwnerId: string | null = null
-    if (body.managedByUserId) {
-      const target = await this.prisma.staffMembership.findUnique({
-        where: { userId: body.managedByUserId },
-        select: { role: true, user: { select: { banned: true } } },
-      })
-      if (target?.role !== "OPERATIONS" || target.user.banned) {
-        throw new BadRequestException({
-          code: "INVALID_OWNER",
-          message:
-            "managedByUserId must reference an active OPERATIONS staff member",
-        })
+    } catch (error) {
+      if (isRetryablePrismaTransactionError(error)) {
+        throw new ConflictException(
+          "Platform website ownership changed concurrently. Review the latest assignment and try again.",
+        )
       }
-      newOwnerId = body.managedByUserId
+      throw error
     }
-
-    await this.prisma.website.update({
-      where: { id: websiteId },
-      data: { managedByUserId: newOwnerId },
-    })
-
-    await this.audit.log({
-      action: "WEBSITE_OWNERSHIP_REASSIGNED",
-      entityType: "Website",
-      entityId: websiteId,
-      metadata: {
-        url: website.url,
-        fromUserId: website.managedByUserId ?? null,
-        toUserId: newOwnerId,
-        reason: body.reason ?? null,
-      },
-      userId: user.id,
-      organizationId: null,
-    })
-
-    return { id: websiteId, managedByUserId: newOwnerId }
   }
 
   // List OPERATIONS staff for the admin reassignment picker.
@@ -3335,9 +3848,16 @@ export class AdminService {
     const where: any = {}
     if (ownershipType) where.ownershipType = ownershipType
 
-    // Scope: OPS staff only sees websites assigned to them.
+    // Operations reviews publisher inventory plus platform inventory assigned
+    // to them. This same boundary is re-checked by every command.
     if (user?.staffRole === "OPERATIONS") {
-      where.managedByUserId = user.id
+      where.OR = [
+        { ownershipType: WebsiteOwnershipType.PUBLISHER },
+        {
+          ownershipType: WebsiteOwnershipType.PLATFORM,
+          managedByUserId: user.id,
+        },
+      ]
     }
 
     const [websites, total] = await Promise.all([
@@ -3390,6 +3910,13 @@ export class AdminService {
         managedBy: w.managedBy,
         metrics: w.metrics,
         publisher: w.publisher,
+        moderation: buildModerationProjection(
+          w,
+          getStaffWebsiteModerationActions(w, {
+            id: user?.id ?? "",
+            staffRole: user?.staffRole ?? null,
+          }),
+        ),
         listing: w.marketplaceListings[0]
           ? {
               ...w.marketplaceListings[0],
@@ -3398,6 +3925,19 @@ export class AdminService {
               ),
               category:
                 w.marketplaceListings[0].categories[0]?.category ?? null,
+              moderation: buildModerationProjection(
+                w.marketplaceListings[0],
+                getStaffListingModerationActions(
+                  {
+                    ...w.marketplaceListings[0],
+                    managedByUserId: w.managedByUserId,
+                  },
+                  {
+                    id: user?.id ?? "",
+                    staffRole: user?.staffRole ?? null,
+                  },
+                ),
+              ),
               services: w.marketplaceListings[0].services.map((service) => ({
                 ...service,
                 price: Number(service.price),
@@ -3425,7 +3965,15 @@ export class AdminService {
       where: {
         id,
         ...(user?.staffRole === "OPERATIONS"
-          ? { ownershipType: "PLATFORM", managedByUserId: user.id }
+          ? {
+              OR: [
+                { ownershipType: WebsiteOwnershipType.PUBLISHER },
+                {
+                  ownershipType: WebsiteOwnershipType.PLATFORM,
+                  managedByUserId: user.id,
+                },
+              ],
+            }
           : {}),
       },
       include: {
@@ -3440,6 +3988,13 @@ export class AdminService {
           },
         },
         publisher: true,
+        moderationEvents: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 50,
+          include: {
+            actor: { select: { id: true, name: true, email: true } },
+          },
+        },
         managedBy: { select: { id: true, name: true, email: true } },
         websiteIntegrations: {
           where: { status: { not: "REMOVED" } },
@@ -3472,11 +4027,34 @@ export class AdminService {
       managedBy: website.managedBy,
       metrics: website.metrics,
       publisher: website.publisher,
+      moderation: {
+        ...buildModerationProjection(
+          website,
+          getStaffWebsiteModerationActions(website, {
+            id: user?.id ?? "",
+            staffRole: user?.staffRole ?? null,
+          }),
+        ),
+        history: website.moderationEvents,
+      },
       listing: listing
         ? {
             ...listing,
             categories: listing.categories.map((item) => item.category),
             category: listing.categories[0]?.category ?? null,
+            moderation: buildModerationProjection(
+              listing,
+              getStaffListingModerationActions(
+                {
+                  ...listing,
+                  managedByUserId: website.managedByUserId,
+                },
+                {
+                  id: user?.id ?? "",
+                  staffRole: user?.staffRole ?? null,
+                },
+              ),
+            ),
             services: listing.services.map((service) => ({
               ...service,
               price: Number(service.price),
@@ -3499,77 +4077,319 @@ export class AdminService {
     }
   }
 
-  async pauseWebsite(id: string, paused: boolean, user: any) {
-    const website = await this.prisma.website.findUnique({ where: { id } })
-    if (!website) throw new NotFoundException("Website not found")
-    if (website.ownershipType !== "PLATFORM") {
-      throw new BadRequestException("Only platform websites can be paused")
-    }
-    this.assertWebsiteInventoryWriteAccess(user)
-
-    const updated = await this.prisma.website.update({
+  async pauseWebsite(
+    id: string,
+    paused: boolean,
+    user: any,
+    details: {
+      reasonCode?: ModerationReasonCode
+      publisherMessage?: string
+      internalNote?: string
+      expectedVersion?: number
+    } = {},
+  ) {
+    const website = await this.prisma.website.findUnique({
       where: { id },
-      data: { isActive: !paused },
+      select: { moderationVersion: true },
     })
+    if (!website) throw new NotFoundException("Website not found")
+    return this.moderateWebsite(
+      id,
+      {
+        action: paused ? ModerationAction.PAUSE : ModerationAction.RESTORE,
+        reasonCode:
+          details.reasonCode ??
+          (paused
+            ? ModerationReasonCode.OPERATIONAL_HOLD
+            : ModerationReasonCode.ISSUE_RESOLVED),
+        publisherMessage:
+          details.publisherMessage ??
+          (paused
+            ? "This website is temporarily unavailable while GuestPost Operations reviews it."
+            : undefined),
+        internalNote:
+          details.internalNote ??
+          "Compatibility website pause endpoint mapped to an explicit moderation action.",
+        expectedVersion:
+          details.expectedVersion ?? website.moderationVersion ?? 0,
+      },
+      user,
+    )
+  }
 
-    const listing = await this.prisma.marketplaceListing.findFirst({
-      where: { websiteId: id, status: { not: ListingStatus.ARCHIVED } },
-    })
-    if (listing) {
-      await this.prisma.marketplaceListing.update({
-        where: { id: listing.id },
-        data: {
-          status: paused ? ListingStatus.PAUSED : ListingStatus.APPROVED,
+  async moderateWebsite(
+    id: string,
+    command: WebsiteModerationCommand,
+    user: any,
+  ) {
+    if (!user?.id || !["SUPER_ADMIN", "OPERATIONS"].includes(user.staffRole)) {
+      throw new ForbiddenException("Staff moderation access is required")
+    }
+
+    const result = await this.prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "Website"
+        WHERE "id" = ${id}
+        FOR UPDATE
+      `
+      const website = await tx.website.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          url: true,
+          domain: true,
+          name: true,
+          publisherId: true,
+          ownershipType: true,
+          managedByUserId: true,
+          isActive: true,
+          activeModerationAction: true,
+          activeModerationAuthority: true,
+          activeModerationReasonCode: true,
+          activeModerationMessage: true,
+          activeModerationPreviousActive: true,
+          moderationVersion: true,
         },
       })
-    }
+      if (!website) throw new NotFoundException("Website not found")
+      if (website.moderationVersion !== command.expectedVersion) {
+        throw new ConflictException({
+          code: "MODERATION_VERSION_CONFLICT",
+          message: "Website moderation changed; refresh and retry.",
+          currentVersion: website.moderationVersion,
+        })
+      }
+      if (
+        !staffCanModerateMarketplaceTarget(website, {
+          id: user.id,
+          staffRole: user.staffRole,
+        })
+      ) {
+        throw new ForbiddenException(
+          "Operations can only moderate assigned platform inventory",
+        )
+      }
 
-    await this.audit.log({
-      action: paused ? "PLATFORM_WEBSITE_PAUSED" : "PLATFORM_WEBSITE_UNPAUSED",
-      entityType: "Website",
-      entityId: id,
-      metadata: { url: website.url, paused, updatedBy: user.id },
-      userId: user.id,
-      organizationId: null,
+      const allowedActions = getStaffWebsiteModerationActions(website, {
+        id: user.id,
+        staffRole: user.staffRole,
+      })
+      if (!allowedActions.includes(command.action)) {
+        throw new BadRequestException({
+          code: "INVALID_MODERATION_TRANSITION",
+          message: `${command.action} is not allowed from the current website moderation state.`,
+          allowedActions,
+        })
+      }
+      if (
+        website.ownershipType === WebsiteOwnershipType.PUBLISHER &&
+        (
+          [
+            ModerationAction.PAUSE,
+            ModerationAction.ARCHIVE,
+          ] as ModerationAction[]
+        ).includes(command.action) &&
+        (!command.publisherMessage ||
+          command.publisherMessage.trim().length < 10)
+      ) {
+        throw new BadRequestException({
+          code: "PUBLISHER_MESSAGE_REQUIRED",
+          message:
+            "A clear publisher-facing message is required for this website action.",
+        })
+      }
+
+      const authority =
+        user.staffRole === "SUPER_ADMIN"
+          ? ModerationAuthority.SUPER_ADMIN
+          : ModerationAuthority.OPERATIONS
+      let resultingActive: boolean
+      let resultingAction: ModerationAction | null
+      let resultingAuthority: ModerationAuthority | null
+      let resultingReason: ModerationReasonCode | null
+      let resultingMessage: string | null
+      let resultingPreviousActive: boolean | null
+
+      if (command.action === ModerationAction.PAUSE) {
+        resultingActive = false
+        resultingAction = ModerationAction.PAUSE
+        resultingAuthority = authority
+        resultingReason = command.reasonCode
+        resultingMessage = command.publisherMessage?.trim() ?? null
+        resultingPreviousActive = website.isActive
+      } else if (command.action === ModerationAction.ARCHIVE) {
+        resultingActive = false
+        resultingAction = ModerationAction.ARCHIVE
+        resultingAuthority = authority
+        resultingReason = command.reasonCode
+        resultingMessage = command.publisherMessage?.trim() ?? null
+        resultingPreviousActive = website.isActive
+      } else if (
+        command.action === ModerationAction.RESTORE ||
+        command.action === ModerationAction.REOPEN
+      ) {
+        resultingActive = true
+        resultingAction = null
+        resultingAuthority = null
+        resultingReason = null
+        resultingMessage = null
+        resultingPreviousActive = null
+      } else {
+        throw new BadRequestException("Unsupported website moderation action")
+      }
+
+      const transition = await tx.website.updateMany({
+        where: { id, moderationVersion: website.moderationVersion },
+        data: {
+          isActive: resultingActive,
+          activeModerationAction: resultingAction,
+          activeModerationAuthority: resultingAuthority,
+          activeModerationReasonCode: resultingReason,
+          activeModerationMessage: resultingMessage,
+          activeModerationPreviousActive: resultingPreviousActive,
+          moderationVersion: { increment: 1 },
+        },
+      })
+      if (transition.count !== 1) {
+        throw new ConflictException(
+          "Website moderation changed concurrently; refresh and retry",
+        )
+      }
+
+      const moderationEvent = await tx.moderationEvent.create({
+        data: {
+          scope: "WEBSITE",
+          websiteId: id,
+          action: command.action,
+          reasonCode: command.reasonCode,
+          publisherMessage: command.publisherMessage?.trim() ?? null,
+          internalNote: command.internalNote?.trim() ?? null,
+          actorUserId: user.id,
+          actorStaffRole: user.staffRole,
+          authority,
+          previousWebsiteActive: website.isActive,
+          resultingWebsiteActive: resultingActive,
+          previousModerationAction: website.activeModerationAction,
+          resultingModerationAction: resultingAction,
+          resubmissionAllowed: false,
+        },
+      })
+
+      await this.audit.log(
+        {
+          action: `WEBSITE_MODERATION_${command.action}`,
+          entityType: "Website",
+          entityId: id,
+          metadata: {
+            domain: website.domain,
+            previousActive: website.isActive,
+            resultingActive,
+            reasonCode: command.reasonCode,
+            publisherMessage: command.publisherMessage ?? null,
+            internalNote: command.internalNote ?? null,
+            previousModerationAction: website.activeModerationAction,
+            resultingModerationAction: resultingAction,
+            previousVersion: website.moderationVersion,
+            resultingVersion: website.moderationVersion + 1,
+            moderationEventId: moderationEvent.id,
+            listingLifecyclePreserved: true,
+          },
+          userId: user.id,
+          organizationId: null,
+        },
+        tx,
+      )
+
+      const communicationEventIds: string[] = []
+      if (this.communications && website.publisherId) {
+        const type =
+          command.action === ModerationAction.PAUSE
+            ? "MARKETPLACE_WEBSITE_PAUSED"
+            : command.action === ModerationAction.ARCHIVE
+              ? "MARKETPLACE_WEBSITE_ARCHIVED"
+              : "MARKETPLACE_WEBSITE_RESTORED"
+        const message =
+          command.publisherMessage ??
+          (resultingActive
+            ? `Your website ${website.domain} is available in the marketplace again.`
+            : `Your website ${website.domain} is unavailable in the marketplace.`)
+        const recipients = await this.communications.publisherRecipients(
+          website.publisherId,
+          false,
+          tx,
+        )
+        const event = await this.communications.record(
+          {
+            type,
+            aggregateType: "Website",
+            aggregateId: id,
+            organizationId: null,
+            title: resultingActive
+              ? "Marketplace website restored"
+              : command.action === ModerationAction.ARCHIVE
+                ? "Marketplace website archived"
+                : "Marketplace website paused",
+            message,
+            actionPath: `/dashboard/websites/${id}`,
+            payload: {
+              action: command.action,
+              reasonCode: command.reasonCode,
+              moderationEventId: moderationEvent.id,
+            },
+            dedupKey: `website:${id}:moderation:${moderationEvent.id}`,
+            recipientUserIds: recipients,
+            actorUserId: user.id,
+          },
+          tx,
+        )
+        communicationEventIds.push(event.eventId)
+      }
+
+      const updatedWebsite = await tx.website.findUniqueOrThrow({
+        where: { id },
+      })
+      return {
+        updatedWebsite: {
+          ...updatedWebsite,
+          moderation: buildModerationProjection(
+            updatedWebsite,
+            getStaffWebsiteModerationActions(updatedWebsite, {
+              id: user.id,
+              staffRole: user.staffRole,
+            }),
+          ),
+        },
+        communicationEventIds,
+      }
     })
 
-    return updated
+    this.communications?.dispatchManyBestEffort(result.communicationEventIds)
+    return result.updatedWebsite
   }
 
   async deleteWebsite(id: string, user: any) {
-    const website = await this.prisma.website.findUnique({ where: { id } })
-    if (!website) throw new NotFoundException("Website not found")
-    if (website.ownershipType !== "PLATFORM")
-      throw new BadRequestException(
-        "Only platform websites can be deleted via admin",
-      )
-    this.assertWebsiteInventoryWriteAccess(user)
-
-    const updated = await this.prisma.website.update({
+    const website = await this.prisma.website.findUnique({
       where: { id },
-      data: { isActive: false },
+      select: { ownershipType: true, moderationVersion: true },
     })
-
-    const listing = await this.prisma.marketplaceListing.findFirst({
-      where: { websiteId: id, status: { not: ListingStatus.ARCHIVED } },
-    })
-    if (listing) {
-      await this.prisma.marketplaceListing.update({
-        where: { id: listing.id },
-        data: { status: ListingStatus.ARCHIVED },
-      })
+    if (!website) throw new NotFoundException("Website not found")
+    if (website.ownershipType !== WebsiteOwnershipType.PLATFORM) {
+      throw new BadRequestException(
+        "Only platform websites can be archived via this compatibility endpoint",
+      )
     }
-
-    await this.audit.log({
-      action: "PLATFORM_WEBSITE_DELETED",
-      entityType: "Website",
-      entityId: id,
-      metadata: { url: website.url, deletedBy: user.id },
-      userId: user.id,
-      organizationId: null,
-    })
-
-    return updated
+    return this.moderateWebsite(
+      id,
+      {
+        action: ModerationAction.ARCHIVE,
+        reasonCode: ModerationReasonCode.DUPLICATE_OR_INVALID,
+        internalNote:
+          "Compatibility delete endpoint mapped to a recoverable website archive.",
+        expectedVersion: website.moderationVersion,
+      },
+      user,
+    )
   }
 
   // ── Audit log browsing (staff) ──────────────────────────────────────────

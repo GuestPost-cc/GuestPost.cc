@@ -1366,10 +1366,6 @@ export type EnumPayoutExecutionStatusFieldUpdateOperationsInput = {
   set?: $Enums.PayoutExecutionStatus
 }
 
-export type NullableBoolFieldUpdateOperationsInput = {
-  set?: boolean | null
-}
-
 export type NullableEnumPayoutCompletionSourceFieldUpdateOperationsInput = {
   set?: $Enums.PayoutCompletionSource | null
 }

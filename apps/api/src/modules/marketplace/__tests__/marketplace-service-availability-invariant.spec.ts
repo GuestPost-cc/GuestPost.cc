@@ -13,6 +13,7 @@ type ServiceRow = {
 
 function createHarness(initialStatus = "APPROVED", serviceCount = 2) {
   let listingStatus = initialStatus
+  let moderationVersion = 0
   const services = new Map<string, ServiceRow>()
   for (let index = 1; index <= serviceCount; index += 1) {
     services.set(`service-${index}`, {
@@ -35,6 +36,17 @@ function createHarness(initialStatus = "APPROVED", serviceCount = 2) {
     ownerType: "PUBLISHER",
     websiteId: null,
     website: null,
+    moderationVersion,
+    activeModerationAction:
+      listingStatus === "PENDING_REVIEW" ? "SUBMIT_FOR_REVIEW" : null,
+    activeModerationAuthority:
+      listingStatus === "PENDING_REVIEW" ? "PUBLISHER" : null,
+    activeModerationReasonCode:
+      listingStatus === "PENDING_REVIEW" ? "INITIAL_SUBMISSION" : null,
+    activeModerationMessage: null,
+    activeModerationPreviousStatus:
+      listingStatus === "PENDING_REVIEW" ? "DRAFT" : null,
+    moderationResubmissionAllowed: false,
     currency: "USD",
     services: [...services.values()]
       .filter((service) => service.availability === "AVAILABLE")
@@ -73,16 +85,29 @@ function createHarness(initialStatus = "APPROVED", serviceCount = 2) {
       }
     }),
     marketplaceListing: {
-      findUnique: jest
-        .fn()
-        .mockImplementation((args: any) =>
-          Promise.resolve(
-            args.select?.status ? { status: listingStatus } : listingRecord(),
-          ),
+      findUnique: jest.fn().mockImplementation((args: any) =>
+        Promise.resolve(
+          args.select?.status
+            ? {
+                websiteId: null,
+                status: listingStatus,
+                moderationVersion,
+              }
+            : listingRecord(),
         ),
+      ),
       updateMany: jest.fn().mockImplementation(({ where, data }: any) => {
         if (where.status !== listingStatus) return Promise.resolve({ count: 0 })
+        if (
+          where.moderationVersion !== undefined &&
+          where.moderationVersion !== moderationVersion
+        ) {
+          return Promise.resolve({ count: 0 })
+        }
         listingStatus = data.status
+        if (data.moderationVersion?.increment) {
+          moderationVersion += data.moderationVersion.increment
+        }
         return Promise.resolve({ count: 1 })
       }),
       findUniqueOrThrow: jest
@@ -123,6 +148,9 @@ function createHarness(initialStatus = "APPROVED", serviceCount = 2) {
     },
     auditLog: {
       create: jest.fn().mockResolvedValue({ id: "marketplace-audit" }),
+    },
+    moderationEvent: {
+      create: jest.fn().mockResolvedValue({ id: "moderation-event-1" }),
     },
     marketplaceFavorite: { findMany: jest.fn().mockResolvedValue([]) },
   }
@@ -231,8 +259,12 @@ describe("approved listing service availability invariant", () => {
     expect(
       results.filter((result) => result.status === "rejected"),
     ).toHaveLength(1)
-    expect(harness.listingStatus()).toBe("APPROVED")
-    expect(harness.services.get("service-1")?.availability).toBe("AVAILABLE")
+    const approved = harness.listingStatus() === "APPROVED"
+    const available =
+      harness.services.get("service-1")?.availability === "AVAILABLE"
+    // Either command may acquire the lock first, but the catalog invariant
+    // must hold: an approved listing can never end with no available service.
+    expect(approved && !available).toBe(false)
     expect(
       harness.lockQueries.filter((query) =>
         query.includes("MarketplaceListing"),

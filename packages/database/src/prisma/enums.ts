@@ -907,6 +907,63 @@ export const ListingStatus = {
 export type ListingStatus = (typeof ListingStatus)[keyof typeof ListingStatus]
 
 
+export const ModerationAction = {
+  SUBMIT_FOR_REVIEW: 'SUBMIT_FOR_REVIEW',
+  APPROVE: 'APPROVE',
+  REQUEST_CHANGES: 'REQUEST_CHANGES',
+  PAUSE: 'PAUSE',
+  RESTORE: 'RESTORE',
+  ARCHIVE: 'ARCHIVE',
+  REOPEN: 'REOPEN',
+  ALLOW_RESUBMISSION: 'ALLOW_RESUBMISSION',
+  DENY_RESUBMISSION: 'DENY_RESUBMISSION'
+} as const
+
+export type ModerationAction = (typeof ModerationAction)[keyof typeof ModerationAction]
+
+
+export const ModerationScope = {
+  LISTING: 'LISTING',
+  WEBSITE: 'WEBSITE'
+} as const
+
+export type ModerationScope = (typeof ModerationScope)[keyof typeof ModerationScope]
+
+
+export const ModerationAuthority = {
+  PUBLISHER: 'PUBLISHER',
+  OPERATIONS: 'OPERATIONS',
+  SUPER_ADMIN: 'SUPER_ADMIN'
+} as const
+
+export type ModerationAuthority = (typeof ModerationAuthority)[keyof typeof ModerationAuthority]
+
+
+export const ModerationReasonCode = {
+  INITIAL_SUBMISSION: 'INITIAL_SUBMISSION',
+  CORRECTIONS_COMPLETE: 'CORRECTIONS_COMPLETE',
+  APPROVED_AFTER_REVIEW: 'APPROVED_AFTER_REVIEW',
+  INCOMPLETE_POLICY: 'INCOMPLETE_POLICY',
+  INCOMPLETE_LISTING: 'INCOMPLETE_LISTING',
+  CONTENT_QUALITY: 'CONTENT_QUALITY',
+  PRICING_OR_SERVICE: 'PRICING_OR_SERVICE',
+  DOMAIN_VERIFICATION: 'DOMAIN_VERIFICATION',
+  POLICY_VIOLATION: 'POLICY_VIOLATION',
+  SECURITY_RISK: 'SECURITY_RISK',
+  FRAUD_RISK: 'FRAUD_RISK',
+  INVENTORY_UNAVAILABLE: 'INVENTORY_UNAVAILABLE',
+  OPERATIONAL_HOLD: 'OPERATIONAL_HOLD',
+  PUBLISHER_REQUEST: 'PUBLISHER_REQUEST',
+  ISSUE_RESOLVED: 'ISSUE_RESOLVED',
+  EMERGENCY_OVERRIDE: 'EMERGENCY_OVERRIDE',
+  DUPLICATE_OR_INVALID: 'DUPLICATE_OR_INVALID',
+  OTHER: 'OTHER',
+  LEGACY_ORIGIN_UNKNOWN: 'LEGACY_ORIGIN_UNKNOWN'
+} as const
+
+export type ModerationReasonCode = (typeof ModerationReasonCode)[keyof typeof ModerationReasonCode]
+
+
 export const ListingFulfillmentType = {
   INTERNAL: 'INTERNAL',
   PUBLISHER: 'PUBLISHER',

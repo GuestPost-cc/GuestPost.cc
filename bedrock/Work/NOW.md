@@ -1,103 +1,115 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-08-15
+updated: 2026-08-23
 ---
 
 # Current focus
 
-The active branch `agent/fraud-case-workflow-20260815` is implementing the
-confirmed delivery-fraud operational-to-financial handoff on top of
-`origin/main` SHA `508b47e` (Support PR #103). Migration
-`20260815120000_delivery_fraud_findings` and its matching application writers
-are present only in this active change set at the time of this note. They have
-not been represented as merged, applied to Neon, or deployed.
+PR #105 layers the marketplace trust-boundary hardening on current `main` SHA
+`1d993e0`, which already includes the support-messaging and confirmed
+delivery-fraud releases. Its base conflicts are resolved locally and migrations
+`20260821120000_marketplace_moderation` and
+`20260821130000_marketplace_moderation_legacy_message_correction` are applied to
+the explicitly authorized Neon staging database. The remaining work is to land
+the review fixes and run the complete repository CI matrix. A staging migration
+is not a production deployment.
 
 The last independently recorded production deployment remains SHA `512b851`
 in finance-locked mode. A merge to `main` does not deploy Render because every
 Blueprint service has manual deployment enabled. The Northflank worker fleet
-also remains under the previously recorded full hold; do not infer a running
-matching worker from an application build or GitHub merge.
+remains under the recorded full hold; do not infer a matching running worker
+from a GitHub merge, CI pass, or staging migration.
 
-## Implemented in the active fraud batch
+## Marketplace hardening in PR #105
 
-- Operations or Super Admin can confirm one current delivery-fraud flag with
-  expected Order/delivery versions, a bounded internal reason, and an
-  actor-scoped UUID idempotency key. Confirmation is mutually exclusive with
-  clearance, appends an immutable `CONFIRMED_FRAUD` finding, retains the exact
-  `DeliveryFraudHold`, and moves no money.
-- The same Order-locked transaction creates or escalates a structured,
-  same-order `LEGAL_OR_SECURITY_EMERGENCY` cancellation review requesting
-  `FULL_REFUND` before the finding is inserted. A reused `PENDING_FINANCE` case
-  must already contain final responsibility, reviewer, and a bounded reason.
-  The combined new command increments `Order.version` exactly once; exact
-  replay increments it zero times and repairs only missing projections.
-- A finding-linked cancellation can progress only through Operations/Super
-  Admin full-refund review to `PENDING_FINANCE`, then a separate Finance/Super
-  Admin canonical refund approval to `APPROVED`. Continue-order, dispute,
-  rejection, withdrawal, deletion, repurposing, and terminal evidence rewrite
-  fail closed.
-- Force cancellation and dispute refund refuse a confirmed-fraud Order under
-  the aggregate lock. A deferred Order constraint independently forbids
-  `CANCELLED`/`COMPLETED` shortcuts and permits `REFUNDED` only when every
-  linked case has complete approved full-refund evidence at commit.
-- PostgreSQL independently enforces live staff authority, same-order linkage,
-  permanent hold retention, full-refund state, exact canonical refund facts,
-  append-only approved cancellation evidence, a restrictive refund foreign
-  key, and update/delete/truncate denial for the linked approved REFUND ledger
-  row.
-- Customer, publisher, Operations, Finance, and Super Admin Order pages receive
-  audience-specific timeline entries derived from immutable domain/ledger
-  facts. Confirmation, clearance, refund, and publisher-compensation events use
-  transactional outbox rows with stable decision-bound dedup keys. External
-  projections never consume raw staff notes, `OrderEvent.message`, audit text,
-  provider details, support IDs, or generic metadata.
-- The dedicated production runbook now covers a populated-clone rehearsal,
-  rotated direct deploy credential, exact identifier-safe runtime grants,
-  API/all-worker hard drain, migration status and integrity postflight,
-  `recovery_only` canaries, intentional server-only return to `normal`, payout
-  execution remaining false, and forward-fix/PITR recovery.
+- Added immutable `ModerationEvent` history plus current projections and
+  optimistic versions for listings and websites. The migration conservatively
+  backfills legacy holds without guessing their prior state.
+- Replaced generic lifecycle mutations with explicit, locked staff/publisher
+  policies. Operations is assignment-bounded, Finance is read-only, Super Admin
+  owns exceptional reopen/archive authority, and publishers cannot clear staff
+  holds unless resubmission is explicitly enabled.
+- Made website pause/archive independent of listing status and required an
+  APPROVED listing with an active, VERIFIED website across every buyer
+  discovery path and checkout. Orderability is revalidated while locking
+  Website, MarketplaceListing, then ListingService.
+- Restricted buyer metrics to current exact provider/key/direct-source evidence.
+  Manual, staff, import, stale, mismatched, and unknown values remain available
+  to authorized internal workflows only.
+- Replaced broad public spreads with explicit allowlist serializers, including
+  reduced review/publisher/service shapes and deposit-gated URLs.
+- Added typed moderation commands/projections and capability-driven admin and
+  publisher UI with reasons, messages, version conflicts, confirmations, and
+  publisher-safe history.
+- Removed publisher create-time status/featured/verified injection and routed
+  legacy archive paths through the same moderation authority.
+- Operations offboarding now fails closed while platform Websites remain
+  assigned. Platform Website creation/reassignment serializes against staff
+  demotion and suspension, revalidates the active Operations owner under lock,
+  and commits reassignment with its audit record atomically.
+
+## Confirmed-fraud base release
+
+- Current `main` records confirmed delivery fraud as immutable, same-order
+  evidence, retains the fraud hold, and drives a separate full-refund review
+  through Operations and Finance authority.
+- Database backstops bind terminal Order outcomes to the canonical cancellation
+  and refund evidence and make confirmed-fraud findings and approved refund
+  evidence append-only.
+- Audience-specific stakeholder timelines and transactional communications do
+  not expose raw internal notes, audit text, support identifiers, provider data,
+  or generic metadata.
+- The delivery-fraud migration remains a mixed-writer cutover: old API/worker
+  images cannot be started against the guarded schema.
 
 ## Explicitly unchanged
 
 - Staff security and finance governance remains owner-deferred: phishing-
   resistant MFA, recent step-up authorization, universal human money-command
   maker-checker, append-only staff-security evidence, and break-glass rehearsal
-  are still paid-launch gates. Super Admin can currently authorize both the
-  operational and financial fraud commands; this batch does not claim actor
-  independence.
-- The existing managed KMS/HSM, provider certification, legal/entity, browser
-  acceptance, Redis capacity, and worker rollout gates remain open. This fraud
-  correctness batch does not certify paid production.
+  remain paid-launch gates.
+- Managed KMS/HSM, provider certification, legal/entity, browser acceptance,
+  Redis capacity, and worker rollout gates remain open. Neither a staging
+  migration nor this correctness batch certifies paid production.
 
 ## Validation state
 
-Database client generation/build, the API and API-client builds, Admin
-TypeScript, and focused fraud, cancellation, refund, settlement-gating,
-timeline, communication, and client suites have passed during active
-development. The local full Admin Next production build reached a sandbox-only
-Turbopack port-permission failure and is not recorded as a passing build. Final
-repository CI, real PostgreSQL migration execution on a populated clone,
-runtime-role canaries, and production postflight remain release gates. No Neon
-migration or deployment was performed by this documentation pass.
+Before the base merge, the marketplace batch passed all 1,693 API unit tests,
+all 459 shared tests, all 90 API-client tests, API Nest build, Prisma
+format/validate/generate, TypeScript checks for API/database/shared/API-client/
+admin/portal/publisher, full ESLint for the three affected apps, Biome, and
+`git diff --check`.
+
+After the base merge, all 1,787 API unit tests passed together, as did database
+and API typechecks, the API-client's 127 tests, 84 focused metrics/provenance/
+search/client tests, affected app typechecks and lint, Prisma format/validate/
+generate, and `git diff --check`. The Neon staging target reports all 78
+migrations current with no failed migration. Its one legacy paused-listing and
+one inactive-website projections use the corrected Super Admin wording, the two
+archived-listing projections remain unchanged, and all four immutable legacy
+events retain their original evidence. Invalid event targets remain zero, both
+append-only guards remain enabled, and all five moderation constraints remain
+present. PR #105 must still pass the combined repository CI matrix; local and
+staging results are not a substitute for that check.
+
+The first post-merge GitHub run passed dependency, migration, static, and API
+unit stages, then exposed a direct Prisma `DriverAdapterError` serialization
+shape in the real support/offboarding race. The structured retry classifier now
+recognizes that exact adapter shape without parsing messages or trusting
+arbitrary nested causes. Focused shared/admin coverage and the API build pass;
+the full GitHub rerun passed. Review findings have since produced a narrow
+follow-up batch, so the next pushed head must pass the complete GitHub matrix
+again before merge.
 
 ## Next actions
 
-1. Freeze the application/schema/migration diff, run format/type/lint/build and
-   the complete focused plus database-backed CI matrix, and resolve every
-   failure without weakening an invariant.
-2. Rotate any database credential exposed outside approved secret storage.
-   Rehearse the unchanged migration on a recent populated Neon branch/clone
-   through a direct deploy-role DSN and execute the exact runtime grant/denial
-   proof through the pooled API/worker role.
-3. Create the production PITR marker, drain Render API and every Northflank
-   `realtime`, `on-demand`, `scheduled`, and ad-hoc writer, prove zero old
-   sessions/in-flight work, then apply the migration once.
-4. Start only the matching image in `FINANCE_RUNTIME_MODE=recovery_only`; run
-   migration status, privilege, invariant, reconciliation, replay,
-   force-cancel/dispute-refund denial, stakeholder-timeline, and outbox canaries
-   without real customer money.
-5. Only after those gates pass, deliberately set server-only
-   `FINANCE_RUNTIME_MODE=normal` for the intended replicas. Keep
-   `PAYOUT_EXECUTION_ENABLED=false` until its separate certification gate is
-   approved.
+1. Push the final review-fix commit to PR #105 and merge only after every
+   required GitHub check succeeds and the review-thread gate is clear.
+2. Keep production writers drained for any later production cutover; rehearse
+   on a populated clone, take the required recovery marker, deploy migrations
+   before the matching images, and use forward-fix/PITR rather than removing
+   evidence guards.
+3. Keep the worker, finance, payout, managed-KMS, and legal/provider gates
+   explicit instead of treating a green PR or staging database as launch
+   approval.

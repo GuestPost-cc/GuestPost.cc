@@ -26,14 +26,11 @@ export type PublicDomainMetricSource =
   | "AHREFS_PAID_API"
   | "MOZ_PAID_API"
   | "OPEN_PAGE_RANK_API"
-  | "PUBLISHER_MANUAL"
-  | "STAFF_MANUAL"
-  | "ADMIN_IMPORT"
 
 export interface PublicDomainMetricValue {
   value: number
   source: PublicDomainMetricSource
-  status: "CURRENT" | "STALE" | "UNAVAILABLE"
+  status: "CURRENT"
   measuredAt: string
   collectedAt: string
 }
@@ -75,7 +72,7 @@ export interface MarketplaceListing {
   priceType: string
   minPrice?: number
   maxPrice?: number
-  traffic?: number
+  traffic?: number | null
   siteMetrics?: {
     periodDays: number
     gsc?: { clicks: number; impressions: number }
@@ -104,14 +101,24 @@ export interface MarketplaceListing {
   featured: boolean
   verified: boolean
   doFollowOnly?: boolean
-  websiteUrl?: string
+  websiteUrl?: string | null
   // Fulfillment website — order items must reference this, not the listing id
   websiteId?: string | null
-  sampleUrl?: string
+  sampleUrl?: string | null
+  signupUrl?: string | null
+  websiteAccess?: {
+    unlocked: boolean
+    reason: "DEPOSIT_VERIFIED" | "FIRST_DEPOSIT_REQUIRED"
+  }
   category?: { id: string; name: string; slug: string }
   categories?: Array<{ id: string; name: string; slug: string }>
   tags: Array<{ id: string; name: string; slug: string }>
-  images: Array<{ url: string; isPrimary: boolean }>
+  images: Array<{
+    url: string
+    alt?: string | null
+    isPrimary: boolean
+    sortOrder?: number
+  }>
   // pricingTiers removed in Phase 5 — replaced by the per-service price on
   // each ListingService row in `services[]`.
   reviews?: Array<{
@@ -547,17 +554,25 @@ export class MarketplaceService {
   }
 
   // ── Phase 6 lifecycle transitions (publisher-side) ───────────────────────
-  submitListing(listingId: string) {
-    return this.client.post(`/marketplace/listings/${listingId}/submit`)
+  submitListing(listingId: string, expectedVersion: number) {
+    return this.client.post(`/marketplace/listings/${listingId}/submit`, {
+      json: { expectedVersion },
+    })
   }
-  pauseListing(listingId: string) {
-    return this.client.post(`/marketplace/listings/${listingId}/pause`)
+  pauseListing(listingId: string, expectedVersion: number) {
+    return this.client.post(`/marketplace/listings/${listingId}/pause`, {
+      json: { expectedVersion },
+    })
   }
-  unpauseListing(listingId: string) {
-    return this.client.post(`/marketplace/listings/${listingId}/unpause`)
+  unpauseListing(listingId: string, expectedVersion: number) {
+    return this.client.post(`/marketplace/listings/${listingId}/unpause`, {
+      json: { expectedVersion },
+    })
   }
-  archiveListing(listingId: string) {
-    return this.client.post(`/marketplace/listings/${listingId}/archive`)
+  archiveListing(listingId: string, expectedVersion: number) {
+    return this.client.post(`/marketplace/listings/${listingId}/archive`, {
+      json: { expectedVersion },
+    })
   }
 
   // Order-flow website picker. Built on the real listings endpoint and
@@ -591,7 +606,7 @@ export class MarketplaceService {
       price: number
       currency: string
       domainRating?: PublicDomainMetricValue
-      traffic: number
+      traffic?: number
       category?: string
       language?: string
       country?: string
@@ -610,7 +625,7 @@ export class MarketplaceService {
         price: l.price ?? 0,
         currency: l.currency ?? "USD",
         domainRating: l.domainMetrics?.ahrefs.domainRating,
-        traffic: l.traffic ?? 0,
+        ...(l.traffic != null ? { traffic: l.traffic } : {}),
         category: l.category?.name,
         language: l.language,
         country: l.country,

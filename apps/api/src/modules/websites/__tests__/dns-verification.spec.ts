@@ -8,6 +8,7 @@
  * (block unless VERIFIED, SUPER_ADMIN emergency override).
  */
 
+import { ListingStatus } from "@guestpost/database"
 import {
   candidateHostnames,
   generateVerificationToken,
@@ -309,6 +310,7 @@ describe("runWebsiteReverifySweep", () => {
         findMany: jest.fn().mockResolvedValue([{ userId: "s1" }]),
       },
       marketplaceListing: {
+        count: jest.fn().mockResolvedValue(1),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       notification: { create: jest.fn().mockResolvedValue({}) },
@@ -467,7 +469,10 @@ describe("runWebsiteReverifySweep", () => {
         data: expect.objectContaining({ verificationStatus: "REVOKED" }),
       }),
     )
-    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalled()
+    expect(prisma.marketplaceListing.count).toHaveBeenCalledWith({
+      where: { websiteId: "w1", status: "APPROVED" },
+    })
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -633,8 +638,43 @@ describe("WebsitesService.submitForReview verification gate", () => {
   let queue: any
   const user = { id: "u1" }
 
+  function readyListing(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "l1",
+      publisherId: "pub1",
+      websiteId: "w1",
+      organizationId: "org1",
+      title: "Listing",
+      status: "DRAFT",
+      ownerType: "PUBLISHER",
+      moderationVersion: 0,
+      activeModerationAction: null,
+      activeModerationAuthority: null,
+      activeModerationReasonCode: null,
+      activeModerationMessage: null,
+      activeModerationPreviousStatus: null,
+      moderationResubmissionAllowed: false,
+      categories: [{ categoryId: "category-1" }],
+      language: "English",
+      sportsGamingAllowed: false,
+      pharmacyAllowed: false,
+      cryptoAllowed: false,
+      backlinkCount: 1,
+      linkType: "DOFOLLOW",
+      linkValidity: "PERMANENT",
+      googleNews: false,
+      markedSponsored: false,
+      foreignLanguageAllowed: false,
+      description: "A complete buyer-facing marketplace description.",
+      services: [{ id: "service-1" }],
+      ...overrides,
+    }
+  }
+
   beforeEach(() => {
     prisma = {
+      $transaction: jest.fn((callback) => callback(prisma)),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: "locked" }]),
       publisher: {
         findUnique: jest
           .fn()
@@ -645,27 +685,18 @@ describe("WebsitesService.submitForReview verification gate", () => {
           id: "w1",
           domain: "example.com",
           publisherId: "pub1",
+          isActive: true,
           verificationStatus: "VERIFIED",
         }),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       marketplaceListing: {
-        findFirst: jest.fn().mockResolvedValue({
-          id: "l1",
-          categories: [{ categoryId: "category-1" }],
-          language: "English",
-          sportsGamingAllowed: false,
-          pharmacyAllowed: false,
-          cryptoAllowed: false,
-          backlinkCount: 1,
-          linkType: "DOFOLLOW",
-          linkValidity: "PERMANENT",
-          googleNews: false,
-          markedSponsored: false,
-          foreignLanguageAllowed: false,
-          description: "A complete buyer-facing marketplace description.",
-          services: [{ id: "service-1" }],
-        }),
-        update: jest.fn().mockResolvedValue({ id: "l1" }),
+        findFirst: jest.fn().mockResolvedValue(readyListing()),
+        findUnique: jest.fn().mockResolvedValue(readyListing()),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      moderationEvent: {
+        create: jest.fn().mockResolvedValue({ id: "event-1" }),
       },
       websiteMetric: {
         findMany: jest
@@ -686,25 +717,173 @@ describe("WebsitesService.submitForReview verification gate", () => {
       id: "w1",
       domain: "example.com",
       publisherId: "pub1",
+      isActive: true,
       verificationStatus: "PENDING_VERIFICATION",
     })
 
     await expect(
       service.submitForReview("pub1", "org1", "w1", user),
     ).rejects.toMatchObject({ response: { code: "WEBSITE_NOT_VERIFIED" } })
-    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
   })
 
-  it("submits a draft listing after DNS ownership is verified", async () => {
+  it("submits and projects the active listing ahead of newer archived history", async () => {
+    const activeListing = readyListing({ id: "l-active" })
+    const newerArchivedListing = readyListing({
+      id: "l-archived",
+      status: "ARCHIVED",
+      activeModerationAction: "ARCHIVE",
+      activeModerationAuthority: "SUPER_ADMIN",
+      moderationResubmissionAllowed: true,
+    })
+    prisma.marketplaceListing.findFirst.mockImplementation(
+      ({ where }: { where: { status: unknown } }) =>
+        Promise.resolve(
+          typeof where.status === "object"
+            ? activeListing
+            : newerArchivedListing,
+        ),
+    )
+    prisma.marketplaceListing.findUnique.mockResolvedValue(activeListing)
+    const projectedWebsite = {
+      id: "w1",
+      moderation: { version: 0, allowedActions: ["ARCHIVE"], active: null },
+      listing: {
+        id: "l-active",
+        status: "PENDING_REVIEW",
+        moderation: { version: 1, allowedActions: [], active: null },
+      },
+    }
+    jest
+      .spyOn(service, "getWebsiteById")
+      .mockResolvedValue(projectedWebsite as any)
+
     await expect(
       service.submitForReview("pub1", "org1", "w1", user),
-    ).resolves.toEqual({ success: true })
-    expect(prisma.marketplaceListing.update).toHaveBeenCalledWith({
-      where: { id: "l1" },
-      data: { status: "PENDING_REVIEW" },
+    ).resolves.toEqual(projectedWebsite)
+    expect(prisma.marketplaceListing.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          websiteId: "w1",
+          publisherId: "pub1",
+          status: { not: "ARCHIVED" },
+        },
+      }),
+    )
+    expect(prisma.marketplaceListing.findFirst).toHaveBeenCalledTimes(1)
+    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalledWith({
+      where: { id: "l-active", status: "DRAFT", moderationVersion: 0 },
+      data: expect.objectContaining({
+        status: "PENDING_REVIEW",
+        activeModerationAction: "SUBMIT_FOR_REVIEW",
+        activeModerationAuthority: "PUBLISHER",
+        moderationVersion: { increment: 1 },
+      }),
     })
+    expect(prisma.moderationEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: "SUBMIT_FOR_REVIEW" }),
+      }),
+    )
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({ action: "WEBSITE_SUBMITTED_FOR_REVIEW" }),
+      prisma,
+    )
+    expect(service.getWebsiteById).toHaveBeenCalledWith(
+      "pub1",
+      "org1",
+      "w1",
+      "l-active",
+    )
+  })
+
+  it("resubmits the exact archived listing that staff explicitly reopened", async () => {
+    const archivedListing = readyListing({
+      status: "ARCHIVED",
+      moderationVersion: 4,
+      activeModerationAction: "ARCHIVE",
+      activeModerationAuthority: "SUPER_ADMIN",
+      activeModerationReasonCode: "DUPLICATE_OR_INVALID",
+      activeModerationPreviousStatus: "REJECTED",
+      moderationResubmissionAllowed: true,
+    })
+    prisma.marketplaceListing.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(archivedListing)
+    prisma.marketplaceListing.findUnique.mockResolvedValue(archivedListing)
+    const projectedWebsite = {
+      id: "w1",
+      listing: { id: "l1", status: "PENDING_REVIEW" },
+    }
+    jest
+      .spyOn(service, "getWebsiteById")
+      .mockResolvedValue(projectedWebsite as any)
+
+    await expect(
+      service.submitForReview("pub1", "org1", "w1", user, 4),
+    ).resolves.toEqual(projectedWebsite)
+
+    expect(prisma.marketplaceListing.findFirst).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: {
+          websiteId: "w1",
+          publisherId: "pub1",
+          status: "ARCHIVED",
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      }),
+    )
+    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalledWith({
+      where: { id: "l1", status: "ARCHIVED", moderationVersion: 4 },
+      data: expect.objectContaining({
+        status: "PENDING_REVIEW",
+        activeModerationPreviousStatus: "ARCHIVED",
+        activeModerationReasonCode: "CORRECTIONS_COMPLETE",
+        moderationResubmissionAllowed: false,
+        moderationVersion: { increment: 1 },
+      }),
+    })
+    expect(service.getWebsiteById).toHaveBeenCalledWith(
+      "pub1",
+      "org1",
+      "w1",
+      "l1",
+    )
+  })
+
+  it("uses one canonical active-first order for singular and list projections", async () => {
+    const canonicalOrder = [
+      { status: "asc" },
+      { createdAt: "desc" },
+      { id: "desc" },
+    ]
+    expect(Object.values(ListingStatus).at(-1)).toBe("ARCHIVED")
+
+    prisma.website.findFirst.mockResolvedValue(null)
+    await expect(
+      service.getWebsiteById("pub1", "org1", "w1"),
+    ).rejects.toBeInstanceOf(NotFoundException)
+    expect(prisma.website.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          marketplaceListings: expect.objectContaining({
+            orderBy: canonicalOrder,
+            take: 1,
+          }),
+        }),
+      }),
+    )
+
+    await expect(service.getWebsites("pub1", "org1")).resolves.toEqual([])
+    expect(prisma.website.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          marketplaceListings: expect.objectContaining({
+            orderBy: canonicalOrder,
+          }),
+        }),
+      }),
     )
   })
 
@@ -716,7 +895,7 @@ describe("WebsitesService.submitForReview verification gate", () => {
     await expect(
       service.submitForReview("pub1", "org1", "w1", user),
     ).rejects.toMatchObject({ response: { code: "MANUAL_METRICS_REQUIRED" } })
-    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
+    expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
   })
 })
 
@@ -730,7 +909,16 @@ describe("AdminService.updateListingStatus verification gate", () => {
   function makeListing(websiteStatus: string | null) {
     return {
       id: "l1",
+      websiteId: websiteStatus ? "w1" : null,
       status: "PENDING_REVIEW",
+      ownerType: websiteStatus ? "PUBLISHER" : "PLATFORM",
+      moderationVersion: 0,
+      activeModerationAction: "SUBMIT_FOR_REVIEW",
+      activeModerationAuthority: "PUBLISHER",
+      activeModerationReasonCode: "INITIAL_SUBMISSION",
+      activeModerationMessage: null,
+      activeModerationPreviousStatus: "DRAFT",
+      moderationResubmissionAllowed: false,
       title: "Listing",
       organizationId: "org1",
       publisherId: "pub1",
@@ -748,7 +936,12 @@ describe("AdminService.updateListingStatus verification gate", () => {
       markedSponsored: false,
       foreignLanguageAllowed: false,
       website: websiteStatus
-        ? { verificationStatus: websiteStatus, domain: "example.com" }
+        ? {
+            verificationStatus: websiteStatus,
+            domain: "example.com",
+            isActive: true,
+            managedByUserId: null,
+          }
         : null,
     }
   }
@@ -762,6 +955,9 @@ describe("AdminService.updateListingStatus verification gate", () => {
           .fn()
           .mockResolvedValue({ id: "l1", status: "APPROVED" }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      moderationEvent: {
+        create: jest.fn().mockResolvedValue({ id: "moderation-event-1" }),
       },
       $transaction: jest.fn(async (work: (tx: unknown) => unknown) =>
         work(prisma),
@@ -789,7 +985,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
     await expect(
       admin.updateListingStatus("l1", "APPROVED", {
         id: "admin1",
-        role: "OPERATIONS",
+        staffRole: "OPERATIONS",
       }),
     ).rejects.toMatchObject({ response: { code: "WEBSITE_NOT_VERIFIED" } })
     expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
@@ -801,7 +997,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
     )
     const res = await admin.updateListingStatus("l1", "APPROVED", {
       id: "admin1",
-      role: "OPERATIONS",
+      staffRole: "SUPER_ADMIN",
     })
     expect(res.status).toBe("APPROVED")
     expect(prisma.marketplaceListing.updateMany).toHaveBeenCalled()
@@ -811,7 +1007,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
     prisma.marketplaceListing.findUnique.mockResolvedValue(makeListing(null))
     const res = await admin.updateListingStatus("l1", "APPROVED", {
       id: "admin1",
-      role: "OPERATIONS",
+      staffRole: "SUPER_ADMIN",
     })
     expect(res.status).toBe("APPROVED")
   })
@@ -824,7 +1020,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
     await expect(
       admin.updateListingStatus("l1", "APPROVED", {
         id: "admin1",
-        staffRole: "OPERATIONS",
+        staffRole: "SUPER_ADMIN",
       }),
     ).rejects.toMatchObject({ response: { code: "NO_AVAILABLE_SERVICES" } })
     expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()

@@ -13,6 +13,7 @@ import {
 import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
+import { ModerationVersionDto } from "../../common/dto/moderation-command.dto"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import {
@@ -165,6 +166,7 @@ export class WebsitesController {
   async submitForReview(
     @Param("publisherId") publisherId: string,
     @Param("id") id: string,
+    @Body() body: ModerationVersionDto,
     @CurrentUser() user: any,
   ) {
     const resolvedPublisherId = this.resolvePublisherId(publisherId, user)
@@ -173,6 +175,43 @@ export class WebsitesController {
       user.publisherOrganizationId,
       id,
       user,
+      body.expectedVersion,
+    )
+  }
+
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post(":id/archive")
+  async archiveWebsite(
+    @Param("publisherId") publisherId: string,
+    @Param("id") id: string,
+    @Body() body: ModerationVersionDto,
+    @CurrentUser() user: any,
+  ) {
+    const resolvedPublisherId = this.resolvePublisherId(publisherId, user)
+    return this.websitesService.archiveWebsite(
+      resolvedPublisherId,
+      user.publisherOrganizationId,
+      id,
+      user,
+      body.expectedVersion,
+    )
+  }
+
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post(":id/reopen")
+  async reopenWebsite(
+    @Param("publisherId") publisherId: string,
+    @Param("id") id: string,
+    @Body() body: ModerationVersionDto,
+    @CurrentUser() user: any,
+  ) {
+    const resolvedPublisherId = this.resolvePublisherId(publisherId, user)
+    return this.websitesService.reopenWebsite(
+      resolvedPublisherId,
+      user.publisherOrganizationId,
+      id,
+      user,
+      body.expectedVersion,
     )
   }
 }

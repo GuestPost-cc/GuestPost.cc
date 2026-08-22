@@ -7,8 +7,8 @@ Platform-owned inventory uses the same metric contract. Platform website
 creation requires current staff-supplied Ahrefs organic traffic and Moz DA,
 stores them with `STAFF_MANUAL` provenance, and queues Ahrefs Free DR plus
 OpenPageRank after the site/listing transaction commits. This keeps manual
-sources replaceable by later paid APIs without changing the marketplace read
-shape.
+sources replaceable by later paid APIs without changing the internal review
+shape. Staff-supplied values do not cross the customer marketplace boundary.
 
 ## Metric sources
 
@@ -17,14 +17,14 @@ shape.
 `WebsiteMetricRevision` retains the previous value and provenance whenever a
 metric is replaced.
 
-| Metric | Current source | Collection | Freshness |
-| --- | --- | --- | --- |
-| Ahrefs Domain Rating | `AHREFS_FREE_API` | Worker | 30 days |
-| Open PageRank, global rank, and referring domains | `OPEN_PAGE_RANK_API` | Worker | 30 days |
-| Ahrefs organic traffic | `PUBLISHER_MANUAL` or `ADMIN_IMPORT` | Publisher/Admin | 90 days |
-| Moz Domain Authority | `PUBLISHER_MANUAL` or `ADMIN_IMPORT` | Publisher/Admin | 90 days |
-| GSC clicks/impressions | Quarantined | Disabled pending canonical-domain binding | Not public |
-| GA4 sessions/users/pageviews | Quarantined | Disabled pending web-stream/domain binding | Not public |
+| Metric | Stored source | Collection | Freshness | Customer marketplace eligibility |
+| --- | --- | --- | --- | --- |
+| Ahrefs Domain Rating | `AHREFS_FREE_API` or `AHREFS_PAID_API` | Provider worker | 30 days | Both direct sources |
+| Open PageRank, global rank, and referring domains | `OPEN_PAGE_RANK_API` | Provider worker | 30 days | Direct source only |
+| Ahrefs organic traffic | Manual/import today; `AHREFS_PAID_API` when enabled | Publisher/Admin or paid provider | 90 days | `AHREFS_PAID_API` only |
+| Moz Domain Authority | Manual/import today; `MOZ_PAID_API` when enabled | Publisher/Admin or paid provider | 90 days | `MOZ_PAID_API` only |
+| GSC clicks/impressions | Quarantined | Disabled pending canonical-domain binding | Not public | Never |
+| GA4 sessions/users/pageviews | Quarantined | Disabled pending web-stream/domain binding | Not public | Never |
 
 Publisher listings cannot be submitted for review until both manual metrics
 exist and are no more than 90 days old. Values imported by an administrator can
@@ -57,17 +57,23 @@ Legacy GSC/GA4 JSON is scrubbed. Listing traffic is rebuilt from the canonical
 `WebsiteMetric.AHREFS_ORGANIC_TRAFFIC` row, and the public projection ignores a
 stale `MarketplaceListing.traffic` value. The database rejects writes from an
 old provider worker, so a rolling old pod cannot repopulate quarantined data.
-Marketplace traffic and DR filters, explicit traffic and DR sorting, default
-ranking, and rule-based recommendations use only a `CURRENT`, unexpired Ahrefs
-`WebsiteMetric` row whose source appears in the explicit, reviewed algorithmic
-source allowlist. The policy is never derived by merely excluding
-`PUBLISHER_MANUAL`: publisher-reported and unknown future sources both fail
-closed. Publisher-reported values remain visible with their provenance but
-never affect filtering, sorting, default ranking, or recommendations. Missing,
-expired, publisher-reported, or unreviewed-source traffic projects as `null`
-for algorithmic use and ranks last with stable creation-time and listing-ID
-tie-breakers; denormalized legacy listing metric columns are never marketplace
-evidence or part of buyer API projections.
+Customer display, marketplace filters, explicit metric sorting, default
+ranking, and rule-based recommendations share one authoritative policy. A row
+must be `CURRENT`, unexpired, valid for the metric's numeric domain, and match
+an exact reviewed key/provider/direct-source identity. The policy is never
+derived by excluding known manual sources: `PUBLISHER_MANUAL`, `STAFF_MANUAL`,
+`ADMIN_IMPORT`, stale/unavailable rows, expired rows, mismatched identities,
+and unknown future values all fail closed. This rule is owner-neutral, so it
+applies identically to publisher- and platform-owned listings.
+
+Manual/imported values remain available to internal publisher and staff
+workflows with their provenance, but are omitted from customer marketplace
+responses. Missing or ineligible traffic projects as `null` for compatibility,
+ranks last with stable creation-time and listing-ID tie-breakers, and never
+becomes a synthetic zero. The public domain-metric DTO includes only value,
+direct source, current status, and measurement/collection timestamps; actor,
+batch, expiry, raw-provider, and legacy denormalized fields do not cross the
+boundary.
 
 Legacy `MarketplaceRecommendation` scores are ignored. Those rows have no
 feature-provenance or metric-policy version and no in-repository producer can
@@ -75,16 +81,13 @@ prove that publisher-entered inputs were excluded. Re-enabling stored/AI scores
 requires a separately reviewed versioned feature contract, fail-closed source
 allowlist, invalidation plan for older rows, and adversarial ranking tests.
 
-Current does not mean independently verified. Buyer marketplace cards, detail
-views, favorites, traffic filters, and traffic sorting disclose whether the
-value can influence discovery and show its source. `PUBLISHER_MANUAL` is
-rendered with the exact buyer-facing label **Publisher Reported**,
-`STAFF_MANUAL` as staff-entered, and `ADMIN_IMPORT` as
-imported; all three are explicitly labelled **not independently verified**.
-Direct provider sources are labelled by provider. Unknown future sources fail
-closed to an unverified/source-unavailable label until their semantics are
-reviewed. Listing/domain verification must never be used as a visual claim
-that a manually supplied traffic number was verified.
+Buyer marketplace cards, detail views, favorites, traffic filters, and traffic
+sorting show only eligible direct-provider values and retain the provider
+attribution. A direct-provider metric is still a third-party signal rather than
+a performance guarantee. Unknown future sources remain unavailable until their
+semantics and exact metric/provider pairing are reviewed. Listing/domain
+verification must never be used as a visual claim that an internal manual
+metric was verified.
 
 Re-enabling Google metrics requires a separately reviewed release with an
 append-only binding that records provider, resource/property, canonical
@@ -124,9 +127,10 @@ with `AHREFS_PAID_API` or `MOZ_PAID_API`. The same upsert/revision path preserve
 history across the source transition.
 
 Public UI attribution is required for provider data. Keep the Ahrefs and Open
-PageRank attribution links whenever their metrics are displayed. Manual or
-imported data requires the same prominence for its unverified provenance; a
-generic provider label is insufficient.
+PageRank attribution links whenever their metrics are displayed. Internal
+publisher/staff views must retain explicit manual/imported provenance; those
+values must not be repackaged under a generic provider label or exposed to
+customers.
 
 ## Super Admin CSV workflow
 
@@ -226,5 +230,8 @@ Publisher owner in the active publisher context:
    summary path fails closed with `GOOGLE_METRICS_DISABLED`, and that public,
    saved-list, service, and recommendation responses contain no Google metric
    payload or legacy GA-derived traffic.
-8. Apply a short temporary override in local data and run the re-verification
+8. Confirm manual/imported metrics remain present in internal review views but
+   are absent from publisher- and platform-owned customer listings, while a
+   current direct-provider fixture remains visible and eligible for discovery.
+9. Apply a short temporary override in local data and run the re-verification
    sweep after its expiry to confirm automatic revocation.

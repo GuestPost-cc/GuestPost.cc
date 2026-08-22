@@ -35,6 +35,7 @@ export type MarketplaceListingAvgAggregateOutputType = {
   referringDomains: number | null
   spamScore: number | null
   backlinkCount: number | null
+  moderationVersion: number | null
 }
 
 export type MarketplaceListingSumAggregateOutputType = {
@@ -46,6 +47,7 @@ export type MarketplaceListingSumAggregateOutputType = {
   referringDomains: number | null
   spamScore: number | null
   backlinkCount: number | null
+  moderationVersion: number | null
 }
 
 export type MarketplaceListingMinAggregateOutputType = {
@@ -86,6 +88,13 @@ export type MarketplaceListingMinAggregateOutputType = {
   publisherId: string | null
   websiteId: string | null
   organizationId: string | null
+  activeModerationAction: $Enums.ModerationAction | null
+  activeModerationAuthority: $Enums.ModerationAuthority | null
+  activeModerationReasonCode: $Enums.ModerationReasonCode | null
+  activeModerationMessage: string | null
+  activeModerationPreviousStatus: $Enums.ListingStatus | null
+  moderationResubmissionAllowed: boolean | null
+  moderationVersion: number | null
   publishedAt: Date | null
   expiresAt: Date | null
   createdAt: Date | null
@@ -130,6 +139,13 @@ export type MarketplaceListingMaxAggregateOutputType = {
   publisherId: string | null
   websiteId: string | null
   organizationId: string | null
+  activeModerationAction: $Enums.ModerationAction | null
+  activeModerationAuthority: $Enums.ModerationAuthority | null
+  activeModerationReasonCode: $Enums.ModerationReasonCode | null
+  activeModerationMessage: string | null
+  activeModerationPreviousStatus: $Enums.ListingStatus | null
+  moderationResubmissionAllowed: boolean | null
+  moderationVersion: number | null
   publishedAt: Date | null
   expiresAt: Date | null
   createdAt: Date | null
@@ -179,6 +195,13 @@ export type MarketplaceListingCountAggregateOutputType = {
   publisherId: number
   websiteId: number
   organizationId: number
+  activeModerationAction: number
+  activeModerationAuthority: number
+  activeModerationReasonCode: number
+  activeModerationMessage: number
+  activeModerationPreviousStatus: number
+  moderationResubmissionAllowed: number
+  moderationVersion: number
   publishedAt: number
   expiresAt: number
   createdAt: number
@@ -196,6 +219,7 @@ export type MarketplaceListingAvgAggregateInputType = {
   referringDomains?: true
   spamScore?: true
   backlinkCount?: true
+  moderationVersion?: true
 }
 
 export type MarketplaceListingSumAggregateInputType = {
@@ -207,6 +231,7 @@ export type MarketplaceListingSumAggregateInputType = {
   referringDomains?: true
   spamScore?: true
   backlinkCount?: true
+  moderationVersion?: true
 }
 
 export type MarketplaceListingMinAggregateInputType = {
@@ -247,6 +272,13 @@ export type MarketplaceListingMinAggregateInputType = {
   publisherId?: true
   websiteId?: true
   organizationId?: true
+  activeModerationAction?: true
+  activeModerationAuthority?: true
+  activeModerationReasonCode?: true
+  activeModerationMessage?: true
+  activeModerationPreviousStatus?: true
+  moderationResubmissionAllowed?: true
+  moderationVersion?: true
   publishedAt?: true
   expiresAt?: true
   createdAt?: true
@@ -291,6 +323,13 @@ export type MarketplaceListingMaxAggregateInputType = {
   publisherId?: true
   websiteId?: true
   organizationId?: true
+  activeModerationAction?: true
+  activeModerationAuthority?: true
+  activeModerationReasonCode?: true
+  activeModerationMessage?: true
+  activeModerationPreviousStatus?: true
+  moderationResubmissionAllowed?: true
+  moderationVersion?: true
   publishedAt?: true
   expiresAt?: true
   createdAt?: true
@@ -340,6 +379,13 @@ export type MarketplaceListingCountAggregateInputType = {
   publisherId?: true
   websiteId?: true
   organizationId?: true
+  activeModerationAction?: true
+  activeModerationAuthority?: true
+  activeModerationReasonCode?: true
+  activeModerationMessage?: true
+  activeModerationPreviousStatus?: true
+  moderationResubmissionAllowed?: true
+  moderationVersion?: true
   publishedAt?: true
   expiresAt?: true
   createdAt?: true
@@ -476,6 +522,13 @@ export type MarketplaceListingGroupByOutputType = {
   publisherId: string | null
   websiteId: string | null
   organizationId: string | null
+  activeModerationAction: $Enums.ModerationAction | null
+  activeModerationAuthority: $Enums.ModerationAuthority | null
+  activeModerationReasonCode: $Enums.ModerationReasonCode | null
+  activeModerationMessage: string | null
+  activeModerationPreviousStatus: $Enums.ListingStatus | null
+  moderationResubmissionAllowed: boolean
+  moderationVersion: number
   publishedAt: Date | null
   expiresAt: Date | null
   createdAt: Date
@@ -548,6 +601,13 @@ export type MarketplaceListingWhereInput = {
   publisherId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   websiteId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   organizationId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
+  activeModerationAction?: Prisma.EnumModerationActionNullableFilter<"MarketplaceListing"> | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.EnumModerationAuthorityNullableFilter<"MarketplaceListing"> | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.EnumModerationReasonCodeNullableFilter<"MarketplaceListing"> | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
+  activeModerationPreviousStatus?: Prisma.EnumListingStatusNullableFilter<"MarketplaceListing"> | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
+  moderationVersion?: Prisma.IntFilter<"MarketplaceListing"> | number
   publishedAt?: Prisma.DateTimeNullableFilter<"MarketplaceListing"> | Date | string | null
   expiresAt?: Prisma.DateTimeNullableFilter<"MarketplaceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceListing"> | Date | string
@@ -565,6 +625,7 @@ export type MarketplaceListingWhereInput = {
   clicks?: Prisma.MarketplaceListingClickListRelationFilter
   services?: Prisma.ListingServiceListRelationFilter
   orders?: Prisma.OrderListRelationFilter
+  moderationEvents?: Prisma.ModerationEventListRelationFilter
 }
 
 export type MarketplaceListingOrderByWithRelationInput = {
@@ -610,6 +671,13 @@ export type MarketplaceListingOrderByWithRelationInput = {
   publisherId?: Prisma.SortOrderInput | Prisma.SortOrder
   websiteId?: Prisma.SortOrderInput | Prisma.SortOrder
   organizationId?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationPreviousStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  moderationResubmissionAllowed?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   expiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -627,6 +695,7 @@ export type MarketplaceListingOrderByWithRelationInput = {
   clicks?: Prisma.MarketplaceListingClickOrderByRelationAggregateInput
   services?: Prisma.ListingServiceOrderByRelationAggregateInput
   orders?: Prisma.OrderOrderByRelationAggregateInput
+  moderationEvents?: Prisma.ModerationEventOrderByRelationAggregateInput
 }
 
 export type MarketplaceListingWhereUniqueInput = Prisma.AtLeast<{
@@ -675,6 +744,13 @@ export type MarketplaceListingWhereUniqueInput = Prisma.AtLeast<{
   publisherId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   websiteId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   organizationId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
+  activeModerationAction?: Prisma.EnumModerationActionNullableFilter<"MarketplaceListing"> | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.EnumModerationAuthorityNullableFilter<"MarketplaceListing"> | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.EnumModerationReasonCodeNullableFilter<"MarketplaceListing"> | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
+  activeModerationPreviousStatus?: Prisma.EnumListingStatusNullableFilter<"MarketplaceListing"> | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
+  moderationVersion?: Prisma.IntFilter<"MarketplaceListing"> | number
   publishedAt?: Prisma.DateTimeNullableFilter<"MarketplaceListing"> | Date | string | null
   expiresAt?: Prisma.DateTimeNullableFilter<"MarketplaceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceListing"> | Date | string
@@ -692,6 +768,7 @@ export type MarketplaceListingWhereUniqueInput = Prisma.AtLeast<{
   clicks?: Prisma.MarketplaceListingClickListRelationFilter
   services?: Prisma.ListingServiceListRelationFilter
   orders?: Prisma.OrderListRelationFilter
+  moderationEvents?: Prisma.ModerationEventListRelationFilter
 }, "id" | "slug">
 
 export type MarketplaceListingOrderByWithAggregationInput = {
@@ -737,6 +814,13 @@ export type MarketplaceListingOrderByWithAggregationInput = {
   publisherId?: Prisma.SortOrderInput | Prisma.SortOrder
   websiteId?: Prisma.SortOrderInput | Prisma.SortOrder
   organizationId?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeModerationPreviousStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  moderationResubmissionAllowed?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   expiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -794,6 +878,13 @@ export type MarketplaceListingScalarWhereWithAggregatesInput = {
   publisherId?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
   websiteId?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
   organizationId?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
+  activeModerationAction?: Prisma.EnumModerationActionNullableWithAggregatesFilter<"MarketplaceListing"> | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.EnumModerationAuthorityNullableWithAggregatesFilter<"MarketplaceListing"> | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.EnumModerationReasonCodeNullableWithAggregatesFilter<"MarketplaceListing"> | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
+  activeModerationPreviousStatus?: Prisma.EnumListingStatusNullableWithAggregatesFilter<"MarketplaceListing"> | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolWithAggregatesFilter<"MarketplaceListing"> | boolean
+  moderationVersion?: Prisma.IntWithAggregatesFilter<"MarketplaceListing"> | number
   publishedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketplaceListing"> | Date | string | null
   expiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketplaceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MarketplaceListing"> | Date | string
@@ -840,6 +931,13 @@ export type MarketplaceListingCreateInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -857,6 +955,7 @@ export type MarketplaceListingCreateInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateInput = {
@@ -902,6 +1001,13 @@ export type MarketplaceListingUncheckedCreateInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -916,6 +1022,7 @@ export type MarketplaceListingUncheckedCreateInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUpdateInput = {
@@ -958,6 +1065,13 @@ export type MarketplaceListingUpdateInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -975,6 +1089,7 @@ export type MarketplaceListingUpdateInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateInput = {
@@ -1020,6 +1135,13 @@ export type MarketplaceListingUncheckedUpdateInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1034,6 +1156,7 @@ export type MarketplaceListingUncheckedUpdateInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateManyInput = {
@@ -1079,6 +1202,13 @@ export type MarketplaceListingCreateManyInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -1125,6 +1255,13 @@ export type MarketplaceListingUpdateManyMutationInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1174,6 +1311,13 @@ export type MarketplaceListingUncheckedUpdateManyInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1238,6 +1382,13 @@ export type MarketplaceListingCountOrderByAggregateInput = {
   publisherId?: Prisma.SortOrder
   websiteId?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrder
+  activeModerationPreviousStatus?: Prisma.SortOrder
+  moderationResubmissionAllowed?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -1253,6 +1404,7 @@ export type MarketplaceListingAvgOrderByAggregateInput = {
   referringDomains?: Prisma.SortOrder
   spamScore?: Prisma.SortOrder
   backlinkCount?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
 }
 
 export type MarketplaceListingMaxOrderByAggregateInput = {
@@ -1293,6 +1445,13 @@ export type MarketplaceListingMaxOrderByAggregateInput = {
   publisherId?: Prisma.SortOrder
   websiteId?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrder
+  activeModerationPreviousStatus?: Prisma.SortOrder
+  moderationResubmissionAllowed?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -1337,6 +1496,13 @@ export type MarketplaceListingMinOrderByAggregateInput = {
   publisherId?: Prisma.SortOrder
   websiteId?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
+  activeModerationAction?: Prisma.SortOrder
+  activeModerationAuthority?: Prisma.SortOrder
+  activeModerationReasonCode?: Prisma.SortOrder
+  activeModerationMessage?: Prisma.SortOrder
+  activeModerationPreviousStatus?: Prisma.SortOrder
+  moderationResubmissionAllowed?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -1352,6 +1518,7 @@ export type MarketplaceListingSumOrderByAggregateInput = {
   referringDomains?: Prisma.SortOrder
   spamScore?: Prisma.SortOrder
   backlinkCount?: Prisma.SortOrder
+  moderationVersion?: Prisma.SortOrder
 }
 
 export type MarketplaceListingScalarRelationFilter = {
@@ -1535,6 +1702,26 @@ export type NullableEnumListingLinkValidityFieldUpdateOperationsInput = {
   set?: $Enums.ListingLinkValidity | null
 }
 
+export type NullableEnumListingStatusFieldUpdateOperationsInput = {
+  set?: $Enums.ListingStatus | null
+}
+
+export type MarketplaceListingCreateNestedOneWithoutModerationEventsInput = {
+  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutModerationEventsInput, Prisma.MarketplaceListingUncheckedCreateWithoutModerationEventsInput>
+  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutModerationEventsInput
+  connect?: Prisma.MarketplaceListingWhereUniqueInput
+}
+
+export type MarketplaceListingUpdateOneWithoutModerationEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutModerationEventsInput, Prisma.MarketplaceListingUncheckedCreateWithoutModerationEventsInput>
+  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutModerationEventsInput
+  upsert?: Prisma.MarketplaceListingUpsertWithoutModerationEventsInput
+  disconnect?: Prisma.MarketplaceListingWhereInput | boolean
+  delete?: Prisma.MarketplaceListingWhereInput | boolean
+  connect?: Prisma.MarketplaceListingWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MarketplaceListingUpdateToOneWithWhereWithoutModerationEventsInput, Prisma.MarketplaceListingUpdateWithoutModerationEventsInput>, Prisma.MarketplaceListingUncheckedUpdateWithoutModerationEventsInput>
+}
+
 export type MarketplaceListingCreateNestedOneWithoutCategoriesInput = {
   create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoriesInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoriesInput>
   connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutCategoriesInput
@@ -1701,6 +1888,13 @@ export type MarketplaceListingCreateWithoutOrganizationInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -1717,6 +1911,7 @@ export type MarketplaceListingCreateWithoutOrganizationInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutOrganizationInput = {
@@ -1761,6 +1956,13 @@ export type MarketplaceListingUncheckedCreateWithoutOrganizationInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   publisherId?: string | null
   websiteId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -1775,6 +1977,7 @@ export type MarketplaceListingUncheckedCreateWithoutOrganizationInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutOrganizationInput = {
@@ -1849,6 +2052,13 @@ export type MarketplaceListingScalarWhereInput = {
   publisherId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   websiteId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   organizationId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
+  activeModerationAction?: Prisma.EnumModerationActionNullableFilter<"MarketplaceListing"> | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.EnumModerationAuthorityNullableFilter<"MarketplaceListing"> | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.EnumModerationReasonCodeNullableFilter<"MarketplaceListing"> | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
+  activeModerationPreviousStatus?: Prisma.EnumListingStatusNullableFilter<"MarketplaceListing"> | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
+  moderationVersion?: Prisma.IntFilter<"MarketplaceListing"> | number
   publishedAt?: Prisma.DateTimeNullableFilter<"MarketplaceListing"> | Date | string | null
   expiresAt?: Prisma.DateTimeNullableFilter<"MarketplaceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceListing"> | Date | string
@@ -1895,6 +2105,13 @@ export type MarketplaceListingCreateWithoutPublisherInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -1911,6 +2128,7 @@ export type MarketplaceListingCreateWithoutPublisherInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutPublisherInput = {
@@ -1955,6 +2173,13 @@ export type MarketplaceListingUncheckedCreateWithoutPublisherInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -1969,6 +2194,7 @@ export type MarketplaceListingUncheckedCreateWithoutPublisherInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutPublisherInput = {
@@ -2037,6 +2263,13 @@ export type MarketplaceListingCreateWithoutWebsiteInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2053,6 +2286,7 @@ export type MarketplaceListingCreateWithoutWebsiteInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutWebsiteInput = {
@@ -2097,6 +2331,13 @@ export type MarketplaceListingUncheckedCreateWithoutWebsiteInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   publisherId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2111,6 +2352,7 @@ export type MarketplaceListingUncheckedCreateWithoutWebsiteInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutWebsiteInput = {
@@ -2179,6 +2421,13 @@ export type MarketplaceListingCreateWithoutOrdersInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2195,6 +2444,7 @@ export type MarketplaceListingCreateWithoutOrdersInput = {
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutOrdersInput = {
@@ -2240,6 +2490,13 @@ export type MarketplaceListingUncheckedCreateWithoutOrdersInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2253,6 +2510,7 @@ export type MarketplaceListingUncheckedCreateWithoutOrdersInput = {
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutOrdersInput = {
@@ -2311,6 +2569,13 @@ export type MarketplaceListingUpdateWithoutOrdersInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2327,6 +2592,7 @@ export type MarketplaceListingUpdateWithoutOrdersInput = {
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutOrdersInput = {
@@ -2372,6 +2638,13 @@ export type MarketplaceListingUncheckedUpdateWithoutOrdersInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2385,6 +2658,287 @@ export type MarketplaceListingUncheckedUpdateWithoutOrdersInput = {
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
+}
+
+export type MarketplaceListingCreateWithoutModerationEventsInput = {
+  id?: string
+  title: string
+  slug: string
+  description: string
+  shortDescription?: string | null
+  status?: $Enums.ListingStatus
+  fulfillmentType?: $Enums.ListingFulfillmentType
+  ownerType?: $Enums.WebsiteOwnershipType
+  currency?: string
+  priceType?: string
+  minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: number | null
+  domainAuthority?: number | null
+  traffic?: number | null
+  referringDomains?: number | null
+  spamScore?: number | null
+  country?: string | null
+  language?: string | null
+  countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
+  featured?: boolean
+  verified?: boolean
+  doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
+  websiteUrl?: string | null
+  sampleUrl?: string | null
+  signupUrl?: string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
+  publishedAt?: Date | string | null
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
+  organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
+  tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
+  images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
+  reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
+  favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
+  savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
+  views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
+  clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+}
+
+export type MarketplaceListingUncheckedCreateWithoutModerationEventsInput = {
+  id?: string
+  title: string
+  slug: string
+  description: string
+  shortDescription?: string | null
+  status?: $Enums.ListingStatus
+  fulfillmentType?: $Enums.ListingFulfillmentType
+  ownerType?: $Enums.WebsiteOwnershipType
+  currency?: string
+  priceType?: string
+  minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: number | null
+  domainAuthority?: number | null
+  traffic?: number | null
+  referringDomains?: number | null
+  spamScore?: number | null
+  country?: string | null
+  language?: string | null
+  countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
+  featured?: boolean
+  verified?: boolean
+  doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
+  websiteUrl?: string | null
+  sampleUrl?: string | null
+  signupUrl?: string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publisherId?: string | null
+  websiteId?: string | null
+  organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
+  publishedAt?: Date | string | null
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
+  tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
+  images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
+  reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
+  favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
+  savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
+  views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
+  clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+}
+
+export type MarketplaceListingCreateOrConnectWithoutModerationEventsInput = {
+  where: Prisma.MarketplaceListingWhereUniqueInput
+  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutModerationEventsInput, Prisma.MarketplaceListingUncheckedCreateWithoutModerationEventsInput>
+}
+
+export type MarketplaceListingUpsertWithoutModerationEventsInput = {
+  update: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutModerationEventsInput, Prisma.MarketplaceListingUncheckedUpdateWithoutModerationEventsInput>
+  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutModerationEventsInput, Prisma.MarketplaceListingUncheckedCreateWithoutModerationEventsInput>
+  where?: Prisma.MarketplaceListingWhereInput
+}
+
+export type MarketplaceListingUpdateToOneWithWhereWithoutModerationEventsInput = {
+  where?: Prisma.MarketplaceListingWhereInput
+  data: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutModerationEventsInput, Prisma.MarketplaceListingUncheckedUpdateWithoutModerationEventsInput>
+}
+
+export type MarketplaceListingUpdateWithoutModerationEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
+  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  priceType?: Prisma.StringFieldUpdateOperationsInput | string
+  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
+  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
+  organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
+  tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
+  images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
+  reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
+  favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
+  savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
+  views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
+  clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+}
+
+export type MarketplaceListingUncheckedUpdateWithoutModerationEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
+  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  priceType?: Prisma.StringFieldUpdateOperationsInput | string
+  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
+  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
+  tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
+  images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
+  reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
+  favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
+  savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
+  views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
+  clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutCategoriesInput = {
@@ -2427,6 +2981,13 @@ export type MarketplaceListingCreateWithoutCategoriesInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2443,6 +3004,7 @@ export type MarketplaceListingCreateWithoutCategoriesInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutCategoriesInput = {
@@ -2488,6 +3050,13 @@ export type MarketplaceListingUncheckedCreateWithoutCategoriesInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2501,6 +3070,7 @@ export type MarketplaceListingUncheckedCreateWithoutCategoriesInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutCategoriesInput = {
@@ -2559,6 +3129,13 @@ export type MarketplaceListingUpdateWithoutCategoriesInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2575,6 +3152,7 @@ export type MarketplaceListingUpdateWithoutCategoriesInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutCategoriesInput = {
@@ -2620,6 +3198,13 @@ export type MarketplaceListingUncheckedUpdateWithoutCategoriesInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2633,6 +3218,7 @@ export type MarketplaceListingUncheckedUpdateWithoutCategoriesInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutServicesInput = {
@@ -2675,6 +3261,13 @@ export type MarketplaceListingCreateWithoutServicesInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2691,6 +3284,7 @@ export type MarketplaceListingCreateWithoutServicesInput = {
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutServicesInput = {
@@ -2736,6 +3330,13 @@ export type MarketplaceListingUncheckedCreateWithoutServicesInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2749,6 +3350,7 @@ export type MarketplaceListingUncheckedCreateWithoutServicesInput = {
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutServicesInput = {
@@ -2807,6 +3409,13 @@ export type MarketplaceListingUpdateWithoutServicesInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2823,6 +3432,7 @@ export type MarketplaceListingUpdateWithoutServicesInput = {
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutServicesInput = {
@@ -2868,6 +3478,13 @@ export type MarketplaceListingUncheckedUpdateWithoutServicesInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2881,6 +3498,7 @@ export type MarketplaceListingUncheckedUpdateWithoutServicesInput = {
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutTagsInput = {
@@ -2923,6 +3541,13 @@ export type MarketplaceListingCreateWithoutTagsInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2939,6 +3564,7 @@ export type MarketplaceListingCreateWithoutTagsInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutTagsInput = {
@@ -2984,6 +3610,13 @@ export type MarketplaceListingUncheckedCreateWithoutTagsInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -2997,6 +3630,7 @@ export type MarketplaceListingUncheckedCreateWithoutTagsInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutTagsInput = {
@@ -3055,6 +3689,13 @@ export type MarketplaceListingUpdateWithoutTagsInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3071,6 +3712,7 @@ export type MarketplaceListingUpdateWithoutTagsInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutTagsInput = {
@@ -3116,6 +3758,13 @@ export type MarketplaceListingUncheckedUpdateWithoutTagsInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3129,6 +3778,7 @@ export type MarketplaceListingUncheckedUpdateWithoutTagsInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutImagesInput = {
@@ -3171,6 +3821,13 @@ export type MarketplaceListingCreateWithoutImagesInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -3187,6 +3844,7 @@ export type MarketplaceListingCreateWithoutImagesInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutImagesInput = {
@@ -3232,6 +3890,13 @@ export type MarketplaceListingUncheckedCreateWithoutImagesInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -3245,6 +3910,7 @@ export type MarketplaceListingUncheckedCreateWithoutImagesInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutImagesInput = {
@@ -3303,6 +3969,13 @@ export type MarketplaceListingUpdateWithoutImagesInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3319,6 +3992,7 @@ export type MarketplaceListingUpdateWithoutImagesInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutImagesInput = {
@@ -3364,6 +4038,13 @@ export type MarketplaceListingUncheckedUpdateWithoutImagesInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3377,6 +4058,7 @@ export type MarketplaceListingUncheckedUpdateWithoutImagesInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutReviewsInput = {
@@ -3419,6 +4101,13 @@ export type MarketplaceListingCreateWithoutReviewsInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -3435,6 +4124,7 @@ export type MarketplaceListingCreateWithoutReviewsInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutReviewsInput = {
@@ -3480,6 +4170,13 @@ export type MarketplaceListingUncheckedCreateWithoutReviewsInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -3493,6 +4190,7 @@ export type MarketplaceListingUncheckedCreateWithoutReviewsInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutReviewsInput = {
@@ -3551,6 +4249,13 @@ export type MarketplaceListingUpdateWithoutReviewsInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3567,6 +4272,7 @@ export type MarketplaceListingUpdateWithoutReviewsInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutReviewsInput = {
@@ -3612,6 +4318,13 @@ export type MarketplaceListingUncheckedUpdateWithoutReviewsInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3625,6 +4338,7 @@ export type MarketplaceListingUncheckedUpdateWithoutReviewsInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutFavoritesInput = {
@@ -3667,6 +4381,13 @@ export type MarketplaceListingCreateWithoutFavoritesInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -3683,6 +4404,7 @@ export type MarketplaceListingCreateWithoutFavoritesInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutFavoritesInput = {
@@ -3728,6 +4450,13 @@ export type MarketplaceListingUncheckedCreateWithoutFavoritesInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -3741,6 +4470,7 @@ export type MarketplaceListingUncheckedCreateWithoutFavoritesInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutFavoritesInput = {
@@ -3799,6 +4529,13 @@ export type MarketplaceListingUpdateWithoutFavoritesInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3815,6 +4552,7 @@ export type MarketplaceListingUpdateWithoutFavoritesInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutFavoritesInput = {
@@ -3860,6 +4598,13 @@ export type MarketplaceListingUncheckedUpdateWithoutFavoritesInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3873,6 +4618,7 @@ export type MarketplaceListingUncheckedUpdateWithoutFavoritesInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutSavedListsInput = {
@@ -3915,6 +4661,13 @@ export type MarketplaceListingCreateWithoutSavedListsInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -3931,6 +4684,7 @@ export type MarketplaceListingCreateWithoutSavedListsInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutSavedListsInput = {
@@ -3976,6 +4730,13 @@ export type MarketplaceListingUncheckedCreateWithoutSavedListsInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -3989,6 +4750,7 @@ export type MarketplaceListingUncheckedCreateWithoutSavedListsInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutSavedListsInput = {
@@ -4047,6 +4809,13 @@ export type MarketplaceListingUpdateWithoutSavedListsInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4063,6 +4832,7 @@ export type MarketplaceListingUpdateWithoutSavedListsInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutSavedListsInput = {
@@ -4108,6 +4878,13 @@ export type MarketplaceListingUncheckedUpdateWithoutSavedListsInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4121,6 +4898,7 @@ export type MarketplaceListingUncheckedUpdateWithoutSavedListsInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutViewsInput = {
@@ -4163,6 +4941,13 @@ export type MarketplaceListingCreateWithoutViewsInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -4179,6 +4964,7 @@ export type MarketplaceListingCreateWithoutViewsInput = {
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutViewsInput = {
@@ -4224,6 +5010,13 @@ export type MarketplaceListingUncheckedCreateWithoutViewsInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -4237,6 +5030,7 @@ export type MarketplaceListingUncheckedCreateWithoutViewsInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutViewsInput = {
@@ -4295,6 +5089,13 @@ export type MarketplaceListingUpdateWithoutViewsInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4311,6 +5112,7 @@ export type MarketplaceListingUpdateWithoutViewsInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutViewsInput = {
@@ -4356,6 +5158,13 @@ export type MarketplaceListingUncheckedUpdateWithoutViewsInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4369,6 +5178,7 @@ export type MarketplaceListingUncheckedUpdateWithoutViewsInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutClicksInput = {
@@ -4411,6 +5221,13 @@ export type MarketplaceListingCreateWithoutClicksInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -4427,6 +5244,7 @@ export type MarketplaceListingCreateWithoutClicksInput = {
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutClicksInput = {
@@ -4472,6 +5290,13 @@ export type MarketplaceListingUncheckedCreateWithoutClicksInput = {
   publisherId?: string | null
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -4485,6 +5310,7 @@ export type MarketplaceListingUncheckedCreateWithoutClicksInput = {
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+  moderationEvents?: Prisma.ModerationEventUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutClicksInput = {
@@ -4543,6 +5369,13 @@ export type MarketplaceListingUpdateWithoutClicksInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4559,6 +5392,7 @@ export type MarketplaceListingUpdateWithoutClicksInput = {
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutClicksInput = {
@@ -4604,6 +5438,13 @@ export type MarketplaceListingUncheckedUpdateWithoutClicksInput = {
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4617,6 +5458,7 @@ export type MarketplaceListingUncheckedUpdateWithoutClicksInput = {
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateManyOrganizationInput = {
@@ -4661,6 +5503,13 @@ export type MarketplaceListingCreateManyOrganizationInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   publisherId?: string | null
   websiteId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -4707,6 +5556,13 @@ export type MarketplaceListingUpdateWithoutOrganizationInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4723,6 +5579,7 @@ export type MarketplaceListingUpdateWithoutOrganizationInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutOrganizationInput = {
@@ -4767,6 +5624,13 @@ export type MarketplaceListingUncheckedUpdateWithoutOrganizationInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4781,6 +5645,7 @@ export type MarketplaceListingUncheckedUpdateWithoutOrganizationInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateManyWithoutOrganizationInput = {
@@ -4825,6 +5690,13 @@ export type MarketplaceListingUncheckedUpdateManyWithoutOrganizationInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4873,6 +5745,13 @@ export type MarketplaceListingCreateManyPublisherInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   websiteId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -4919,6 +5798,13 @@ export type MarketplaceListingUpdateWithoutPublisherInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4935,6 +5821,7 @@ export type MarketplaceListingUpdateWithoutPublisherInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutPublisherInput = {
@@ -4979,6 +5866,13 @@ export type MarketplaceListingUncheckedUpdateWithoutPublisherInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4993,6 +5887,7 @@ export type MarketplaceListingUncheckedUpdateWithoutPublisherInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateManyWithoutPublisherInput = {
@@ -5037,6 +5932,13 @@ export type MarketplaceListingUncheckedUpdateManyWithoutPublisherInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5085,6 +5987,13 @@ export type MarketplaceListingCreateManyWebsiteInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   publisherId?: string | null
   organizationId?: string | null
+  activeModerationAction?: $Enums.ModerationAction | null
+  activeModerationAuthority?: $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: $Enums.ModerationReasonCode | null
+  activeModerationMessage?: string | null
+  activeModerationPreviousStatus?: $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: number
   publishedAt?: Date | string | null
   expiresAt?: Date | string | null
   createdAt?: Date | string
@@ -5131,6 +6040,13 @@ export type MarketplaceListingUpdateWithoutWebsiteInput = {
   metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5147,6 +6063,7 @@ export type MarketplaceListingUpdateWithoutWebsiteInput = {
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutWebsiteInput = {
@@ -5191,6 +6108,13 @@ export type MarketplaceListingUncheckedUpdateWithoutWebsiteInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5205,6 +6129,7 @@ export type MarketplaceListingUncheckedUpdateWithoutWebsiteInput = {
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+  moderationEvents?: Prisma.ModerationEventUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateManyWithoutWebsiteInput = {
@@ -5249,6 +6174,13 @@ export type MarketplaceListingUncheckedUpdateManyWithoutWebsiteInput = {
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationAction?: Prisma.NullableEnumModerationActionFieldUpdateOperationsInput | $Enums.ModerationAction | null
+  activeModerationAuthority?: Prisma.NullableEnumModerationAuthorityFieldUpdateOperationsInput | $Enums.ModerationAuthority | null
+  activeModerationReasonCode?: Prisma.NullableEnumModerationReasonCodeFieldUpdateOperationsInput | $Enums.ModerationReasonCode | null
+  activeModerationMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeModerationPreviousStatus?: Prisma.NullableEnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus | null
+  moderationResubmissionAllowed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  moderationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5271,6 +6203,7 @@ export type MarketplaceListingCountOutputType = {
   clicks: number
   services: number
   orders: number
+  moderationEvents: number
 }
 
 export type MarketplaceListingCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -5284,6 +6217,7 @@ export type MarketplaceListingCountOutputTypeSelect<ExtArgs extends runtime.Type
   clicks?: boolean | MarketplaceListingCountOutputTypeCountClicksArgs
   services?: boolean | MarketplaceListingCountOutputTypeCountServicesArgs
   orders?: boolean | MarketplaceListingCountOutputTypeCountOrdersArgs
+  moderationEvents?: boolean | MarketplaceListingCountOutputTypeCountModerationEventsArgs
 }
 
 /**
@@ -5366,6 +6300,13 @@ export type MarketplaceListingCountOutputTypeCountOrdersArgs<ExtArgs extends run
   where?: Prisma.OrderWhereInput
 }
 
+/**
+ * MarketplaceListingCountOutputType without action
+ */
+export type MarketplaceListingCountOutputTypeCountModerationEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ModerationEventWhereInput
+}
+
 
 export type MarketplaceListingSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -5410,6 +6351,13 @@ export type MarketplaceListingSelect<ExtArgs extends runtime.Types.Extensions.In
   publisherId?: boolean
   websiteId?: boolean
   organizationId?: boolean
+  activeModerationAction?: boolean
+  activeModerationAuthority?: boolean
+  activeModerationReasonCode?: boolean
+  activeModerationMessage?: boolean
+  activeModerationPreviousStatus?: boolean
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: boolean
   publishedAt?: boolean
   expiresAt?: boolean
   createdAt?: boolean
@@ -5427,6 +6375,7 @@ export type MarketplaceListingSelect<ExtArgs extends runtime.Types.Extensions.In
   clicks?: boolean | Prisma.MarketplaceListing$clicksArgs<ExtArgs>
   services?: boolean | Prisma.MarketplaceListing$servicesArgs<ExtArgs>
   orders?: boolean | Prisma.MarketplaceListing$ordersArgs<ExtArgs>
+  moderationEvents?: boolean | Prisma.MarketplaceListing$moderationEventsArgs<ExtArgs>
   _count?: boolean | Prisma.MarketplaceListingCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["marketplaceListing"]>
 
@@ -5473,6 +6422,13 @@ export type MarketplaceListingSelectCreateManyAndReturn<ExtArgs extends runtime.
   publisherId?: boolean
   websiteId?: boolean
   organizationId?: boolean
+  activeModerationAction?: boolean
+  activeModerationAuthority?: boolean
+  activeModerationReasonCode?: boolean
+  activeModerationMessage?: boolean
+  activeModerationPreviousStatus?: boolean
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: boolean
   publishedAt?: boolean
   expiresAt?: boolean
   createdAt?: boolean
@@ -5525,6 +6481,13 @@ export type MarketplaceListingSelectUpdateManyAndReturn<ExtArgs extends runtime.
   publisherId?: boolean
   websiteId?: boolean
   organizationId?: boolean
+  activeModerationAction?: boolean
+  activeModerationAuthority?: boolean
+  activeModerationReasonCode?: boolean
+  activeModerationMessage?: boolean
+  activeModerationPreviousStatus?: boolean
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: boolean
   publishedAt?: boolean
   expiresAt?: boolean
   createdAt?: boolean
@@ -5577,13 +6540,20 @@ export type MarketplaceListingSelectScalar = {
   publisherId?: boolean
   websiteId?: boolean
   organizationId?: boolean
+  activeModerationAction?: boolean
+  activeModerationAuthority?: boolean
+  activeModerationReasonCode?: boolean
+  activeModerationMessage?: boolean
+  activeModerationPreviousStatus?: boolean
+  moderationResubmissionAllowed?: boolean
+  moderationVersion?: boolean
   publishedAt?: boolean
   expiresAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type MarketplaceListingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "slug" | "description" | "shortDescription" | "status" | "fulfillmentType" | "ownerType" | "currency" | "priceType" | "minPrice" | "maxPrice" | "domainRating" | "domainAuthority" | "traffic" | "referringDomains" | "spamScore" | "country" | "language" | "countries" | "languages" | "featured" | "verified" | "doFollowOnly" | "sportsGamingAllowed" | "pharmacyAllowed" | "cryptoAllowed" | "backlinkCount" | "linkType" | "linkValidity" | "googleNews" | "markedSponsored" | "foreignLanguageAllowed" | "websiteUrl" | "sampleUrl" | "signupUrl" | "metricsData" | "trafficData" | "semrushData" | "publisherId" | "websiteId" | "organizationId" | "publishedAt" | "expiresAt" | "createdAt" | "updatedAt", ExtArgs["result"]["marketplaceListing"]>
+export type MarketplaceListingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "slug" | "description" | "shortDescription" | "status" | "fulfillmentType" | "ownerType" | "currency" | "priceType" | "minPrice" | "maxPrice" | "domainRating" | "domainAuthority" | "traffic" | "referringDomains" | "spamScore" | "country" | "language" | "countries" | "languages" | "featured" | "verified" | "doFollowOnly" | "sportsGamingAllowed" | "pharmacyAllowed" | "cryptoAllowed" | "backlinkCount" | "linkType" | "linkValidity" | "googleNews" | "markedSponsored" | "foreignLanguageAllowed" | "websiteUrl" | "sampleUrl" | "signupUrl" | "metricsData" | "trafficData" | "semrushData" | "publisherId" | "websiteId" | "organizationId" | "activeModerationAction" | "activeModerationAuthority" | "activeModerationReasonCode" | "activeModerationMessage" | "activeModerationPreviousStatus" | "moderationResubmissionAllowed" | "moderationVersion" | "publishedAt" | "expiresAt" | "createdAt" | "updatedAt", ExtArgs["result"]["marketplaceListing"]>
 export type MarketplaceListingInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.MarketplaceListing$publisherArgs<ExtArgs>
   website?: boolean | Prisma.MarketplaceListing$websiteArgs<ExtArgs>
@@ -5598,6 +6568,7 @@ export type MarketplaceListingInclude<ExtArgs extends runtime.Types.Extensions.I
   clicks?: boolean | Prisma.MarketplaceListing$clicksArgs<ExtArgs>
   services?: boolean | Prisma.MarketplaceListing$servicesArgs<ExtArgs>
   orders?: boolean | Prisma.MarketplaceListing$ordersArgs<ExtArgs>
+  moderationEvents?: boolean | Prisma.MarketplaceListing$moderationEventsArgs<ExtArgs>
   _count?: boolean | Prisma.MarketplaceListingCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type MarketplaceListingIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -5627,6 +6598,7 @@ export type $MarketplaceListingPayload<ExtArgs extends runtime.Types.Extensions.
     clicks: Prisma.$MarketplaceListingClickPayload<ExtArgs>[]
     services: Prisma.$ListingServicePayload<ExtArgs>[]
     orders: Prisma.$OrderPayload<ExtArgs>[]
+    moderationEvents: Prisma.$ModerationEventPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -5671,6 +6643,13 @@ export type $MarketplaceListingPayload<ExtArgs extends runtime.Types.Extensions.
     publisherId: string | null
     websiteId: string | null
     organizationId: string | null
+    activeModerationAction: $Enums.ModerationAction | null
+    activeModerationAuthority: $Enums.ModerationAuthority | null
+    activeModerationReasonCode: $Enums.ModerationReasonCode | null
+    activeModerationMessage: string | null
+    activeModerationPreviousStatus: $Enums.ListingStatus | null
+    moderationResubmissionAllowed: boolean
+    moderationVersion: number
     publishedAt: Date | null
     expiresAt: Date | null
     createdAt: Date
@@ -6082,6 +7061,7 @@ export interface Prisma__MarketplaceListingClient<T, Null = never, ExtArgs exten
   clicks<T extends Prisma.MarketplaceListing$clicksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$clicksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingClickPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   services<T extends Prisma.MarketplaceListing$servicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$servicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ListingServicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   orders<T extends Prisma.MarketplaceListing$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  moderationEvents<T extends Prisma.MarketplaceListing$moderationEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$moderationEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ModerationEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -6153,6 +7133,13 @@ export interface MarketplaceListingFieldRefs {
   readonly publisherId: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly websiteId: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly organizationId: Prisma.FieldRef<"MarketplaceListing", 'String'>
+  readonly activeModerationAction: Prisma.FieldRef<"MarketplaceListing", 'ModerationAction'>
+  readonly activeModerationAuthority: Prisma.FieldRef<"MarketplaceListing", 'ModerationAuthority'>
+  readonly activeModerationReasonCode: Prisma.FieldRef<"MarketplaceListing", 'ModerationReasonCode'>
+  readonly activeModerationMessage: Prisma.FieldRef<"MarketplaceListing", 'String'>
+  readonly activeModerationPreviousStatus: Prisma.FieldRef<"MarketplaceListing", 'ListingStatus'>
+  readonly moderationResubmissionAllowed: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
+  readonly moderationVersion: Prisma.FieldRef<"MarketplaceListing", 'Int'>
   readonly publishedAt: Prisma.FieldRef<"MarketplaceListing", 'DateTime'>
   readonly expiresAt: Prisma.FieldRef<"MarketplaceListing", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"MarketplaceListing", 'DateTime'>
@@ -6852,6 +7839,30 @@ export type MarketplaceListing$ordersArgs<ExtArgs extends runtime.Types.Extensio
   take?: number
   skip?: number
   distinct?: Prisma.OrderScalarFieldEnum | Prisma.OrderScalarFieldEnum[]
+}
+
+/**
+ * MarketplaceListing.moderationEvents
+ */
+export type MarketplaceListing$moderationEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ModerationEvent
+   */
+  select?: Prisma.ModerationEventSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ModerationEvent
+   */
+  omit?: Prisma.ModerationEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ModerationEventInclude<ExtArgs> | null
+  where?: Prisma.ModerationEventWhereInput
+  orderBy?: Prisma.ModerationEventOrderByWithRelationInput | Prisma.ModerationEventOrderByWithRelationInput[]
+  cursor?: Prisma.ModerationEventWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ModerationEventScalarFieldEnum | Prisma.ModerationEventScalarFieldEnum[]
 }
 
 /**
