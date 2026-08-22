@@ -1,18 +1,19 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-08-21
+updated: 2026-08-23
 ---
 
 # Current focus
 
 PR #105 layers the marketplace trust-boundary hardening on current `main` SHA
 `1d993e0`, which already includes the support-messaging and confirmed
-delivery-fraud releases. Its base conflicts are resolved locally and the only
-pending migration, `20260821120000_marketplace_moderation`, has been applied to
+delivery-fraud releases. Its base conflicts are resolved locally and migrations
+`20260821120000_marketplace_moderation` and
+`20260821130000_marketplace_moderation_legacy_message_correction` are applied to
 the explicitly authorized Neon staging database. The remaining work is to land
-the resolved merge commit and run the complete repository CI matrix. A staging
-migration is not a production deployment.
+the review fixes and run the complete repository CI matrix. A staging migration
+is not a production deployment.
 
 The last independently recorded production deployment remains SHA `512b851`
 in finance-locked mode. A merge to `main` does not deploy Render because every
@@ -29,10 +30,10 @@ from a GitHub merge, CI pass, or staging migration.
   policies. Operations is assignment-bounded, Finance is read-only, Super Admin
   owns exceptional reopen/archive authority, and publishers cannot clear staff
   holds unless resubmission is explicitly enabled.
-- Made website pause/archive independent of listing status and required
-  APPROVED + active + VERIFIED across every buyer discovery path and checkout.
-  Orderability is revalidated while locking Website, MarketplaceListing, then
-  ListingService.
+- Made website pause/archive independent of listing status and required an
+  APPROVED listing with an active, VERIFIED website across every buyer
+  discovery path and checkout. Orderability is revalidated while locking
+  Website, MarketplaceListing, then ListingService.
 - Restricted buyer metrics to current exact provider/key/direct-source evidence.
   Manual, staff, import, stale, mismatched, and unknown values remain available
   to authorized internal workflows only.
@@ -83,11 +84,13 @@ admin/portal/publisher, full ESLint for the three affected apps, Biome, and
 After the base merge, all 1,787 API unit tests passed together, as did database
 and API typechecks, the API-client's 127 tests, 84 focused metrics/provenance/
 search/client tests, affected app typechecks and lint, Prisma format/validate/
-generate, and `git diff --check`. The Neon staging target reports all 77
-migrations current with no failed migration, complete conservative projections
-for its three legacy held listings and one inactive website, zero invalid event
-targets, both append-only guards enabled, and all five moderation constraints
-validated. PR #105 must still pass the combined repository CI matrix; local and
+generate, and `git diff --check`. The Neon staging target reports all 78
+migrations current with no failed migration. Its one legacy paused-listing and
+one inactive-website projections use the corrected Super Admin wording, the two
+archived-listing projections remain unchanged, and all four immutable legacy
+events retain their original evidence. Invalid event targets remain zero, both
+append-only guards remain enabled, and all five moderation constraints remain
+present. PR #105 must still pass the combined repository CI matrix; local and
 staging results are not a substitute for that check.
 
 The first post-merge GitHub run passed dependency, migration, static, and API
@@ -95,12 +98,14 @@ unit stages, then exposed a direct Prisma `DriverAdapterError` serialization
 shape in the real support/offboarding race. The structured retry classifier now
 recognizes that exact adapter shape without parsing messages or trusting
 arbitrary nested causes. Focused shared/admin coverage and the API build pass;
-the full GitHub rerun remains the real-database proof.
+the full GitHub rerun passed. Review findings have since produced a narrow
+follow-up batch, so the next pushed head must pass the complete GitHub matrix
+again before merge.
 
 ## Next actions
 
-1. Push the resolved merge commit to PR #105 and keep the draft PR open until every
-   required GitHub check succeeds.
+1. Push the final review-fix commit to PR #105 and merge only after every
+   required GitHub check succeeds and the review-thread gate is clear.
 2. Keep production writers drained for any later production cutover; rehearse
    on a populated clone, take the required recovery marker, deploy migrations
    before the matching images, and use forward-fix/PITR rather than removing

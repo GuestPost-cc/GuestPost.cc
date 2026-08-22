@@ -449,13 +449,15 @@ export default function PublisherListingsPage() {
                 key={listing.id}
                 listing={listing}
                 lifecyclePending={lifecycleMut.isPending}
-                onLifecycle={(action) =>
+                onLifecycle={(action) => {
+                  const moderation = listing.moderation
+                  if (!moderation) return
                   lifecycleMut.mutate({
                     listingId: listing.id,
                     action,
-                    expectedVersion: listing.moderation!.version,
+                    expectedVersion: moderation.version,
                   })
-                }
+                }}
               />
             ))}
           </div>

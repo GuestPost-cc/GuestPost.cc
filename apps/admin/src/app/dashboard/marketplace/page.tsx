@@ -59,7 +59,10 @@ import {
   AdminPage,
   AdminPageHeader,
 } from "../../../components/admin-workspace"
-import { ModerationActionDialog } from "../../../components/moderation-action-dialog"
+import {
+  ModerationActionDialog,
+  moderationActionIsDestructive,
+} from "../../../components/moderation-action-dialog"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
@@ -468,7 +471,7 @@ function ListingActions({
               key={action}
               disabled={busy}
               className={
-                ["REQUEST_CHANGES", "PAUSE", "ARCHIVE"].includes(action)
+                moderationActionIsDestructive(action)
                   ? "text-destructive focus:text-destructive"
                   : undefined
               }

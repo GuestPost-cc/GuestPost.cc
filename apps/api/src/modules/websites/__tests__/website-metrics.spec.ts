@@ -72,6 +72,8 @@ describe("marketplace metric serializers", () => {
     ["out-of-range value", { value: 101 }],
     ["invalid expiration", { expiresAt: "not-a-date" }],
     ["invalid measurement date", { measuredAt: "not-a-date" }],
+    ["missing measurement date", { measuredAt: undefined }],
+    ["null collection date", { collectedAt: null }],
     [
       "expiration at the projection boundary",
       { expiresAt: new Date("2026-08-21T00:00:00Z") },

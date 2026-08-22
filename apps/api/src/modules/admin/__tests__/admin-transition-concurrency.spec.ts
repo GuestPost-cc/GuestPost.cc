@@ -1,4 +1,4 @@
-import { ConflictException } from "@nestjs/common"
+import { ConflictException, ForbiddenException } from "@nestjs/common"
 import { AdminService } from "../admin.service"
 
 function listing(status: string) {
@@ -78,6 +78,60 @@ describe("AdminService committed transition concurrency", () => {
         internalNote: expect.any(String),
       }),
     )
+  })
+
+  it("returns the full projected listing for an idempotent status update", async () => {
+    const unchanged = listing("REJECTED")
+    const prisma: any = {
+      marketplaceListing: {
+        findUnique: jest.fn().mockResolvedValue(unchanged),
+      },
+    }
+    const service = new AdminService(prisma, {} as any, {} as any, {} as any)
+
+    await expect(
+      service.updateListingStatus(
+        unchanged.id,
+        unchanged.status,
+        { id: "admin-1", staffRole: "SUPER_ADMIN" },
+        false,
+        { expectedVersion: unchanged.moderationVersion },
+      ),
+    ).resolves.toMatchObject({
+      id: unchanged.id,
+      title: unchanged.title,
+      status: unchanged.status,
+      moderation: { version: unchanged.moderationVersion },
+    })
+    expect(prisma.marketplaceListing.findUnique).toHaveBeenCalledWith({
+      where: { id: unchanged.id },
+      include: { website: { select: { managedByUserId: true } } },
+    })
+  })
+
+  it("rejects an idempotent platform listing update by unassigned Operations", async () => {
+    const unchanged = {
+      ...listing("APPROVED"),
+      websiteId: "website-1",
+      ownerType: "PLATFORM",
+      website: { managedByUserId: "ops-2" },
+    }
+    const prisma: any = {
+      marketplaceListing: {
+        findUnique: jest.fn().mockResolvedValue(unchanged),
+      },
+    }
+    const service = new AdminService(prisma, {} as any, {} as any, {} as any)
+
+    await expect(
+      service.updateListingStatus(
+        unchanged.id,
+        unchanged.status,
+        { id: "ops-1", staffRole: "OPERATIONS" },
+        false,
+        { expectedVersion: unchanged.moderationVersion },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException)
   })
 
   it("rejects a distinct listing command when the locked predecessor changed", async () => {

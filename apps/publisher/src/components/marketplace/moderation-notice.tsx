@@ -55,6 +55,13 @@ export function PublisherModerationNotice({
     "REOPEN",
     "ALLOW_RESUBMISSION",
   ].includes(event.action)
+  const hasSelfServiceRecovery =
+    moderation?.allowedActions.some(
+      (action) => action === "SUBMIT_FOR_REVIEW" || action === "REOPEN",
+    ) ?? false
+  const resubmissionRestricted =
+    !hasSelfServiceRecovery &&
+    ["REQUEST_CHANGES", "ARCHIVE", "DENY_RESUBMISSION"].includes(event.action)
   const Icon = restrictive
     ? event.action === "PAUSE"
       ? PauseCircle
@@ -64,11 +71,11 @@ export function PublisherModerationNotice({
     event.action === "ARCHIVE" &&
     event.authority === "PUBLISHER" &&
     moderation?.allowedActions.includes("SUBMIT_FOR_REVIEW")
-      ? "You archived this listing. A new submission returns it to review; it never goes directly back to buyers."
+      ? `You archived this ${subject}. A new submission returns it to review; it never goes directly back to buyers.`
       : event.action === "ARCHIVE" &&
           event.authority === "PUBLISHER" &&
           moderation?.allowedActions.includes("REOPEN")
-        ? "You archived this domain. Reopen it before preparing the inventory for another review."
+        ? `You archived this ${subject}. Reopen it before preparing the inventory for another review.`
         : GUIDANCE[event.action]
 
   return (
@@ -117,7 +124,7 @@ export function PublisherModerationNotice({
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
             {guidance}
           </p>
-          {event.resubmissionAllowed === false ? (
+          {resubmissionRestricted && event.resubmissionAllowed === false ? (
             <p className="mt-1 text-xs font-medium text-amber-800 dark:text-amber-200">
               Resubmission requires a new staff decision.
             </p>

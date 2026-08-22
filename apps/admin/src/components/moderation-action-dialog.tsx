@@ -103,17 +103,17 @@ const DEFAULT_REASON: Record<ModerationAction, ModerationReasonCode> = {
   DENY_RESUBMISSION: "POLICY_VIOLATION",
 }
 
-const MESSAGE_REQUIRED_ACTIONS = new Set<ModerationAction>([
+const HIGH_IMPACT_ACTIONS: ReadonlySet<ModerationAction> = new Set([
   "REQUEST_CHANGES",
   "PAUSE",
   "ARCHIVE",
   "DENY_RESUBMISSION",
 ])
 
+const MESSAGE_REQUIRED_ACTIONS = HIGH_IMPACT_ACTIONS
+
 export function moderationActionIsDestructive(action: ModerationAction) {
-  return ["REQUEST_CHANGES", "PAUSE", "ARCHIVE", "DENY_RESUBMISSION"].includes(
-    action,
-  )
+  return HIGH_IMPACT_ACTIONS.has(action)
 }
 
 export function ModerationActionDialog({

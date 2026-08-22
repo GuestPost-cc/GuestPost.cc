@@ -26,6 +26,7 @@ import {
   QUEUES,
   runSerializableTransactionWithRetry,
   StaffRole,
+  staffCanModerateMarketplaceTarget,
   validateWebsiteEnlistmentInput,
 } from "@guestpost/shared"
 import {
@@ -2807,6 +2808,9 @@ export class AdminService {
     if (!Object.values(ListingStatus).includes(status as ListingStatus)) {
       throw new BadRequestException(`Invalid listing status: ${status}`)
     }
+    if (!user?.id || !["SUPER_ADMIN", "OPERATIONS"].includes(user.staffRole)) {
+      throw new ForbiddenException("Staff moderation access is required")
+    }
     if (user?.staffRole === "OPERATIONS" && status === ListingStatus.ARCHIVED) {
       throw new ForbiddenException(
         "Only Super Admin can archive marketplace inventory",
@@ -2815,10 +2819,42 @@ export class AdminService {
 
     const current = await this.prisma.marketplaceListing.findUnique({
       where: { id },
-      select: { status: true, moderationVersion: true },
+      include: {
+        website: { select: { managedByUserId: true } },
+      },
     })
     if (!current) throw new NotFoundException("Listing not found")
-    if (current.status === status) return current
+    const moderationActor = { id: user.id, staffRole: user.staffRole }
+    if (current.status === status) {
+      const listingModerationTarget = {
+        ownerType: current.ownerType,
+        managedByUserId: current.website?.managedByUserId ?? null,
+      }
+      if (
+        !staffCanModerateMarketplaceTarget(
+          listingModerationTarget,
+          moderationActor,
+        )
+      ) {
+        throw new ForbiddenException(
+          "Operations can only moderate assigned platform inventory",
+        )
+      }
+      const { website, ...unchangedListing } = current
+      return {
+        ...unchangedListing,
+        moderation: buildModerationProjection(
+          unchangedListing,
+          getStaffListingModerationActions(
+            {
+              ...unchangedListing,
+              managedByUserId: listingModerationTarget.managedByUserId,
+            },
+            moderationActor,
+          ),
+        ),
+      }
+    }
 
     const action =
       status === ListingStatus.APPROVED
@@ -2948,9 +2984,13 @@ export class AdminService {
       }
 
       if (
-        user.staffRole === "OPERATIONS" &&
-        listing.ownerType === WebsiteOwnershipType.PLATFORM &&
-        listing.website?.managedByUserId !== user.id
+        !staffCanModerateMarketplaceTarget(
+          {
+            ownerType: listing.ownerType,
+            managedByUserId: listing.website?.managedByUserId ?? null,
+          },
+          { id: user.id, staffRole: user.staffRole },
+        )
       ) {
         throw new ForbiddenException(
           "Operations can only moderate assigned platform inventory",
@@ -3061,7 +3101,7 @@ export class AdminService {
       let resultingReason = listing.activeModerationReasonCode
       let resultingMessage = listing.activeModerationMessage
       let resultingPreviousStatus = listing.activeModerationPreviousStatus
-      let resultingResubmission = listing.moderationResubmissionAllowed
+      let resultingResubmission: boolean
 
       switch (command.action) {
         case ModerationAction.APPROVE:
@@ -4121,9 +4161,10 @@ export class AdminService {
         })
       }
       if (
-        user.staffRole === "OPERATIONS" &&
-        website.ownershipType === WebsiteOwnershipType.PLATFORM &&
-        website.managedByUserId !== user.id
+        !staffCanModerateMarketplaceTarget(website, {
+          id: user.id,
+          staffRole: user.staffRole,
+        })
       ) {
         throw new ForbiddenException(
           "Operations can only moderate assigned platform inventory",
@@ -4163,12 +4204,12 @@ export class AdminService {
         user.staffRole === "SUPER_ADMIN"
           ? ModerationAuthority.SUPER_ADMIN
           : ModerationAuthority.OPERATIONS
-      let resultingActive = website.isActive
-      let resultingAction = website.activeModerationAction
-      let resultingAuthority = website.activeModerationAuthority
-      let resultingReason = website.activeModerationReasonCode
-      let resultingMessage = website.activeModerationMessage
-      let resultingPreviousActive = website.activeModerationPreviousActive
+      let resultingActive: boolean
+      let resultingAction: ModerationAction | null
+      let resultingAuthority: ModerationAuthority | null
+      let resultingReason: ModerationReasonCode | null
+      let resultingMessage: string | null
+      let resultingPreviousActive: boolean | null
 
       if (command.action === ModerationAction.PAUSE) {
         resultingActive = false

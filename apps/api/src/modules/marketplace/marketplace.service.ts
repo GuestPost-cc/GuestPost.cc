@@ -19,6 +19,7 @@ import {
   isMarketplaceAuthoritativeMetric,
   marketplaceAuthoritativeMetricSourcesFor,
   normalizePositiveUsdMoney,
+  projectModerationPublisherMessage,
   QUEUES,
   USD_CURRENCY,
 } from "@guestpost/shared"
@@ -469,7 +470,7 @@ export class MarketplaceService {
           action: event.action,
           authority: event.authority,
           reasonCode: event.reasonCode,
-          publisherMessage: event.publisherMessage,
+          publisherMessage: projectModerationPublisherMessage(event),
           resubmissionAllowed: event.resubmissionAllowed,
           previousStatus: event.previousStatus,
           resultingStatus: event.resultingStatus,
@@ -1103,7 +1104,7 @@ export class MarketplaceService {
         action: event.action,
         authority: event.authority,
         reasonCode: event.reasonCode,
-        publisherMessage: event.publisherMessage,
+        publisherMessage: projectModerationPublisherMessage(event),
         ...(user.staffRole !== "FINANCE" && {
           internalNote: event.internalNote,
           actor: event.actor
@@ -2256,9 +2257,16 @@ export class MarketplaceService {
         tx,
       )
 
-      return tx.marketplaceListing.findUniqueOrThrow({
+      const updated = await tx.marketplaceListing.findUniqueOrThrow({
         where: { id: listingId },
       })
+      return {
+        ...updated,
+        moderation: buildModerationProjection(
+          updated,
+          getPublisherListingLifecycleActions(updated),
+        ),
+      }
     })
   }
 
@@ -2925,11 +2933,15 @@ export class MarketplaceService {
           take: 20,
           select: {
             id: true,
+            listingId: true,
+            websiteId: true,
             scope: true,
             action: true,
             authority: true,
             reasonCode: true,
             publisherMessage: true,
+            actorUserId: true,
+            actorStaffRole: true,
             resubmissionAllowed: true,
             previousStatus: true,
             resultingStatus: true,

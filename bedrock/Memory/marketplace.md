@@ -67,6 +67,12 @@ Website pause/archive changes domain availability only and never guesses or rewr
 the listing lifecycle. Legacy paused/archived/inactive records are conservatively
 backfilled as `LEGACY_ORIGIN_UNKNOWN` with no invented prior state.
 
+The applied moderation migration is checksum-pinned. A forward correction updates
+only unchanged current legacy-pause projections whose complete import tuple still
+matches; immutable `ModerationEvent` rows are not rewritten. Publisher-facing
+history corrects the obsolete Operations wording only at presentation time and
+only for the exact deterministic legacy-import tuple.
+
 ## Buyer availability and public projection (2026-08-21)
 
 Buyer discovery and orderability require all three facts: listing `APPROVED`,

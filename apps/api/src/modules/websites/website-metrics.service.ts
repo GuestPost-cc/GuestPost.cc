@@ -228,6 +228,7 @@ function isValidPublicMetricValue(key: unknown, value: number): boolean {
 }
 
 function toPublicIsoDate(value: unknown): string | null {
+  if (value == null) return null
   const date = value instanceof Date ? value : new Date(value as any)
   return Number.isFinite(date.getTime()) ? date.toISOString() : null
 }

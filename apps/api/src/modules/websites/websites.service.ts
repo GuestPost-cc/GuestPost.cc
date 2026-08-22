@@ -4,6 +4,7 @@ import {
   ModerationAction,
   ModerationAuthority,
   ModerationReasonCode,
+  type Prisma,
   WebsiteMetricKey,
   WebsiteMetricProvider,
   WebsiteMetricSource,
@@ -13,6 +14,7 @@ import {
   generateVerificationToken,
   getPublisherListingLifecycleActions,
   getPublisherWebsiteLifecycleActions,
+  projectModerationPublisherMessage,
   QUEUES,
   USD_CURRENCY,
   validateWebsiteEnlistmentInput,
@@ -44,6 +46,16 @@ import {
   upsertWebsiteMetric,
 } from "./website-metrics.service"
 
+// PostgreSQL preserves enum declaration order and ListingStatus declares
+// ARCHIVED last. Together with the partial unique index allowing at most one
+// non-archived listing per website, this puts the canonical current listing
+// first and otherwise falls back to the newest archived history row.
+const canonicalPublisherWebsiteListingOrder = [
+  { status: "asc" },
+  { createdAt: "desc" },
+  { id: "desc" },
+] satisfies Prisma.MarketplaceListingOrderByWithRelationInput[]
+
 @Injectable()
 export class WebsitesService {
   constructor(
@@ -59,7 +71,7 @@ export class WebsitesService {
       action: event.action,
       authority: event.authority,
       reasonCode: event.reasonCode,
-      publisherMessage: event.publisherMessage,
+      publisherMessage: projectModerationPublisherMessage(event),
       resubmissionAllowed: event.resubmissionAllowed,
       previousStatus: event.previousStatus,
       resultingStatus: event.resultingStatus,
@@ -596,6 +608,7 @@ export class WebsitesService {
     publisherId: string,
     organizationId: string,
     websiteId: string,
+    projectedListingId?: string,
   ) {
     const publisher = await this.prisma.publisher.findUnique({
       where: { id: publisherId },
@@ -618,7 +631,8 @@ export class WebsitesService {
           },
         },
         marketplaceListings: {
-          orderBy: { createdAt: "desc" },
+          ...(projectedListingId ? { where: { id: projectedListingId } } : {}),
+          orderBy: canonicalPublisherWebsiteListingOrder,
           take: 1,
           include: {
             categories: { include: { category: true } },
@@ -793,6 +807,7 @@ export class WebsitesService {
         // Surface the AVAILABLE services so callers can render per-service
         // price/TAT directly.
         marketplaceListings: {
+          orderBy: canonicalPublisherWebsiteListingOrder,
           select: {
             id: true,
             title: true,
@@ -1050,18 +1065,39 @@ export class WebsitesService {
       })
     }
 
-    const listing = await this.prisma.marketplaceListing.findFirst({
-      where: { websiteId: id, publisherId },
-      orderBy: { createdAt: "asc" },
-      include: {
-        categories: { select: { categoryId: true } },
-        services: {
-          where: { availability: "AVAILABLE" },
-          select: { id: true },
-          take: 1,
-        },
+    const submissionListingInclude = {
+      categories: { select: { categoryId: true } },
+      services: {
+        where: { availability: "AVAILABLE" as const },
+        select: { id: true },
+        take: 1,
       },
+    }
+    let listing = await this.prisma.marketplaceListing.findFirst({
+      where: {
+        websiteId: id,
+        publisherId,
+        status: { not: ListingStatus.ARCHIVED },
+      },
+      orderBy: { createdAt: "asc" },
+      include: submissionListingInclude,
     })
+
+    // The partial unique index guarantees at most one non-archived listing for
+    // a website. When none exists, the newest archived listing is the only
+    // lifecycle candidate; the shared policy below decides whether staff has
+    // explicitly permitted that exact listing to be resubmitted.
+    if (!listing) {
+      listing = await this.prisma.marketplaceListing.findFirst({
+        where: {
+          websiteId: id,
+          publisherId,
+          status: ListingStatus.ARCHIVED,
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        include: submissionListingInclude,
+      })
+    }
 
     if (!listing) {
       throw new BadRequestException({
@@ -1134,7 +1170,7 @@ export class WebsitesService {
       })
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    const transitionedListingId = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`
         SELECT "id"
         FROM "Website"
@@ -1324,8 +1360,14 @@ export class WebsitesService {
         },
         tx,
       )
+      return currentListing.id
     })
 
-    return { success: true }
+    return this.getWebsiteById(
+      publisherId,
+      organizationId,
+      id,
+      transitionedListingId,
+    )
   }
 }

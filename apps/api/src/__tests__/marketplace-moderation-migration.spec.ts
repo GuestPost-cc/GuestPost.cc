@@ -9,6 +9,14 @@ const migration = readFileSync(
   ),
   "utf8",
 )
+const legacyMessageCorrection = readFileSync(
+  join(
+    process.cwd(),
+    "../..",
+    "packages/database/prisma/migrations/20260821130000_marketplace_moderation_legacy_message_correction/migration.sql",
+  ),
+  "utf8",
+)
 
 describe("marketplace moderation migration", () => {
   it("creates append-only evidence with exact target constraints", () => {
@@ -41,5 +49,27 @@ describe("marketplace moderation migration", () => {
       ),
     )
     expect(websiteBackfill).not.toContain('UPDATE public."MarketplaceListing"')
+  })
+
+  it("corrects only unchanged current legacy projections in a forward migration", () => {
+    expect(legacyMessageCorrection).toContain(
+      'UPDATE public."MarketplaceListing" listing',
+    )
+    expect(legacyMessageCorrection).toContain('UPDATE public."Website" website')
+    expect(legacyMessageCorrection).toContain(
+      "A GuestPost Super Admin must review it before restoration.",
+    )
+    expect(legacyMessageCorrection).toContain(
+      "event.\"id\" = 'legacy-listing-' || listing.\"id\" || '-paused'",
+    )
+    expect(legacyMessageCorrection).toContain(
+      "event.\"id\" = 'legacy-website-' || website.\"id\" || '-inactive'",
+    )
+    expect(legacyMessageCorrection).toContain('listing."moderationVersion" = 1')
+    expect(legacyMessageCorrection).toContain('website."moderationVersion" = 1')
+    expect(legacyMessageCorrection).not.toContain(
+      'UPDATE public."ModerationEvent"',
+    )
+    expect(legacyMessageCorrection).not.toMatch(/DROP|DISABLE TRIGGER/)
   })
 })

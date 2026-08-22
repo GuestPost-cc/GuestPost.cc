@@ -103,7 +103,85 @@ export interface StaffModerationActor {
   staffRole?: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
 }
 
-function staffOwnsTarget(
+export const LEGACY_SUPER_ADMIN_LISTING_PAUSE_MESSAGE =
+  "This listing was paused before moderation history was introduced. A GuestPost Super Admin must review it before restoration."
+export const LEGACY_SUPER_ADMIN_WEBSITE_PAUSE_MESSAGE =
+  "This website was inactive before moderation history was introduced. A GuestPost Super Admin must review it before restoration."
+
+const LEGACY_OPERATIONS_LISTING_PAUSE_MESSAGE =
+  "This listing was paused before moderation history was introduced. GuestPost Operations must review it before restoration."
+const LEGACY_OPERATIONS_WEBSITE_PAUSE_MESSAGE =
+  "This website was inactive before moderation history was introduced. GuestPost Operations must review it before restoration."
+
+interface ModerationPublisherMessageEvent {
+  id: string
+  listingId: string | null
+  websiteId: string | null
+  scope: "LISTING" | "WEBSITE"
+  action: ModerationActionValue
+  authority: ModerationAuthorityValue
+  reasonCode: ModerationReasonCodeValue
+  publisherMessage: string | null
+  actorUserId: string | null
+  actorStaffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
+  previousStatus: ListingStatusValue | null
+  resultingStatus: ListingStatusValue | null
+  previousWebsiteActive: boolean | null
+  resultingWebsiteActive: boolean | null
+  resubmissionAllowed: boolean
+}
+
+/**
+ * Corrects presentation of the exact system-imported legacy pause rows whose
+ * stored copy named Operations even though their authority is Super Admin.
+ * The underlying ModerationEvent remains immutable; every tuple and the
+ * deterministic migration ID must match before presentation is corrected.
+ */
+export function projectModerationPublisherMessage(
+  event: ModerationPublisherMessageEvent,
+): string | null {
+  const exactLegacyImport =
+    event.action === "PAUSE" &&
+    event.authority === "SUPER_ADMIN" &&
+    event.reasonCode === "LEGACY_ORIGIN_UNKNOWN" &&
+    event.actorUserId === null &&
+    event.actorStaffRole === null &&
+    event.resubmissionAllowed === false
+
+  if (
+    exactLegacyImport &&
+    event.scope === "LISTING" &&
+    event.listingId !== null &&
+    event.websiteId === null &&
+    event.id === `legacy-listing-${event.listingId}-paused` &&
+    event.publisherMessage === LEGACY_OPERATIONS_LISTING_PAUSE_MESSAGE &&
+    event.previousStatus === null &&
+    event.resultingStatus === "PAUSED" &&
+    event.previousWebsiteActive === null &&
+    event.resultingWebsiteActive === null
+  ) {
+    return LEGACY_SUPER_ADMIN_LISTING_PAUSE_MESSAGE
+  }
+
+  if (
+    exactLegacyImport &&
+    event.scope === "WEBSITE" &&
+    event.websiteId !== null &&
+    event.listingId === null &&
+    event.id === `legacy-website-${event.websiteId}-inactive` &&
+    event.publisherMessage === LEGACY_OPERATIONS_WEBSITE_PAUSE_MESSAGE &&
+    event.previousStatus === null &&
+    event.resultingStatus === null &&
+    event.previousWebsiteActive === null &&
+    event.resultingWebsiteActive === false
+  ) {
+    return LEGACY_SUPER_ADMIN_WEBSITE_PAUSE_MESSAGE
+  }
+
+  return event.publisherMessage
+}
+
+export function staffCanModerateMarketplaceTarget(
   target: {
     ownershipType?: MarketplaceOwnerTypeValue
     ownerType?: MarketplaceOwnerTypeValue
@@ -129,7 +207,7 @@ export function getStaffListingModerationActions(
   listing: ListingModerationSnapshot,
   actor: StaffModerationActor,
 ): ModerationActionValue[] {
-  if (!staffOwnsTarget(listing, actor)) return []
+  if (!staffCanModerateMarketplaceTarget(listing, actor)) return []
 
   const actions: ModerationActionValue[] = []
   const canChangeActive = actorCanChangeActiveStaffDecision(listing, actor)
@@ -229,7 +307,7 @@ export function getStaffWebsiteModerationActions(
   website: WebsiteModerationSnapshot,
   actor: StaffModerationActor,
 ): ModerationActionValue[] {
-  if (!staffOwnsTarget(website, actor)) return []
+  if (!staffCanModerateMarketplaceTarget(website, actor)) return []
 
   const actions: ModerationActionValue[] = []
   const canChangeActive = actorCanChangeActiveStaffDecision(website, actor)

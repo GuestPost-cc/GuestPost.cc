@@ -334,9 +334,17 @@ describe("publisher listing management", () => {
       $queryRaw: jest.fn().mockResolvedValue([{ id: "locked" }]),
       marketplaceListing: {
         findUnique: jest.fn().mockResolvedValue(listing),
-        findUniqueOrThrow: jest
-          .fn()
-          .mockResolvedValue({ ...listing, status: "PENDING_REVIEW" }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          ...listing,
+          status: "PENDING_REVIEW",
+          moderationVersion: 5,
+          activeModerationAction: "SUBMIT_FOR_REVIEW",
+          activeModerationAuthority: "PUBLISHER",
+          activeModerationReasonCode: "CORRECTIONS_COMPLETE",
+          activeModerationMessage: null,
+          activeModerationPreviousStatus: "REJECTED",
+          moderationResubmissionAllowed: false,
+        }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       listingService: { count: jest.fn().mockResolvedValue(1) },
@@ -357,11 +365,10 @@ describe("publisher listing management", () => {
       auditLog: { create: jest.fn().mockResolvedValue({ id: "audit-1" }) },
     }
 
-    await new MarketplaceService(prisma, {} as any).submitListingForReview(
-      "user-1",
-      "publisher-1",
-      "listing-1",
-    )
+    const result = await new MarketplaceService(
+      prisma,
+      {} as any,
+    ).submitListingForReview("user-1", "publisher-1", "listing-1")
 
     expect(prisma.marketplaceListing.updateMany).toHaveBeenCalledWith({
       where: {
@@ -388,5 +395,17 @@ describe("publisher listing management", () => {
       }),
     )
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1)
+    expect(result).toMatchObject({
+      id: "listing-1",
+      status: "PENDING_REVIEW",
+      moderation: {
+        version: 5,
+        allowedActions: ["ARCHIVE"],
+        active: {
+          action: "SUBMIT_FOR_REVIEW",
+          authority: "PUBLISHER",
+        },
+      },
+    })
   })
 })
