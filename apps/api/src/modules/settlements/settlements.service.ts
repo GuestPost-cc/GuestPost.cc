@@ -1012,8 +1012,21 @@ export class SettlementsService {
       include: { order: true },
     })
     if (!settlement) throw new NotFoundException("Settlement not found")
-    if (settlement.status === "RELEASED")
-      throw new BadRequestException("Settlement already released")
+    // Force-approve may only advance a live approval chain
+    // (PENDING/UNDER_REVIEW -> CUSTOMER_APPROVED -> ADMIN_APPROVED+release).
+    // Terminal states are irreversible staff decisions: RELEASED already paid,
+    // and CANCELLED was deliberately killed — resurrecting it would move money
+    // on a cancelled record. Re-asserting on ADMIN_APPROVED would silently
+    // downgrade it. Fail closed on every non-live status.
+    if (
+      settlement.status !== "PENDING" &&
+      settlement.status !== "UNDER_REVIEW" &&
+      settlement.status !== "CUSTOMER_APPROVED"
+    ) {
+      throw new BadRequestException(
+        `Cannot force-approve settlement in ${settlement.status} status`,
+      )
+    }
 
     const previousStatus = settlement.status
 
@@ -1045,8 +1058,16 @@ export class SettlementsService {
           })
         }
 
+        // Conditional transition — the status predicate pins the CAS to the
+        // exact pre-tx snapshot. A concurrent cancel/release/approve that
+        // changed the status (or version) makes count 0 and fails closed,
+        // instead of overwriting a terminal decision.
         const updated = await tx.settlement.updateMany({
-          where: { id, version: settlement.version },
+          where: {
+            id,
+            status: settlement.status,
+            version: settlement.version,
+          },
           data: {
             status: targetStatus,
             version: { increment: 1 },

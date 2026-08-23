@@ -1,10 +1,107 @@
 ---
 note_type: backlog
 project: guestpost-platform
-updated: 2026-08-15
+updated: 2026-08-23
 ---
 
 # Backlog
+
+## Undocumented bug-hunt batch (2026-08-23)
+
+A read-only bug hunt across API money paths, auth/security, schema/shared,
+frontend apps, and worker queues found 22 defects not tracked anywhere. The two
+High findings are fixed on the `fix/force-approve-cancelled-and-link-property`
+branch; the rest are recorded here as open work. None of these overlap the
+historical audit registers.
+
+Fixed in this batch:
+
+- [x] **HIGH — Publisher integrations "Link property" always failed 400.**
+  `apps/publisher/src/app/dashboard/integrations/[id]/page.tsx` hardcoded
+  `websiteId: ""`, which `linkPropertyRequestSchema` (`z.string().cuid()`)
+  always rejects. Fixed by a link dialog that resolves a real publisher
+  website id; guarded by a static-source regression spec.
+- [x] **HIGH — `forceApprove` could resurrect a CANCELLED settlement and pay
+  it out.** Pre-check rejected only `RELEASED` and the CAS lacked a status
+  predicate, so `CANCELLED -> CUSTOMER_APPROVED -> ADMIN_APPROVED` released
+  funds on a deliberately cancelled record (and `ADMIN_APPROVED` was silently
+  downgraded). Fixed to live statuses only plus a status-pinned CAS matching
+  the six sibling transition sites; regression spec added.
+
+Open findings (deferred):
+
+- [ ] **Medium — Tier review window (`reviewEndsAt`) is never enforced on
+  release paths.** `customerApprove` accepts day-0 and the auto-release sweep
+  has no `reviewEndsAt` filter (`settlements.service.ts`,
+  `packages/shared/src/settlement-auto-release-core.ts`), so the 7/14/30-day
+  fraud hold is bypassable. Enforce the window on every release path.
+- [ ] **Medium — `/identity/me` leaks suspension metadata.** AuthGuard spreads
+  the full Prisma User row into `request.user`
+  (`apps/api/src/modules/auth/auth.guard.ts`), so the response carries
+  `banReason`, `banReasonCode`, `banExpires`, `suspendedByUserId`,
+  contradicting the documented invariant that suspension notes are never
+  exposed. Project the user shape explicitly.
+- [ ] **Medium — Better Auth `trustedOrigins` trusts the request Origin in
+  every non-production NODE_ENV** (`packages/auth/src/index.ts`), disabling
+  CSRF/redirect validation on staging/preview deployments. Require an explicit
+  allowlist outside production too.
+- [ ] **Medium — safe-fetch SSRF allowlist misses CGNAT `100.64.0.0/10`,
+  multicast/reserved IPv4, and `ff00::/8` / `fec0::/10` IPv6**
+  (`packages/shared/src/safe-fetch.ts`). Add ranges + tests.
+- [ ] **Medium — `SETTLEMENT_AUTO_APPROVE_DISABLED=true` cannot deregister an
+  already-registered repeatable job**, and env-interval changes leave stale
+  duplicate schedules across several sweep registrars
+  (`apps/worker/src/index.ts`). Remove repeatables by name like
+  `registerWebsiteReverifySweep`.
+- [ ] **Medium — Legacy auth emails (verification/password reset) lack the
+  exactly-once lease/quarantine** of the SEND_DELIVERY pipeline; ambiguous
+  SMTP failures retry up to 5 times sending duplicates
+  (`apps/worker/src/processors/email.processor.ts`).
+- [ ] **Medium — Sync-history pagination controls render but do nothing**
+  (`handlePageChange` empty) and `useSyncHistory` omits filters from its query
+  key — wiring filters later would serve one cached page for every combination
+  (`apps/publisher/src/app/dashboard/integrations/[id]/page.tsx`).
+- [ ] **Medium — `scripts/load-test.ts` is dead-broken against the current
+  schema** (queries dropped `MarketplaceListing.type`/`price`; posts a legacy
+  order payload) and provisions users/orgs/wallets before any environment
+  guard runs. Rewrite against ListingService ordering or delete.
+- [ ] **Low-Medium — Portal deposit polling leaves an orphaned 60s timeout**
+  that pops a false "still processing" toast after the wallet already credited
+  (`apps/portal/src/app/dashboard/billing/page.tsx`). Track and clear the
+  timer on success/unmount.
+- [ ] **Low — Unauthenticated `/api/v1/metrics/queues` exposes queue depths;
+  `/health/ready` reflects raw dependency error strings** (internal topology
+  disclosure). Gate behind service identity or restrict fields
+  (`apps/api/src/main.ts`).
+- [ ] **Low — Any junk `Authorization: Bearer` header buys the authenticated
+  rate-limit tier** (~5x budget unauthenticated) via
+  `has-auth-credentials.ts`. Validate token presence before tier selection.
+- [ ] **Low — Job-signing payload `v` field is HMAC'd but never validated**,
+  so a future version bump gates nothing
+  (`packages/shared/src/job-signing.ts`).
+- [ ] **Low — API vs worker `SEND_DELIVERY` wake jobId schemes drift**;
+  completed wakes persist up to days under unsuffixed ids and silently swallow
+  later wakes (bounded ~5 min by the outbox sweep)
+  (`communications.service.ts` vs `communication-outbox-dispatch-core.ts`).
+- [ ] **Low — Withdrawals "This Month" KPI ignores year** (same-month
+  prior-year payouts counted) on the publisher withdrawals page.
+- [ ] **Low — Earnings "Withdrawable" tab equals the "Approved" tab** because
+  the transaction mapper drops `availableAt`
+  (`apps/publisher/src/app/dashboard/earnings/page.tsx`).
+- [ ] **Low — `verify-link` processor records failed verifications as
+  `VERIFIED_AUTO` order events and writes status without a version guard**
+  (currently dormant: no producer enqueues VERIFY_LINK)
+  (`apps/worker/src/processors/verification.processor.ts`).
+- [ ] **Low — `generate-report` has no retry dedup** — a crash after
+  `report.create` but before ack inserts a duplicate Report row
+  (`apps/worker/src/processors/report.processor.ts`).
+- [ ] **Low — OAuth state consumption is GET-then-DEL, not atomic single-use**
+  (`packages/integrations/src/services/oauth-state.service.ts`). Use `getdel`.
+- [ ] **Informational — `inviteMember` error differentiation enumerates
+  registered/banned emails** (`apps/api/src/modules/identity/identity.service.ts`).
+- [ ] **Informational — `OrderDeliveryVersion.adminVerifiedById` relation has
+  no backing index** (last unindexed User relation)
+  (`packages/database/prisma/schema.prisma`).
 
 ## Explicitly deferred: staff security and finance governance (2026-08-12)
 

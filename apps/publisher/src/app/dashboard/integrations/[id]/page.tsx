@@ -35,10 +35,11 @@ import {
   ReconnectBanner,
   SyncHistoryTable,
 } from "@guestpost/ui"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
 import {
   ArrowLeft,
+  Check,
   Globe,
   Link2,
   Loader2,
@@ -51,6 +52,8 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import { api } from "../../../../lib/api"
+import { useAuth } from "../../../../lib/auth"
 import {
   useConnectIntegration,
   useDisconnectIntegration,
@@ -86,6 +89,11 @@ type DiscoveredResourceItem = {
   externalResourceId: string
   externalResourceName: string | null
   metadata: Record<string, unknown> | null
+}
+
+type LinkTarget = {
+  externalResourceId: string
+  externalResourceName: string | null
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -133,7 +141,8 @@ export default function IntegrationDetailPage() {
   const integrationId = params.id as string
 
   const [showDisconnect, setShowDisconnect] = useState(false)
-  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(
+  const [linkTarget, setLinkTarget] = useState<LinkTarget | null>(null)
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState<string | null>(
     null,
   )
 
@@ -152,6 +161,19 @@ export default function IntegrationDetailPage() {
     refetch: refetchSyncHistory,
     isLoading: syncHistoryLoading,
   } = useSyncHistory(integrationId, { pageSize: 10 })
+
+  const { user } = useAuth()
+  const publisherId = user?.publisherId
+  const { data: publisherWebsites = [], isLoading: websitesLoading } = useQuery(
+    {
+      queryKey: ["integration-link-websites", publisherId],
+      queryFn: async () => {
+        if (!publisherId) return []
+        return api.publishers.getWebsites(publisherId)
+      },
+      enabled: Boolean(publisherId),
+    },
+  )
 
   // ── Mutations ────────────────────────────────────────────
 
@@ -192,6 +214,11 @@ export default function IntegrationDetailPage() {
     (syncHistory?.pagination as Pagination | undefined) ?? initialPagination
   const connection = integration?.connection
 
+  const linkedWebsiteIds = new Set(linkedWebsites.map((w) => w.websiteId))
+  const linkableWebsites = publisherWebsites.filter(
+    (site) => site.isActive && site.url && !linkedWebsiteIds.has(site.id),
+  )
+
   // ── Handlers ─────────────────────────────────────────────
 
   const handleReconnect = async () => {
@@ -216,16 +243,32 @@ export default function IntegrationDetailPage() {
     }
   }
 
-  const handleLink = async (externalResourceId: string) => {
+  const openLinkDialog = (resource: DiscoveredResourceItem) => {
+    setLinkTarget({
+      externalResourceId: resource.externalResourceId,
+      externalResourceName: resource.externalResourceName,
+    })
+    setSelectedWebsiteId(null)
+  }
+
+  const closeLinkDialog = () => {
+    if (linkMutation.isPending) return
+    setLinkTarget(null)
+    setSelectedWebsiteId(null)
+  }
+
+  const confirmLink = async () => {
+    if (!linkTarget || !selectedWebsiteId) return
     try {
       await linkMutation.mutateAsync({
-        websiteId: "",
-        externalResourceId,
+        websiteId: selectedWebsiteId,
+        externalResourceId: linkTarget.externalResourceId,
       })
       toast.success("Property linked")
       await refetch()
       await refetchResources()
-      setSelectedResourceId(null)
+      setLinkTarget(null)
+      setSelectedWebsiteId(null)
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to link property")
     }
@@ -503,7 +546,8 @@ export default function IntegrationDetailPage() {
                   const isAlreadyLinked = linkedWebsites.some(
                     (lw) => lw.externalResourceId === r.externalResourceId,
                   )
-                  const isSelected = r.externalResourceId === selectedResourceId
+                  const isSelected =
+                    linkTarget?.externalResourceId === r.externalResourceId
                   const isLinking = isSelected && linkMutation.isPending
 
                   return (
@@ -532,10 +576,7 @@ export default function IntegrationDetailPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setSelectedResourceId(r.externalResourceId)
-                              handleLink(r.externalResourceId)
-                            }}
+                            onClick={() => openLinkDialog(r)}
                             disabled={isLinking}
                             className="gap-1.5"
                           >
@@ -604,6 +645,104 @@ export default function IntegrationDetailPage() {
           onPageChange={handlePageChange}
         />
       </section>
+
+      {/* ── Link property dialog ────────────────────────────── */}
+      <Dialog
+        open={linkTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) closeLinkDialog()
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link property to a website</DialogTitle>
+            <DialogDescription>
+              Choose which of your websites{" "}
+              {linkTarget?.externalResourceName ??
+                linkTarget?.externalResourceId}{" "}
+              should sync data for.
+            </DialogDescription>
+          </DialogHeader>
+
+          {websitesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2
+                className="h-5 w-5 animate-spin text-muted-foreground"
+                aria-hidden="true"
+              />
+            </div>
+          ) : linkableWebsites.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-xl border py-8 text-center">
+              <Globe
+                className="h-7 w-7 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-muted-foreground">
+                No available websites to link.
+              </p>
+              <Link
+                href="/dashboard/websites"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Go to your websites
+              </Link>
+            </div>
+          ) : (
+            <div
+              role="listbox"
+              aria-label="Your websites"
+              className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border p-2"
+            >
+              {linkableWebsites.map((site) => {
+                const active = site.id === selectedWebsiteId
+                return (
+                  <button
+                    key={site.id}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => setSelectedWebsiteId(site.id)}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                      active
+                        ? "bg-primary/10 text-foreground"
+                        : "hover:bg-muted",
+                    )}
+                  >
+                    <span className="truncate">{site.url}</span>
+                    {active && (
+                      <Check
+                        className="h-4 w-4 shrink-0 text-primary"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeLinkDialog}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmLink}
+              disabled={
+                !selectedWebsiteId ||
+                linkMutation.isPending ||
+                linkableWebsites.length === 0
+              }
+              className="gap-1.5"
+            >
+              {linkMutation.isPending && (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
+              Link property
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Disconnect ──────────────────────────────────────── */}
       <section className="border-t pt-6">
