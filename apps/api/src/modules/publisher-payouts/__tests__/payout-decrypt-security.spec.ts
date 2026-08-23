@@ -201,6 +201,17 @@ describe("PayoutEncryptionService", () => {
     )
   })
 
+  it("treats an empty optional legacy key as unset", () => {
+    process.env.NODE_ENV = "development"
+    process.env.PAYOUT_ENCRYPTION_KEYS = JSON.stringify({
+      "active-2026-08": "a".repeat(64),
+    })
+    process.env.PAYOUT_ENCRYPTION_ACTIVE_KEY_ID = "active-2026-08"
+    process.env.PAYOUT_ENCRYPTION_KEY = ""
+
+    expect(() => new PayoutEncryptionService()).not.toThrow()
+  })
+
   it("does not treat the legacy key as authority to create v2 writes", () => {
     process.env.NODE_ENV = "production"
     clearPayoutKeyEnv()

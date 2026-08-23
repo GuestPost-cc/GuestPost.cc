@@ -9,9 +9,9 @@ const UNVERIFIED_SUFFIX = "not independently verified"
 
 /**
  * Sources whose values were collected directly from the named provider and
- * may cross the customer-marketplace trust boundary. Keep this as an explicit
- * allowlist: deriving the policy by excluding known manual sources would
- * silently admit a future enum value before its provenance is reviewed.
+ * may be used for marketplace filters, sorting, and ranking. Keep this as an
+ * explicit allowlist: deriving the policy by excluding known manual sources
+ * would silently admit a future enum value before its provenance is reviewed.
  */
 export const MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES = Object.freeze([
   "AHREFS_FREE_API",
@@ -24,9 +24,9 @@ export type MarketplaceAuthoritativeMetricSource =
   (typeof MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES)[number]
 
 /**
- * Filtering, sorting, and recommendations use the same trust boundary as the
- * public projection. This compatibility name is retained for existing callers
- * while making it impossible for display and ranking policy to drift apart.
+ * Filtering, sorting, and recommendations use the authoritative provider-only
+ * trust boundary. Public display has a separate, broader allowlist for current
+ * publisher- and staff-supplied values, without exposing their provenance.
  */
 export const MARKETPLACE_ALGORITHMIC_METRIC_SOURCES =
   MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES
@@ -122,6 +122,28 @@ export function isMarketplaceAuthoritativeMetric<
     metric.key,
     metric.provider,
   ).includes(metric.source as MarketplaceAuthoritativeMetricSource)
+}
+
+/**
+ * Sources allowed in the customer-facing metric projection. Manual values are
+ * displayable when they use a known metric/provider identity, but remain
+ * excluded from algorithmic filters and ranking because they are not
+ * independently collected by the platform.
+ */
+export function isMarketplacePublicMetric<T extends MarketplaceMetricIdentity>(
+  metric: T,
+): boolean {
+  if (isMarketplaceAuthoritativeMetric(metric)) return true
+  if (
+    metric.source !== "PUBLISHER_MANUAL" &&
+    metric.source !== "STAFF_MANUAL"
+  ) {
+    return false
+  }
+  return (
+    marketplaceAuthoritativeMetricSourcesFor(metric.key, metric.provider)
+      .length > 0
+  )
 }
 
 /**

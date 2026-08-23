@@ -2,6 +2,7 @@ import {
   isMarketplaceAlgorithmicMetricSource,
   isMarketplaceAuthoritativeMetric,
   isMarketplaceAuthoritativeMetricSource,
+  isMarketplacePublicMetric,
   MARKETPLACE_ALGORITHMIC_METRIC_SOURCES,
   MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES,
   marketplaceAuthoritativeMetricSourcesFor,
@@ -68,13 +69,7 @@ describe("marketplace algorithmic metric source policy", () => {
   })
 })
 
-describe("authoritative public marketplace metric policy", () => {
-  it("keeps public display and algorithmic source allowlists identical", () => {
-    expect(MARKETPLACE_ALGORITHMIC_METRIC_SOURCES).toBe(
-      MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES,
-    )
-  })
-
+describe("marketplace metric source policies", () => {
   it.each(
     MARKETPLACE_AUTHORITATIVE_METRIC_SOURCES,
   )("recognizes direct provider source %s", (source) => {
@@ -143,5 +138,31 @@ describe("authoritative public marketplace metric policy", () => {
         "AHREFS",
       ),
     ).toEqual([])
+  })
+
+  it.each([
+    {
+      key: "AHREFS_ORGANIC_TRAFFIC",
+      provider: "AHREFS",
+      source: "PUBLISHER_MANUAL",
+    },
+    {
+      key: "MOZ_DOMAIN_AUTHORITY",
+      provider: "MOZ",
+      source: "STAFF_MANUAL",
+    },
+  ])("allows known manual values for public display without making them authoritative", (metric) => {
+    expect(isMarketplacePublicMetric(metric)).toBe(true)
+    expect(isMarketplaceAuthoritativeMetric(metric)).toBe(false)
+  })
+
+  it("rejects imported values from the public display policy", () => {
+    expect(
+      isMarketplacePublicMetric({
+        key: "AHREFS_ORGANIC_TRAFFIC",
+        provider: "AHREFS",
+        source: "ADMIN_IMPORT",
+      }),
+    ).toBe(false)
   })
 })

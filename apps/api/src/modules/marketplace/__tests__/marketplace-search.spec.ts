@@ -361,9 +361,29 @@ describe("MarketplaceService search", () => {
   it.each([
     "PUBLISHER_MANUAL",
     "STAFF_MANUAL",
+  ])("displays current supplied organic traffic from source %s without making it authoritative", async (source) => {
+    prisma.marketplaceListing.findMany.mockResolvedValue([
+      listingRow("supplied", 100, 75_000, source),
+    ])
+
+    const result = await service.searchListings({ sortBy: "newest" })
+
+    expect(result.listings[0].domainMetrics?.ahrefs.organicTraffic).toEqual(
+      expect.objectContaining({
+        value: 75_000,
+        status: "CURRENT",
+      }),
+    )
+    expect(
+      result.listings[0].domainMetrics?.ahrefs.organicTraffic,
+    ).not.toHaveProperty("source")
+    expect(result.listings[0].traffic).toBeNull()
+  })
+
+  it.each([
     "ADMIN_IMPORT",
     "AHREFS_FREE_API",
-  ])("hides non-authoritative organic traffic from source %s", async (source) => {
+  ])("hides unreviewed organic traffic from source %s", async (source) => {
     prisma.marketplaceListing.findMany.mockResolvedValue([
       listingRow("non-authoritative", 100, 75_000, source),
     ])

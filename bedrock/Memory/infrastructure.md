@@ -211,6 +211,10 @@ bytes/checksum, and remove only that canary object under the retention policy.
 ## Environment
 
 - `.env.development` — dev env vars (loaded when `NODE_ENV=development`)
+- `pnpm dev:all` explicitly loads only `.env.development`, validates the local
+  API origin, uses production semantics for the build, and never auto-applies
+  Prisma migrations; apply pending local migrations with
+  `pnpm db:migrations:deploy` after stopping API/worker processes.
 - `.env.example` — template with all required vars
 - Runtime env validation at startup (required: `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`; production also requires `QUEUE_SIGNING_SECRET` and trusted origins)
 - `NODE_ENV` guards production behaviors

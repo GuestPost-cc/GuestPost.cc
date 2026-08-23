@@ -95,14 +95,21 @@ pnpm check:website-docs
 dependencies (`@guestpost/database`, `@guestpost/shared`, …) are built before the
 target app starts.
 
-`pnpm dev:all` clears generated Next.js state before the production build and
-again before the development servers, then runs `pnpm db:migrations:status`
-before it starts any API, worker, or web process. The first cleanup removes
-stale build locks; the second prevents production route artifacts from hiding
-valid development routes. Pending or failed migrations stop startup instead
-of allowing new application code to run against an older schema. Stop every
-running API and worker before `pnpm db:migrations:deploy`; financial evidence
-migrations are not guaranteed to be compatible with old writers.
+`pnpm dev:all` loads only `.env.development` (while preserving explicit shell
+overrides), clears generated Next.js state before the production build and
+again before the development servers, then runs
+`pnpm db:migrations:status` before it starts any API, worker, or web process.
+The first cleanup removes stale build locks; the second prevents production
+route artifacts from hiding valid development routes. The preflight build
+force-refreshes ignored workspace `dist/` outputs so stale declarations cannot
+survive a branch switch, then uses production `NODE_ENV` semantics and the
+local API origin from the development environment. No inline
+`NEXT_PUBLIC_API_URL=...` prefix is needed. It does not load `.env` or apply
+migrations automatically. Pending or failed migrations stop startup instead of
+allowing new application code to run against an older schema. Stop every
+running API and worker before
+`pnpm db:migrations:deploy`; financial evidence migrations are not guaranteed
+to be compatible with old writers.
 
 Public website architecture, documentation maintenance, discovery endpoints,
 security boundaries, and release checks are documented in

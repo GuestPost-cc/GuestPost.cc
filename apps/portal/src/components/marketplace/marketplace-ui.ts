@@ -2,11 +2,6 @@ import type {
   ListingServiceOption,
   MarketplaceListing,
 } from "@guestpost/api-client"
-import {
-  isMarketplaceAuthoritativeMetric,
-  isMarketplaceAuthoritativeMetricSource,
-  websiteMetricSourceDisclosure,
-} from "@guestpost/shared"
 
 export const SERVICE_OPTIONS = [
   {
@@ -103,27 +98,10 @@ export function formatCompactNumber(value: number): string {
   }).format(value)
 }
 
-export function metricSourceSummary(metric?: {
-  source?: string | null
-  status?: string | null
-}): string {
-  if (
-    metric?.status !== "CURRENT" ||
-    !isMarketplaceAuthoritativeMetricSource(metric?.source)
-  ) {
-    return "Unavailable"
-  }
-  const disclosure = websiteMetricSourceDisclosure(metric.source)
-  return `Current · ${disclosure.shortLabel}`
-}
-
-export function publicMarketplaceMetric<
-  T extends { source?: string | null; status?: string | null },
->(metric: T | null | undefined, key: string, provider: string): T | undefined {
-  return metric?.status === "CURRENT" &&
-    isMarketplaceAuthoritativeMetric({ key, provider, source: metric.source })
-    ? metric
-    : undefined
+export function publicMarketplaceMetric<T extends { status?: string | null }>(
+  metric: T | null | undefined,
+): T | undefined {
+  return metric?.status === "CURRENT" ? metric : undefined
 }
 
 export function availableServices(

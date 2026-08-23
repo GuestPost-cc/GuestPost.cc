@@ -94,9 +94,11 @@ describe("public marketplace metric visibility", () => {
     expect(result.domainMetrics.ahrefs.domainRating).toEqual(
       expect.objectContaining({
         value: 73.5,
-        source: "AHREFS_FREE_API",
         status: "CURRENT",
       }),
+    )
+    expect(result.domainMetrics.ahrefs.domainRating).not.toHaveProperty(
+      "source",
     )
     expect(JSON.stringify(result)).not.toContain("must-not-leak")
     expect(result.domainRating).toBeUndefined()
@@ -138,7 +140,7 @@ describe("public marketplace metric visibility", () => {
   it.each([
     "PUBLISHER",
     "PLATFORM",
-  ])("hides manual and imported metrics for %s-owned listings", (ownerType) => {
+  ])("projects publisher/staff metrics without provenance for %s-owned listings", (ownerType) => {
     const result = project(
       listing(
         {
@@ -175,12 +177,24 @@ describe("public marketplace metric visibility", () => {
       ),
     )
 
-    expect(result.domainMetrics).toBeUndefined()
-    expect(result.domainRating).toBeUndefined()
-    expect(result.domainAuthority).toBeUndefined()
-    expect(JSON.stringify(result)).not.toMatch(
-      /PUBLISHER_MANUAL|STAFF_MANUAL|ADMIN_IMPORT/,
+    expect(result.domainMetrics).toEqual(
+      expect.objectContaining({
+        ahrefs: expect.objectContaining({
+          domainRating: expect.objectContaining({ value: 65 }),
+        }),
+      }),
     )
+    expect(result.domainMetrics.moz.domainAuthority).toEqual(
+      expect.objectContaining({ value: 64 }),
+    )
+    expect(result.domainMetrics.openPageRank.pageRank).toBeUndefined()
+    expect(result.domainMetrics.ahrefs.domainRating).not.toHaveProperty(
+      "source",
+    )
+    expect(result.domainMetrics.moz.domainAuthority).not.toHaveProperty(
+      "source",
+    )
+    expect(JSON.stringify(result)).not.toMatch(/PUBLISHER_MANUAL|STAFF_MANUAL/)
   })
 
   it("projects only current, unexpired, provider-sourced Ahrefs traffic", () => {
@@ -258,12 +272,16 @@ describe("public marketplace metric visibility", () => {
     )
 
     expect(publisherReported.traffic).toBeNull()
-    expect(publisherReported.domainMetrics).toBeUndefined()
+    expect(publisherReported.domainMetrics?.ahrefs.organicTraffic).toEqual(
+      expect.objectContaining({ value: 12_345 }),
+    )
+    expect(
+      publisherReported.domainMetrics?.ahrefs.organicTraffic,
+    ).not.toHaveProperty("source")
     expect(current.traffic).toBe(12_345)
     expect(current.domainMetrics.ahrefs.organicTraffic).toEqual(
       expect.objectContaining({
         value: 12_345,
-        source: "AHREFS_PAID_API",
         status: "CURRENT",
       }),
     )

@@ -6,10 +6,7 @@ import { ExternalLink, Heart, Star } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  metricSourceSummary,
-  publicMarketplaceMetric,
-} from "../../../../components/marketplace/marketplace-ui"
+import { publicMarketplaceMetric } from "../../../../components/marketplace/marketplace-ui"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
 
@@ -30,7 +27,6 @@ interface FavoriteListing {
       ahrefs: {
         organicTraffic?: {
           value: number
-          source?: string
           status?: string
         }
       }
@@ -140,8 +136,6 @@ export default function FavoritesPage() {
         {favorites.map((fav) => {
           const organicTraffic = publicMarketplaceMetric(
             fav.listing.domainMetrics?.ahrefs.organicTraffic,
-            "AHREFS_ORGANIC_TRAFFIC",
-            "AHREFS",
           )
           return (
             <div
@@ -214,9 +208,6 @@ export default function FavoritesPage() {
                     <span className="text-sm text-muted-foreground">
                       {organicTraffic.value.toLocaleString()} Ahrefs organic
                       traffic
-                      <span className="block text-xs">
-                        {metricSourceSummary(organicTraffic)}
-                      </span>
                     </span>
                   )}
                 </div>

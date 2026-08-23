@@ -4,7 +4,7 @@ import {
   WebsiteMetricSource,
   WebsiteMetricStatus,
 } from "@guestpost/database"
-import { isMarketplaceAuthoritativeMetric } from "@guestpost/shared"
+import { isMarketplacePublicMetric } from "@guestpost/shared"
 import {
   BadRequestException,
   ForbiddenException,
@@ -234,10 +234,10 @@ function toPublicIsoDate(value: unknown): string | null {
 }
 
 /**
- * Fail-closed customer marketplace projection. Only current, unexpired values
- * with an exact reviewed key/provider/direct-source identity cross this
- * boundary. Manual/imported values remain stored and available through the
- * internal publisher and staff serializers above.
+ * Customer marketplace projection. Only current, unexpired values with an
+ * exact reviewed key/provider identity cross this boundary. Direct provider,
+ * publisher-manual, and staff-manual values are displayable; provenance and
+ * internal actor/import fields are deliberately omitted from the response.
  */
 export function serializePublicMarketplaceDomainMetrics(
   metrics: any[],
@@ -252,7 +252,7 @@ export function serializePublicMarketplaceDomainMetrics(
     if (
       !metric ||
       metric.status !== WebsiteMetricStatus.CURRENT ||
-      !isMarketplaceAuthoritativeMetric(metric)
+      !isMarketplacePublicMetric(metric)
     ) {
       return undefined
     }
@@ -270,7 +270,6 @@ export function serializePublicMarketplaceDomainMetrics(
     }
     return {
       value,
-      source: metric.source,
       status: WebsiteMetricStatus.CURRENT,
       measuredAt,
       collectedAt,
