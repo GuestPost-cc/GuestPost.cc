@@ -42,7 +42,13 @@ async function main(): Promise<void> {
   // launches development servers afterward. Keep the local API origin in the
   // environment, but do not pass NODE_ENV=development into the build: Next.js
   // treats that as a non-standard mode and can produce inconsistent bundles.
-  await run(["build"], { ...process.env, NODE_ENV: "production" })
+  // Force-refresh ignored workspace dist/ outputs. They are not versioned and
+  // can otherwise survive a branch switch with declarations from another
+  // commit, which makes Next resolve stale package APIs during its build.
+  await run(["exec", "turbo", "build", "--force"], {
+    ...process.env,
+    NODE_ENV: "production",
+  })
   await run(["db:migrations:status"])
   await run(["clean:next-dev"])
   await run([

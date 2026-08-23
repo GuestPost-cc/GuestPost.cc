@@ -35,10 +35,12 @@ preserving explicit shell overrides, starts infrastructure, removes stale
 Next.js output before the production build, builds the workspace, checks
 `pnpm db:migrations:status`, and removes production Next.js output before
 launching the development servers. The preflight build receives production
-`NODE_ENV` semantics plus the local public API origin; the development servers
-receive the development runtime settings. The two cleanup boundaries prevent
-stale locks from blocking builds and prevent production route artifacts from
-hiding valid development routes. Prisma returns a non-zero status for pending
+`NODE_ENV` semantics plus the local public API origin and force-refreshes
+ignored workspace `dist/` outputs so branch switches cannot leave stale package
+declarations behind; the development servers receive the development runtime
+settings. The two cleanup boundaries prevent stale locks from blocking builds
+and prevent production route artifacts from hiding valid development routes.
+Prisma returns a non-zero status for pending
 or failed migrations, so startup fails closed rather than serving requests with
 an incompatible generated client and database schema. The workflow never
 loads the root `.env` file and never applies migrations automatically.

@@ -100,12 +100,14 @@ overrides), clears generated Next.js state before the production build and
 again before the development servers, then runs
 `pnpm db:migrations:status` before it starts any API, worker, or web process.
 The first cleanup removes stale build locks; the second prevents production
-route artifacts from hiding valid development routes. The preflight build uses
-production `NODE_ENV` semantics and the local API origin from the development
-environment, so no inline `NEXT_PUBLIC_API_URL=...` prefix is needed. It does
-not load `.env` or apply migrations automatically. Pending or failed migrations
-stop startup instead of allowing new application code to run against an older
-schema. Stop every running API and worker before
+route artifacts from hiding valid development routes. The preflight build
+force-refreshes ignored workspace `dist/` outputs so stale declarations cannot
+survive a branch switch, then uses production `NODE_ENV` semantics and the
+local API origin from the development environment. No inline
+`NEXT_PUBLIC_API_URL=...` prefix is needed. It does not load `.env` or apply
+migrations automatically. Pending or failed migrations stop startup instead of
+allowing new application code to run against an older schema. Stop every
+running API and worker before
 `pnpm db:migrations:deploy`; financial evidence migrations are not guaranteed
 to be compatible with old writers.
 
