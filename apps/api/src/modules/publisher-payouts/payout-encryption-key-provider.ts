@@ -110,7 +110,9 @@ export function loadPayoutEncryptionKeyProviderFromEnv(
 ): PayoutEncryptionKeyProvider {
   const serializedKeys = env.PAYOUT_ENCRYPTION_KEYS
   const activeKeyId = env.PAYOUT_ENCRYPTION_ACTIVE_KEY_ID
-  const legacyKey = env.PAYOUT_ENCRYPTION_KEY
+  // An empty optional legacy-key variable is equivalent to unset. Non-empty
+  // values still go through strict 64-hex validation below.
+  const legacyKey = env.PAYOUT_ENCRYPTION_KEY?.trim() || undefined
 
   if (
     !serializedKeys &&
