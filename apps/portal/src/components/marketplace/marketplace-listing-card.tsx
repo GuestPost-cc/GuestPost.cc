@@ -27,7 +27,6 @@ import {
   fulfillmentBadgeClass,
   fulfillmentLabel,
   listingImage,
-  metricSourceSummary,
   publicMarketplaceMetric,
   serviceShortLabel,
   startingPrice,
@@ -61,8 +60,6 @@ export function MarketplaceListingCard({
     listing.categories ?? (listing.category ? [listing.category] : [])
   const organicTraffic = publicMarketplaceMetric(
     listing.domainMetrics?.ahrefs.organicTraffic,
-    "AHREFS_ORGANIC_TRAFFIC",
-    "AHREFS",
   )
 
   return (
@@ -176,14 +173,6 @@ export function MarketplaceListingCard({
                 ? formatCompactNumber(organicTraffic.value)
                 : "—"}
             </dd>
-            {organicTraffic && (
-              <p
-                className="mt-1 text-[10px] leading-4 text-muted-foreground"
-                title={metricSourceSummary(organicTraffic)}
-              >
-                {metricSourceSummary(organicTraffic)}
-              </p>
-            )}
           </div>
           <div className="px-3">
             <dt className="text-[11px] text-muted-foreground">Fastest</dt>

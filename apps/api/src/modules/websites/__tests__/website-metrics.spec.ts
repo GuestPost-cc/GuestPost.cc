@@ -18,7 +18,7 @@ describe("marketplace metric serializers", () => {
   const measuredAt = new Date("2026-07-22T00:00:00Z")
   const collectedAt = new Date("2026-07-22T01:00:00Z")
 
-  it("preserves manual provenance internally while hiding it from customers", () => {
+  it("projects current manual values without exposing provenance to customers", () => {
     const manualMetric = {
       key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
       provider: WebsiteMetricProvider.AHREFS,
@@ -35,9 +35,23 @@ describe("marketplace metric serializers", () => {
     ).toEqual(
       expect.objectContaining({ value: 1200, source: "PUBLISHER_MANUAL" }),
     )
-    expect(
-      serializePublicMarketplaceDomainMetrics([manualMetric]),
-    ).toBeUndefined()
+    expect(serializePublicMarketplaceDomainMetrics([manualMetric])).toEqual({
+      ahrefs: {
+        domainRating: undefined,
+        organicTraffic: {
+          value: 1200,
+          status: "CURRENT",
+          measuredAt: measuredAt.toISOString(),
+          collectedAt: collectedAt.toISOString(),
+        },
+      },
+      moz: { domainAuthority: undefined },
+      openPageRank: {
+        pageRank: undefined,
+        globalRank: undefined,
+        referringDomains: undefined,
+      },
+    })
   })
 
   it("returns only display-safe fields for an authoritative provider metric", () => {
@@ -58,7 +72,6 @@ describe("marketplace metric serializers", () => {
 
     expect(projected?.ahrefs.domainRating).toEqual({
       value: 73,
-      source: "AHREFS_FREE_API",
       status: "CURRENT",
       measuredAt: measuredAt.toISOString(),
       collectedAt: collectedAt.toISOString(),

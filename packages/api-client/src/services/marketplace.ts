@@ -21,15 +21,8 @@ export interface ListingAttribution {
   label: string
 }
 
-export type PublicDomainMetricSource =
-  | "AHREFS_FREE_API"
-  | "AHREFS_PAID_API"
-  | "MOZ_PAID_API"
-  | "OPEN_PAGE_RANK_API"
-
 export interface PublicDomainMetricValue {
   value: number
-  source: PublicDomainMetricSource
   status: "CURRENT"
   measuredAt: string
   collectedAt: string

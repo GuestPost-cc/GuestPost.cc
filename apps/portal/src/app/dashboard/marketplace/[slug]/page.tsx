@@ -48,7 +48,6 @@ import {
   formatMoney,
   fulfillmentBadgeClass,
   fulfillmentLabel,
-  metricSourceSummary,
   publicMarketplaceMetric,
   serviceDescription,
   serviceLabel,
@@ -180,23 +179,15 @@ export default function ListingDetailPage() {
       : (listing.publisher?.name ?? "Verified publisher"))
   const ahrefsDomainRating = publicMarketplaceMetric(
     listing.domainMetrics?.ahrefs.domainRating,
-    "AHREFS_DOMAIN_RATING",
-    "AHREFS",
   )
   const ahrefsOrganicTraffic = publicMarketplaceMetric(
     listing.domainMetrics?.ahrefs.organicTraffic,
-    "AHREFS_ORGANIC_TRAFFIC",
-    "AHREFS",
   )
   const mozDomainAuthority = publicMarketplaceMetric(
     listing.domainMetrics?.moz.domainAuthority,
-    "MOZ_DOMAIN_AUTHORITY",
-    "MOZ",
   )
   const openPageRank = publicMarketplaceMetric(
     listing.domainMetrics?.openPageRank.pageRank,
-    "OPEN_PAGE_RANK",
-    "OPEN_PAGE_RANK",
   )
 
   return (
@@ -360,8 +351,7 @@ export default function ListingDetailPage() {
                 Domain metrics
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Current authority and organic traffic collected directly from
-                the named providers.
+                Current authority and organic traffic for this domain.
               </p>
             </div>
             <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -372,7 +362,6 @@ export default function ListingDetailPage() {
                     ? formatCompactNumber(ahrefsDomainRating.value)
                     : "—"
                 }
-                note={metricSourceSummary(ahrefsDomainRating)}
               />
               <Metric
                 label="Ahrefs traffic"
@@ -381,7 +370,6 @@ export default function ListingDetailPage() {
                     ? formatCompactNumber(ahrefsOrganicTraffic.value)
                     : "—"
                 }
-                note={metricSourceSummary(ahrefsOrganicTraffic)}
               />
               <Metric
                 label="Moz DA"
@@ -390,40 +378,14 @@ export default function ListingDetailPage() {
                     ? formatCompactNumber(mozDomainAuthority.value)
                     : "—"
                 }
-                note={metricSourceSummary(mozDomainAuthority)}
               />
               <Metric
                 label="Open PageRank"
                 value={
                   openPageRank?.value != null ? String(openPageRank.value) : "—"
                 }
-                note={metricSourceSummary(openPageRank)}
               />
             </dl>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Only current metrics collected directly from reviewed provider
-              integrations are shown or used for marketplace filters and
-              ranking. Publisher, staff-entered, imported, stale, and unknown
-              values remain internal. Review each provider before purchasing.
-              {" · "}
-              <a
-                href="https://ahrefs.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2"
-              >
-                Domain Rating by Ahrefs
-              </a>
-              {" · "}
-              <a
-                href="https://openpagerank.keywordseverywhere.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2"
-              >
-                Open PageRank
-              </a>
-            </p>
           </section>
 
           {listing.siteMetrics && (
@@ -809,13 +771,13 @@ function Metric({
 }: {
   label: string
   value: string
-  note: string
+  note?: string
 }) {
   return (
     <div className="rounded-2xl border bg-muted/20 p-4">
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="mt-2 text-2xl font-bold tracking-tight">{value}</dd>
-      <p className="mt-1 text-[11px] text-muted-foreground">{note}</p>
+      {note && <p className="mt-1 text-[11px] text-muted-foreground">{note}</p>}
     </div>
   )
 }
