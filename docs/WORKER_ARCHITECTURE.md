@@ -130,7 +130,7 @@ and one `WORKER_TASK`:
 | `payout-reconcile` | `*/10 * * * *` | Inbox + provider status safety net |
 | `settlement-auto-approve` | `*/15 * * * *` | Review-window approvals |
 | `settlement-auto-release` | `5,20,35,50 * * * *` | Offset from approval |
-| `cancellation-timeouts` | `*/15 * * * *` | Cancellation response deadlines |
+| `cancellation-timeouts` | `*/15 * * * *` | Cancellation response deadlines; also nudges stalled `ESCALATED`/`PENDING_FINANCE` cases (order-event trail + required-channel staff alert, no state change) |
 | `acceptance-timeouts` | `10,25,40,55 * * * *` | Order acceptance deadlines; at most three minutes later than the legacy cadence |
 | `auto-accept` | `10 * * * *` | Orders past review window |
 | `review-reminders` | `20 * * * *` | Upcoming review deadline email |

@@ -122,6 +122,20 @@ auto-accept creates/reuses `PlatformRevenue` and transitions the order to
 - Cancellation response window: 24 hours by default
   (`CANCELLATION_RESPONSE_WINDOW_HOURS`). Unanswered requests become
   `ESCALATED` and stay on fulfillment hold for staff review.
+- Fraud-handoff review SLA: 48 hours by default (`FRAUD_REVIEW_WINDOW_HOURS`).
+  A confirmed-fraud handoff stamps this deadline on its `ESCALATED` case at
+  creation, so every deadline-ordered workbench queue flags the case overdue
+  until Operations completes the first review. Escalating an already-requested
+  case keeps its original (possibly expired) deadline to preserve urgency.
+- Stalled-case reminders: first nudge after 3 days, then every 7 days
+  (`CASE_STALL_FIRST_REMINDER_DAYS`, `CASE_STALL_REMINDER_INTERVAL_DAYS`).
+  The cancellation timeout sweep writes one `CANCELLATION_STALL_REMINDER`
+  order event per elapsed-day bucket plus a required-channel staff alert —
+  Operations + Super Admin for `ESCALATED`, Finance + Super Admin for
+  `PENDING_FINANCE`. The sweep never transitions state or moves money; any
+  review action resets the stall clock because reminders measure time since
+  the case row's last update. Legacy cases created with a null deadline are
+  covered because detection uses age, not the deadline column.
 - Sweep cadence: 15 minutes by default
   (`ORDER_ACCEPTANCE_SWEEP_MINUTES`, `CANCELLATION_TIMEOUT_SWEEP_MINUTES`).
 
@@ -160,8 +174,11 @@ audited break-glass path.
 
 ## Deployment and Verification
 
-1. Apply migration `20260716120000_order_cancellation_workflow` before deploying
-   API or worker code.
+1. Apply migrations `20260716120000_order_cancellation_workflow` and
+   `20260824100000_cancellation_stall_reminder_event` before deploying API or
+   worker code. The enum addition is a single-statement, dedicated-transaction
+   migration; apply it before starting any writer that emits
+   `CANCELLATION_STALL_REMINDER`.
 2. Deploy the API and worker together so new repeatable jobs and database fields
    become active in one release window.
 3. Confirm the worker registers `cancellation-response-timeout-sweep` and
