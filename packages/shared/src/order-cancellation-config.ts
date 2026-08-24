@@ -3,6 +3,9 @@ export const ORDER_CANCELLATION_DEFAULTS = {
   responseWindowHours: 24,
   acceptanceSweepMinutes: 15,
   responseSweepMinutes: 15,
+  fraudReviewWindowHours: 48,
+  caseStallFirstReminderDays: 3,
+  caseStallReminderIntervalDays: 7,
 } as const
 
 export function parseBoundedPositiveInteger(
@@ -38,6 +41,21 @@ export function resolveOrderCancellationConfig(
       env.CANCELLATION_TIMEOUT_SWEEP_MINUTES,
       ORDER_CANCELLATION_DEFAULTS.responseSweepMinutes,
       { min: 1, max: 24 * 60 },
+    ),
+    fraudReviewWindowHours: parseBoundedPositiveInteger(
+      env.FRAUD_REVIEW_WINDOW_HOURS,
+      ORDER_CANCELLATION_DEFAULTS.fraudReviewWindowHours,
+      { min: 1, max: 24 * 30 },
+    ),
+    caseStallFirstReminderDays: parseBoundedPositiveInteger(
+      env.CASE_STALL_FIRST_REMINDER_DAYS,
+      ORDER_CANCELLATION_DEFAULTS.caseStallFirstReminderDays,
+      { min: 1, max: 90 },
+    ),
+    caseStallReminderIntervalDays: parseBoundedPositiveInteger(
+      env.CASE_STALL_REMINDER_INTERVAL_DAYS,
+      ORDER_CANCELLATION_DEFAULTS.caseStallReminderIntervalDays,
+      { min: 1, max: 30 },
     ),
   }
 }

@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto"
 import {
+  computeFraudHandoffDeadline,
   deliveryVerificationJobId,
   isUniqueViolation,
   notificationDedupKey,
   orderEventMetadata,
   QUEUE_JOBS,
   QUEUES,
+  resolveOrderCancellationConfig,
   runLockedOrderSerializableTransaction,
   WorkflowDecisionService,
 } from "@guestpost/shared"
@@ -336,6 +338,9 @@ export class DeliveryInterventionService {
     const fulfillmentChannel =
       order.fulfillmentChannel ??
       (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    const { fraudReviewWindowHours } = resolveOrderCancellationConfig(
+      process.env,
+    )
     const request = await tx.orderCancellationRequest.create({
       data: {
         orderId: order.id,
@@ -354,7 +359,10 @@ export class DeliveryInterventionService {
         fulfillmentChannel,
         responsibility: "UNDETERMINED",
         requestedResolution: "FULL_REFUND",
-        responseDeadlineAt: null,
+        responseDeadlineAt: computeFraudHandoffDeadline(
+          new Date(),
+          fraudReviewWindowHours,
+        ),
         idempotencyKey: stableIdempotencyKey,
       },
     })

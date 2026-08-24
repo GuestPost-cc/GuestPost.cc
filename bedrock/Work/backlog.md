@@ -1,10 +1,39 @@
 ---
 note_type: backlog
 project: guestpost-platform
-updated: 2026-08-23
+updated: 2026-08-24
 ---
 
 # Backlog
+
+## Fraud-case SLA + stall sweep (2026-08-24)
+
+Built on top of the existing deadline machinery so confirmed-fraud refunds can
+no longer stall invisibly:
+
+- `ensureFraudCancellationHandoff` now stamps a configured review deadline
+  (`FRAUD_REVIEW_WINDOW_HOURS`, default 48h) instead of `null`, making every
+  workbench CRITICAL flag and overdue sort apply from creation.
+- The existing `cancellation-response-timeout-sweep` also nudges stalled
+  `ESCALATED`/`PENDING_FINANCE` cases via the shared cadence helpers (first at
+  day 3, then weekly): one `CANCELLATION_STALL_REMINDER` order-event per day
+  bucket plus a required-channel `STAFF_RECONCILIATION_ALERT` to the
+  accountable roles (Operations+Super Admin for ESCALATED, Finance+Super Admin
+  for PENDING_FINANCE). No state or money transitions are automated.
+- Shared pure policy (`computeFraudHandoffDeadline`, `caseStalledDays`,
+  `isCaseStallReminderDue`) is the single source of the cadence.
+
+Still open from the 2026-08-24 reconciliation plan:
+
+- [ ] Persist scheduled reconciliation runs (`ReconciliationRun` table +
+  findings history) instead of AuditLog-only history; alert on nonzero
+  findings.
+- [ ] Settlement aging surface for MANUAL-policy settlements past
+  `reviewEndsAt` (staff notification), pairing with the documented
+  `reviewEndsAt` enforcement gap below.
+- [ ] Quarantine/flag pre-evidence legacy deposit ledger rows; dev reset script.
+- [ ] Finance workbench surfaces for wallet-drift / publisher-balance /
+  revenue-split families computed by `reconciliation-core.ts`.
 
 ## Undocumented bug-hunt batch (2026-08-23)
 

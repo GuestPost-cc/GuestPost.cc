@@ -236,3 +236,43 @@ function denied(message: string): OrderCancellationDecision {
     message,
   }
 }
+
+/**
+ * Staff-review SLA clock for fraud-confirmed handoff cases. Unlike
+ * counterparty REQUEST_CANCELLATION flows (which deadline the responder),
+ * this bounds how long a confirmed-fraud case may sit before its first
+ * staff review without surfacing as overdue on every workbench.
+ */
+export function computeFraudHandoffDeadline(
+  now: Date,
+  fraudReviewWindowHours: number,
+): Date {
+  return new Date(now.getTime() + fraudReviewWindowHours * 3_600_000)
+}
+
+/**
+ * Whole days a case has sat in its current active state. Callers pass the
+ * case row's updatedAt, which every review transition bumps — so any human
+ * progress resets the stall clock.
+ */
+export function caseStalledDays(updatedAt: Date, now: Date): number {
+  const elapsed = now.getTime() - updatedAt.getTime()
+  if (!Number.isFinite(elapsed) || elapsed <= 0) return 0
+  return Math.floor(elapsed / 86_400_000)
+}
+
+/**
+ * Reminder cadence for stalled cases: first nudge at firstReminderDays,
+ * then every intervalDays thereafter. Pure so the API and worker share one
+ * definition of "due".
+ */
+export function isCaseStallReminderDue(
+  stalledDays: number,
+  firstReminderDays: number,
+  intervalDays: number,
+): boolean {
+  if (!Number.isFinite(stalledDays) || stalledDays < firstReminderDays) {
+    return false
+  }
+  return (stalledDays - firstReminderDays) % intervalDays === 0
+}

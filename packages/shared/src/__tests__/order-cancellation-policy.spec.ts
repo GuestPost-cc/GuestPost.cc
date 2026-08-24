@@ -1,6 +1,9 @@
 import {
   type CancellationActor,
+  caseStalledDays,
+  computeFraudHandoffDeadline,
   decideOrderCancellation,
+  isCaseStallReminderDue,
 } from "../order-cancellation-policy"
 
 interface Case {
@@ -147,5 +150,38 @@ describe("order cancellation policy", () => {
 
     expect(decision.action).toBe("REQUEST_CANCELLATION")
     expect(decision.message).toContain("deadline was missed")
+  })
+})
+
+describe("fraud-handoff SLA and stall-reminder policy", () => {
+  it("computes the fraud-handoff review deadline from the window hours", () => {
+    const now = new Date("2026-08-24T10:00:00.000Z")
+    expect(computeFraudHandoffDeadline(now, 48).toISOString()).toBe(
+      "2026-08-26T10:00:00.000Z",
+    )
+    expect(computeFraudHandoffDeadline(now, 1).toISOString()).toBe(
+      "2026-08-24T11:00:00.000Z",
+    )
+  })
+
+  it("counts whole stalled days and never goes negative", () => {
+    const now = new Date("2026-08-24T12:00:00.000Z")
+    expect(caseStalledDays(new Date("2026-08-21T12:00:00.000Z"), now)).toBe(3)
+    expect(caseStalledDays(new Date("2026-08-24T11:59:00.000Z"), now)).toBe(0)
+    expect(caseStalledDays(new Date("2026-08-25T00:00:00.000Z"), now)).toBe(0)
+  })
+
+  it("nudges on the first reminder day and every interval thereafter", () => {
+    expect(isCaseStallReminderDue(2, 3, 7)).toBe(false)
+    expect(isCaseStallReminderDue(3, 3, 7)).toBe(true)
+    expect(isCaseStallReminderDue(9, 3, 7)).toBe(false)
+    expect(isCaseStallReminderDue(10, 3, 7)).toBe(true)
+    expect(isCaseStallReminderDue(17, 3, 7)).toBe(true)
+  })
+
+  it("supports a daily cadence when configured", () => {
+    expect(isCaseStallReminderDue(5, 5, 1)).toBe(true)
+    expect(isCaseStallReminderDue(6, 5, 1)).toBe(true)
+    expect(isCaseStallReminderDue(4, 5, 1)).toBe(false)
   })
 })
