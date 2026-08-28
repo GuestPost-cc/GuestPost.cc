@@ -29,7 +29,7 @@ last_doctor_result: ok
 ## Activity
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
-- Last backfill/import: `2026-08-23`
+- Last backfill/import: `2026-08-28`
 - Last project sync: `2026-08-28T17:16:30Z`
 - Last compaction: `2026-06-11`
 - Last validation: `2026-08-14T23:11:24Z` (`ok`)
