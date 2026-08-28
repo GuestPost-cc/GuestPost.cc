@@ -160,7 +160,7 @@ test("continues past failing cases without losing the rest", async () => {
   assert.equal(recorded.length, 0)
 })
 
-test("skips the staff alert but still writes the trail when no eligible staff exist", async () => {
+test("does not consume the reminder bucket when no eligible staff exist", async () => {
   const base = harness([stalledCase()])
   const createdEvents: any[] = []
   const prisma = {
@@ -182,7 +182,54 @@ test("skips the staff alert but still writes the trail when no eligible staff ex
     recordOutbox: base.recordOutbox,
   })
 
-  assert.equal(createdEvents.length, 1)
+  assert.equal(createdEvents.length, 0)
   assert.equal(base.recorded.length, 0)
   assert.equal(result.nudged, 0)
+})
+
+test("paginates beyond old off-bucket cases so later due cases are not starved", async () => {
+  const cases = [
+    stalledCase({
+      id: "offbucket-20",
+      updatedAt: new Date("2026-08-04T12:00:00.000Z"),
+    }),
+    stalledCase({
+      id: "offbucket-19",
+      updatedAt: new Date("2026-08-05T12:00:00.000Z"),
+    }),
+    stalledCase({
+      id: "due-17",
+      orderId: "order-due",
+      updatedAt: new Date("2026-08-07T12:00:00.000Z"),
+    }),
+  ]
+  const base = harness(cases)
+  const queries: any[] = []
+  const prisma = {
+    ...base.prisma,
+    orderCancellationRequest: {
+      findMany: async (args: any) => {
+        queries.push(args)
+        const start = args.cursor
+          ? cases.findIndex((item) => item.id === args.cursor.id) + 1
+          : 0
+        return cases.slice(start, start + args.take)
+      },
+    },
+  }
+
+  const result = await nudgeStaleCancellationCases(prisma, NOW, CONFIG, {
+    take: 2,
+    recordOutbox: base.recordOutbox,
+  })
+
+  assert.equal(queries.length, 2)
+  assert.deepEqual(queries[1].cursor, { id: "offbucket-19" })
+  assert.equal(queries[1].skip, 1)
+  assert.equal(result.staleScanned, 3)
+  assert.equal(result.nudged, 1)
+  assert.equal(
+    base.recorded[0].dedupKey,
+    "staff:cancellation-case:due-17:stall:17",
+  )
 })
