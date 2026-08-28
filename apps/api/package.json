@@ -23,7 +23,7 @@
     "@nestjs/platform-express": "^11.1.28",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "@sentry/node": "10.68.0",
+    "@sentry/node": "10.70.0",
     "@types/cookie-parser": "^1.4.10",
     "bullmq": "^5.80.12",
     "class-transformer": "^0.5.1",
