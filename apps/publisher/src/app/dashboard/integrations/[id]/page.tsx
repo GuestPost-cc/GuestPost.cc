@@ -164,16 +164,20 @@ export default function IntegrationDetailPage() {
 
   const { user } = useAuth()
   const publisherId = user?.publisherId
-  const { data: publisherWebsites = [], isLoading: websitesLoading } = useQuery(
-    {
-      queryKey: ["integration-link-websites", publisherId],
-      queryFn: async () => {
-        if (!publisherId) return []
-        return api.publishers.getWebsites(publisherId)
-      },
-      enabled: Boolean(publisherId),
+  const {
+    data: publisherWebsites = [],
+    isLoading: websitesLoading,
+    isFetching: websitesFetching,
+    isError: websitesError,
+    refetch: refetchWebsites,
+  } = useQuery({
+    queryKey: ["integration-link-websites", publisherId],
+    queryFn: async () => {
+      if (!publisherId) return []
+      return api.publishers.getWebsites(publisherId)
     },
-  )
+    enabled: Boolean(publisherId),
+  })
 
   // ── Mutations ────────────────────────────────────────────
 
@@ -214,7 +218,12 @@ export default function IntegrationDetailPage() {
     (syncHistory?.pagination as Pagination | undefined) ?? initialPagination
   const connection = integration?.connection
 
-  const linkedWebsiteIds = new Set(linkedWebsites.map((w) => w.websiteId))
+  const activeLinkedWebsites = linkedWebsites.filter(
+    (website) => website.status !== WebsiteIntegrationStatus.REMOVED,
+  )
+  const linkedWebsiteIds = new Set(
+    activeLinkedWebsites.map((website) => website.websiteId),
+  )
   const linkableWebsites = publisherWebsites.filter(
     (site) => site.isActive && site.url && !linkedWebsiteIds.has(site.id),
   )
@@ -543,7 +552,7 @@ export default function IntegrationDetailPage() {
               </thead>
               <tbody>
                 {(resources as DiscoveredResourceItem[]).map((r) => {
-                  const isAlreadyLinked = linkedWebsites.some(
+                  const isAlreadyLinked = activeLinkedWebsites.some(
                     (lw) => lw.externalResourceId === r.externalResourceId,
                   )
                   const isSelected =
@@ -664,12 +673,31 @@ export default function IntegrationDetailPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {websitesLoading ? (
+          {websitesLoading || websitesFetching ? (
             <div className="flex items-center justify-center py-8">
               <Loader2
                 className="h-5 w-5 animate-spin text-muted-foreground"
                 aria-hidden="true"
               />
+            </div>
+          ) : websitesError ? (
+            <div
+              role="alert"
+              className="flex flex-col items-center gap-3 rounded-xl border py-8 text-center"
+            >
+              <p className="text-sm text-muted-foreground">
+                Failed to load your websites.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refetchWebsites()}
+                className="gap-1.5"
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                Retry
+              </Button>
             </div>
           ) : linkableWebsites.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-xl border py-8 text-center">

@@ -79,4 +79,25 @@ describe("publisher integrations link-property regression guard", () => {
     expect(confirmCall?.[1]).toContain("websiteId: selectedWebsiteId")
     expect(confirmCall?.[1]).not.toContain('websiteId: ""')
   })
+
+  it("distinguishes website lookup failures from a successful empty result", () => {
+    const content = readFileSync(PAGE_PATH, "utf-8")
+
+    expect(content).toMatch(/isError:\s*websitesError/)
+    expect(content).toMatch(/refetch:\s*refetchWebsites/)
+    expect(content).toContain("Failed to load your websites.")
+    expect(content).toMatch(/onClick=\{\(\) => void refetchWebsites\(\)\}/)
+  })
+
+  it("excludes removed tombstones from active website and property links", () => {
+    const content = readFileSync(PAGE_PATH, "utf-8")
+
+    expect(content).toMatch(
+      /activeLinkedWebsites\s*=\s*linkedWebsites\.filter\([\s\S]*?WebsiteIntegrationStatus\.REMOVED/,
+    )
+    expect(content).toMatch(
+      /linkedWebsiteIds\s*=\s*new Set\([\s\S]*?activeLinkedWebsites\.map/,
+    )
+    expect(content).toMatch(/isAlreadyLinked\s*=\s*activeLinkedWebsites\.some/)
+  })
 })
