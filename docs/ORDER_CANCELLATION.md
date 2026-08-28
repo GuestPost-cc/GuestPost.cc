@@ -124,9 +124,10 @@ auto-accept creates/reuses `PlatformRevenue` and transitions the order to
   `ESCALATED` and stay on fulfillment hold for staff review.
 - Fraud-handoff review SLA: 48 hours by default (`FRAUD_REVIEW_WINDOW_HOURS`).
   A confirmed-fraud handoff stamps this deadline on its `ESCALATED` case at
-  creation, so every deadline-ordered workbench queue flags the case overdue
-  until Operations completes the first review. Escalating an already-requested
-  case keeps its original (possibly expired) deadline to preserve urgency.
+  creation, so every deadline-ordered workbench queue tracks the case
+  immediately and flags it overdue only after the configured deadline passes.
+  Escalating an already-requested case keeps its original (possibly expired)
+  deadline to preserve urgency.
 - Stalled-case reminders: first nudge after 3 days, then every 7 days
   (`CASE_STALL_FIRST_REMINDER_DAYS`, `CASE_STALL_REMINDER_INTERVAL_DAYS`).
   The cancellation timeout sweep writes one `CANCELLATION_STALL_REMINDER`

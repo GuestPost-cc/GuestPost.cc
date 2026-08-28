@@ -241,7 +241,7 @@ function denied(message: string): OrderCancellationDecision {
  * Staff-review SLA clock for fraud-confirmed handoff cases. Unlike
  * counterparty REQUEST_CANCELLATION flows (which deadline the responder),
  * this bounds how long a confirmed-fraud case may sit before its first
- * staff review without surfacing as overdue on every workbench.
+ * staff review before deadline-ordered workbenches flag it overdue.
  */
 export function computeFraudHandoffDeadline(
   now: Date,
