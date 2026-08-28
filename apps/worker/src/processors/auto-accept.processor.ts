@@ -21,6 +21,7 @@ import { createLogger } from "@guestpost/shared/dist/observability/structured-lo
 import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
 import * as Sentry from "@sentry/node"
 import { processAcceptanceTimeoutOrderInTransaction } from "../lib/acceptance-timeout-refund"
+import { nudgeStaleCancellationCases } from "../lib/cancellation-stall-nudge"
 import { dispatchCommunicationEventsBestEffort } from "../lib/communication-outbox-dispatch"
 import { recordPublisherTierCommunications } from "../lib/publisher-tier-communications"
 import { createObservableWorker } from "../lib/queue-observability"
@@ -102,7 +103,27 @@ export function createAutoAcceptWorker() {
         job.name === QUEUE_JOBS[QUEUES.AUTO_ACCEPT].CANCELLATION_TIMEOUT_SWEEP
       ) {
         assertFinanceOperationAllowed("operator_decision")
-        return runCancellationResponseTimeoutSweep()
+        const escalatedResult = await runCancellationResponseTimeoutSweep()
+        const stallResult = await nudgeStaleCancellationCases(
+          prisma,
+          new Date(),
+          resolveOrderCancellationConfig(process.env),
+          {
+            onError: (requestId, error) => {
+              logger.error("cancellation stall nudge failed", {
+                requestId,
+                err: error instanceof Error ? error.message : String(error),
+              })
+              Sentry.captureException(error, {
+                tags: { queue: QUEUES.AUTO_ACCEPT, requestId },
+              })
+            },
+          },
+        )
+        await dispatchCommunicationEventsBestEffort(
+          stallResult.communicationEventIds,
+        )
+        return { ...escalatedResult, ...stallResult }
       }
 
       if (

@@ -142,7 +142,12 @@ workflow:
    An inconsistent or terminal stable-key case fails closed.
 2. Otherwise create an `ESCALATED`, staff-requested
    `LEGAL_OR_SECURITY_EMERGENCY` case with `FULL_REFUND` requested and
-   responsibility still `UNDETERMINED`.
+   responsibility still `UNDETERMINED`. The case is created with a configured
+   review deadline (`FRAUD_REVIEW_WINDOW_HOURS`, 48 hours by default) so the
+   existing deadline-ordered workbenches track it from creation and flag it
+   overdue after that deadline passes; the cancellation timeout sweep
+   additionally nudges the accountable staff roles while the case sits
+   unresolved.
 3. Operations or Super Admin assigns final responsibility, records a bounded
    review reason, and recommends `FULL_REFUND`. A finding-linked case cannot
    continue the Order, become a dispute, be withdrawn, rejected, deleted, or

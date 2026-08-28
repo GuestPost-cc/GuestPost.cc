@@ -35,10 +35,11 @@ import {
   ReconnectBanner,
   SyncHistoryTable,
 } from "@guestpost/ui"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
 import {
   ArrowLeft,
+  Check,
   Globe,
   Link2,
   Loader2,
@@ -51,6 +52,8 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import { api } from "../../../../lib/api"
+import { useAuth } from "../../../../lib/auth"
 import {
   useConnectIntegration,
   useDisconnectIntegration,
@@ -86,6 +89,11 @@ type DiscoveredResourceItem = {
   externalResourceId: string
   externalResourceName: string | null
   metadata: Record<string, unknown> | null
+}
+
+type LinkTarget = {
+  externalResourceId: string
+  externalResourceName: string | null
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -133,7 +141,9 @@ export default function IntegrationDetailPage() {
   const integrationId = params.id as string
 
   const [showDisconnect, setShowDisconnect] = useState(false)
-  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(
+  const [linkTarget, setLinkTarget] = useState<LinkTarget | null>(null)
+  const [linkFlowPending, setLinkFlowPending] = useState(false)
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState<string | null>(
     null,
   )
 
@@ -152,6 +162,23 @@ export default function IntegrationDetailPage() {
     refetch: refetchSyncHistory,
     isLoading: syncHistoryLoading,
   } = useSyncHistory(integrationId, { pageSize: 10 })
+
+  const { user } = useAuth()
+  const publisherId = user?.publisherId
+  const {
+    data: publisherWebsites = [],
+    isLoading: websitesLoading,
+    isFetching: websitesFetching,
+    isError: websitesError,
+    refetch: refetchWebsites,
+  } = useQuery({
+    queryKey: ["integration-link-websites", publisherId],
+    queryFn: async () => {
+      if (!publisherId) return []
+      return api.publishers.getWebsites(publisherId)
+    },
+    enabled: Boolean(publisherId),
+  })
 
   // ── Mutations ────────────────────────────────────────────
 
@@ -192,6 +219,16 @@ export default function IntegrationDetailPage() {
     (syncHistory?.pagination as Pagination | undefined) ?? initialPagination
   const connection = integration?.connection
 
+  const activeLinkedWebsites = linkedWebsites.filter(
+    (website) => website.status !== WebsiteIntegrationStatus.REMOVED,
+  )
+  const linkedWebsiteIds = new Set(
+    activeLinkedWebsites.map((website) => website.websiteId),
+  )
+  const linkableWebsites = publisherWebsites.filter(
+    (site) => site.isActive && site.url && !linkedWebsiteIds.has(site.id),
+  )
+
   // ── Handlers ─────────────────────────────────────────────
 
   const handleReconnect = async () => {
@@ -216,18 +253,38 @@ export default function IntegrationDetailPage() {
     }
   }
 
-  const handleLink = async (externalResourceId: string) => {
+  const openLinkDialog = (resource: DiscoveredResourceItem) => {
+    if (linkFlowPending) return
+    setLinkTarget({
+      externalResourceId: resource.externalResourceId,
+      externalResourceName: resource.externalResourceName,
+    })
+    setSelectedWebsiteId(null)
+  }
+
+  const closeLinkDialog = () => {
+    if (linkFlowPending) return
+    setLinkTarget(null)
+    setSelectedWebsiteId(null)
+  }
+
+  const confirmLink = async () => {
+    if (!linkTarget || !selectedWebsiteId || linkFlowPending) return
+    setLinkFlowPending(true)
     try {
       await linkMutation.mutateAsync({
-        websiteId: "",
-        externalResourceId,
+        websiteId: selectedWebsiteId,
+        externalResourceId: linkTarget.externalResourceId,
       })
       toast.success("Property linked")
       await refetch()
       await refetchResources()
-      setSelectedResourceId(null)
+      setLinkTarget(null)
+      setSelectedWebsiteId(null)
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to link property")
+    } finally {
+      setLinkFlowPending(false)
     }
   }
 
@@ -500,11 +557,12 @@ export default function IntegrationDetailPage() {
               </thead>
               <tbody>
                 {(resources as DiscoveredResourceItem[]).map((r) => {
-                  const isAlreadyLinked = linkedWebsites.some(
+                  const isAlreadyLinked = activeLinkedWebsites.some(
                     (lw) => lw.externalResourceId === r.externalResourceId,
                   )
-                  const isSelected = r.externalResourceId === selectedResourceId
-                  const isLinking = isSelected && linkMutation.isPending
+                  const isSelected =
+                    linkTarget?.externalResourceId === r.externalResourceId
+                  const isLinking = isSelected && linkFlowPending
 
                   return (
                     <tr
@@ -532,11 +590,8 @@ export default function IntegrationDetailPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setSelectedResourceId(r.externalResourceId)
-                              handleLink(r.externalResourceId)
-                            }}
-                            disabled={isLinking}
+                            onClick={() => openLinkDialog(r)}
+                            disabled={linkFlowPending}
                             className="gap-1.5"
                           >
                             {isLinking ? (
@@ -604,6 +659,128 @@ export default function IntegrationDetailPage() {
           onPageChange={handlePageChange}
         />
       </section>
+
+      {/* ── Link property dialog ────────────────────────────── */}
+      <Dialog
+        open={linkTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) closeLinkDialog()
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link property to a website</DialogTitle>
+            <DialogDescription>
+              Choose which of your websites{" "}
+              {linkTarget?.externalResourceName ??
+                linkTarget?.externalResourceId}{" "}
+              should sync data for.
+            </DialogDescription>
+          </DialogHeader>
+
+          {websitesLoading || websitesFetching ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2
+                className="h-5 w-5 animate-spin text-muted-foreground"
+                aria-hidden="true"
+              />
+            </div>
+          ) : websitesError ? (
+            <div
+              role="alert"
+              className="flex flex-col items-center gap-3 rounded-xl border py-8 text-center"
+            >
+              <p className="text-sm text-muted-foreground">
+                Failed to load your websites.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refetchWebsites()}
+                className="gap-1.5"
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                Retry
+              </Button>
+            </div>
+          ) : linkableWebsites.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-xl border py-8 text-center">
+              <Globe
+                className="h-7 w-7 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-muted-foreground">
+                No available websites to link.
+              </p>
+              <Link
+                href="/dashboard/websites"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Go to your websites
+              </Link>
+            </div>
+          ) : (
+            <div
+              role="listbox"
+              aria-label="Your websites"
+              className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border p-2"
+            >
+              {linkableWebsites.map((site) => {
+                const active = site.id === selectedWebsiteId
+                return (
+                  <button
+                    key={site.id}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => setSelectedWebsiteId(site.id)}
+                    disabled={linkFlowPending}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                      active
+                        ? "bg-primary/10 text-foreground"
+                        : "hover:bg-muted",
+                    )}
+                  >
+                    <span className="truncate">{site.url}</span>
+                    {active && (
+                      <Check
+                        className="h-4 w-4 shrink-0 text-primary"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeLinkDialog}
+              disabled={linkFlowPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmLink}
+              disabled={
+                !selectedWebsiteId ||
+                linkFlowPending ||
+                linkableWebsites.length === 0
+              }
+              className="gap-1.5"
+            >
+              {linkFlowPending && (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
+              Link property
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Disconnect ──────────────────────────────────────── */}
       <section className="border-t pt-6">
