@@ -142,6 +142,7 @@ export default function IntegrationDetailPage() {
 
   const [showDisconnect, setShowDisconnect] = useState(false)
   const [linkTarget, setLinkTarget] = useState<LinkTarget | null>(null)
+  const [linkFlowPending, setLinkFlowPending] = useState(false)
   const [selectedWebsiteId, setSelectedWebsiteId] = useState<string | null>(
     null,
   )
@@ -253,6 +254,7 @@ export default function IntegrationDetailPage() {
   }
 
   const openLinkDialog = (resource: DiscoveredResourceItem) => {
+    if (linkFlowPending) return
     setLinkTarget({
       externalResourceId: resource.externalResourceId,
       externalResourceName: resource.externalResourceName,
@@ -261,13 +263,14 @@ export default function IntegrationDetailPage() {
   }
 
   const closeLinkDialog = () => {
-    if (linkMutation.isPending) return
+    if (linkFlowPending) return
     setLinkTarget(null)
     setSelectedWebsiteId(null)
   }
 
   const confirmLink = async () => {
-    if (!linkTarget || !selectedWebsiteId) return
+    if (!linkTarget || !selectedWebsiteId || linkFlowPending) return
+    setLinkFlowPending(true)
     try {
       await linkMutation.mutateAsync({
         websiteId: selectedWebsiteId,
@@ -280,6 +283,8 @@ export default function IntegrationDetailPage() {
       setSelectedWebsiteId(null)
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to link property")
+    } finally {
+      setLinkFlowPending(false)
     }
   }
 
@@ -557,7 +562,7 @@ export default function IntegrationDetailPage() {
                   )
                   const isSelected =
                     linkTarget?.externalResourceId === r.externalResourceId
-                  const isLinking = isSelected && linkMutation.isPending
+                  const isLinking = isSelected && linkFlowPending
 
                   return (
                     <tr
@@ -586,7 +591,7 @@ export default function IntegrationDetailPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => openLinkDialog(r)}
-                            disabled={isLinking}
+                            disabled={linkFlowPending}
                             className="gap-1.5"
                           >
                             {isLinking ? (
@@ -730,6 +735,7 @@ export default function IntegrationDetailPage() {
                     role="option"
                     aria-selected={active}
                     onClick={() => setSelectedWebsiteId(site.id)}
+                    disabled={linkFlowPending}
                     className={cn(
                       "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors",
                       active
@@ -751,19 +757,23 @@ export default function IntegrationDetailPage() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={closeLinkDialog}>
+            <Button
+              variant="outline"
+              onClick={closeLinkDialog}
+              disabled={linkFlowPending}
+            >
               Cancel
             </Button>
             <Button
               onClick={confirmLink}
               disabled={
                 !selectedWebsiteId ||
-                linkMutation.isPending ||
+                linkFlowPending ||
                 linkableWebsites.length === 0
               }
               className="gap-1.5"
             >
-              {linkMutation.isPending && (
+              {linkFlowPending && (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               )}
               Link property

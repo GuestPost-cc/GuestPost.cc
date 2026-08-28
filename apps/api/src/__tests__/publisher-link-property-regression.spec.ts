@@ -100,4 +100,17 @@ describe("publisher integrations link-property regression guard", () => {
     )
     expect(content).toMatch(/isAlreadyLinked\s*=\s*activeLinkedWebsites\.some/)
   })
+
+  it("keeps the link workflow locked through post-mutation refreshes", () => {
+    const content = readFileSync(PAGE_PATH, "utf-8")
+
+    expect(content).toMatch(/\[linkFlowPending,\s*setLinkFlowPending\]/)
+    expect(content).toMatch(
+      /openLinkDialog[\s\S]*?if \(linkFlowPending\) return/,
+    )
+    expect(content).toMatch(
+      /confirmLink[\s\S]*?setLinkFlowPending\(true\)[\s\S]*?await refetch\(\)[\s\S]*?await refetchResources\(\)[\s\S]*?finally[\s\S]*?setLinkFlowPending\(false\)/,
+    )
+    expect(content).toMatch(/disabled=\{linkFlowPending\}/)
+  })
 })
