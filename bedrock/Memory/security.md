@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: security
 project: guestpost-platform
-updated: 2026-08-14
+updated: 2026-09-08
 ---
 
 # Security
@@ -39,6 +39,24 @@ updated: 2026-08-14
 - Generic support read/reply is customer/publisher-only; staff use the guarded
   admin surface. Generic settlement detail is customer-only; staff use the
   guarded admin settlement surface.
+
+## Staged Row-Level Security
+
+- Phase 1 protects `ApiKey` with PostgreSQL `ENABLE ROW LEVEL SECURITY` and
+  `FORCE ROW LEVEL SECURITY`. API-key CRUD accepts only the durable
+  `CurrentAuthority` projection, pins customer-owner facts with transaction-
+  local PostgreSQL settings, and performs the protected Prisma calls through
+  that same interactive transaction client.
+- The database policy requires matching organization context and a live,
+  active customer-owner `Membership` joined to `User`; a request context does
+  not survive connection pooling or a later membership deactivation. The
+  opaque API-key validation path can see/update only a matching presented key
+  hash and has no staff, worker, or tenant-wide bypass.
+- This is intentionally not a full-model RLS claim. The remaining 98 Prisma
+  models still use the existing guard/service ownership boundaries until each
+  receives a policy, context producer, non-owner database-role test, and
+  explicit grant review. `docs/RLS_ROLLOUT.md` records the role topology,
+  rollout gates, threat model, and remaining phases.
 
 ## Support Messaging Security
 

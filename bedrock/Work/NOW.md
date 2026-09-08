@@ -1,10 +1,27 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-08-23
+updated: 2026-09-08
 ---
 
 # Current focus
+
+## Staged tenant RLS
+
+The current reviewable change adds the first forced-RLS boundary for
+organization API keys. It keeps database schema/migration authority separate
+from API, worker, and fail-closed reporting runtime roles; documents the
+controlled role/ownership cutover; and proves two-organization CRUD isolation
+using a disposable PostgreSQL clone and a non-owner `NOBYPASSRLS` test role.
+
+Only `ApiKey` is protected today. The remaining 98 Prisma models are not
+represented as complete RLS coverage and retain their established auth/guard
+checks. The next RLS phases must inventory every direct API, worker, Better
+Auth pre-authorization, staff, and public-catalog operation before enabling
+their policies. Do not use an owner, worker, staff, `PUBLIC`, or generic
+runtime bypass as a shortcut.
+
+## Prior marketplace context
 
 PR #105 layers the marketplace trust-boundary hardening on current `main` SHA
 `1d993e0`, which already includes the support-messaging and confirmed

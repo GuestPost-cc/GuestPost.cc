@@ -13,6 +13,12 @@ export {
   parsePoolMax,
 } from "./create-prisma-client"
 export * from "./prisma/client"
+export {
+  type ApiKeyValidationRlsContext,
+  type OrganizationOwnerRlsContext,
+  withApiKeyValidationRlsContext,
+  withOrganizationOwnerRlsContext,
+} from "./rls-context"
 export { PrismaClient }
 
 const globalForPrisma = globalThis as unknown as {
