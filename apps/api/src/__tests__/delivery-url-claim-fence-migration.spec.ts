@@ -31,6 +31,10 @@ const runtimeGrantSql = fs.readFileSync(
   path.join(repoRoot, "scripts/fixtures/grant-delivery-url-fence-runtime.sql"),
   "utf8",
 )
+const rlsProvisioningSql = fs.readFileSync(
+  path.join(repoRoot, "scripts/provision-rls-roles.sql"),
+  "utf8",
+)
 
 describe("delivery URL claim fence migration contract", () => {
   it("uses the same advisory namespace as the application lock", () => {
@@ -124,5 +128,18 @@ describe("delivery URL claim fence migration contract", () => {
     expect(runtimeGrantSql).toMatch(/GRANT USAGE ON SCHEMA public/)
     expect(runtimeGrantSql).toMatch(/REVOKE CREATE ON SCHEMA public/)
     expect(financeRehearsalScript).toContain("ERROR:  40001:")
+  })
+
+  it("preserves the exact direct fence grant in the staged RLS role topology", () => {
+    expect(rlsProvisioningSql).toContain("\\set ON_ERROR_STOP on")
+    expect(rlsProvisioningSql).toMatch(
+      /database_name is required[\s\S]*\\quit 3/,
+    )
+    expect(rlsProvisioningSql).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\."acquire_delivery_url_claim_fence"\(text\)\s+TO guestpost_api_group, guestpost_worker_group/,
+    )
+    expect(rlsProvisioningSql).toContain(
+      "REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC",
+    )
   })
 })

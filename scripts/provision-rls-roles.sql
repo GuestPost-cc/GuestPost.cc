@@ -8,10 +8,12 @@
 -- Example:
 --   psql "$ADMIN_DATABASE_URL" -v database_name=guestpost -f scripts/provision-rls-roles.sql
 
+\set ON_ERROR_STOP on
+
 \if :{?database_name}
 \else
   \echo 'database_name is required (for example: -v database_name=guestpost)'
-  \quit
+  \quit 3
 \endif
 
 DO $roles$
@@ -93,6 +95,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost_worker_group;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_api_group;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_worker_group;
+
+-- The delivery verification worker and API delivery flows call this
+-- SECURITY INVOKER fence directly. Functions were revoked from PUBLIC above,
+-- so retain only this audited runtime surface for the two callers.
+GRANT EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)
+  TO guestpost_api_group, guestpost_worker_group;
 
 -- Reporting starts fail-closed: connect + schema usage but no table, sequence,
 -- or function privileges. Add an approved view/query grant per report.

@@ -137,25 +137,42 @@ describe("[INTEGRATION] RLS — API key tenant isolation", () => {
         expect(visible.map((row: { id: string }) => row.id)).toEqual([
           createdA.id,
         ])
+      })
 
-        // INSERT: an A context cannot write a B row.
-        await expect(
+      // Keep each rejected mutation in its own transaction. PostgreSQL marks
+      // a transaction aborted after an RLS error, so combining these would let
+      // the later assertions pass without reaching their policy checks.
+      await expect(
+        withOwner(prisma, role, tenantA, (tx) =>
           tx.apiKey.create({
             data: apiKeyData(tenantB.organization.id, `forbidden-${suffix}`),
           }),
-        ).rejects.toThrow(/row-level security/i)
+        ),
+      ).rejects.toThrow(/row-level security/i)
 
-        // UPDATE and DELETE: cross-tenant predicates match no target row.
-        await expect(
+      // UPDATE and DELETE: cross-tenant predicates match no visible target.
+      await expect(
+        withOwner(prisma, role, tenantA, (tx) =>
           tx.apiKey.update({
             where: { id: createdB.id },
             data: { name: "cross-tenant-update" },
           }),
-        ).rejects.toThrow()
-        await expect(
+        ),
+      ).rejects.toMatchObject({ code: "P2025" })
+      await expect(
+        withOwner(prisma, role, tenantA, (tx) =>
           tx.apiKey.delete({ where: { id: createdB.id } }),
-        ).rejects.toThrow()
-      })
+        ),
+      ).rejects.toMatchObject({ code: "P2025" })
+
+      // Verify that both cross-tenant mutations left the protected row intact.
+      const tenantBAfterDeniedMutations = await withOwner(
+        prisma,
+        role,
+        tenantB,
+        (tx) => tx.apiKey.findUniqueOrThrow({ where: { id: createdB.id } }),
+      )
+      expect(tenantBAfterDeniedMutations.name).toBe(keyB.name)
 
       // The allowed tenant can perform its own INSERT, UPDATE, and DELETE.
       await withOwner(prisma, role, tenantA, async (tx) => {

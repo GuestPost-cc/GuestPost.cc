@@ -51,7 +51,12 @@ updated: 2026-09-08
   active customer-owner `Membership` joined to `User`; a request context does
   not survive connection pooling or a later membership deactivation. The
   opaque API-key validation path can see/update only a matching presented key
-  hash and has no staff, worker, or tenant-wide bypass.
+  hash and has no staff, worker, or tenant-wide bypass. RLS rejection tests
+  isolate each expected database failure in its own transaction: a PostgreSQL
+  policy error aborts that transaction, so later mutation assertions must not
+  reuse it. The staged runtime-role provisioning revokes function access from
+  `PUBLIC` and grants only the direct delivery URL fence function to the API
+  and worker groups that call it.
 - This is intentionally not a full-model RLS claim. The remaining 98 Prisma
   models still use the existing guard/service ownership boundaries until each
   receives a policy, context producer, non-owner database-role test, and

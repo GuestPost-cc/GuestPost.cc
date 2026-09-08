@@ -13,6 +13,8 @@ organization API keys. It keeps database schema/migration authority separate
 from API, worker, and fail-closed reporting runtime roles; documents the
 controlled role/ownership cutover; and proves two-organization CRUD isolation
 using a disposable PostgreSQL clone and a non-owner `NOBYPASSRLS` test role.
+Rejected API-key mutations are tested in separate transactions so an aborted
+PostgreSQL transaction cannot mask later cross-tenant UPDATE/DELETE checks.
 
 Only `ApiKey` is protected today. The remaining 98 Prisma models are not
 represented as complete RLS coverage and retain their established auth/guard
