@@ -15,13 +15,13 @@ overrides:
   browserslist: 4.28.8
   baseline-browser-mapping: 2.11.0
   fast-uri: 3.1.6
-  hono: 4.12.34
+  hono: 4.13.5
   ip-address: 10.3.1
   nanoid: 3.3.18
   postcss: 8.5.23
   mysql2: 3.23.1
   qs: 6.16.0
-  sharp: 0.35.3
+  sharp: 0.35.4
   shell-quote: 1.9.0
   valibot: 1.4.2
   vitest: 4.1.11
