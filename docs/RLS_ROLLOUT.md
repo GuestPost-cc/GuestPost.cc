@@ -32,10 +32,10 @@ approved local or staging clone. It creates:
 | Role | Attributes | Purpose |
 | --- | --- | --- |
 | `guestpost_schema_owner` | `NOLOGIN`, no superuser or bypass | Owns schema and migrations. |
-| `guestpost_migrator` | login, `NOINHERIT`, no superuser or bypass | Sets role to the schema owner only for migration runs. |
-| `guestpost_api_group` / `guestpost_api_runtime` | group is `NOLOGIN`; runtime is login, no DDL or bypass | API service connection. |
-| `guestpost_worker_group` / `guestpost_worker_runtime` | group is `NOLOGIN`; runtime is login, no DDL or bypass | Queue/worker service connection. |
-| `guestpost_reporting_group` / `guestpost_reporting_runtime` | group is `NOLOGIN`; runtime is login, no DDL or bypass | Fail-closed reporting identity. |
+| `guestpost_migrator` | bootstrap leaves `NOLOGIN`, `NOINHERIT`, no superuser or bypass | Sets role to the schema owner only for migration runs after controlled activation. |
+| `guestpost_api_group` / `guestpost_api_runtime` | group is `NOLOGIN`; bootstrap leaves runtime `NOLOGIN`, with no DDL or bypass | API service connection after controlled activation. |
+| `guestpost_worker_group` / `guestpost_worker_runtime` | group is `NOLOGIN`; bootstrap leaves runtime `NOLOGIN`, with no DDL or bypass | Queue/worker service connection after controlled activation. |
+| `guestpost_reporting_group` / `guestpost_reporting_runtime` | both remain `NOLOGIN` until approved; no DDL or bypass | Fail-closed reporting identity. |
 
 All roles are `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOREPLICATION`,
 and `NOBYPASSRLS`. Database access, schema usage, and relation permissions are
@@ -51,11 +51,12 @@ RLS bypass. Reporting gets no table grants until a report-specific view/query
 is approved. Every later phase must replace the broad DML baseline with a
 table/column grant matrix; it must not add a role-wide RLS bypass.
 
-The bootstrap recipe is authoritative for its eight managed roles: it disables
-the four login roles, removes every existing membership edge involving a
-managed role, restores only the four documented edges, and then re-enables
-login. Do not attach ad hoc memberships to these roles; rerunning the recipe
-will intentionally remove them.
+The bootstrap recipe is authoritative for its eight managed roles: in one
+transaction it disables the four credential roles, removes every existing
+membership edge involving a managed role, restores only the four documented
+edges, and reconciles direct and default ACLs. Credential roles remain
+`NOLOGIN` afterward. Do not attach ad hoc memberships or direct grants to these
+roles; rerunning the recipe will intentionally remove them.
 
 The migrator membership is `INHERIT FALSE, SET TRUE`. The recipe persists a
 database-scoped `role=guestpost_schema_owner` session default for
@@ -90,9 +91,10 @@ bootstrap inventory rather than a new-relation grant.
    have separate connection strings. Do not run the bootstrap recipe against
    production as a discovery mechanism.
 2. Execute the role recipe through a protected administrator connection with
-   `-v database_name=<approved_clone>`. Set distinct passwords or certificate
-   credentials out of band. No application service receives the migrator or
-   schema-owner secret.
+   `-v database_name=<approved_clone>`. It commits the complete role/ACL graph
+   atomically and leaves all credential roles `NOLOGIN`. Set distinct passwords
+   or certificate mappings and the matching host authentication rules out of
+   band. No application service receives the migrator or schema-owner secret.
 3. Transfer schema/table ownership to `guestpost_schema_owner` using an
    explicit, reviewed ownership inventory. The migration job connects as
    `guestpost_migrator`; the database-scoped role default applied by the recipe
@@ -101,8 +103,12 @@ bootstrap inventory rather than a new-relation grant.
    `session_user = 'guestpost_migrator'` and
    `current_user = 'guestpost_schema_owner'`; abort on any mismatch. API and
    worker jobs never receive the migration URL.
-4. Revoke the former runtime identity's owner/DDL capabilities only after the
-   API and worker have been switched to their runtime credentials and all
+4. After credentials, certificate mappings, host authentication, ownership,
+   and catalog checks are approved, explicitly enable only the required
+   credential roles in a separate administrator change. Then connect with each
+   new identity and verify its `session_user`, `current_user`, role memberships,
+   and denied operations before switching API or worker configuration. Revoke
+   the former runtime identity's owner/DDL capabilities only after the new
    bootstrap/auth checks pass. Better Auth performs database reads before a
    request has a user or organization context, so the auth tables and the
    pre-auth path must be validated before tenant policies are enabled.

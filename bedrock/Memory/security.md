@@ -57,9 +57,10 @@ updated: 2026-09-08
   reuse it. The staged runtime-role provisioning revokes function access from
   `PUBLIC` and grants only the direct delivery URL fence function to the API
   and worker groups that call it. The bootstrap owns the complete membership
-  graph for its eight managed roles: it disables logins, removes unexpected
-  membership edges, restores only the four reviewed edges, then re-enables
-  logins. Default privileges remain fail-closed; every future relation-creating
+  graph for its eight managed roles: atomically disables credential roles,
+  removes unexpected membership edges and direct/default ACLs, restores only
+  the reviewed edges and grants, and leaves credentials `NOLOGIN` for separate
+  activation after authentication is configured. Every future relation-creating
   migration must carry reviewed object-specific runtime grants and a contract
   test instead of blanket application-role defaults. Migrator connections use
   a target-database session default that makes every Prisma Migrate connection

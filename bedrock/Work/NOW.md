@@ -15,13 +15,14 @@ controlled role/ownership cutover; and proves two-organization CRUD isolation
 using a disposable PostgreSQL clone and a non-owner `NOBYPASSRLS` test role.
 Rejected API-key mutations are tested in separate transactions so an aborted
 PostgreSQL transaction cannot mask later cross-tenant UPDATE/DELETE checks.
-The reviewed role bootstrap disables login while it removes every unexpected
-membership involving its managed roles, restores only the documented topology,
-enforces database-scoped schema-owner switching for every migrator connection,
-clears runtime role-switch defaults, and then re-enables login. Its rollout
-audit expands built-in ACL defaults and requires zero `PUBLIC` privileges.
-Future relation-creating migrations must ship their object-specific API/worker
-grants and a matching contract test.
+The reviewed role bootstrap atomically disables credentials while it removes
+every unexpected managed-role membership and direct/default ACL, restores only
+the documented topology and grants, enforces database-scoped schema-owner
+switching for migrator connections, and leaves credentials `NOLOGIN` for a
+separate activation after authentication is configured. Its rollout audit
+expands built-in ACL defaults and requires zero `PUBLIC` privileges. Future
+relation-creating migrations must ship their object-specific API/worker grants
+and a matching contract test.
 
 Only `ApiKey` is protected today. The remaining 98 Prisma models are not
 represented as complete RLS coverage and retain their established auth/guard
@@ -130,12 +131,13 @@ again before merge.
 
 ## Next actions
 
-1. Push the final review-fix commit to PR #105 and merge only after every
-   required GitHub check succeeds and the review-thread gate is clear.
-2. Keep production writers drained for any later production cutover; rehearse
-   on a populated clone, take the required recovery marker, deploy migrations
-   before the matching images, and use forward-fix/PITR rather than removing
-   evidence guards.
-3. Keep the worker, finance, payout, managed-KMS, and legal/provider gates
-   explicit instead of treating a green PR or staging database as launch
-   approval.
+1. Merge staged-RLS PR #116 only after its final rebased head passes the complete
+   GitHub matrix and every review thread is cleared.
+2. Rehearse the role recipe on an approved disposable clone, verify the exact
+   membership/direct/default ACL graph, configure independent credentials and
+   host authentication, then activate only the required credential roles in a
+   separate approved change.
+3. On staging, verify migrator `session_user`/`current_user`, apply the migration
+   under the schema owner, run cross-tenant and auth/bootstrap checks with the
+   non-owner runtime identities, and keep production unchanged until a separate
+   cutover is approved.

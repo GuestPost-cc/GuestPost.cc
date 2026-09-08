@@ -25,6 +25,11 @@ SELECT current_database() = :'database_name' AS target_database_matches \gset
   \quit 3
 \endif
 
+-- PostgreSQL role and ACL changes are transactional. Keep the complete
+-- reconciliation atomic so ON_ERROR_STOP causes an implicit rollback on any
+-- failure rather than committing a partially updated security boundary.
+BEGIN;
+
 DO $roles$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_schema_owner') THEN
@@ -55,7 +60,8 @@ END
 $roles$;
 
 -- Disable credential use before reconciling any role that predated this
--- rollout. LOGIN is restored only after the exact membership graph is rebuilt.
+-- rollout. Credential activation is a separate controlled change after this
+-- transaction commits and authentication is configured.
 ALTER ROLE guestpost_migrator NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 ALTER ROLE guestpost_api_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
 ALTER ROLE guestpost_worker_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
@@ -141,16 +147,30 @@ ALTER ROLE guestpost_migrator IN DATABASE :"database_name"
 -- privileges. Existing application roles must be explicitly reviewed before
 -- this is used against a shared environment.
 REVOKE ALL ON DATABASE :"database_name" FROM PUBLIC;
+REVOKE ALL ON DATABASE :"database_name" FROM
+  guestpost_schema_owner,
+  guestpost_api_group,
+  guestpost_worker_group,
+  guestpost_reporting_group,
+  guestpost_migrator,
+  guestpost_api_runtime,
+  guestpost_worker_runtime,
+  guestpost_reporting_runtime;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_migrator;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_api_runtime;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_worker_runtime;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_reporting_runtime;
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM
+  guestpost_api_group,
+  guestpost_worker_group,
+  guestpost_reporting_group,
+  guestpost_migrator,
+  guestpost_api_runtime,
+  guestpost_worker_runtime,
+  guestpost_reporting_runtime;
 GRANT USAGE, CREATE ON SCHEMA public TO guestpost_schema_owner;
-REVOKE CREATE ON SCHEMA public FROM guestpost_api_group;
-REVOKE CREATE ON SCHEMA public FROM guestpost_worker_group;
-REVOKE CREATE ON SCHEMA public FROM guestpost_reporting_group;
 GRANT USAGE ON SCHEMA public TO guestpost_api_group;
 GRANT USAGE ON SCHEMA public TO guestpost_worker_group;
 GRANT USAGE ON SCHEMA public TO guestpost_reporting_group;
@@ -158,6 +178,30 @@ GRANT USAGE ON SCHEMA public TO guestpost_reporting_group;
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM
+  guestpost_api_group,
+  guestpost_worker_group,
+  guestpost_reporting_group,
+  guestpost_migrator,
+  guestpost_api_runtime,
+  guestpost_worker_runtime,
+  guestpost_reporting_runtime;
+REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
+  guestpost_api_group,
+  guestpost_worker_group,
+  guestpost_reporting_group,
+  guestpost_migrator,
+  guestpost_api_runtime,
+  guestpost_worker_runtime,
+  guestpost_reporting_runtime;
+REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
+  guestpost_api_group,
+  guestpost_worker_group,
+  guestpost_reporting_group,
+  guestpost_migrator,
+  guestpost_api_runtime,
+  guestpost_worker_runtime,
+  guestpost_reporting_runtime;
 
 -- Compatibility baseline for the existing API/worker graph. The inventory
 -- currently contains 99 Prisma models and over 2,000 call sites, including
@@ -184,11 +228,33 @@ GRANT EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON SEQUENCES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON TABLES FROM
+  guestpost_api_group,
+  guestpost_worker_group,
+  guestpost_reporting_group,
+  guestpost_migrator,
+  guestpost_api_runtime,
+  guestpost_worker_runtime,
+  guestpost_reporting_runtime;
+ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON SEQUENCES FROM
+  guestpost_api_group,
+  guestpost_worker_group,
+  guestpost_reporting_group,
+  guestpost_migrator,
+  guestpost_api_runtime,
+  guestpost_worker_runtime,
+  guestpost_reporting_runtime;
+ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM
+  guestpost_api_group,
+  guestpost_worker_group,
+  guestpost_reporting_group,
+  guestpost_migrator,
+  guestpost_api_runtime,
+  guestpost_worker_runtime,
+  guestpost_reporting_runtime;
 
--- Existing passwords are preserved. Newly created roles still have no usable
--- password until credentials are set through the separate controlled change.
--- Keep every login disabled until the complete privilege graph is reconciled.
-ALTER ROLE guestpost_migrator LOGIN;
-ALTER ROLE guestpost_api_runtime LOGIN;
-ALTER ROLE guestpost_worker_runtime LOGIN;
-ALTER ROLE guestpost_reporting_runtime LOGIN;
+COMMIT;
+
+-- Existing passwords are preserved, but every credential role remains
+-- NOLOGIN. Enable LOGIN only in a separate approved change after passwords or
+-- certificate mappings and host authentication rules have been configured.

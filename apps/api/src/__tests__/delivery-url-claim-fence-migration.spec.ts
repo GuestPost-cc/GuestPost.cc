@@ -151,23 +151,38 @@ describe("delivery URL claim fence migration contract", () => {
     expect(rlsProvisioningSql).toContain(
       "REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC",
     )
+    const managedAclCleanup = rlsProvisioningSql.indexOf(
+      "REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM\n  guestpost_api_group",
+    )
+    const compatibilityGrant = rlsProvisioningSql.indexOf(
+      "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost_api_group",
+    )
+    expect(managedAclCleanup).toBeGreaterThan(-1)
+    expect(compatibilityGrant).toBeGreaterThan(managedAclCleanup)
+    expect(rlsProvisioningSql).toContain(
+      "ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM\n  guestpost_api_group",
+    )
   })
 
-  it("rebuilds the managed membership graph before enabling login roles", () => {
+  it("atomically rebuilds the managed graph and leaves credentials disabled", () => {
+    const transactionStart = rlsProvisioningSql.indexOf("BEGIN;\n\nDO $roles$")
     const membershipCleanup = rlsProvisioningSql.indexOf("DO $memberships$")
     const intendedMemberships = rlsProvisioningSql.indexOf(
       "GRANT guestpost_schema_owner TO guestpost_migrator",
     )
-    const loginEnablement = rlsProvisioningSql.indexOf(
-      "ALTER ROLE guestpost_migrator LOGIN;",
-    )
+    const transactionCommit = rlsProvisioningSql.indexOf("\nCOMMIT;")
 
+    expect(transactionStart).toBeGreaterThan(-1)
     expect(membershipCleanup).toBeGreaterThan(-1)
+    expect(membershipCleanup).toBeGreaterThan(transactionStart)
     expect(intendedMemberships).toBeGreaterThan(membershipCleanup)
-    expect(loginEnablement).toBeGreaterThan(intendedMemberships)
+    expect(transactionCommit).toBeGreaterThan(intendedMemberships)
     expect(rlsProvisioningSql).toContain("'REVOKE %I FROM %I'")
     expect(rlsProvisioningSql).toContain(
       "ALTER ROLE guestpost_api_runtime NOLOGIN",
+    )
+    expect(rlsProvisioningSql).not.toMatch(
+      /^ALTER ROLE guestpost_(?:migrator|api_runtime|worker_runtime|reporting_runtime) LOGIN;$/m,
     )
     expect(
       rlsProvisioningSql.match(/^GRANT guestpost_\w+ TO guestpost_\w+ .+;$/gm),
@@ -197,5 +212,6 @@ describe("delivery URL claim fence migration contract", () => {
       "FROM information_schema.table_privileges",
     )
     expect(rlsRolloutRunbook).toContain("WITH public_acl AS")
+    expect(rlsRolloutRunbook).toContain("leaves all credential roles `NOLOGIN`")
   })
 })
