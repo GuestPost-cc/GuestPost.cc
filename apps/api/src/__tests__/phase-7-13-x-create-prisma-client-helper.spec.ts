@@ -72,6 +72,19 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
         void (client as any).$disconnect?.()
       })
     })
+
+    it("accepts an explicit URL for a separate workload identity", () => {
+      jest.isolateModules(() => {
+        delete process.env.DATABASE_URL
+        const { createPrismaClient } =
+          require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
+        const client = createPrismaClient({
+          databaseUrl: "postgresql://auth:test@localhost:5432/test",
+        })
+        expect(client).toBeDefined()
+        void (client as any).$disconnect?.()
+      })
+    })
   })
 
   describe("static-source: both production callsites adopt the helpers", () => {
@@ -94,7 +107,7 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
         /import\s*\{[^}]*createPrismaClient[^}]*\}\s*from\s*["']\.\/create-prisma-client["']/,
       )
       expect(src).toMatch(
-        /globalForPrisma\.prisma\s*\?\?\s*createPrismaClient\(\)/,
+        /globalForPrisma\.prisma\s*\?\?\s*createRlsAwarePrismaClient\(createPrismaClient\(\)\)/,
       )
     })
 

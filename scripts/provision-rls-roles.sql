@@ -41,6 +41,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_api_group') THEN
     CREATE ROLE guestpost_api_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_auth_group') THEN
+    CREATE ROLE guestpost_auth_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_worker_group') THEN
     CREATE ROLE guestpost_worker_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
   END IF;
@@ -50,11 +53,17 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_api_runtime') THEN
     CREATE ROLE guestpost_api_runtime NOLOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_auth_runtime') THEN
+    CREATE ROLE guestpost_auth_runtime NOLOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_worker_runtime') THEN
     CREATE ROLE guestpost_worker_runtime NOLOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_reporting_runtime') THEN
     CREATE ROLE guestpost_reporting_runtime NOLOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_rls_authorizer') THEN
+    CREATE ROLE guestpost_rls_authorizer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
   END IF;
 END
 $roles$;
@@ -64,23 +73,27 @@ $roles$;
 -- transaction commits and authentication is configured.
 ALTER ROLE guestpost_migrator NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 ALTER ROLE guestpost_api_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+ALTER ROLE guestpost_auth_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
 ALTER ROLE guestpost_worker_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
 ALTER ROLE guestpost_reporting_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
 
 -- Make the remaining safe attributes idempotent too.
 ALTER ROLE guestpost_schema_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 ALTER ROLE guestpost_api_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE guestpost_auth_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 ALTER ROLE guestpost_worker_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 ALTER ROLE guestpost_reporting_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE guestpost_rls_authorizer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 
 ALTER ROLE guestpost_migrator SET search_path = pg_catalog, public;
 ALTER ROLE guestpost_api_runtime SET search_path = pg_catalog, public;
+ALTER ROLE guestpost_auth_runtime SET search_path = pg_catalog, public;
 ALTER ROLE guestpost_worker_runtime SET search_path = pg_catalog, public;
 ALTER ROLE guestpost_reporting_runtime SET search_path = pg_catalog, public;
 
 -- This recipe owns the complete membership topology for its managed roles.
 -- Remove both direct and transitive surprises left by an earlier/manual setup,
--- then recreate only the four reviewed edges below. This is safe to rerun.
+-- then recreate only the five reviewed edges below. This is safe to rerun.
 DO $memberships$
 DECLARE
   membership_row record;
@@ -97,20 +110,26 @@ BEGIN
       'guestpost_migrator',
       'guestpost_api_group',
       'guestpost_api_runtime',
+      'guestpost_auth_group',
+      'guestpost_auth_runtime',
       'guestpost_worker_group',
       'guestpost_worker_runtime',
       'guestpost_reporting_group',
-      'guestpost_reporting_runtime'
+      'guestpost_reporting_runtime',
+      'guestpost_rls_authorizer'
     )
     OR member_role.rolname IN (
       'guestpost_schema_owner',
       'guestpost_migrator',
       'guestpost_api_group',
       'guestpost_api_runtime',
+      'guestpost_auth_group',
+      'guestpost_auth_runtime',
       'guestpost_worker_group',
       'guestpost_worker_runtime',
       'guestpost_reporting_group',
-      'guestpost_reporting_runtime'
+      'guestpost_reporting_runtime',
+      'guestpost_rls_authorizer'
     )
   LOOP
     EXECUTE format(
@@ -128,15 +147,18 @@ $memberships$;
 -- every separate connection opened by Prisma Migrate.
 ALTER ROLE guestpost_migrator RESET role;
 ALTER ROLE guestpost_api_runtime RESET role;
+ALTER ROLE guestpost_auth_runtime RESET role;
 ALTER ROLE guestpost_worker_runtime RESET role;
 ALTER ROLE guestpost_reporting_runtime RESET role;
 ALTER ROLE guestpost_migrator IN DATABASE :"database_name" RESET role;
 ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name" RESET role;
+ALTER ROLE guestpost_auth_runtime IN DATABASE :"database_name" RESET role;
 ALTER ROLE guestpost_worker_runtime IN DATABASE :"database_name" RESET role;
 ALTER ROLE guestpost_reporting_runtime IN DATABASE :"database_name" RESET role;
 
 GRANT guestpost_schema_owner TO guestpost_migrator WITH INHERIT FALSE, SET TRUE;
 GRANT guestpost_api_group TO guestpost_api_runtime WITH INHERIT TRUE, SET FALSE;
+GRANT guestpost_auth_group TO guestpost_auth_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_worker_group TO guestpost_worker_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_reporting_group TO guestpost_reporting_runtime WITH INHERIT TRUE, SET FALSE;
 
@@ -150,28 +172,36 @@ REVOKE ALL ON DATABASE :"database_name" FROM PUBLIC;
 REVOKE ALL ON DATABASE :"database_name" FROM
   guestpost_schema_owner,
   guestpost_api_group,
+  guestpost_auth_group,
   guestpost_worker_group,
   guestpost_reporting_group,
   guestpost_migrator,
   guestpost_api_runtime,
+  guestpost_auth_runtime,
   guestpost_worker_runtime,
-  guestpost_reporting_runtime;
+  guestpost_reporting_runtime,
+  guestpost_rls_authorizer;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_migrator;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_api_runtime;
+GRANT CONNECT ON DATABASE :"database_name" TO guestpost_auth_runtime;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_worker_runtime;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_reporting_runtime;
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON SCHEMA public FROM
   guestpost_api_group,
+  guestpost_auth_group,
   guestpost_worker_group,
   guestpost_reporting_group,
   guestpost_migrator,
   guestpost_api_runtime,
+  guestpost_auth_runtime,
   guestpost_worker_runtime,
-  guestpost_reporting_runtime;
+  guestpost_reporting_runtime,
+  guestpost_rls_authorizer;
 GRANT USAGE, CREATE ON SCHEMA public TO guestpost_schema_owner;
 GRANT USAGE ON SCHEMA public TO guestpost_api_group;
+GRANT USAGE ON SCHEMA public TO guestpost_auth_group;
 GRANT USAGE ON SCHEMA public TO guestpost_worker_group;
 GRANT USAGE ON SCHEMA public TO guestpost_reporting_group;
 
@@ -180,38 +210,67 @@ REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM
   guestpost_api_group,
+  guestpost_auth_group,
   guestpost_worker_group,
   guestpost_reporting_group,
   guestpost_migrator,
   guestpost_api_runtime,
+  guestpost_auth_runtime,
   guestpost_worker_runtime,
-  guestpost_reporting_runtime;
+  guestpost_reporting_runtime,
+  guestpost_rls_authorizer;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
   guestpost_api_group,
+  guestpost_auth_group,
   guestpost_worker_group,
   guestpost_reporting_group,
   guestpost_migrator,
   guestpost_api_runtime,
+  guestpost_auth_runtime,
   guestpost_worker_runtime,
-  guestpost_reporting_runtime;
+  guestpost_reporting_runtime,
+  guestpost_rls_authorizer;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
   guestpost_api_group,
+  guestpost_auth_group,
   guestpost_worker_group,
   guestpost_reporting_group,
   guestpost_migrator,
   guestpost_api_runtime,
+  guestpost_auth_runtime,
   guestpost_worker_runtime,
-  guestpost_reporting_runtime;
+  guestpost_reporting_runtime,
+  guestpost_rls_authorizer;
 
--- Compatibility baseline for the existing API/worker graph. The inventory
--- currently contains 99 Prisma models and over 2,000 call sites, including
--- Better Auth's pre-authorization reads. It receives normal DML but no DDL,
--- role, replication, superuser, or RLS-bypass ability. Each future RLS phase
--- must replace these broad relation grants with its documented table matrix.
+-- The API and worker need relation-level DML for the reviewed 99-model graph;
+-- FORCE RLS and the command-aware policy matrix decide which rows each
+-- workload may actually read or change. These grants confer no DDL, role,
+-- replication, superuser, or RLS-bypass ability. Default privileges below
+-- remain empty so a future relation fails closed until its ACL, policy root,
+-- manifest entry, activation count, and tests are reviewed together.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost_api_group;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost_worker_group;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_api_group;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_worker_group;
+
+-- Better Auth is isolated from the API runtime. It owns session/account flows
+-- and the atomic birth-time provisioning transaction, but no marketplace,
+-- order, payout, or reporting tables.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  public."User",
+  public."LegalAcceptance",
+  public."Session",
+  public."Account",
+  public."Verification",
+  public."ActiveContext",
+  public."Organization",
+  public."Membership",
+  public."PublisherMembership",
+  public."Publisher",
+  public."PublisherBalance",
+  public."Wallet",
+  public."AuditLog"
+TO guestpost_auth_group;
 
 -- The delivery verification worker and API delivery flows call this
 -- SECURITY INVOKER fence directly. Functions were revoked from PUBLIC above,
@@ -230,28 +289,37 @@ ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON TABLES FROM
   guestpost_api_group,
+  guestpost_auth_group,
   guestpost_worker_group,
   guestpost_reporting_group,
   guestpost_migrator,
   guestpost_api_runtime,
+  guestpost_auth_runtime,
   guestpost_worker_runtime,
-  guestpost_reporting_runtime;
+  guestpost_reporting_runtime,
+  guestpost_rls_authorizer;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON SEQUENCES FROM
   guestpost_api_group,
+  guestpost_auth_group,
   guestpost_worker_group,
   guestpost_reporting_group,
   guestpost_migrator,
   guestpost_api_runtime,
+  guestpost_auth_runtime,
   guestpost_worker_runtime,
-  guestpost_reporting_runtime;
+  guestpost_reporting_runtime,
+  guestpost_rls_authorizer;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM
   guestpost_api_group,
+  guestpost_auth_group,
   guestpost_worker_group,
   guestpost_reporting_group,
   guestpost_migrator,
   guestpost_api_runtime,
+  guestpost_auth_runtime,
   guestpost_worker_runtime,
-  guestpost_reporting_runtime;
+  guestpost_reporting_runtime,
+  guestpost_rls_authorizer;
 
 COMMIT;
 

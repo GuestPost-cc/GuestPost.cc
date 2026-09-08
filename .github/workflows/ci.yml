@@ -150,6 +150,60 @@ jobs:
           PGPASSWORD: guestpost
         run: pnpm --filter @guestpost/api test:integration
 
+      - name: Verify full application RLS boundary
+        env:
+          PGPASSWORD: guestpost
+        run: |
+          psql -h localhost -U guestpost -d postgres -v ON_ERROR_STOP=1 \
+            -c "DROP DATABASE IF EXISTS guestpost_rls_boundary_test WITH (FORCE)"
+          psql -h localhost -U guestpost -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE DATABASE guestpost_rls_boundary_test"
+
+          DATABASE_URL=postgresql://guestpost:guestpost@localhost:5432/guestpost_rls_boundary_test \
+            pnpm --filter @guestpost/database exec prisma migrate deploy
+
+          psql -h localhost -U guestpost -d guestpost_rls_boundary_test \
+            -v ON_ERROR_STOP=1 -v database_name=guestpost_rls_boundary_test \
+            -f scripts/provision-rls-roles.sql
+
+          psql -h localhost -U guestpost -d guestpost_rls_boundary_test \
+            -v ON_ERROR_STOP=1 <<'SQL'
+          DO $ownership$
+          DECLARE
+            object_row record;
+          BEGIN
+            FOR object_row IN
+              SELECT relation.relkind, namespace.nspname, relation.relname
+              FROM pg_class AS relation
+              JOIN pg_namespace AS namespace
+                ON namespace.oid = relation.relnamespace
+              WHERE namespace.nspname = 'public'
+                AND relation.relkind IN ('r', 'S')
+            LOOP
+              IF object_row.relkind = 'S' THEN
+                EXECUTE format(
+                  'ALTER SEQUENCE %I.%I OWNER TO guestpost_schema_owner',
+                  object_row.nspname,
+                  object_row.relname
+                );
+              ELSE
+                EXECUTE format(
+                  'ALTER TABLE %I.%I OWNER TO guestpost_schema_owner',
+                  object_row.nspname,
+                  object_row.relname
+                );
+              END IF;
+            END LOOP;
+          END
+          $ownership$;
+          SQL
+
+          psql -h localhost -U guestpost -d guestpost_rls_boundary_test \
+            -v ON_ERROR_STOP=1 -v database_name=guestpost_rls_boundary_test \
+            -v activate=YES -f scripts/activate-full-rls.sql
+          psql -h localhost -U guestpost -d guestpost_rls_boundary_test \
+            -v ON_ERROR_STOP=1 -f scripts/test-full-rls-boundary.sql
+
       - name: Package unit tests
         run: >-
           pnpm --filter @guestpost/shared

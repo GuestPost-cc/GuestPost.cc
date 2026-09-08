@@ -1,273 +1,241 @@
-# Row-level security rollout
+# Full application row-level security rollout
 
-## Status
+## Status and scope
 
-This is a staged security boundary, not a claim that all application data has
-row-level security.
+The repository contains a staged RLS boundary for all 99 Prisma application
+models. It covers customer, publisher, staff, authentication, webhook, worker,
+and catalog workloads. The full boundary is not activated by a normal Prisma
+migration:
 
-Phase 1 protects `ApiKey` with `ENABLE ROW LEVEL SECURITY` and `FORCE ROW
-LEVEL SECURITY`. An active customer owner can CRUD only keys for the active
-organization. The opaque key-authentication path can read and update only the
-one row that matches the presented key hash. There is no staff, worker,
-reporting, owner, or `PUBLIC` policy bypass.
+- `20260908130000_full_application_rls_boundary/migration.sql` installs four
+  explicit command policies per model but leaves them inert.
+- `scripts/provision-rls-roles.sql` reconciles the least-privilege database
+  role and ACL topology while leaving every credential role `NOLOGIN`.
+- `scripts/activate-full-rls.sql` performs guarded, atomic `ENABLE` + `FORCE`
+  activation only after exact catalog, policy, role, privilege, and ownership
+  checks pass.
+- `scripts/emergency-disable-full-rls.sql` atomically disables the full
+  boundary while preserving the independently proven Phase 1 `ApiKey`
+  boundary.
 
-The API derives the values from the durable `CurrentAuthority` after session
-validation and pins them to the same interactive Prisma transaction using
-`set_config(..., true)`. PostgreSQL clears those values at commit or rollback,
-so a pooled connection cannot retain a prior request's context. The policy also
-checks the live `Membership` and `User` records, so a deactivated or demoted
-customer owner loses access even if the request began before that change.
+No repository script enables a login, creates a password, changes an
+environment, or targets a hosted database automatically.
 
-The remaining 98 Prisma models are deliberately outside this first RLS phase.
-They continue to rely on their existing API guards and service-level ownership
-checks. Do not describe the platform as fully RLS-isolated until each listed
-table has a documented policy, context producer, non-owner test, and rollout
-decision.
+## Policy boundary
+
+| Workload | Database identity | Row authority |
+| --- | --- | --- |
+| Customer API | `guestpost_api_runtime` | Live, active `Membership`, non-suspended `User`, and active organization. API keys additionally require live `OWNER` authority. |
+| Publisher API | `guestpost_api_runtime` | Live `PublisherMembership`, non-suspended `User`, active publisher, and resources rooted through publisher/website/order relationships. |
+| Staff API | `guestpost_api_runtime` | Live `StaffMembership` and non-suspended staff user. `SUPER_ADMIN`, `OPERATIONS`, and `FINANCE` use explicit command/model matrices; caller-provided staff role settings never grant authority. |
+| Better Auth | `guestpost_auth_runtime` | Separate table-level identity for account/session and birth-time provisioning tables only. It has no order, marketplace, payout, or reporting table privilege. |
+| Public catalog | API identity with `PUBLIC` context | Approved and verified listings whose website is active and verified, plus only their catalog-visible related rows. Anonymous telemetry cannot claim a user ID. |
+| Signed webhook | API identity with fixed server-selected ingress | Explicit Stripe, payout-provider, or integration-OAuth table allowlist. Handler signature/state verification remains mandatory before mutation. |
+| Worker | `guestpost_worker_runtime` | Explicit platform-worker model allowlist and a nonempty server-selected queue name. It has no `BYPASSRLS`; missing context returns no rows. |
+| Reporting | `guestpost_reporting_runtime` | Fail closed: connection and schema usage only, with no table grants. |
+
+Marketplace browsing is an intentional shared boundary: a live customer or
+publisher can read the reviewed catalog while retaining access to its own
+private resources. Draft, unverified, inactive-site, and cross-tenant rows stay
+hidden. Catalog telemetry writes require either no user for anonymous traffic
+or the exact live actor ID for an authenticated request. Review author names
+and images are display-safe snapshots on `MarketplaceReview`; public catalog
+queries do not receive the related private `User` row. Website metrics are
+visible only through a reviewed listing on an active, verified website.
+
+Mutation policies are command-aware. Live owners control customer and
+publisher membership grants, non-owner invite acceptance is limited by a
+database trigger to an otherwise unchanged PENDING-to-ACTIVE transition, and
+Operations cannot mutate staff authority. Audit rows are append-only. Separate
+last-owner triggers reject deletion or demotion of the final active customer or
+publisher owner, preventing an administrative or self-service lockout.
+
+RLS is a row boundary, not column masking. Public-facing application queries
+must continue selecting only approved response fields. A holder of a runtime
+database credential can also set custom PostgreSQL settings, so the settings
+are an application context channel—not authentication for hostile arbitrary
+SQL. Protect credentials, prohibit user-controlled raw SQL, retain API guards
+and projections, and alert on unexpected role use.
+
+## Runtime context and pool safety
+
+The API initializes an `AsyncLocalStorage` scope before global guards. Better
+Auth validates the session first through `AUTH_DATABASE_URL`; the API then uses
+an `AUTH_BOOTSTRAP` context to resolve only the actor's durable authority.
+`CurrentAuthorityGuard` replaces it with a customer, publisher, or staff
+context before a protected handler runs.
+
+The central Prisma proxy wraps every model/raw operation in an interactive
+transaction and calls `set_config(..., true)` for every supported setting.
+Those settings are transaction-local, all unused values are cleared, and
+PostgreSQL removes them at commit/rollback. A pooled connection therefore
+cannot carry one request's tenant or role into another. Existing interactive
+transactions receive context once on the exact transaction client; array-form
+transactions fail closed while enforcement is enabled.
+
+The worker establishes the same request/job scope around bootstrap and each
+BullMQ processor. Integrations create RLS-aware clients. When
+`RLS_ENFORCEMENT_ENABLED` is absent or not exactly `true`, the proxy remains
+inert for pre-rollout and local compatibility.
 
 ## Role topology
 
-`scripts/provision-rls-roles.sql` is a reviewed bootstrap recipe for an
-approved local or staging clone. It creates:
+`scripts/provision-rls-roles.sql` owns 11 roles and exactly five membership
+edges:
 
-| Role | Attributes | Purpose |
-| --- | --- | --- |
-| `guestpost_schema_owner` | `NOLOGIN`, no superuser or bypass | Owns schema and migrations. |
-| `guestpost_migrator` | bootstrap leaves `NOLOGIN`, `NOINHERIT`, no superuser or bypass | Sets role to the schema owner only for migration runs after controlled activation. |
-| `guestpost_api_group` / `guestpost_api_runtime` | group is `NOLOGIN`; bootstrap leaves runtime `NOLOGIN`, with no DDL or bypass | API service connection after controlled activation. |
-| `guestpost_worker_group` / `guestpost_worker_runtime` | group is `NOLOGIN`; bootstrap leaves runtime `NOLOGIN`, with no DDL or bypass | Queue/worker service connection after controlled activation. |
-| `guestpost_reporting_group` / `guestpost_reporting_runtime` | both remain `NOLOGIN` until approved; no DDL or bypass | Fail-closed reporting identity. |
+The reconciliation leaves all credential roles `NOLOGIN`; enabling credentials
+is a separate administrator action after connection-level verification.
 
-All roles are `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOREPLICATION`,
-and `NOBYPASSRLS`. Database access, schema usage, and relation permissions are
-explicit; the recipe revokes implicit `PUBLIC` privileges on the target
-database, schema, existing relations, sequences, and functions. It creates no
-passwords. Put independent runtime credentials in the deployment secret store
-and enforce them with TLS and database host authentication rules.
+| Roles | Purpose |
+| --- | --- |
+| `guestpost_schema_owner`, `guestpost_migrator` | `NOLOGIN` schema owner plus isolated migration identity. Migrator is `NOINHERIT` and may only `SET ROLE` to the owner. |
+| `guestpost_api_group`, `guestpost_api_runtime` | API DML identity, never owner/DDL/bypass. |
+| `guestpost_auth_group`, `guestpost_auth_runtime` | Better Auth and account birth-time tables only. |
+| `guestpost_worker_group`, `guestpost_worker_runtime` | Platform job tables only, subject to forced policies. |
+| `guestpost_reporting_group`, `guestpost_reporting_runtime` | Starts with no table access. |
+| `guestpost_rls_authorizer` | `NOLOGIN`, `NOINHERIT`, no membership and no bypass; owns boolean-only `SECURITY DEFINER` policy helpers after activation. |
 
-The API and worker group grants are a compatibility baseline while the
-99-model/2,000+-operation permission inventory is being split. They provide
-normal DML only—never schema ownership, role administration, superuser, or
-RLS bypass. Reporting gets no table grants until a report-specific view/query
-is approved. Every later phase must replace the broad DML baseline with a
-table/column grant matrix; it must not add a role-wide RLS bypass.
-
-The bootstrap recipe is authoritative for its eight managed roles: in one
-transaction it disables the four credential roles, removes every existing
-membership edge involving a managed role, restores only the four documented
-edges, and reconciles direct and default ACLs. Credential roles remain
-`NOLOGIN` afterward. Do not attach ad hoc memberships or direct grants to these
-roles; rerunning the recipe will intentionally remove them.
-
-The migrator membership is `INHERIT FALSE, SET TRUE`. The recipe persists a
-database-scoped `role=guestpost_schema_owner` session default for
-`guestpost_migrator`, so every connection opened by Prisma Migrate starts with
-`session_user=guestpost_migrator` and `current_user=guestpost_schema_owner`.
-Runtime memberships are `INHERIT TRUE, SET FALSE`, and any global or
-target-database connection-time role defaults on runtime identities are reset.
+Every managed role is `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`,
+`NOREPLICATION`, and `NOBYPASSRLS`. Provisioning removes unexpected direct or
+transitive membership edges and reconciles database/schema/relation/function
+ACLs in one transaction. It creates no password and leaves credential roles
+`NOLOGIN`; credential activation is a separate approved administrator change.
 
 ## Required migration grant checklist
 
-Default privileges deliberately grant nothing to application roles. Every
-migration that creates a table or sequence must therefore include reviewed,
-object-specific grants in that same migration before it can be merged:
+Default privileges grant no application access. Every migration that creates a table or sequence
+(or adds a policy root) must update all of the following in the same change:
 
-- identify whether the API, worker, both, or neither may use each new object;
-- grant only the required `SELECT`, `INSERT`, `UPDATE`, and `DELETE` table
-  operations to `guestpost_api_group` and/or `guestpost_worker_group`;
-- grant sequence `USAGE` and `SELECT` only when inserts use that sequence;
-- add a migration contract test that names the object and exact grantees; and
-- reject blanket application-role default privileges and `PUBLIC` access.
+- the Prisma model manifest and full-boundary migration/next policy migration;
+- the exact API, auth, worker, or reporting relation grants;
+- the activation catalog count and the destructive boundary test;
+- command-specific policy tests, including a non-owner and no-context case.
 
-A migration that creates no table or sequence records that fact during review
-and needs no synthetic grant. The Phase 1 `ApiKey` migration changes policies
-on an existing table, so its compatibility grant comes from the reviewed
-bootstrap inventory rather than a new-relation grant.
+Reviewers must reject blanket application-role default privileges and require
+object-specific grants for every newly created relation.
 
-## Controlled rollout
+## Lockout-safe deployment order
 
-1. On a disposable clone, inventory current ownership, privileges, `PUBLIC`
-   grants, direct SQL functions, and every API/worker connection identity.
-   Confirm the migration job, API, worker, reporting process, and local tests
-   have separate connection strings. Do not run the bootstrap recipe against
-   production as a discovery mechanism.
-2. Execute the role recipe through a protected administrator connection with
-   `-v database_name=<approved_clone>`. It commits the complete role/ACL graph
-   atomically and leaves all credential roles `NOLOGIN`. Set distinct passwords
-   or certificate mappings and the matching host authentication rules out of
-   band. No application service receives the migrator or schema-owner secret.
-3. Transfer schema/table ownership to `guestpost_schema_owner` using an
-   explicit, reviewed ownership inventory. The migration job connects as
-   `guestpost_migrator`; the database-scoped role default applied by the recipe
-   makes each Prisma Migrate connection run as `guestpost_schema_owner`. Before
-   deployment, connect with the migration URL and require
-   `session_user = 'guestpost_migrator'` and
-   `current_user = 'guestpost_schema_owner'`; abort on any mismatch. API and
-   worker jobs never receive the migration URL.
-4. After credentials, certificate mappings, host authentication, ownership,
-   and catalog checks are approved, explicitly enable only the required
-   credential roles in a separate administrator change. Then connect with each
-   new identity and verify its `session_user`, `current_user`, role memberships,
-   and denied operations before switching API or worker configuration. Revoke
-   the former runtime identity's owner/DDL capabilities only after the new
-   bootstrap/auth checks pass. Better Auth performs database reads before a
-   request has a user or organization context, so the auth tables and the
-   pre-auth path must be validated before tenant policies are enabled.
-5. Apply the migration on the clone, validate the catalog queries below, run
-   the cross-tenant integration test as a non-owner runtime role, and exercise
-   API authentication, worker jobs, staff flows, and public catalog reads.
-   Promote only through the normal staging/production change process.
+Never combine these stages into one production command. Rehearse every step on
+a current, disposable clone first.
 
-No environment, hosted database, deployment, or credential is changed by this
-repository change. The local `guestpost` development database is intentionally
-not a target; the integration suite uses only `guestpost_test_template` and
-disposable `test_*` clones.
+1. **Prove the clone.** Apply all migrations, provision roles, transfer the
+   reviewed public table/sequence ownership inventory to
+   `guestpost_schema_owner`, activate the clone, and run
+   `scripts/test-full-rls-boundary.sql` as a cluster administrator. The test is
+   destructive and uses fixed fixtures, so it is for a fresh ephemeral
+   database only. GitHub CI performs this entire sequence in a dedicated
+   `guestpost_rls_boundary_test` database.
+2. **Install inert policies.** Deploy the Prisma migration normally. Verify 99
+   covered models and 396 full-boundary policies. Do not activate RLS yet.
+3. **Provision disabled identities.** Run the role recipe through a protected
+   administrator connection with the exact target database name. Transfer
+   ownership from an explicit inventory. Create independent TLS/password or
+   certificate credentials out of band, then enable only the approved login
+   roles. Never give a runtime the migrator/owner secret.
+4. **Verify each connection.** Connect with each new URL and check
+   `session_user`, `current_user`, membership edges, `rolbypassrls=false`, and
+   expected table grants/denials. The migrator must enter as
+   `guestpost_migrator` with `current_user=guestpost_schema_owner`; runtime
+   sessions must remain their runtime identity.
+5. **Deploy context-aware code while policies are inert.** Configure the API
+   `DATABASE_URL` with the API runtime identity, `AUTH_DATABASE_URL` with the
+   auth runtime identity, and worker `DATABASE_URL` with the worker runtime
+   identity. Set `RLS_ENFORCEMENT_ENABLED=true` on API and worker. API startup
+   deliberately fails if enforcement is enabled without `AUTH_DATABASE_URL`,
+   preventing a session-wide lockout caused by sending Better Auth through the
+   tenant-scoped API client.
+6. **Canary before activation.** Exercise signup/sign-in/sign-out/password
+   reset, customer owner/member switching, publisher private listings and
+   orders, customer invitation acceptance/decline, review creation/rendering,
+   marketplace metric filtering, all staff roles, public catalog,
+   Stripe/payout callbacks, and each worker queue. Confirm transaction latency
+   and pool saturation are within limits. Because policies are still inert, a
+   context bug cannot lock users out during this stage.
+7. **Activate atomically.** Through an approved admin session, run:
 
-## Policy contract
+   ```sh
+   psql "$ADMIN_DATABASE_URL" \
+     -v database_name=<exact_database_name> \
+     -v activate=YES \
+     -f scripts/activate-full-rls.sql
+   ```
 
-The API-key owner context contains only server-derived values:
+   The script aborts unless the database name and confirmation match exactly,
+   all 99 tables and 396 policies exist, managed roles lack privileged
+   attributes, and every application table/sequence has the reviewed owner.
+   It transfers helper ownership, grants only the three runtime groups access
+   to the private helper schema, enables and forces every policy in one
+   transaction, and verifies the result before commit.
+8. **Post-activation canary.** Repeat the step 6 journey with two distinct
+   customer organizations and publishers. Include demotion/removal/suspension
+   while a session is active. Alert on RLS denials, missing request context,
+   authentication errors, transaction timeouts, and queue retries.
+9. **Emergency recovery.** If activation causes lockout, keep the new roles and
+   code in place and run the guarded emergency script through the approved
+   administrator connection:
 
-```text
-guestpost.rls_workload=API
-guestpost.rls_actor_kind=CUSTOMER
-guestpost.rls_actor_id=<durable User.id>
-guestpost.rls_organization_id=<durable Organization.id>
-guestpost.rls_organization_role=OWNER
-```
+   ```sh
+   psql "$ADMIN_DATABASE_URL" \
+     -v database_name=<exact_database_name> \
+     -v disable=EMERGENCY \
+     -f scripts/emergency-disable-full-rls.sql
+   ```
 
-`ApiKeysService` accepts `DurableCurrentAuthority`, not a client-supplied user
-or organization ID. The service opens an interactive transaction, sets local
-configuration, and performs the protected Prisma operation through that exact
-transaction client. The opaque API-key validation path sets only a validated
-SHA-256 key hash and cannot assume a staff, worker, or tenant identity.
+   This disables/no-forces the generalized policies atomically but preserves
+   `ApiKey` RLS. Re-run the canary before deciding whether a code rollback or
+   corrected policy activation is required. Record the incident and never
+   treat emergency disablement as the steady state.
 
-Custom PostgreSQL settings are an application-to-database context channel, not
-an authentication mechanism for a hostile holder of the runtime database
-credential. RLS protects against omitted or incorrect tenant predicates from
-the application; it does not make arbitrary runtime SQL or a stolen database
-credential safe. Protect runtime credentials, limit raw SQL, monitor role use,
-and retain the API authorization layer. A future hardened design may move
-context assertion into a narrowly scoped, audited database interface, but must
-not introduce a generic `SECURITY DEFINER` or `BYPASSRLS` escape hatch.
+## Required verification
 
-## Required catalog checks
+The checked-in suites cover three layers:
 
-Run these on the approved clone using a migration/admin identity, never a
-production database during development:
+- unit/contract tests verify the 99-model manifest, four-policy generation,
+  all context variants, context clearing, proxy behavior, guard switching,
+  explicit database URL support, and activation/rollback safeguards;
+- the existing API-key PostgreSQL integration test proves owner-only CRUD and
+  opaque presented-key narrowing;
+- `scripts/test-full-rls-boundary.sql` proves actual forced-policy behavior for
+  customer owner/member, publisher, Operations/Finance/Super Admin, auth,
+  public, and worker identities, including cross-tenant update denial,
+  telemetry spoofing denial, membership self-promotion denial, safe invite
+  acceptance, last-owner preservation, append-only audit, filtered public
+  review/metric reads, no-context denial, transaction-local reset, suspension,
+  and live authority revocation.
+
+Useful post-activation catalog checks:
 
 ```sql
-SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity
-FROM pg_class AS c
-JOIN pg_namespace AS n ON n.oid = c.relnamespace
-WHERE n.nspname = 'public' AND c.relname = 'ApiKey';
+SELECT count(*) AS fully_forced_tables
+FROM pg_class AS relation
+JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+WHERE namespace.nspname = 'public'
+  AND relation.relkind = 'r'
+  AND relation.relname <> '_prisma_migrations'
+  AND relation.relrowsecurity
+  AND relation.relforcerowsecurity;
 
-SELECT policyname, cmd, roles, qual, with_check
+SELECT count(DISTINCT tablename) AS covered_tables,
+       count(*) AS command_policies
 FROM pg_policies
-WHERE schemaname = 'public' AND tablename = 'ApiKey'
-ORDER BY policyname;
+WHERE schemaname = 'public'
+  AND policyname LIKE '%\_full\_boundary\_%' ESCAPE '\';
 
-SELECT grantee, privilege_type
-FROM information_schema.table_privileges
-WHERE table_schema = 'public' AND table_name = 'ApiKey'
-ORDER BY grantee, privilege_type;
-
--- This PUBLIC audit must return zero rows after provisioning. acldefault()
--- expands built-in defaults when a catalog ACL is NULL.
 WITH public_acl AS (
-  SELECT
-    'database'::text AS object_type,
-    d.datname::text AS object_name,
-    acl.privilege_type
-  FROM pg_database AS d
-  CROSS JOIN LATERAL aclexplode(
-    COALESCE(d.datacl, acldefault('d', d.datdba))
-  ) AS acl
-  WHERE d.datname = current_database() AND acl.grantee = 0
-
-  UNION ALL
-
-  SELECT 'schema', n.nspname, acl.privilege_type
-  FROM pg_namespace AS n
-  CROSS JOIN LATERAL aclexplode(
-    COALESCE(n.nspacl, acldefault('n', n.nspowner))
-  ) AS acl
-  WHERE n.nspname = 'public' AND acl.grantee = 0
-
-  UNION ALL
-
-  SELECT
-    'table',
-    format('%I.%I', p.table_schema, p.table_name),
-    p.privilege_type::text
-  FROM information_schema.table_privileges AS p
-  WHERE p.table_schema = 'public' AND p.grantee = 'PUBLIC'
-
-  UNION ALL
-
-  SELECT
-    'sequence',
-    format('%I.%I', n.nspname, c.relname),
-    acl.privilege_type
-  FROM pg_class AS c
-  JOIN pg_namespace AS n ON n.oid = c.relnamespace
-  CROSS JOIN LATERAL aclexplode(
-    COALESCE(c.relacl, acldefault('s', c.relowner))
-  ) AS acl
-  WHERE n.nspname = 'public' AND c.relkind = 'S' AND acl.grantee = 0
-
-  UNION ALL
-
-  SELECT
-    'function',
-    format(
-      '%I.%I(%s)',
-      n.nspname,
-      p.proname,
-      pg_get_function_identity_arguments(p.oid)
-    ),
-    acl.privilege_type
-  FROM pg_proc AS p
-  JOIN pg_namespace AS n ON n.oid = p.pronamespace
-  CROSS JOIN LATERAL aclexplode(
-    COALESCE(p.proacl, acldefault('f', p.proowner))
-  ) AS acl
-  WHERE n.nspname = 'public' AND acl.grantee = 0
+  SELECT table_schema, table_name, privilege_type
+  FROM information_schema.table_privileges
+  WHERE table_schema = 'public' AND grantee = 'PUBLIC'
 )
-SELECT object_type, object_name, privilege_type
-FROM public_acl
-ORDER BY object_type, object_name, privilege_type;
+SELECT * FROM public_acl;
 
-SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls
+SELECT rolname, rolsuper, rolcreaterole, rolcreatedb,
+       rolreplication, rolbypassrls
 FROM pg_roles
 WHERE rolname LIKE 'guestpost_%'
 ORDER BY rolname;
 ```
 
-The integration test at
-`apps/api/src/__tests__/integration/rls/api-key-tenant-isolation.integration.spec.ts`
-proves SELECT, INSERT, UPDATE, and DELETE behavior for two organizations using
-a temporary non-owner, `NOBYPASSRLS` role. It also proves no-context denial,
-staff denial, presented-key narrowing, and denial after membership deactivation.
-
-## Next phases
-
-Prioritize tables by the harm from cross-tenant disclosure or mutation, not by
-alphabetical model order:
-
-1. Customer order/billing path: `Order`, `OrderItem`, `OrderEvent`, wallet and
-   billing relations, with explicit customer-owner/member rules.
-2. Publisher path: publisher-owned listings, services, integrations, payout
-   projections, and publisher-membership context.
-3. Support and staff path: tickets, messages, assignments, Operations scopes,
-   Finance scopes, and audited Super Admin capabilities.
-4. Public catalog: approved/verified listing projections only; never grant a
-   generic anonymous policy to source tables that contain drafts, contacts, or
-   finance data.
-5. Worker/system flows: distinct workload context, job authentication, and
-   explicit operation-specific policies. Background work does not inherit an
-   end-user policy.
-
-Each phase needs a schema migration, a server-side context wrapper, explicit
-`FOR SELECT/INSERT/UPDATE/DELETE` policies, a non-owner database-role test,
-two-tenant CRUD tests, auth/bootstrap regression coverage, and a role/grant
-review. `FORCE ROW LEVEL SECURITY` is mandatory unless a documented migration
-exception is approved.
+Expected values are 99 forced tables, 99 covered tables, 396 command policies,
+and `false` for every privileged role attribute. Treat any mismatch as a
+failed deployment gate.

@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common"
 import { CsrfMiddleware } from "./common/middleware/csrf.middleware"
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware"
+import { RlsRequestScopeMiddleware } from "./common/middleware/rls-request-scope.middleware"
 import { PrismaModule } from "./common/prisma.module"
 import { ActiveContextModule } from "./modules/active-context/active-context.module"
 import { AdminModule } from "./modules/admin/admin.module"
@@ -56,7 +57,7 @@ export class AppModule implements NestModule {
     // AsyncLocalStorage frame that audit logs / Sentry tags / worker
     // enqueue all read from.
     consumer
-      .apply(RequestIdMiddleware)
+      .apply(RlsRequestScopeMiddleware, RequestIdMiddleware)
       .forRoutes("*")
       .apply(CsrfMiddleware)
       .forRoutes("*")

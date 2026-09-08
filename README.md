@@ -154,6 +154,8 @@ The minimum required keys (already present in `.env.example`):
 | Key                  | Purpose                                              |
 |----------------------|------------------------------------------------------|
 | `DATABASE_URL`       | Postgres connection string (literal, no `${...}`)    |
+| `AUTH_DATABASE_URL`  | Separate Better Auth URL when full RLS is enabled     |
+| `RLS_ENFORCEMENT_ENABLED` | Exact `true` after staged RLS rollout           |
 | `REDIS_URL`          | API cache/rate-limit Redis connection                 |
 | `QUEUE_REDIS_URL`    | Optional dedicated BullMQ Redis (falls back above)    |
 | `JWT_SECRET`         | Better Auth / JWT signing key                        |

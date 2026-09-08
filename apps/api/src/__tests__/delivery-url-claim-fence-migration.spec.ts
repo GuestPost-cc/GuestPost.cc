@@ -182,13 +182,14 @@ describe("delivery URL claim fence migration contract", () => {
       "ALTER ROLE guestpost_api_runtime NOLOGIN",
     )
     expect(rlsProvisioningSql).not.toMatch(
-      /^ALTER ROLE guestpost_(?:migrator|api_runtime|worker_runtime|reporting_runtime) LOGIN;$/m,
+      /^ALTER ROLE guestpost_(?:migrator|api_runtime|auth_runtime|worker_runtime|reporting_runtime) LOGIN;$/m,
     )
     expect(
       rlsProvisioningSql.match(/^GRANT guestpost_\w+ TO guestpost_\w+ .+;$/gm),
     ).toEqual([
       "GRANT guestpost_schema_owner TO guestpost_migrator WITH INHERIT FALSE, SET TRUE;",
       "GRANT guestpost_api_group TO guestpost_api_runtime WITH INHERIT TRUE, SET FALSE;",
+      "GRANT guestpost_auth_group TO guestpost_auth_runtime WITH INHERIT TRUE, SET FALSE;",
       "GRANT guestpost_worker_group TO guestpost_worker_runtime WITH INHERIT TRUE, SET FALSE;",
       "GRANT guestpost_reporting_group TO guestpost_reporting_runtime WITH INHERIT TRUE, SET FALSE;",
     ])

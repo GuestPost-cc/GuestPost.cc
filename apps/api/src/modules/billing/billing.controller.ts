@@ -16,7 +16,7 @@ import { Request } from "express"
 import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
-import { Public } from "../../common/decorators/public.decorator"
+import { PublicWebhook } from "../../common/decorators/public.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { BillingService } from "./billing.service"
@@ -71,7 +71,7 @@ export class BillingController {
     return this.billing.checkDepositStatus(publicReference, user)
   }
 
-  @Public()
+  @PublicWebhook("STRIPE")
   @Post("webhook/stripe")
   async stripeWebhook(
     @Headers("stripe-signature") signature: string,

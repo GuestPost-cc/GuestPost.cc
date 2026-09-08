@@ -6,30 +6,27 @@ updated: 2026-09-08
 
 # Current focus
 
-## Staged tenant RLS
+## Full staged application RLS
 
-The current reviewable change adds the first forced-RLS boundary for
-organization API keys. It keeps database schema/migration authority separate
-from API, worker, and fail-closed reporting runtime roles; documents the
-controlled role/ownership cutover; and proves two-organization CRUD isolation
-using a disposable PostgreSQL clone and a non-owner `NOBYPASSRLS` test role.
-Rejected API-key mutations are tested in separate transactions so an aborted
-PostgreSQL transaction cannot mask later cross-tenant UPDATE/DELETE checks.
-The reviewed role bootstrap atomically disables credentials while it removes
-every unexpected managed-role membership and direct/default ACL, restores only
-the documented topology and grants, enforces database-scoped schema-owner
-switching for migrator connections, and leaves credentials `NOLOGIN` for a
-separate activation after authentication is configured. Its rollout audit
-expands built-in ACL defaults and requires zero `PUBLIC` privileges. Future
-relation-creating migrations must ship their object-specific API/worker grants
-and a matching contract test.
+PR #116 now contains an inert four-command policy surface for all 99 Prisma
+models plus context-aware API, Better Auth, integrations, and worker clients.
+Customer, publisher, and staff authority is rechecked from live PostgreSQL
+rows; public/catalog, webhook, auth, and platform-worker workloads have
+separate explicit boundaries. Better Auth uses a distinct runtime URL, and API
+startup fails if enforcement is enabled without it.
 
-Only `ApiKey` is protected today. The remaining 98 Prisma models are not
-represented as complete RLS coverage and retain their established auth/guard
-checks. The next RLS phases must inventory every direct API, worker, Better
-Auth pre-authorization, staff, and public-catalog operation before enabling
-their policies. Do not use an owner, worker, staff, `PUBLIC`, or generic
-runtime bypass as a shortcut.
+The 11-role topology is non-superuser, `NOBYPASSRLS`, and leaves all
+credentials `NOLOGIN`. Activation is a separate guarded transaction after code
+and credentials are canaried while policies remain inert. A guarded emergency
+disable preserves the Phase 1 `ApiKey` boundary. A real PostgreSQL 17
+provision/ownership/activation test passed for all 99 forced tables, including
+customer owner/member isolation, publisher private and routed-order access,
+Operations/Finance/Super Admin, auth table denial, public filtering, worker
+no-context denial, cross-tenant DML, role and telemetry spoofing, customer and
+publisher self-promotion denial, safe invite acceptance, last-owner
+preservation, append-only audit, display-safe review snapshots, public metric
+filtering, delivery URL fencing, suspension, and live membership revocation.
+The same destructive matrix now runs in a dedicated GitHub CI database.
 
 ## Prior marketplace context
 
@@ -131,13 +128,10 @@ again before merge.
 
 ## Next actions
 
-1. Merge staged-RLS PR #116 only after its final rebased head passes the complete
-   GitHub matrix and every review thread is cleared.
-2. Rehearse the role recipe on an approved disposable clone, verify the exact
-   membership/direct/default ACL graph, configure independent credentials and
-   host authentication, then activate only the required credential roles in a
-   separate approved change.
-3. On staging, verify migrator `session_user`/`current_user`, apply the migration
-   under the schema owner, run cross-tenant and auth/bootstrap checks with the
-   non-owner runtime identities, and keep production unchanged until a separate
-   cutover is approved.
+1. Push the final PR #116 head and require the complete GitHub matrix plus all
+   resolved review threads before merge.
+2. Keep hosted databases unchanged. After merge, rehearse the canonical
+   lockout-safe sequence from `docs/RLS_ROLLOUT.md` on a current staging clone,
+   including separate API/auth/worker credentials and pre-activation canaries.
+3. Treat activation on staging or production as a separate approved operations
+   change; repository CI and merge do not authorize or perform that cutover.

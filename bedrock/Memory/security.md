@@ -40,39 +40,63 @@ updated: 2026-09-08
   admin surface. Generic settlement detail is customer-only; staff use the
   guarded admin settlement surface.
 
-## Staged Row-Level Security
+## Full Application Row-Level Security
 
-- Phase 1 protects `ApiKey` with PostgreSQL `ENABLE ROW LEVEL SECURITY` and
-  `FORCE ROW LEVEL SECURITY`. API-key CRUD accepts only the durable
-  `CurrentAuthority` projection, pins customer-owner facts with transaction-
-  local PostgreSQL settings, and performs the protected Prisma calls through
-  that same interactive transaction client.
-- The database policy requires matching organization context and a live,
-  active customer-owner `Membership` joined to `User`; a request context does
-  not survive connection pooling or a later membership deactivation. The
-  opaque API-key validation path can see/update only a matching presented key
-  hash and has no staff, worker, or tenant-wide bypass. RLS rejection tests
-  isolate each expected database failure in its own transaction: a PostgreSQL
-  policy error aborts that transaction, so later mutation assertions must not
-  reuse it. The staged runtime-role provisioning revokes function access from
-  `PUBLIC` and grants only the direct delivery URL fence function to the API
-  and worker groups that call it. The bootstrap owns the complete membership
-  graph for its eight managed roles: atomically disables credential roles,
-  removes unexpected membership edges and direct/default ACLs, restores only
-  the reviewed edges and grants, and leaves credentials `NOLOGIN` for separate
-  activation after authentication is configured. Every future relation-creating
-  migration must carry reviewed object-specific runtime grants and a contract
-  test instead of blanket application-role defaults. Migrator connections use
-  a target-database session default that makes every Prisma Migrate connection
-  run as the schema owner; runtime roles have connection-time role switching
-  cleared and cannot `SET ROLE` to their inherited groups. The rollout audit
-  expands built-in ACL defaults and must find no `PUBLIC` database, schema,
-  table, sequence, or function privileges.
-- This is intentionally not a full-model RLS claim. The remaining 98 Prisma
-  models still use the existing guard/service ownership boundaries until each
-  receives a policy, context producer, non-owner database-role test, and
-  explicit grant review. `docs/RLS_ROLLOUT.md` records the role topology,
-  rollout gates, threat model, and remaining phases.
+- The staged full boundary classifies all 99 Prisma models and installs
+  explicit SELECT/INSERT/UPDATE/DELETE policies for customer, publisher,
+  staff, Better Auth, catalog, webhook, and worker workloads. The migration is
+  deliberately inert; a separately confirmed activation script verifies 99
+  tables, 396 policies, role attributes, ACLs, and ownership before atomically
+  enabling and forcing RLS.
+- Customer and publisher policies recheck live membership and non-suspended
+  users. Customer API keys additionally recheck the live OWNER role, so a
+  forged/stale organization-role setting cannot grant access. Staff policies
+  ignore caller-supplied role settings and derive SUPER_ADMIN, OPERATIONS, or
+  FINANCE authority from live `StaffMembership` rows.
+- Better Auth uses `AUTH_DATABASE_URL` and a separate auth identity because it
+  performs session/account reads before tenant context exists. API startup
+  fails when `RLS_ENFORCEMENT_ENABLED=true` without that URL. The auth role has
+  only account/session and birth-time provisioning tables, not orders,
+  marketplace, payouts, or reporting.
+- A central RLS-aware Prisma proxy wraps each operation in an interactive
+  transaction, sets and clears every context GUC with transaction-local
+  `set_config`, and rejects array-form transactions while enforcement is on.
+  Explicit security transactions (organization-owner and opaque-key
+  validation) unwrap the proxy and install their exact context on the raw
+  transaction host. Transaction completion prevents connection-pool context
+  leakage.
+- Reviewed catalog rows are shared intentionally with live customers and
+  publishers; draft/unverified listings or listings on inactive/unverified
+  websites remain hidden. Authenticated telemetry is bound to the exact actor;
+  anonymous telemetry cannot claim a user ID. Public review authors use
+  display-safe name/image snapshots, so catalog reads never require access to
+  private `User` rows. Public website metrics remain restricted to reviewed
+  catalog websites. RLS remains a row boundary, not column masking, so endpoint
+  projections and API guards remain mandatory.
+- Mutation authorization is command-aware. Customer and publisher membership
+  writes recheck live owner rows, non-owner invite acceptance is constrained by
+  a database trigger to the unchanged PENDING-to-ACTIVE transition, Operations
+  cannot mutate staff authority, and audit rows are append-only. Database
+  triggers also reject deletion/demotion of the last active customer or
+  publisher owner to prevent an application lockout.
+- The 11-role topology keeps schema owner, migrator, API, auth, worker,
+  reporting, and the boolean-only RLS authorizer separate. All are
+  non-superuser and `NOBYPASSRLS`; provisioning leaves credential roles
+  `NOLOGIN`. The worker is a platform service principal with an explicit model
+  allowlist and required server-selected queue context. Reporting has no table
+  grants.
+- `scripts/test-full-rls-boundary.sql` is a destructive ephemeral-database
+  proof covering customer owner/member, publisher, staff roles, auth, public,
+  worker, cross-tenant DML, spoofed role/telemetry, membership self-promotion,
+  invite acceptance, last-owner preservation, append-only audit, delivery
+  fencing, no-context denial, suspension, and immediate authority revocation.
+  CI builds a dedicated database and runs the full provision/activate/test
+  sequence.
+- Rollout is lockout-safe: install policies inert, provision disabled roles,
+  verify separate credentials, deploy context-aware code, canary, activate
+  atomically, and canary again. The guarded emergency script disables the
+  generalized boundary atomically while preserving Phase 1 `ApiKey` RLS.
+  `docs/RLS_ROLLOUT.md` is canonical.
 
 ## Support Messaging Security
 

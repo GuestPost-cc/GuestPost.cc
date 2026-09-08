@@ -1283,23 +1283,25 @@ export class OrdersService {
                 { updatedAt: "desc" },
               ]
             : [{ createdAt: "desc" }]
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.order.findMany({
-        where,
-        orderBy,
-        take,
-        skip,
-        include: {
-          items: true,
-          website: true,
-          campaign: true,
-          settlements: { include: { approvals: true } },
-          dispute: true,
-          cancellationRequests: { orderBy: { createdAt: "desc" }, take: 1 },
-        },
-      }),
-      this.prisma.order.count({ where }),
-    ])
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.order.findMany({
+          where,
+          orderBy,
+          take,
+          skip,
+          include: {
+            items: true,
+            website: true,
+            campaign: true,
+            settlements: { include: { approvals: true } },
+            dispute: true,
+            cancellationRequests: { orderBy: { createdAt: "desc" }, take: 1 },
+          },
+        }),
+        tx.order.count({ where }),
+      ]),
+    )
     const websiteUnlocked = await canCustomerViewWebsite(
       this.prisma,
       organizationId,
@@ -1324,23 +1326,25 @@ export class OrdersService {
         notIn: [OrderStatus.DRAFT, OrderStatus.PENDING_PAYMENT],
       },
     }
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.order.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take,
-        skip,
-        include: {
-          items: true,
-          website: true,
-          campaign: true,
-          settlements: { include: { approvals: true } },
-          dispute: true,
-          cancellationRequests: { orderBy: { createdAt: "desc" }, take: 1 },
-        },
-      }),
-      this.prisma.order.count({ where }),
-    ])
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.order.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take,
+          skip,
+          include: {
+            items: true,
+            website: true,
+            campaign: true,
+            settlements: { include: { approvals: true } },
+            dispute: true,
+            cancellationRequests: { orderBy: { createdAt: "desc" }, take: 1 },
+          },
+        }),
+        tx.order.count({ where }),
+      ]),
+    )
     return {
       items: items.map((order) => projectExternalOrder(order, "PUBLISHER")),
       total,

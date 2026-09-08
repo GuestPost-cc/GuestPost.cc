@@ -465,16 +465,18 @@ export class SettlementsService {
       ...(organizationId ? { order: { organizationId } } : {}),
       ...(statuses?.length ? { status: { in: statuses } } : {}),
     }
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.settlement.findMany({
-        where,
-        include: { order: true, publisher: true, approvals: true },
-        orderBy: { createdAt: "desc" },
-        take,
-        skip,
-      }),
-      this.prisma.settlement.count({ where }),
-    ])
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.settlement.findMany({
+          where,
+          include: { order: true, publisher: true, approvals: true },
+          orderBy: { createdAt: "desc" },
+          take,
+          skip,
+        }),
+        tx.settlement.count({ where }),
+      ]),
+    )
     return { items, total, take, skip }
   }
 

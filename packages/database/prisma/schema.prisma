@@ -3155,17 +3155,21 @@ model MarketplaceListingImage {
 // pricing on ListingService rows. See migration 20260614040000_phase5_cleanup.
 
 model MarketplaceReview {
-  id          String    @id @default(cuid())
-  listingId   String
-  userId      String
-  rating      Int
-  title       String?
-  content     String
-  response    String?
-  respondedAt DateTime?
-  status      String    @default("APPROVED") // APPROVED, PENDING, SPAM, FLAGGED
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  listingId     String
+  userId        String
+  // Display-safe snapshots let public catalog reads render review authors
+  // without granting the public RLS context access to private User rows.
+  reviewerName  String?
+  reviewerImage String?
+  rating        Int
+  title         String?
+  content       String
+  response      String?
+  respondedAt   DateTime?
+  status        String    @default("APPROVED") // APPROVED, PENDING, SPAM, FLAGGED
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
   user    User               @relation(fields: [userId], references: [id])
