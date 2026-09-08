@@ -136,6 +136,12 @@ describe("delivery URL claim fence migration contract", () => {
       /database_name is required[\s\S]*\\quit 3/,
     )
     expect(rlsProvisioningSql).toMatch(
+      /SELECT current_database\(\) = :'database_name' AS target_database_matches \\gset[\s\S]*\\if :target_database_matches[\s\S]*\\quit 3/,
+    )
+    expect(rlsProvisioningSql).toContain(
+      "GRANT USAGE, CREATE ON SCHEMA public TO guestpost_schema_owner",
+    )
+    expect(rlsProvisioningSql).toMatch(
       /GRANT EXECUTE ON FUNCTION public\."acquire_delivery_url_claim_fence"\(text\)\s+TO guestpost_api_group, guestpost_worker_group/,
     )
     expect(rlsProvisioningSql).toContain(

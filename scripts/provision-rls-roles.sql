@@ -16,6 +16,15 @@
   \quit 3
 \endif
 
+\set QUIET on
+SELECT current_database() = :'database_name' AS target_database_matches \gset
+\set QUIET off
+\if :target_database_matches
+\else
+  \echo 'connected database does not match database_name'
+  \quit 3
+\endif
+
 DO $roles$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_schema_owner') THEN
@@ -75,6 +84,7 @@ GRANT CONNECT ON DATABASE :"database_name" TO guestpost_worker_runtime;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_reporting_runtime;
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA public TO guestpost_schema_owner;
 REVOKE CREATE ON SCHEMA public FROM guestpost_api_group;
 REVOKE CREATE ON SCHEMA public FROM guestpost_worker_group;
 REVOKE CREATE ON SCHEMA public FROM guestpost_reporting_group;
