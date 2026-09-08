@@ -199,8 +199,8 @@ importers:
         specifier: ^1.4.10
         version: 1.4.10(@types/express@5.0.6)
       bullmq:
-        specifier: ^5.80.12
-        version: 5.81.3
+        specifier: ^5.81.4
+        version: 5.81.4
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -560,8 +560,8 @@ importers:
         specifier: 1.0.3
         version: 1.0.3
       bullmq:
-        specifier: ^5.80.12
-        version: 5.81.3
+        specifier: ^5.81.4
+        version: 5.81.4
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -693,8 +693,8 @@ importers:
         specifier: workspace:*
         version: link:../shared
       bullmq:
-        specifier: ^5.80.12
-        version: 5.81.3
+        specifier: ^5.81.4
+        version: 5.81.4
       ioredis:
         specifier: 5.11.1
         version: 5.11.1
@@ -4353,8 +4353,8 @@ packages:
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
 
-  bullmq@5.81.3:
-    resolution: {integrity: sha512-Q7uEH2G92rVjX3Yl2qw3+6VEO15uxehC6DfeTHQBQTehddcRDSDuquD9zuvDjxiCffXsPUaBwrRlvlbVcgKs7g==}
+  bullmq@5.81.4:
+    resolution: {integrity: sha512-n+WHSzz20KooBGoJyASre6oJNz/p5f1IJRRN2ibD+NWPQaNpNQmDrwYuPO+bsXrQeM1MQzUxXGbdjmyOFKP2xQ==}
     engines: {node: '>=12.22.0'}
     peerDependencies:
       redis: '>=5.0.0'
@@ -11106,7 +11106,7 @@ snapshots:
       base64-js: 1.5.1
       ieee754: 1.2.1
 
-  bullmq@5.81.3:
+  bullmq@5.81.4:
     dependencies:
       cron-parser: 4.9.0
       ioredis: 5.11.1
