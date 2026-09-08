@@ -116,10 +116,26 @@ BEGIN
 END
 $memberships$;
 
-GRANT guestpost_schema_owner TO guestpost_migrator;
-GRANT guestpost_api_group TO guestpost_api_runtime;
-GRANT guestpost_worker_group TO guestpost_worker_runtime;
-GRANT guestpost_reporting_group TO guestpost_reporting_runtime;
+-- Remove connection-time role defaults that could survive from an earlier
+-- setup. Runtime sessions stay on their login identities. Migrator sessions
+-- switch to the schema owner automatically for this database only, including
+-- every separate connection opened by Prisma Migrate.
+ALTER ROLE guestpost_migrator RESET role;
+ALTER ROLE guestpost_api_runtime RESET role;
+ALTER ROLE guestpost_worker_runtime RESET role;
+ALTER ROLE guestpost_reporting_runtime RESET role;
+ALTER ROLE guestpost_migrator IN DATABASE :"database_name" RESET role;
+ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name" RESET role;
+ALTER ROLE guestpost_worker_runtime IN DATABASE :"database_name" RESET role;
+ALTER ROLE guestpost_reporting_runtime IN DATABASE :"database_name" RESET role;
+
+GRANT guestpost_schema_owner TO guestpost_migrator WITH INHERIT FALSE, SET TRUE;
+GRANT guestpost_api_group TO guestpost_api_runtime WITH INHERIT TRUE, SET FALSE;
+GRANT guestpost_worker_group TO guestpost_worker_runtime WITH INHERIT TRUE, SET FALSE;
+GRANT guestpost_reporting_group TO guestpost_reporting_runtime WITH INHERIT TRUE, SET FALSE;
+
+ALTER ROLE guestpost_migrator IN DATABASE :"database_name"
+  SET role TO 'guestpost_schema_owner';
 
 -- Do not leave access to a newly provisioned database to implicit PUBLIC
 -- privileges. Existing application roles must be explicitly reviewed before

@@ -57,6 +57,13 @@ managed role, restores only the four documented edges, and then re-enables
 login. Do not attach ad hoc memberships to these roles; rerunning the recipe
 will intentionally remove them.
 
+The migrator membership is `INHERIT FALSE, SET TRUE`. The recipe persists a
+database-scoped `role=guestpost_schema_owner` session default for
+`guestpost_migrator`, so every connection opened by Prisma Migrate starts with
+`session_user=guestpost_migrator` and `current_user=guestpost_schema_owner`.
+Runtime memberships are `INHERIT TRUE, SET FALSE`, and any global or
+target-database connection-time role defaults on runtime identities are reset.
+
 ## Required migration grant checklist
 
 Default privileges deliberately grant nothing to application roles. Every
@@ -88,8 +95,12 @@ bootstrap inventory rather than a new-relation grant.
    schema-owner secret.
 3. Transfer schema/table ownership to `guestpost_schema_owner` using an
    explicit, reviewed ownership inventory. The migration job connects as
-   `guestpost_migrator` and runs `SET ROLE guestpost_schema_owner` before
-   `prisma migrate deploy`; API and worker jobs never do this.
+   `guestpost_migrator`; the database-scoped role default applied by the recipe
+   makes each Prisma Migrate connection run as `guestpost_schema_owner`. Before
+   deployment, connect with the migration URL and require
+   `session_user = 'guestpost_migrator'` and
+   `current_user = 'guestpost_schema_owner'`; abort on any mismatch. API and
+   worker jobs never receive the migration URL.
 4. Revoke the former runtime identity's owner/DDL capabilities only after the
    API and worker have been switched to their runtime credentials and all
    bootstrap/auth checks pass. Better Auth performs database reads before a
@@ -149,9 +160,75 @@ WHERE schemaname = 'public' AND tablename = 'ApiKey'
 ORDER BY policyname;
 
 SELECT grantee, privilege_type
-FROM information_schema.role_table_grants
+FROM information_schema.table_privileges
 WHERE table_schema = 'public' AND table_name = 'ApiKey'
 ORDER BY grantee, privilege_type;
+
+-- This PUBLIC audit must return zero rows after provisioning. acldefault()
+-- expands built-in defaults when a catalog ACL is NULL.
+WITH public_acl AS (
+  SELECT
+    'database'::text AS object_type,
+    d.datname::text AS object_name,
+    acl.privilege_type
+  FROM pg_database AS d
+  CROSS JOIN LATERAL aclexplode(
+    COALESCE(d.datacl, acldefault('d', d.datdba))
+  ) AS acl
+  WHERE d.datname = current_database() AND acl.grantee = 0
+
+  UNION ALL
+
+  SELECT 'schema', n.nspname, acl.privilege_type
+  FROM pg_namespace AS n
+  CROSS JOIN LATERAL aclexplode(
+    COALESCE(n.nspacl, acldefault('n', n.nspowner))
+  ) AS acl
+  WHERE n.nspname = 'public' AND acl.grantee = 0
+
+  UNION ALL
+
+  SELECT
+    'table',
+    format('%I.%I', p.table_schema, p.table_name),
+    p.privilege_type::text
+  FROM information_schema.table_privileges AS p
+  WHERE p.table_schema = 'public' AND p.grantee = 'PUBLIC'
+
+  UNION ALL
+
+  SELECT
+    'sequence',
+    format('%I.%I', n.nspname, c.relname),
+    acl.privilege_type
+  FROM pg_class AS c
+  JOIN pg_namespace AS n ON n.oid = c.relnamespace
+  CROSS JOIN LATERAL aclexplode(
+    COALESCE(c.relacl, acldefault('s', c.relowner))
+  ) AS acl
+  WHERE n.nspname = 'public' AND c.relkind = 'S' AND acl.grantee = 0
+
+  UNION ALL
+
+  SELECT
+    'function',
+    format(
+      '%I.%I(%s)',
+      n.nspname,
+      p.proname,
+      pg_get_function_identity_arguments(p.oid)
+    ),
+    acl.privilege_type
+  FROM pg_proc AS p
+  JOIN pg_namespace AS n ON n.oid = p.pronamespace
+  CROSS JOIN LATERAL aclexplode(
+    COALESCE(p.proacl, acldefault('f', p.proowner))
+  ) AS acl
+  WHERE n.nspname = 'public' AND acl.grantee = 0
+)
+SELECT object_type, object_name, privilege_type
+FROM public_acl
+ORDER BY object_type, object_name, privilege_type;
 
 SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls
 FROM pg_roles

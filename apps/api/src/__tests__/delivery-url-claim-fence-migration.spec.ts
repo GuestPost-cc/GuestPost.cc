@@ -170,13 +170,19 @@ describe("delivery URL claim fence migration contract", () => {
       "ALTER ROLE guestpost_api_runtime NOLOGIN",
     )
     expect(
-      rlsProvisioningSql.match(/^GRANT guestpost_\w+ TO guestpost_\w+;$/gm),
+      rlsProvisioningSql.match(/^GRANT guestpost_\w+ TO guestpost_\w+ .+;$/gm),
     ).toEqual([
-      "GRANT guestpost_schema_owner TO guestpost_migrator;",
-      "GRANT guestpost_api_group TO guestpost_api_runtime;",
-      "GRANT guestpost_worker_group TO guestpost_worker_runtime;",
-      "GRANT guestpost_reporting_group TO guestpost_reporting_runtime;",
+      "GRANT guestpost_schema_owner TO guestpost_migrator WITH INHERIT FALSE, SET TRUE;",
+      "GRANT guestpost_api_group TO guestpost_api_runtime WITH INHERIT TRUE, SET FALSE;",
+      "GRANT guestpost_worker_group TO guestpost_worker_runtime WITH INHERIT TRUE, SET FALSE;",
+      "GRANT guestpost_reporting_group TO guestpost_reporting_runtime WITH INHERIT TRUE, SET FALSE;",
     ])
+    expect(rlsProvisioningSql).toMatch(
+      /ALTER ROLE guestpost_migrator IN DATABASE :"database_name"\s+SET role TO 'guestpost_schema_owner'/,
+    )
+    expect(rlsProvisioningSql).toContain(
+      'ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name" RESET role',
+    )
   })
 
   it("requires object-specific grants in every relation-creating migration", () => {
@@ -187,5 +193,9 @@ describe("delivery URL claim fence migration contract", () => {
     expect(rlsRolloutRunbook).toContain(
       "reject blanket application-role default privileges",
     )
+    expect(rlsRolloutRunbook).toContain(
+      "FROM information_schema.table_privileges",
+    )
+    expect(rlsRolloutRunbook).toContain("WITH public_acl AS")
   })
 })

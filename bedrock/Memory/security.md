@@ -61,7 +61,12 @@ updated: 2026-09-08
   membership edges, restores only the four reviewed edges, then re-enables
   logins. Default privileges remain fail-closed; every future relation-creating
   migration must carry reviewed object-specific runtime grants and a contract
-  test instead of blanket application-role defaults.
+  test instead of blanket application-role defaults. Migrator connections use
+  a target-database session default that makes every Prisma Migrate connection
+  run as the schema owner; runtime roles have connection-time role switching
+  cleared and cannot `SET ROLE` to their inherited groups. The rollout audit
+  expands built-in ACL defaults and must find no `PUBLIC` database, schema,
+  table, sequence, or function privileges.
 - This is intentionally not a full-model RLS claim. The remaining 98 Prisma
   models still use the existing guard/service ownership boundaries until each
   receives a policy, context producer, non-owner database-role test, and
