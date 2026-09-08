@@ -201,6 +201,13 @@ jobs:
           psql -h localhost -U guestpost -d guestpost_rls_boundary_test \
             -v ON_ERROR_STOP=1 -v database_name=guestpost_rls_boundary_test \
             -v activate=YES -f scripts/activate-full-rls.sql
+
+          # Provisioning is documented as rerunnable after activation. Prove
+          # its ACL reconciliation preserves the RLS authorizer's read grants.
+          psql -h localhost -U guestpost -d guestpost_rls_boundary_test \
+            -v ON_ERROR_STOP=1 -v database_name=guestpost_rls_boundary_test \
+            -f scripts/provision-rls-roles.sql
+
           psql -h localhost -U guestpost -d guestpost_rls_boundary_test \
             -v ON_ERROR_STOP=1 -f scripts/test-full-rls-boundary.sql
 

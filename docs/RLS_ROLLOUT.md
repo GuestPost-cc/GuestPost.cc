@@ -108,7 +108,8 @@ Default privileges grant no application access. Every migration that creates a t
 (or adds a policy root) must update all of the following in the same change:
 
 - the Prisma model manifest and full-boundary migration/next policy migration;
-- the exact API, auth, worker, or reporting relation grants;
+- the exact API, auth, worker, or reporting relation grants, plus read-only
+  `guestpost_rls_authorizer` access for every new policy root;
 - the activation catalog count and the destructive boundary test;
 - command-specific policy tests, including a non-owner and no-context case.
 
@@ -172,11 +173,14 @@ a current, disposable clone first.
    atomically swaps `ApiKey` from its six Phase 1 policies to four
    full-boundary policies, enables and forces every table, and verifies the
    final 99-model/396-policy result before commit.
-8. **Post-activation canary.** Repeat the step 6 journey with two distinct
+8. **Prove provisioning reruns.** Re-run the role recipe after activation and
+   repeat the boundary matrix. Its atomic ACL reconciliation must retain the
+   authorizer's schema usage and read-only access to every current policy root.
+9. **Post-activation canary.** Repeat the step 6 journey with two distinct
    customer organizations and publishers. Include demotion/removal/suspension
    while a session is active. Alert on RLS denials, missing request context,
    authentication errors, transaction timeouts, and queue retries.
-9. **Emergency recovery.** If activation causes lockout, keep the new roles and
+10. **Emergency recovery.** If activation causes lockout, keep the new roles and
    code in place and run the guarded emergency script through the approved
    administrator connection:
 

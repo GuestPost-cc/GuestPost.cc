@@ -253,6 +253,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_api_group;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_worker_group;
 
+-- A post-activation rerun must preserve the SECURITY DEFINER authorizer's
+-- ability to read policy roots. This role is NOLOGIN, NOINHERIT, has no
+-- memberships, and receives no mutation privilege.
+GRANT USAGE ON SCHEMA public TO guestpost_rls_authorizer;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO guestpost_rls_authorizer;
+
 -- Better Auth is isolated from the API runtime. It owns session/account flows
 -- and the atomic birth-time provisioning transaction, but no marketplace,
 -- order, payout, or reporting tables.
@@ -282,8 +288,8 @@ GRANT EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)
 -- or function privileges. Add an approved view/query grant per report.
 
 -- Do not let new relations/functions silently recreate PUBLIC access. Every
--- relation-creating migration must carry its reviewed, object-specific API and
--- worker table/sequence grants; see the required checklist in RLS_ROLLOUT.md.
+-- relation-creating migration must carry its reviewed, object-specific API,
+-- worker, and authorizer grants; see the required checklist in RLS_ROLLOUT.md.
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON SEQUENCES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;

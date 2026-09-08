@@ -26,9 +26,11 @@ customer owner/member isolation, publisher private and routed-order access,
 Operations/Finance/Super Admin, auth table denial, public filtering, worker
 no-context denial, cross-tenant DML, role and telemetry spoofing, customer and
 publisher self-promotion denial, safe invite acceptance, last-owner
-preservation, append-only audit, display-safe review snapshots, public metric
-filtering, delivery URL fencing, suspension, and live membership revocation.
-The same destructive matrix now runs in a dedicated GitHub CI database.
+preservation (including concurrent customer and publisher owner demotions),
+append-only audit, display-safe review snapshots, public metric filtering,
+delivery URL fencing, suspension, and live membership revocation. The same
+destructive matrix now runs after an activation-time provisioning rerun in a
+dedicated GitHub CI database, proving authorizer ACL reconciliation is safe.
 
 ## Prior marketplace context
 

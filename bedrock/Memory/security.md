@@ -80,7 +80,8 @@ updated: 2026-09-08
   a database trigger to the unchanged PENDING-to-ACTIVE transition, Operations
   cannot mutate staff authority, and audit rows are append-only. Database
   triggers also reject deletion/demotion of the last active customer or
-  publisher owner to prevent an application lockout.
+  publisher owner to prevent an application lockout; parent-scoped advisory
+  transaction locks serialize concurrent owner transitions before recounting.
 - The 11-role topology keeps schema owner, migrator, API, auth, worker,
   reporting, and the boolean-only RLS authorizer separate. All are
   non-superuser and `NOBYPASSRLS`; provisioning leaves credential roles
@@ -92,8 +93,10 @@ updated: 2026-09-08
   worker, cross-tenant DML, spoofed role/telemetry, membership self-promotion,
   invite acceptance, last-owner preservation, append-only audit, delivery
   fencing, no-context denial, suspension, and immediate authority revocation.
-  CI builds a dedicated database and runs the full provision/activate/test
-  sequence.
+  CI builds a dedicated database and runs the full
+  provision/activate/reprovision/test sequence. Reprovisioning restores the
+  NOLOGIN authorizer's schema usage and read-only access to existing policy
+  roots, while future roots still require explicit migration grants.
 - Rollout is lockout-safe: install policies inert, provision disabled roles,
   verify separate credentials, deploy context-aware code, canary, activate
   atomically, and canary again. The guarded emergency script disables the

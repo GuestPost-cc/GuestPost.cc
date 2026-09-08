@@ -1025,6 +1025,13 @@ BEGIN
        OR NEW."organizationId" <> OLD."organizationId"
      )
   THEN
+    -- Serialize competing demotions/removals for the same organization. The
+    -- transaction-scoped lock is held through commit, so a concurrent trigger
+    -- recounts only after the winning owner transition is durable.
+    PERFORM pg_advisory_xact_lock(
+      hashtextextended('guestpost.customer-owner:' || OLD."organizationId", 0)
+    );
+
     SELECT count(*) INTO active_owner_count
     FROM public."Membership" AS membership
     WHERE membership."organizationId" = OLD."organizationId"
@@ -1066,6 +1073,12 @@ BEGIN
     IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
     RETURN NEW;
   END IF;
+
+  -- Publisher owners have no status column, so role/removal transitions share
+  -- a publisher-scoped transaction lock before evaluating the invariant.
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('guestpost.publisher-owner:' || OLD."publisherId", 0)
+  );
 
   SELECT count(*) INTO active_owner_count
   FROM public."PublisherMembership" AS membership

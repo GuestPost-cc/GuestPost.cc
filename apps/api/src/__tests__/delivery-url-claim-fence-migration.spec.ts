@@ -214,5 +214,14 @@ describe("delivery URL claim fence migration contract", () => {
     )
     expect(rlsRolloutRunbook).toContain("WITH public_acl AS")
     expect(rlsRolloutRunbook).toContain("leaves all credential roles `NOLOGIN`")
+    expect(rlsProvisioningSql).toContain(
+      "GRANT USAGE ON SCHEMA public TO guestpost_rls_authorizer",
+    )
+    expect(rlsProvisioningSql).toContain(
+      "GRANT SELECT ON ALL TABLES IN SCHEMA public TO guestpost_rls_authorizer",
+    )
+    expect(rlsRolloutRunbook).toContain(
+      "`guestpost_rls_authorizer` access for every new policy root",
+    )
   })
 })

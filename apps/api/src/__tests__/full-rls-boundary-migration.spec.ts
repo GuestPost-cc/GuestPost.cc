@@ -103,6 +103,9 @@ describe("full application RLS boundary migration", () => {
     expect(migration).toContain("publisher_owner(target_id text)")
     expect(migration).toContain("enforce_membership_transition()")
     expect(migration).toContain("enforce_publisher_owner_transition()")
+    expect(migration.match(/pg_advisory_xact_lock\(/g)).toHaveLength(2)
+    expect(migration).toContain("guestpost.customer-owner:")
+    expect(migration).toContain("guestpost.publisher-owner:")
     expect(migration).toContain(
       "membership self-update is limited to accepting an unchanged pending invitation",
     )
