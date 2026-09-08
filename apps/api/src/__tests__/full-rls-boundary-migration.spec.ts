@@ -30,7 +30,7 @@ function migrationModels(): string[] {
 }
 
 describe("full application RLS boundary migration", () => {
-  it("installs four explicit policy commands for every manifest model", () => {
+  it("stages four explicit policy commands without replacing live ApiKey policies", () => {
     const models = migrationModels()
     expect(new Set(models).size).toBe(99)
     expect(models.sort()).toEqual([...RLS_MODEL_NAMES].sort())
@@ -42,6 +42,11 @@ describe("full application RLS boundary migration", () => {
     expect(migration).toContain("_full_boundary_insert")
     expect(migration).toContain("_full_boundary_update")
     expect(migration).toContain("_full_boundary_delete")
+    expect(migration).toContain("IF model_name = 'ApiKey' THEN")
+    expect(activation).toContain('CREATE POLICY "ApiKey_full_boundary_select"')
+    expect(activation).toContain(
+      'DROP POLICY "ApiKey_select_active_organization_owner"',
+    )
   })
 
   it("is inert until the separately confirmed atomic activation", () => {
@@ -50,7 +55,12 @@ describe("full application RLS boundary migration", () => {
     )
     expect(activation).toContain("activate=YES is required")
     expect(activation).toContain("expected exactly 99 application tables")
+    expect(activation).toContain("covered_model_count <> 98")
+    expect(activation).toContain("total_policy_count <> 398")
+    expect(activation).toContain("phase_one_api_key_policy_count <> 6")
+    expect(activation).toContain("covered_model_count <> 99")
     expect(activation).toContain("policy_count <> 396")
+    expect(activation).toContain("total_policy_count <> 396")
     expect(activation).toContain("ENABLE ROW LEVEL SECURITY")
     expect(activation).toContain("FORCE ROW LEVEL SECURITY")
     expect(activation).toMatch(/BEGIN;[\s\S]*COMMIT;/)

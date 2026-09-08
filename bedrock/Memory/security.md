@@ -44,10 +44,12 @@ updated: 2026-09-08
 
 - The staged full boundary classifies all 99 Prisma models and installs
   explicit SELECT/INSERT/UPDATE/DELETE policies for customer, publisher,
-  staff, Better Auth, catalog, webhook, and worker workloads. The migration is
-  deliberately inert; a separately confirmed activation script verifies 99
-  tables, 396 policies, role attributes, ACLs, and ownership before atomically
-  enabling and forcing RLS.
+  staff, Better Auth, catalog, webhook, and worker workloads. The migration
+  leaves the six active Phase 1 `ApiKey` policies untouched while staging 392
+  inert policies across the other 98 models. A separately confirmed activation
+  script verifies that state, prepares authorizer grants, atomically swaps
+  `ApiKey` to its four full-boundary policies, and verifies the final 99-table,
+  396-policy boundary before commit.
 - Customer and publisher policies recheck live membership and non-suspended
   users. Customer API keys additionally recheck the live OWNER role, so a
   forged/stale organization-role setting cannot grant access. Staff policies

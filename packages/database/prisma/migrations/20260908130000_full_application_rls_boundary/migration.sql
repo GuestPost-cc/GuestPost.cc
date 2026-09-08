@@ -2,9 +2,9 @@
 --
 -- Activation is deliberately separate (scripts/activate-full-rls.sql). This
 -- migration is safe to deploy before runtime credentials are switched: it
--- creates the policy contract for all 99 application tables but does not run
--- ENABLE/FORCE RLS. ApiKey remains protected by the preceding Phase 1
--- migration throughout the staged rollout.
+-- creates the policy contract for the 98 not-yet-forced application tables
+-- but does not run ENABLE/FORCE RLS. ApiKey remains protected exclusively by
+-- the preceding Phase 1 policies until activation atomically swaps them.
 
 -- Public review responses must not need visibility into the Better Auth User
 -- row. Snapshot only the two display-safe fields and backfill existing reviews
@@ -1126,6 +1126,14 @@ DECLARE
   ];
 BEGIN
   FOREACH model_name IN ARRAY models LOOP
+    -- ApiKey is already FORCE RLS under the Phase 1 policies. Installing the
+    -- role-aware policy before its activation-time grants exist would lock out
+    -- the live Phase 1 runtime. The activation transaction performs its policy
+    -- swap only after the new authorizer grants are ready.
+    IF model_name = 'ApiKey' THEN
+      CONTINUE;
+    END IF;
+
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I',
       model_name || '_full_boundary_select', model_name);
     EXECUTE format(

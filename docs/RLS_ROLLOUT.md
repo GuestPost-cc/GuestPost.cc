@@ -8,7 +8,8 @@ and catalog workloads. The full boundary is not activated by a normal Prisma
 migration:
 
 - `20260908130000_full_application_rls_boundary/migration.sql` installs four
-  explicit command policies per model but leaves them inert.
+  explicit command policies for the 98 not-yet-forced models but leaves them
+  inert; it does not touch the six live Phase 1 `ApiKey` policies.
 - `scripts/provision-rls-roles.sql` reconciles the least-privilege database
   role and ACL topology while leaving every credential role `NOLOGIN`.
 - `scripts/activate-full-rls.sql` performs guarded, atomic `ENABLE` + `FORCE`
@@ -126,8 +127,9 @@ a current, disposable clone first.
    destructive and uses fixed fixtures, so it is for a fresh ephemeral
    database only. GitHub CI performs this entire sequence in a dedicated
    `guestpost_rls_boundary_test` database.
-2. **Install inert policies.** Deploy the Prisma migration normally. Verify 99
-   covered models and 396 full-boundary policies. Do not activate RLS yet.
+2. **Install inert policies.** Deploy the Prisma migration normally. Verify 98
+   covered models and 392 full-boundary policies, plus the six Phase 1
+   `ApiKey` policies. Do not activate the generalized boundary yet.
 3. **Provision disabled identities.** Run the role recipe through a protected
    administrator connection with the exact target database name. Transfer
    ownership from an explicit inventory. Create independent TLS/password or
@@ -150,8 +152,9 @@ a current, disposable clone first.
    orders, customer invitation acceptance/decline, review creation/rendering,
    marketplace metric filtering, all staff roles, public catalog,
    Stripe/payout callbacks, and each worker queue. Confirm transaction latency
-   and pool saturation are within limits. Because policies are still inert, a
-   context bug cannot lock users out during this stage.
+   and pool saturation are within limits. Because the 98 new policy sets are
+   still inert and the proven Phase 1 `ApiKey` policies remain unchanged, a
+   generalized context bug cannot lock users out during this stage.
 7. **Activate atomically.** Through an approved admin session, run:
 
    ```sh
@@ -162,11 +165,13 @@ a current, disposable clone first.
    ```
 
    The script aborts unless the database name and confirmation match exactly,
-   all 99 tables and 396 policies exist, managed roles lack privileged
-   attributes, and every application table/sequence has the reviewed owner.
-   It transfers helper ownership, grants only the three runtime groups access
-   to the private helper schema, enables and forces every policy in one
-   transaction, and verifies the result before commit.
+   all 98 staged model policy sets and all six Phase 1 `ApiKey` policies exist,
+   managed roles lack privileged attributes, and every application
+   table/sequence has the reviewed owner. It transfers helper ownership,
+   grants only the three runtime groups access to the private helper schema,
+   atomically swaps `ApiKey` from its six Phase 1 policies to four
+   full-boundary policies, enables and forces every table, and verifies the
+   final 99-model/396-policy result before commit.
 8. **Post-activation canary.** Repeat the step 6 journey with two distinct
    customer organizations and publishers. Include demotion/removal/suspension
    while a session is active. Alert on RLS denials, missing request context,
@@ -191,7 +196,8 @@ a current, disposable clone first.
 
 The checked-in suites cover three layers:
 
-- unit/contract tests verify the 99-model manifest, four-policy generation,
+- unit/contract tests verify the 99-model manifest, staged four-policy
+  generation, the lockout-safe activation-time `ApiKey` policy swap,
   all context variants, context clearing, proxy behavior, guard switching,
   explicit database URL support, and activation/rollback safeguards;
 - the existing API-key PostgreSQL integration test proves owner-only CRUD and
@@ -236,6 +242,8 @@ WHERE rolname LIKE 'guestpost_%'
 ORDER BY rolname;
 ```
 
-Expected values are 99 forced tables, 99 covered tables, 396 command policies,
+Before activation, expected full-boundary values are 98 covered tables and 392
+command policies, alongside six Phase 1 `ApiKey` policies. After activation,
+expected values are 99 forced tables, 99 covered tables, 396 command policies,
 and `false` for every privileged role attribute. Treat any mismatch as a
 failed deployment gate.

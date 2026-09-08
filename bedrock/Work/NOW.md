@@ -8,8 +8,10 @@ updated: 2026-09-08
 
 ## Full staged application RLS
 
-PR #116 now contains an inert four-command policy surface for all 99 Prisma
-models plus context-aware API, Better Auth, integrations, and worker clients.
+PR #116 now contains an inert four-command policy surface for 98 Prisma models
+plus a lockout-safe activation-time swap from the six live Phase 1 `ApiKey`
+policies to four full-boundary policies, alongside context-aware API, Better
+Auth, integrations, and worker clients.
 Customer, publisher, and staff authority is rechecked from live PostgreSQL
 rows; public/catalog, webhook, auth, and platform-worker workloads have
 separate explicit boundaries. Better Auth uses a distinct runtime URL, and API

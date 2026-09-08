@@ -1874,6 +1874,14 @@ describe("[INTEGRATION] Financial — canonical payout completion persistence", 
         'ALTER TABLE "Withdrawal" ENABLE TRIGGER "Withdrawal_financial_provenance_guard"',
       )
     }
+    const replacementOwner = await makeUser(prisma, { userType: "PUBLISHER" })
+    await prisma.publisherMembership.create({
+      data: {
+        userId: replacementOwner.id,
+        publisherId: fixture.publisherId,
+        role: "PUBLISHER_OWNER",
+      },
+    })
     await prisma.publisherMembership.update({
       where: {
         userId_publisherId: {

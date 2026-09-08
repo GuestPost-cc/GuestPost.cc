@@ -46,6 +46,8 @@ DECLARE
   model_count integer;
   covered_model_count integer;
   policy_count integer;
+  total_policy_count integer;
+  phase_one_api_key_policy_count integer;
   bad_role_count integer;
   bad_owner_count integer;
 BEGIN
@@ -66,10 +68,33 @@ BEGIN
   WHERE schemaname = 'public'
     AND policyname LIKE '%\_full\_boundary\_%' ESCAPE '\';
 
-  IF covered_model_count <> 99 OR policy_count <> 396 THEN
+  IF covered_model_count <> 98 OR policy_count <> 392 THEN
     RAISE EXCEPTION
       'full-boundary policy coverage is incomplete: models %, policies %',
       covered_model_count, policy_count;
+  END IF;
+
+  SELECT
+    count(*),
+    count(*) FILTER (
+      WHERE tablename = 'ApiKey'
+        AND policyname = ANY (ARRAY[
+          'ApiKey_select_active_organization_owner',
+          'ApiKey_select_presented_opaque_key',
+          'ApiKey_insert_active_organization_owner',
+          'ApiKey_update_active_organization_owner',
+          'ApiKey_update_presented_opaque_key',
+          'ApiKey_delete_active_organization_owner'
+        ])
+    )
+    INTO total_policy_count, phase_one_api_key_policy_count
+  FROM pg_policies
+  WHERE schemaname = 'public';
+
+  IF total_policy_count <> 398 OR phase_one_api_key_policy_count <> 6 THEN
+    RAISE EXCEPTION
+      'expected exactly 392 staged and 6 Phase 1 policies before activation; total %, Phase 1 %',
+      total_policy_count, phase_one_api_key_policy_count;
   END IF;
 
   SELECT count(*) INTO bad_role_count
@@ -140,6 +165,73 @@ GRANT USAGE ON SCHEMA guestpost_rls
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA guestpost_rls
   TO guestpost_api_group, guestpost_auth_group, guestpost_worker_group;
 
+-- ApiKey is already FORCE RLS. Keep the six Phase 1 policies in place until
+-- every full-boundary function and grant above is ready, then swap policies in
+-- this same transaction so no committed state can lock out API-key traffic.
+CREATE POLICY "ApiKey_full_boundary_select"
+ON public."ApiKey"
+FOR SELECT
+USING (
+  current_user = 'guestpost_rls_authorizer'
+  OR guestpost_rls.authorize(
+    current_user,
+    'ApiKey',
+    'SELECT',
+    to_jsonb("ApiKey".*)
+  )
+);
+
+CREATE POLICY "ApiKey_full_boundary_insert"
+ON public."ApiKey"
+FOR INSERT
+WITH CHECK (
+  guestpost_rls.authorize(
+    current_user,
+    'ApiKey',
+    'INSERT',
+    to_jsonb("ApiKey".*)
+  )
+);
+
+CREATE POLICY "ApiKey_full_boundary_update"
+ON public."ApiKey"
+FOR UPDATE
+USING (
+  guestpost_rls.authorize(
+    current_user,
+    'ApiKey',
+    'UPDATE',
+    to_jsonb("ApiKey".*)
+  )
+)
+WITH CHECK (
+  guestpost_rls.authorize(
+    current_user,
+    'ApiKey',
+    'UPDATE',
+    to_jsonb("ApiKey".*)
+  )
+);
+
+CREATE POLICY "ApiKey_full_boundary_delete"
+ON public."ApiKey"
+FOR DELETE
+USING (
+  guestpost_rls.authorize(
+    current_user,
+    'ApiKey',
+    'DELETE',
+    to_jsonb("ApiKey".*)
+  )
+);
+
+DROP POLICY "ApiKey_select_active_organization_owner" ON public."ApiKey";
+DROP POLICY "ApiKey_select_presented_opaque_key" ON public."ApiKey";
+DROP POLICY "ApiKey_insert_active_organization_owner" ON public."ApiKey";
+DROP POLICY "ApiKey_update_active_organization_owner" ON public."ApiKey";
+DROP POLICY "ApiKey_update_presented_opaque_key" ON public."ApiKey";
+DROP POLICY "ApiKey_delete_active_organization_owner" ON public."ApiKey";
+
 DO $activate$
 DECLARE
   table_name text;
@@ -164,6 +256,9 @@ $activate$;
 DO $postflight$
 DECLARE
   incomplete integer;
+  covered_model_count integer;
+  policy_count integer;
+  total_policy_count integer;
 BEGIN
   SELECT count(*) INTO incomplete
   FROM pg_class AS relation
@@ -175,6 +270,28 @@ BEGIN
 
   IF incomplete <> 0 THEN
     RAISE EXCEPTION '% application tables are not ENABLE+FORCE RLS', incomplete;
+  END IF;
+
+  SELECT count(DISTINCT tablename), count(*)
+    INTO covered_model_count, policy_count
+  FROM pg_policies
+  WHERE schemaname = 'public'
+    AND policyname LIKE '%\_full\_boundary\_%' ESCAPE '\';
+
+  IF covered_model_count <> 99 OR policy_count <> 396 THEN
+    RAISE EXCEPTION
+      'activated policy coverage is incomplete: models %, policies %',
+      covered_model_count, policy_count;
+  END IF;
+
+  SELECT count(*) INTO total_policy_count
+  FROM pg_policies
+  WHERE schemaname = 'public';
+
+  IF total_policy_count <> 396 THEN
+    RAISE EXCEPTION
+      'unexpected public policy remains after activation: expected 396, found %',
+      total_policy_count;
   END IF;
 END
 $postflight$;
