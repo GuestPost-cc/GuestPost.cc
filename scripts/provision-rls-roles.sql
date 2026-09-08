@@ -31,7 +31,7 @@ BEGIN
     CREATE ROLE guestpost_schema_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_migrator') THEN
-    CREATE ROLE guestpost_migrator LOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+    CREATE ROLE guestpost_migrator NOLOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_api_group') THEN
     CREATE ROLE guestpost_api_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
@@ -43,31 +43,78 @@ BEGIN
     CREATE ROLE guestpost_reporting_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_api_runtime') THEN
-    CREATE ROLE guestpost_api_runtime LOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+    CREATE ROLE guestpost_api_runtime NOLOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_worker_runtime') THEN
-    CREATE ROLE guestpost_worker_runtime LOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+    CREATE ROLE guestpost_worker_runtime NOLOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_reporting_runtime') THEN
-    CREATE ROLE guestpost_reporting_runtime LOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+    CREATE ROLE guestpost_reporting_runtime NOLOGIN PASSWORD NULL NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
   END IF;
 END
 $roles$;
 
--- Make the safe attributes idempotent even if a role predated this rollout.
+-- Disable credential use before reconciling any role that predated this
+-- rollout. LOGIN is restored only after the exact membership graph is rebuilt.
+ALTER ROLE guestpost_migrator NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+ALTER ROLE guestpost_api_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+ALTER ROLE guestpost_worker_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+ALTER ROLE guestpost_reporting_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
+
+-- Make the remaining safe attributes idempotent too.
 ALTER ROLE guestpost_schema_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-ALTER ROLE guestpost_migrator LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 ALTER ROLE guestpost_api_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 ALTER ROLE guestpost_worker_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 ALTER ROLE guestpost_reporting_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-ALTER ROLE guestpost_api_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
-ALTER ROLE guestpost_worker_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
-ALTER ROLE guestpost_reporting_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT;
 
 ALTER ROLE guestpost_migrator SET search_path = pg_catalog, public;
 ALTER ROLE guestpost_api_runtime SET search_path = pg_catalog, public;
 ALTER ROLE guestpost_worker_runtime SET search_path = pg_catalog, public;
 ALTER ROLE guestpost_reporting_runtime SET search_path = pg_catalog, public;
+
+-- This recipe owns the complete membership topology for its managed roles.
+-- Remove both direct and transitive surprises left by an earlier/manual setup,
+-- then recreate only the four reviewed edges below. This is safe to rerun.
+DO $memberships$
+DECLARE
+  membership_row record;
+BEGIN
+  FOR membership_row IN
+    SELECT
+      granted_role.rolname AS granted_role_name,
+      member_role.rolname AS member_role_name
+    FROM pg_auth_members AS auth_membership
+    JOIN pg_roles AS granted_role ON granted_role.oid = auth_membership.roleid
+    JOIN pg_roles AS member_role ON member_role.oid = auth_membership.member
+    WHERE granted_role.rolname IN (
+      'guestpost_schema_owner',
+      'guestpost_migrator',
+      'guestpost_api_group',
+      'guestpost_api_runtime',
+      'guestpost_worker_group',
+      'guestpost_worker_runtime',
+      'guestpost_reporting_group',
+      'guestpost_reporting_runtime'
+    )
+    OR member_role.rolname IN (
+      'guestpost_schema_owner',
+      'guestpost_migrator',
+      'guestpost_api_group',
+      'guestpost_api_runtime',
+      'guestpost_worker_group',
+      'guestpost_worker_runtime',
+      'guestpost_reporting_group',
+      'guestpost_reporting_runtime'
+    )
+  LOOP
+    EXECUTE format(
+      'REVOKE %I FROM %I',
+      membership_row.granted_role_name,
+      membership_row.member_role_name
+    );
+  END LOOP;
+END
+$memberships$;
 
 GRANT guestpost_schema_owner TO guestpost_migrator;
 GRANT guestpost_api_group TO guestpost_api_runtime;
@@ -115,8 +162,17 @@ GRANT EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)
 -- Reporting starts fail-closed: connect + schema usage but no table, sequence,
 -- or function privileges. Add an approved view/query grant per report.
 
--- Do not let new relations/functions silently recreate PUBLIC access. New
--- application grants are an explicit migration-review responsibility.
+-- Do not let new relations/functions silently recreate PUBLIC access. Every
+-- relation-creating migration must carry its reviewed, object-specific API and
+-- worker table/sequence grants; see the required checklist in RLS_ROLLOUT.md.
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON TABLES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON SEQUENCES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
+-- Existing passwords are preserved. Newly created roles still have no usable
+-- password until credentials are set through the separate controlled change.
+-- Keep every login disabled until the complete privilege graph is reconciled.
+ALTER ROLE guestpost_migrator LOGIN;
+ALTER ROLE guestpost_api_runtime LOGIN;
+ALTER ROLE guestpost_worker_runtime LOGIN;
+ALTER ROLE guestpost_reporting_runtime LOGIN;

@@ -56,7 +56,12 @@ updated: 2026-09-08
   policy error aborts that transaction, so later mutation assertions must not
   reuse it. The staged runtime-role provisioning revokes function access from
   `PUBLIC` and grants only the direct delivery URL fence function to the API
-  and worker groups that call it.
+  and worker groups that call it. The bootstrap owns the complete membership
+  graph for its eight managed roles: it disables logins, removes unexpected
+  membership edges, restores only the four reviewed edges, then re-enables
+  logins. Default privileges remain fail-closed; every future relation-creating
+  migration must carry reviewed object-specific runtime grants and a contract
+  test instead of blanket application-role defaults.
 - This is intentionally not a full-model RLS claim. The remaining 98 Prisma
   models still use the existing guard/service ownership boundaries until each
   receives a policy, context producer, non-owner database-role test, and

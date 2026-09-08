@@ -51,6 +51,30 @@ RLS bypass. Reporting gets no table grants until a report-specific view/query
 is approved. Every later phase must replace the broad DML baseline with a
 table/column grant matrix; it must not add a role-wide RLS bypass.
 
+The bootstrap recipe is authoritative for its eight managed roles: it disables
+the four login roles, removes every existing membership edge involving a
+managed role, restores only the four documented edges, and then re-enables
+login. Do not attach ad hoc memberships to these roles; rerunning the recipe
+will intentionally remove them.
+
+## Required migration grant checklist
+
+Default privileges deliberately grant nothing to application roles. Every
+migration that creates a table or sequence must therefore include reviewed,
+object-specific grants in that same migration before it can be merged:
+
+- identify whether the API, worker, both, or neither may use each new object;
+- grant only the required `SELECT`, `INSERT`, `UPDATE`, and `DELETE` table
+  operations to `guestpost_api_group` and/or `guestpost_worker_group`;
+- grant sequence `USAGE` and `SELECT` only when inserts use that sequence;
+- add a migration contract test that names the object and exact grantees; and
+- reject blanket application-role default privileges and `PUBLIC` access.
+
+A migration that creates no table or sequence records that fact during review
+and needs no synthetic grant. The Phase 1 `ApiKey` migration changes policies
+on an existing table, so its compatibility grant comes from the reviewed
+bootstrap inventory rather than a new-relation grant.
+
 ## Controlled rollout
 
 1. On a disposable clone, inventory current ownership, privileges, `PUBLIC`

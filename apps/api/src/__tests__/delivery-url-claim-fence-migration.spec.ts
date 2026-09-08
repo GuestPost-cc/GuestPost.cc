@@ -35,6 +35,10 @@ const rlsProvisioningSql = fs.readFileSync(
   path.join(repoRoot, "scripts/provision-rls-roles.sql"),
   "utf8",
 )
+const rlsRolloutRunbook = fs.readFileSync(
+  path.join(repoRoot, "docs/RLS_ROLLOUT.md"),
+  "utf8",
+)
 
 describe("delivery URL claim fence migration contract", () => {
   it("uses the same advisory namespace as the application lock", () => {
@@ -146,6 +150,42 @@ describe("delivery URL claim fence migration contract", () => {
     )
     expect(rlsProvisioningSql).toContain(
       "REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC",
+    )
+  })
+
+  it("rebuilds the managed membership graph before enabling login roles", () => {
+    const membershipCleanup = rlsProvisioningSql.indexOf("DO $memberships$")
+    const intendedMemberships = rlsProvisioningSql.indexOf(
+      "GRANT guestpost_schema_owner TO guestpost_migrator",
+    )
+    const loginEnablement = rlsProvisioningSql.indexOf(
+      "ALTER ROLE guestpost_migrator LOGIN;",
+    )
+
+    expect(membershipCleanup).toBeGreaterThan(-1)
+    expect(intendedMemberships).toBeGreaterThan(membershipCleanup)
+    expect(loginEnablement).toBeGreaterThan(intendedMemberships)
+    expect(rlsProvisioningSql).toContain("'REVOKE %I FROM %I'")
+    expect(rlsProvisioningSql).toContain(
+      "ALTER ROLE guestpost_api_runtime NOLOGIN",
+    )
+    expect(
+      rlsProvisioningSql.match(/^GRANT guestpost_\w+ TO guestpost_\w+;$/gm),
+    ).toEqual([
+      "GRANT guestpost_schema_owner TO guestpost_migrator;",
+      "GRANT guestpost_api_group TO guestpost_api_runtime;",
+      "GRANT guestpost_worker_group TO guestpost_worker_runtime;",
+      "GRANT guestpost_reporting_group TO guestpost_reporting_runtime;",
+    ])
+  })
+
+  it("requires object-specific grants in every relation-creating migration", () => {
+    expect(rlsRolloutRunbook).toContain("## Required migration grant checklist")
+    expect(rlsRolloutRunbook).toMatch(
+      /Every\s+migration that creates a table or sequence/,
+    )
+    expect(rlsRolloutRunbook).toContain(
+      "reject blanket application-role default privileges",
     )
   })
 })
