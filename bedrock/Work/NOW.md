@@ -1,7 +1,7 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-08
+updated: 2026-09-09
 ---
 
 # Current focus
@@ -31,6 +31,10 @@ append-only audit, display-safe review snapshots, public metric filtering,
 delivery URL fencing, suspension, and live membership revocation. The same
 destructive matrix now runs after an activation-time provisioning rerun in a
 dedicated GitHub CI database, proving authorizer ACL reconciliation is safe.
+The CI ownership rehearsal transfers tables before independently owned
+sequences because PostgreSQL transfers `OWNED BY` sequences with their parent
+table and rejects an attached sequence-first owner change; the corrected clean
+database sequence passed again through activation and the full matrix.
 
 ## Prior marketplace context
 

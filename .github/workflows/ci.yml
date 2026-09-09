@@ -173,26 +173,39 @@ jobs:
             object_row record;
           BEGIN
             FOR object_row IN
-              SELECT relation.relkind, namespace.nspname, relation.relname
+              SELECT namespace.nspname, relation.relname
               FROM pg_class AS relation
               JOIN pg_namespace AS namespace
                 ON namespace.oid = relation.relnamespace
               WHERE namespace.nspname = 'public'
-                AND relation.relkind IN ('r', 'S')
+                AND relation.relkind = 'r'
             LOOP
-              IF object_row.relkind = 'S' THEN
-                EXECUTE format(
-                  'ALTER SEQUENCE %I.%I OWNER TO guestpost_schema_owner',
-                  object_row.nspname,
-                  object_row.relname
-                );
-              ELSE
-                EXECUTE format(
-                  'ALTER TABLE %I.%I OWNER TO guestpost_schema_owner',
-                  object_row.nspname,
-                  object_row.relname
-                );
-              END IF;
+              EXECUTE format(
+                'ALTER TABLE %I.%I OWNER TO guestpost_schema_owner',
+                object_row.nspname,
+                object_row.relname
+              );
+            END LOOP;
+
+            -- Changing a table owner also changes any sequence linked with
+            -- OWNED BY. Transfer only sequences that remain independently
+            -- owned so PostgreSQL never rejects an attached sequence first.
+            FOR object_row IN
+              SELECT namespace.nspname, relation.relname
+              FROM pg_class AS relation
+              JOIN pg_namespace AS namespace
+                ON namespace.oid = relation.relnamespace
+              JOIN pg_roles AS owner_role
+                ON owner_role.oid = relation.relowner
+              WHERE namespace.nspname = 'public'
+                AND relation.relkind = 'S'
+                AND owner_role.rolname <> 'guestpost_schema_owner'
+            LOOP
+              EXECUTE format(
+                'ALTER SEQUENCE %I.%I OWNER TO guestpost_schema_owner',
+                object_row.nspname,
+                object_row.relname
+              );
             END LOOP;
           END
           $ownership$;
