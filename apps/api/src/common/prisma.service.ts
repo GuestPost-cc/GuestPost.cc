@@ -1,4 +1,8 @@
-import { createPrismaAdapter, PrismaClient } from "@guestpost/database"
+import {
+  createPrismaAdapter,
+  createRlsAwarePrismaClient,
+  PrismaClient,
+} from "@guestpost/database"
 import {
   Injectable,
   type OnModuleDestroy,
@@ -24,6 +28,16 @@ export class PrismaService
       // before declaring failure, but keep a ceiling so a stuck txn can't hang.
       transactionOptions: { maxWait: 10_000, timeout: 20_000 },
     })
+  }
+
+  /**
+   * Prisma's generated model properties are delegates, not class methods, so
+   * a proxy is the one central interception point that covers every service
+   * without changing thousands of call sites. It is inert until the staged
+   * enforcement flag is enabled.
+   */
+  asRlsAwareClient(): PrismaService {
+    return createRlsAwarePrismaClient(this)
   }
 
   async onModuleInit() {

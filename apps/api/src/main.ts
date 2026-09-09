@@ -82,6 +82,16 @@ function validateEnv(): void {
     process.exit(1)
   }
 
+  if (
+    process.env.RLS_ENFORCEMENT_ENABLED === "true" &&
+    !process.env.AUTH_DATABASE_URL
+  ) {
+    bootstrapLogger.error(
+      "FATAL: AUTH_DATABASE_URL is required when RLS_ENFORCEMENT_ENABLED=true",
+    )
+    process.exit(1)
+  }
+
   if ((process.env.BETTER_AUTH_SECRET?.trim().length ?? 0) < 32) {
     bootstrapLogger.error(
       "BETTER_AUTH_SECRET must be a random value of at least 32 characters",

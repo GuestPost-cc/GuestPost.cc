@@ -13,16 +13,21 @@ overrides:
   dompurify: 3.4.13
   deepmerge-ts: 8.0.0
   browserslist: 4.28.8
+  baseline-browser-mapping: 2.11.0
   fast-uri: 3.1.6
-  hono: 4.12.34
+  hono: 4.13.5
   ip-address: 10.3.1
   nanoid: 3.3.18
   postcss: 8.5.23
   mysql2: 3.23.1
+  multer: 2.3.0
   qs: 6.16.0
-  sharp: 0.35.3
+  sharp: 0.35.4
   shell-quote: 1.9.0
   valibot: 1.4.2
+  vitest: 4.1.11
+  "@vitest/coverage-v8": 4.1.11
+  "@vitest/mocker": 4.1.11
 # pnpm v11 build-script approvals (map form); onlyBuiltDependencies kept for
 # older pnpm compatibility.
 allowBuilds:

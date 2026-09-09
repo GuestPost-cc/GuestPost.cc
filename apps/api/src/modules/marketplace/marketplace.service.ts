@@ -64,11 +64,6 @@ type ListingWriteActor = {
 
 const publicWebsiteInclude = {
   metricsHistory: true,
-  websiteIntegrations: {
-    include: {
-      integration: { select: { provider: true, status: true } },
-    },
-  },
 } satisfies Prisma.WebsiteInclude
 
 const MAX_CANONICAL_ORGANIC_TRAFFIC = 2_147_483_647
@@ -295,8 +290,8 @@ export class MarketplaceService {
             content: review.content,
             createdAt: review.createdAt,
             user: {
-              name: review.user?.name ?? null,
-              image: review.user?.image ?? null,
+              name: review.reviewerName ?? review.user?.name ?? null,
+              image: review.reviewerImage ?? review.user?.image ?? null,
             },
           }))
       : []
@@ -1058,6 +1053,11 @@ export class MarketplaceService {
         website: {
           include: {
             ...publicWebsiteInclude,
+            websiteIntegrations: {
+              include: {
+                integration: { select: { provider: true, status: true } },
+              },
+            },
             managedBy: { select: { id: true, name: true, email: true } },
             moderationEvents: {
               orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -1268,7 +1268,6 @@ export class MarketplaceService {
         images: { orderBy: { sortOrder: "asc" } },
         reviews: {
           where: { status: "APPROVED" },
-          include: { user: { select: { id: true, name: true, image: true } } },
           orderBy: { createdAt: "desc" },
           take: 10,
         },
@@ -2590,18 +2589,25 @@ export class MarketplaceService {
       throw new BadRequestException("You have already reviewed this listing")
     }
 
+    const reviewer = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, image: true },
+    })
+    if (!reviewer) throw new ForbiddenException("Reviewer account not found")
+
     const review = await this.prisma.marketplaceReview.create({
       data: {
         listingId: dto.listingId,
         userId,
+        reviewerName: reviewer.name,
+        reviewerImage: reviewer.image,
         rating: dto.rating,
         title: dto.title,
         content: dto.content,
       },
-      include: { user: { select: { id: true, name: true, image: true } } },
     })
 
-    return review
+    return { ...review, user: reviewer }
   }
 
   // =============================================================================

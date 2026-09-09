@@ -40,17 +40,16 @@ describe("OrderCancellationService cancellation queue reads", () => {
         settlements: [],
       },
     }
-    const prisma = {
+    const prisma: any = {
       orderCancellationRequest: {
         findMany: jest.fn().mockResolvedValue([request]),
         count: jest.fn().mockResolvedValue(1),
       },
-      $transaction: jest
-        .fn()
-        .mockImplementation(async (operations: Array<Promise<unknown>>) =>
-          Promise.all(operations),
-        ),
+      $transaction: jest.fn(),
     }
+    prisma.$transaction.mockImplementation(async (operation: any) =>
+      operation(prisma),
+    )
     const service = new OrderCancellationService(
       prisma as any,
       {} as any,

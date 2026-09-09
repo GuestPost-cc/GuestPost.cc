@@ -2,15 +2,16 @@ import { SettlementsService } from "./settlements.service"
 
 describe("SettlementsService list filtering", () => {
   it("applies the controlled status filter to both rows and the exact count", async () => {
-    const prisma = {
+    const prisma: any = {
       settlement: {
         findMany: jest.fn().mockResolvedValue([{ id: "settlement-1" }]),
         count: jest.fn().mockResolvedValue(37),
       },
-      $transaction: jest.fn((queries: Array<Promise<unknown>>) =>
-        Promise.all(queries),
-      ),
+      $transaction: jest.fn(),
     }
+    prisma.$transaction.mockImplementation(async (operation: any) =>
+      operation(prisma),
+    )
     const service = new SettlementsService(prisma as any, {} as any, {} as any)
 
     const result = await service.listSettlements(undefined, 20, 20, [

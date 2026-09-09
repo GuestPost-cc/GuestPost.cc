@@ -60,17 +60,53 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
   })
 
   describe("runtime contract: createPrismaClient", () => {
-    it("returns a defined PrismaClient when DATABASE_URL is set", () => {
-      jest.isolateModules(() => {
-        process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test"
-        const { createPrismaClient } =
-          require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
-        const client = createPrismaClient()
-        expect(client).toBeDefined()
-        // Cleanup — prevent test from holding the client open
-        // (no $connect was called, but disconnect is idempotent).
-        void (client as any).$disconnect?.()
-      })
+    it("returns a defined PrismaClient when DATABASE_URL is set", async () => {
+      const previousDatabaseUrl = process.env.DATABASE_URL
+      try {
+        await jest.isolateModulesAsync(async () => {
+          process.env.DATABASE_URL =
+            "postgresql://test:test@localhost:5432/test"
+          const { createPrismaClient } =
+            require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
+          const client = createPrismaClient()
+          try {
+            expect(client).toBeDefined()
+          } finally {
+            await (client as any).$disconnect?.()
+          }
+        })
+      } finally {
+        if (previousDatabaseUrl === undefined) {
+          delete process.env.DATABASE_URL
+        } else {
+          process.env.DATABASE_URL = previousDatabaseUrl
+        }
+      }
+    })
+
+    it("accepts an explicit URL for a separate workload identity", async () => {
+      const previousDatabaseUrl = process.env.DATABASE_URL
+      try {
+        await jest.isolateModulesAsync(async () => {
+          delete process.env.DATABASE_URL
+          const { createPrismaClient } =
+            require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
+          const client = createPrismaClient({
+            databaseUrl: "postgresql://auth:test@localhost:5432/test",
+          })
+          try {
+            expect(client).toBeDefined()
+          } finally {
+            await (client as any).$disconnect?.()
+          }
+        })
+      } finally {
+        if (previousDatabaseUrl === undefined) {
+          delete process.env.DATABASE_URL
+        } else {
+          process.env.DATABASE_URL = previousDatabaseUrl
+        }
+      }
     })
   })
 
@@ -94,7 +130,7 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
         /import\s*\{[^}]*createPrismaClient[^}]*\}\s*from\s*["']\.\/create-prisma-client["']/,
       )
       expect(src).toMatch(
-        /globalForPrisma\.prisma\s*\?\?\s*createPrismaClient\(\)/,
+        /globalForPrisma\.prisma\s*\?\?\s*createRlsAwarePrismaClient\(createPrismaClient\(\)\)/,
       )
     })
 

@@ -12,6 +12,7 @@ const mockDiscoverResources = jest.fn()
 
 jest.mock("@guestpost/database", () => ({
   createPrismaClient: () => mockDb,
+  createRlsAwarePrismaClient: (client: unknown) => client,
 }))
 jest.mock("../../google-metrics-gate", () => ({
   assertGoogleMetricsEnabled: jest.fn(),

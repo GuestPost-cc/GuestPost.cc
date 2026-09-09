@@ -1,4 +1,7 @@
-import { createPrismaClient } from "@guestpost/database"
+import {
+  createPrismaClient,
+  createRlsAwarePrismaClient,
+} from "@guestpost/database"
 import {
   ProviderError,
   ProviderRateLimitError,
@@ -31,7 +34,7 @@ interface GscSearchAnalyticsResponse {
   responseAggregationType?: string
 }
 
-const db = createPrismaClient()
+const db = createRlsAwarePrismaClient(createPrismaClient())
 
 export class GoogleSearchConsoleProvider
   implements DiscoveryProvider, SyncProvider

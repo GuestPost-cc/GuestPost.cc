@@ -20,6 +20,10 @@
 
 // Deep import: request-context uses node:async_hooks and is not in the
 // shared barrel.
+import {
+  runWithRlsRequestScope,
+  setRlsRequestContext,
+} from "@guestpost/database"
 import { runWithRequestId } from "@guestpost/shared/dist/observability/request-context"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import * as Sentry from "@sentry/node"
@@ -85,10 +89,19 @@ export function createObservableWorker<TData = any, TResult = any>(
         return processor(job, token)
       })
     }
+    const runWithRls = () =>
+      runWithRlsRequestScope(() => {
+        setRlsRequestContext({
+          workload: "WORKER",
+          worker: queueName,
+          resourceId: job?.id ? String(job.id) : undefined,
+        })
+        return run()
+      })
     if (requestId) {
-      return runWithRequestId(requestId, run)
+      return runWithRequestId(requestId, runWithRls)
     }
-    return run()
+    return runWithRls()
   }
 
   const worker = new Worker<TData, TResult, string>(

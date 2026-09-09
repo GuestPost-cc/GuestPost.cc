@@ -10,6 +10,7 @@ const mockQueueAdd = jest.fn()
 
 jest.mock("@guestpost/database", () => ({
   createPrismaClient: () => mockDb,
+  createRlsAwarePrismaClient: (client: unknown) => client,
 }))
 jest.mock("bullmq", () => ({
   Queue: jest.fn().mockImplementation(() => ({

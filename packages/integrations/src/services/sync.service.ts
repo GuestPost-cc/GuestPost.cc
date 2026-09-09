@@ -1,4 +1,7 @@
-import { createPrismaClient } from "@guestpost/database"
+import {
+  createPrismaClient,
+  createRlsAwarePrismaClient,
+} from "@guestpost/database"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { Queue } from "bullmq"
 import {
@@ -18,7 +21,7 @@ import type { OwnerContext, SyncResult } from "../types"
 import { IntegrationSyncJobType } from "../types"
 import { wakeOnDemandWorker } from "../worker-wakeup"
 
-const db = createPrismaClient()
+const db = createRlsAwarePrismaClient(createPrismaClient())
 let encryptionSingleton: IntegrationEncryptionService | undefined
 
 function integrationEncryption(): IntegrationEncryptionService {

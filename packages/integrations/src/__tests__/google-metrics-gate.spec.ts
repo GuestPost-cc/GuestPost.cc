@@ -1,5 +1,6 @@
 jest.mock("@guestpost/database", () => ({
   createPrismaClient: () => ({}),
+  createRlsAwarePrismaClient: (client: unknown) => client,
 }))
 
 import { GoogleMetricsDisabledError } from "../errors"

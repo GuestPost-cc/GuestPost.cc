@@ -127,16 +127,18 @@ export class CampaignsService {
 
   async listOrders(organizationId: string, take = 50, skip = 0) {
     const where = { organizationId }
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.order.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        include: { website: true, campaign: true },
-        take,
-        skip,
-      }),
-      this.prisma.order.count({ where }),
-    ])
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.order.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          include: { website: true, campaign: true },
+          take,
+          skip,
+        }),
+        tx.order.count({ where }),
+      ]),
+    )
     return {
       items: items.map((order) => projectExternalOrder(order, "CUSTOMER")),
       total,
@@ -163,16 +165,18 @@ export class CampaignsService {
 
   async listCampaigns(organizationId: string, take = 50, skip = 0) {
     const where = { organizationId }
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.campaign.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take,
-        skip,
-        include: { _count: { select: { orders: true } } },
-      }),
-      this.prisma.campaign.count({ where }),
-    ])
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.campaign.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take,
+          skip,
+          include: { _count: { select: { orders: true } } },
+        }),
+        tx.campaign.count({ where }),
+      ]),
+    )
     return {
       items: items.map(({ _count, ...campaign }) => ({
         ...campaign,
@@ -208,16 +212,18 @@ export class CampaignsService {
     if (!campaign) throw new NotFoundException("Campaign not found")
 
     const where = { campaignId, organizationId }
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.order.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        include: { items: true, website: true, settlements: true },
-        take,
-        skip,
-      }),
-      this.prisma.order.count({ where }),
-    ])
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.order.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          include: { items: true, website: true, settlements: true },
+          take,
+          skip,
+        }),
+        tx.order.count({ where }),
+      ]),
+    )
     return {
       items: items.map((order) => projectExternalOrder(order, "CUSTOMER")),
       total,
@@ -292,16 +298,18 @@ export class CampaignsService {
 
   async listPublisherOrders(publisherId: string, take = 50, skip = 0) {
     const where = { website: { publisherId } }
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.order.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        include: { website: true, campaign: true },
-        take,
-        skip,
-      }),
-      this.prisma.order.count({ where }),
-    ])
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.order.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          include: { website: true, campaign: true },
+          take,
+          skip,
+        }),
+        tx.order.count({ where }),
+      ]),
+    )
     return {
       items: items.map((order) => projectExternalOrder(order, "PUBLISHER")),
       total,
