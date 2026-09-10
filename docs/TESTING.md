@@ -2,14 +2,18 @@
 
 ## Test types
 
-| Type | Tool | Location | Coverage target |
+| Type | Tool | Location | Primary assurance |
 |------|------|----------|-----------------|
-| Unit (API) | Jest | `apps/api/src/__tests__/` and module `__tests__/` | 80%+ |
+| Unit (API) | Jest | `apps/api/src/__tests__/` and module `__tests__/` | Service and authorization behavior |
 | Contract (API client) | Jest + TypeScript | `packages/api-client/src/__tests__/` | Request/response boundary |
-| Unit (UI) | Vitest | `packages/ui/src/` | 80%+ |
+| Unit (UI) | Vitest | `packages/ui/src/` | Component behavior with coverage artifacts |
 | E2E | Playwright | `e2e/` | Critical paths |
 | PostgreSQL integration | Jest | `apps/api/src/__tests__/integration/` | Transactions, locks, invariants |
 | Scenario integration | Scripts | `scripts/` | Provider/domain journeys |
+
+The repository currently publishes coverage artifacts but does not enforce a
+repo-wide numeric threshold. Do not describe 80% as a release gate until a
+measured, package-specific baseline is committed to the test configuration.
 
 ## Running tests
 

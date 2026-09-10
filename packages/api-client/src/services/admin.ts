@@ -1837,10 +1837,14 @@ export class AdminService {
       status?: string
       from?: string
       to?: string
+      take?: number
+      skip?: number
     } = {},
   ) {
     const q = new URLSearchParams(
-      Object.entries(filters).filter(([, v]) => v) as [string, string][],
+      Object.entries(filters)
+        .filter(([, value]) => value !== undefined && value !== "")
+        .map(([key, value]) => [key, String(value)]),
     ).toString()
     return this.client.get<any>(
       `/admin/websites/verification${q ? `?${q}` : ""}`,

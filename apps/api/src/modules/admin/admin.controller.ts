@@ -248,13 +248,17 @@ export class AdminController {
     @Query("status") status?: string,
     @Query("from") from?: string,
     @Query("to") to?: string,
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
   ) {
+    const pagination = parsePagination(take, skip)
     return this.websiteVerification.reviewCenter({
       publisherId,
       domain,
       status,
       from,
       to,
+      ...pagination,
     })
   }
 

@@ -28,7 +28,12 @@ export class ApiKeysController {
     const permissions = body.permissions?.length
       ? body.permissions
       : ["orders:read"]
-    return this.apiKeys.createKey(authority, body.name, permissions)
+    return this.apiKeys.createKey(
+      authority,
+      body.name,
+      permissions,
+      body.expiresAt,
+    )
   }
 
   @Get()

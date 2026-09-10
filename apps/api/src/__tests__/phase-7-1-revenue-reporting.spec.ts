@@ -261,6 +261,7 @@ describe("Phase 7.1 — reporting.service #15 fix (channel snapshot wins)", () =
     expect(src).toMatch(
       /fulfillmentChannel\s*\?\?\s*\(?\s*order\.website|fulfillmentChannel\s*\?\?\s*[^)]*ownershipType/,
     )
-    expect(src).toMatch(/resolveChannel|fulfillmentChannel ?? o\.website/)
+    expect(src).toContain("platformWhere")
+    expect(src).toContain('fulfillmentChannel: "PLATFORM"')
   })
 })

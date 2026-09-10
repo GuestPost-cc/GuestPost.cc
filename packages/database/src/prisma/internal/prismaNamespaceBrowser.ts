@@ -1085,6 +1085,7 @@ export type PayoutBatchScalarFieldEnum = (typeof PayoutBatchScalarFieldEnum)[key
 export const ApiKeyScalarFieldEnum = {
   id: 'id',
   organizationId: 'organizationId',
+  createdByUserId: 'createdByUserId',
   name: 'name',
   keyHash: 'keyHash',
   permissions: 'permissions',
@@ -1150,6 +1151,7 @@ export const ReportScalarFieldEnum = {
   format: 'format',
   exportedAt: 'exportedAt',
   orderId: 'orderId',
+  dedupKey: 'dedupKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

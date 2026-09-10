@@ -1,17 +1,23 @@
+import type { ApiKeyPermission } from "@guestpost/shared"
 import type { HttpClient } from "../client"
 
 export interface ApiKeyResponse {
   id: string
   name: string
-  prefix: string
-  permissions: string
+  permissions: ApiKeyPermission[]
   lastUsedAt: string | null
   expiresAt: string | null
   createdAt: string
 }
 
-export interface ApiKeyCreatedResponse extends ApiKeyResponse {
-  rawKey: string
+export interface ApiKeyCreatedResponse {
+  id: string
+  name: string
+  permissions: ApiKeyPermission[]
+  expiresAt: string
+  createdAt: string
+  key: string
+  message: string
 }
 
 export class ApiKeysService {
@@ -21,7 +27,11 @@ export class ApiKeysService {
     return this.client.get<ApiKeyResponse[]>("/api-keys")
   }
 
-  create(data: { name: string; permissions?: string; expiresAt?: string }) {
+  create(data: {
+    name: string
+    permissions?: ApiKeyPermission[]
+    expiresAt?: string
+  }) {
     return this.client.post<ApiKeyCreatedResponse>("/api-keys", {
       json: data as unknown as Record<string, unknown>,
     })

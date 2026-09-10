@@ -1,3 +1,4 @@
+export * from "./api-key-permissions"
 export * from "./api-origin"
 export * from "./audit/order-event-metadata"
 export * from "./briefs"

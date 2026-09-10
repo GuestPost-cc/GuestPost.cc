@@ -60,7 +60,6 @@ import { createReconciliationWorker } from "./processors/reconciliation.processo
 import { createReportWorker } from "./processors/report.processor"
 import { createSettlementAutoApproveWorker } from "./processors/settlement-auto-approve.processor"
 import { createSettlementReleaseWorker } from "./processors/settlement-release.processor"
-import { createVerificationWorker } from "./processors/verification.processor"
 import { createWebsiteVerificationWorker } from "./processors/website-verification.processor"
 import { connection } from "./redis"
 import { assertNoRegistryDrift, RegisteredJob } from "./repeatable-job-registry"
@@ -83,7 +82,7 @@ async function registerCommunicationOutboxSweep(): Promise<RegisteredJob> {
   const everyMs = 5 * 60 * 1000
   const jobName = QUEUE_JOBS[QUEUES.EMAIL].SWEEP_OUTBOX
   const queue = new Queue(QUEUES.EMAIL, { connection })
-  await queue.removeRepeatable(jobName, { every: everyMs }).catch(() => {})
+  await queue.removeRepeatable(jobName, { every: everyMs })
   await queue.add(jobName, signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: jobName,
@@ -100,9 +99,9 @@ async function registerPayoutStatusPoll(): Promise<RegisteredJob> {
   // Stale repeatable jobs signed with a previous iat (from an old worker boot)
   // would fail HMAC verification. Remove the old config before registering
   // with a deterministic iat=0 so the payload is bit-identical across restarts.
-  await queue
-    .removeRepeatable("payout-check-status", { every: 10 * 60 * 1000 })
-    .catch(() => {})
+  await queue.removeRepeatable("payout-check-status", {
+    every: 10 * 60 * 1000,
+  })
   await queue.add("payout-check-status", signJobPayload({ limit: 50 }, 0), {
     repeat: { every: 10 * 60 * 1000 },
     jobId: "payout-check-status-poll",
@@ -122,9 +121,7 @@ async function registerReconciliationSweep(): Promise<RegisteredJob> {
     60 *
     1000
   const queue = new Queue(QUEUES.RECONCILIATION, { connection })
-  await queue
-    .removeRepeatable("reconciliation-run", { every: everyMs })
-    .catch(() => {})
+  await queue.removeRepeatable("reconciliation-run", { every: everyMs })
   await queue.add("reconciliation-run", signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: "reconciliation-sweep",
@@ -144,9 +141,7 @@ async function registerReconciliationSweep(): Promise<RegisteredJob> {
 async function registerPaymentDisputeInbox(): Promise<RegisteredJob> {
   const everyMs = 5 * 60 * 1000
   const queue = new Queue(QUEUES.RECONCILIATION, { connection })
-  await queue
-    .removeRepeatable("payment-dispute-inbox", { every: everyMs })
-    .catch(() => {})
+  await queue.removeRepeatable("payment-dispute-inbox", { every: everyMs })
   await queue.add(
     "payment-dispute-inbox",
     signJobPayload(
@@ -176,7 +171,7 @@ async function registerDepositCreditRecovery(): Promise<RegisteredJob> {
   const everyMs = 5 * 60 * 1000
   const jobName = QUEUE_JOBS[QUEUES.RECONCILIATION].DEPOSIT_CREDIT_RECOVERY
   const queue = new Queue(QUEUES.RECONCILIATION, { connection })
-  await queue.removeRepeatable(jobName, { every: everyMs }).catch(() => {})
+  await queue.removeRepeatable(jobName, { every: everyMs })
   await queue.add(
     jobName,
     signJobPayload(
@@ -231,9 +226,7 @@ async function registerWebsiteReverifySweep(): Promise<RegisteredJob> {
 async function registerDomainMetricsRefresh(): Promise<RegisteredJob> {
   const everyMs = 30 * 24 * 60 * 60 * 1000
   const queue = new Queue(QUEUES.DOMAIN_METRICS, { connection })
-  await queue
-    .removeRepeatable("domain-metrics-refresh", { every: everyMs })
-    .catch(() => {})
+  await queue.removeRepeatable("domain-metrics-refresh", { every: everyMs })
   await queue.add(
     "domain-metrics-refresh",
     signJobPayload({ batchSize: 100 }, 0),
@@ -259,9 +252,7 @@ async function registerSettlementHoldLinkSweep(): Promise<RegisteredJob> {
     60 *
     1000
   const queue = new Queue(QUEUES.DELIVERY_VERIFICATION, { connection })
-  await queue
-    .removeRepeatable("settlement-hold-sweep", { every: everyMs })
-    .catch(() => {})
+  await queue.removeRepeatable("settlement-hold-sweep", { every: everyMs })
   await queue.add("settlement-hold-sweep", signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: "settlement-hold-sweep",
@@ -344,9 +335,7 @@ async function registerSettlementAutoApproveSweep(): Promise<RegisteredJob> {
     10_000,
   )
   const queue = new Queue(QUEUES.SETTLEMENT, { connection })
-  await queue
-    .removeRepeatable("settlement-auto-approve", { every: everyMs })
-    .catch(() => {})
+  await queue.removeRepeatable("settlement-auto-approve", { every: everyMs })
   await queue.add("settlement-auto-approve", signJobPayload({ batchSize }, 0), {
     repeat: { every: everyMs },
     jobId: "settlement-auto-approve",
@@ -436,9 +425,7 @@ async function registerAutoAcceptSweep(): Promise<RegisteredJob> {
   const everyMs =
     Math.max(Number(process.env.AUTO_ACCEPT_SWEEP_MINUTES ?? 60), 1) * 60 * 1000
   const queue = new Queue(QUEUES.AUTO_ACCEPT, { connection })
-  await queue
-    .removeRepeatable("auto-accept-sweep", { every: everyMs })
-    .catch(() => {})
+  await queue.removeRepeatable("auto-accept-sweep", { every: everyMs })
   await queue.add("auto-accept-sweep", signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: "auto-accept-sweep",
@@ -459,9 +446,7 @@ async function registerReviewReminderSweep(): Promise<RegisteredJob> {
   const everyMs =
     Math.max(Number(process.env.AUTO_ACCEPT_SWEEP_MINUTES ?? 60), 1) * 60 * 1000
   const queue = new Queue(QUEUES.AUTO_ACCEPT, { connection })
-  await queue
-    .removeRepeatable("review-reminder-sweep", { every: everyMs })
-    .catch(() => {})
+  await queue.removeRepeatable("review-reminder-sweep", { every: everyMs })
   await queue.add("review-reminder-sweep", signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: "review-reminder-sweep",
@@ -481,7 +466,7 @@ async function registerCancellationResponseTimeoutSweep(): Promise<RegisteredJob
   const everyMs = responseSweepMinutes * 60 * 1000
   const jobName = QUEUE_JOBS[QUEUES.AUTO_ACCEPT].CANCELLATION_TIMEOUT_SWEEP
   const queue = new Queue(QUEUES.AUTO_ACCEPT, { connection })
-  await queue.removeRepeatable(jobName, { every: everyMs }).catch(() => {})
+  await queue.removeRepeatable(jobName, { every: everyMs })
   await queue.add(jobName, signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: jobName,
@@ -500,7 +485,7 @@ async function registerOrderAcceptanceTimeoutSweep(): Promise<RegisteredJob> {
   const everyMs = acceptanceSweepMinutes * 60 * 1000
   const jobName = QUEUE_JOBS[QUEUES.AUTO_ACCEPT].ACCEPTANCE_TIMEOUT_SWEEP
   const queue = new Queue(QUEUES.AUTO_ACCEPT, { connection })
-  await queue.removeRepeatable(jobName, { every: everyMs }).catch(() => {})
+  await queue.removeRepeatable(jobName, { every: everyMs })
   await queue.add(jobName, signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: jobName,
@@ -560,7 +545,6 @@ const WORKER_FACTORIES = {
   email: createEmailWorker,
   report: createReportWorker,
   notification: createNotificationWorker,
-  verification: createVerificationWorker,
   payout: createPayoutWorker,
   reconciliation: createReconciliationWorker,
   "website-verification": createWebsiteVerificationWorker,
@@ -576,7 +560,6 @@ const WORKER_FACTORIES = {
 
 const ON_DEMAND_QUEUES = [
   QUEUES.REPORT,
-  QUEUES.VERIFICATION,
   QUEUES.PAYOUT,
   QUEUES.PUBLISHER_TRUST,
   QUEUES.INTEGRATION_DISCOVERY,

@@ -27,6 +27,7 @@ export type AggregateApiKey = {
 export type ApiKeyMinAggregateOutputType = {
   id: string | null
   organizationId: string | null
+  createdByUserId: string | null
   name: string | null
   keyHash: string | null
   lastUsedAt: Date | null
@@ -38,6 +39,7 @@ export type ApiKeyMinAggregateOutputType = {
 export type ApiKeyMaxAggregateOutputType = {
   id: string | null
   organizationId: string | null
+  createdByUserId: string | null
   name: string | null
   keyHash: string | null
   lastUsedAt: Date | null
@@ -49,6 +51,7 @@ export type ApiKeyMaxAggregateOutputType = {
 export type ApiKeyCountAggregateOutputType = {
   id: number
   organizationId: number
+  createdByUserId: number
   name: number
   keyHash: number
   permissions: number
@@ -63,6 +66,7 @@ export type ApiKeyCountAggregateOutputType = {
 export type ApiKeyMinAggregateInputType = {
   id?: true
   organizationId?: true
+  createdByUserId?: true
   name?: true
   keyHash?: true
   lastUsedAt?: true
@@ -74,6 +78,7 @@ export type ApiKeyMinAggregateInputType = {
 export type ApiKeyMaxAggregateInputType = {
   id?: true
   organizationId?: true
+  createdByUserId?: true
   name?: true
   keyHash?: true
   lastUsedAt?: true
@@ -85,6 +90,7 @@ export type ApiKeyMaxAggregateInputType = {
 export type ApiKeyCountAggregateInputType = {
   id?: true
   organizationId?: true
+  createdByUserId?: true
   name?: true
   keyHash?: true
   permissions?: true
@@ -170,6 +176,7 @@ export type ApiKeyGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalA
 export type ApiKeyGroupByOutputType = {
   id: string
   organizationId: string
+  createdByUserId: string | null
   name: string
   keyHash: string
   permissions: runtime.JsonValue
@@ -203,6 +210,7 @@ export type ApiKeyWhereInput = {
   NOT?: Prisma.ApiKeyWhereInput | Prisma.ApiKeyWhereInput[]
   id?: Prisma.StringFilter<"ApiKey"> | string
   organizationId?: Prisma.StringFilter<"ApiKey"> | string
+  createdByUserId?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   name?: Prisma.StringFilter<"ApiKey"> | string
   keyHash?: Prisma.StringFilter<"ApiKey"> | string
   permissions?: Prisma.JsonFilter<"ApiKey">
@@ -211,11 +219,13 @@ export type ApiKeyWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"ApiKey"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ApiKey"> | Date | string
   organization?: Prisma.XOR<Prisma.OrganizationScalarRelationFilter, Prisma.OrganizationWhereInput>
+  createdBy?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
 }
 
 export type ApiKeyOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
+  createdByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrder
   keyHash?: Prisma.SortOrder
   permissions?: Prisma.SortOrder
@@ -224,6 +234,7 @@ export type ApiKeyOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   organization?: Prisma.OrganizationOrderByWithRelationInput
+  createdBy?: Prisma.UserOrderByWithRelationInput
 }
 
 export type ApiKeyWhereUniqueInput = Prisma.AtLeast<{
@@ -233,6 +244,7 @@ export type ApiKeyWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.ApiKeyWhereInput[]
   NOT?: Prisma.ApiKeyWhereInput | Prisma.ApiKeyWhereInput[]
   organizationId?: Prisma.StringFilter<"ApiKey"> | string
+  createdByUserId?: Prisma.StringNullableFilter<"ApiKey"> | string | null
   name?: Prisma.StringFilter<"ApiKey"> | string
   permissions?: Prisma.JsonFilter<"ApiKey">
   lastUsedAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
@@ -240,11 +252,13 @@ export type ApiKeyWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"ApiKey"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ApiKey"> | Date | string
   organization?: Prisma.XOR<Prisma.OrganizationScalarRelationFilter, Prisma.OrganizationWhereInput>
+  createdBy?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
 }, "id" | "keyHash">
 
 export type ApiKeyOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
+  createdByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrder
   keyHash?: Prisma.SortOrder
   permissions?: Prisma.SortOrder
@@ -263,6 +277,7 @@ export type ApiKeyScalarWhereWithAggregatesInput = {
   NOT?: Prisma.ApiKeyScalarWhereWithAggregatesInput | Prisma.ApiKeyScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"ApiKey"> | string
   organizationId?: Prisma.StringWithAggregatesFilter<"ApiKey"> | string
+  createdByUserId?: Prisma.StringNullableWithAggregatesFilter<"ApiKey"> | string | null
   name?: Prisma.StringWithAggregatesFilter<"ApiKey"> | string
   keyHash?: Prisma.StringWithAggregatesFilter<"ApiKey"> | string
   permissions?: Prisma.JsonWithAggregatesFilter<"ApiKey">
@@ -282,11 +297,13 @@ export type ApiKeyCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   organization: Prisma.OrganizationCreateNestedOneWithoutApiKeysInput
+  createdBy?: Prisma.UserCreateNestedOneWithoutCreatedApiKeysInput
 }
 
 export type ApiKeyUncheckedCreateInput = {
   id?: string
   organizationId: string
+  createdByUserId?: string | null
   name: string
   keyHash: string
   permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
@@ -306,11 +323,13 @@ export type ApiKeyUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutApiKeysNestedInput
+  createdBy?: Prisma.UserUpdateOneWithoutCreatedApiKeysNestedInput
 }
 
 export type ApiKeyUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  createdByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   keyHash?: Prisma.StringFieldUpdateOperationsInput | string
   permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
@@ -323,6 +342,7 @@ export type ApiKeyUncheckedUpdateInput = {
 export type ApiKeyCreateManyInput = {
   id?: string
   organizationId: string
+  createdByUserId?: string | null
   name: string
   keyHash: string
   permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
@@ -346,6 +366,7 @@ export type ApiKeyUpdateManyMutationInput = {
 export type ApiKeyUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  createdByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   keyHash?: Prisma.StringFieldUpdateOperationsInput | string
   permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
@@ -368,6 +389,7 @@ export type ApiKeyOrderByRelationAggregateInput = {
 export type ApiKeyCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
+  createdByUserId?: Prisma.SortOrder
   name?: Prisma.SortOrder
   keyHash?: Prisma.SortOrder
   permissions?: Prisma.SortOrder
@@ -380,6 +402,7 @@ export type ApiKeyCountOrderByAggregateInput = {
 export type ApiKeyMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
+  createdByUserId?: Prisma.SortOrder
   name?: Prisma.SortOrder
   keyHash?: Prisma.SortOrder
   lastUsedAt?: Prisma.SortOrder
@@ -391,12 +414,55 @@ export type ApiKeyMaxOrderByAggregateInput = {
 export type ApiKeyMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
+  createdByUserId?: Prisma.SortOrder
   name?: Prisma.SortOrder
   keyHash?: Prisma.SortOrder
   lastUsedAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type ApiKeyCreateNestedManyWithoutCreatedByInput = {
+  create?: Prisma.XOR<Prisma.ApiKeyCreateWithoutCreatedByInput, Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput> | Prisma.ApiKeyCreateWithoutCreatedByInput[] | Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput[]
+  connectOrCreate?: Prisma.ApiKeyCreateOrConnectWithoutCreatedByInput | Prisma.ApiKeyCreateOrConnectWithoutCreatedByInput[]
+  createMany?: Prisma.ApiKeyCreateManyCreatedByInputEnvelope
+  connect?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+}
+
+export type ApiKeyUncheckedCreateNestedManyWithoutCreatedByInput = {
+  create?: Prisma.XOR<Prisma.ApiKeyCreateWithoutCreatedByInput, Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput> | Prisma.ApiKeyCreateWithoutCreatedByInput[] | Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput[]
+  connectOrCreate?: Prisma.ApiKeyCreateOrConnectWithoutCreatedByInput | Prisma.ApiKeyCreateOrConnectWithoutCreatedByInput[]
+  createMany?: Prisma.ApiKeyCreateManyCreatedByInputEnvelope
+  connect?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+}
+
+export type ApiKeyUpdateManyWithoutCreatedByNestedInput = {
+  create?: Prisma.XOR<Prisma.ApiKeyCreateWithoutCreatedByInput, Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput> | Prisma.ApiKeyCreateWithoutCreatedByInput[] | Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput[]
+  connectOrCreate?: Prisma.ApiKeyCreateOrConnectWithoutCreatedByInput | Prisma.ApiKeyCreateOrConnectWithoutCreatedByInput[]
+  upsert?: Prisma.ApiKeyUpsertWithWhereUniqueWithoutCreatedByInput | Prisma.ApiKeyUpsertWithWhereUniqueWithoutCreatedByInput[]
+  createMany?: Prisma.ApiKeyCreateManyCreatedByInputEnvelope
+  set?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+  disconnect?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+  delete?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+  connect?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+  update?: Prisma.ApiKeyUpdateWithWhereUniqueWithoutCreatedByInput | Prisma.ApiKeyUpdateWithWhereUniqueWithoutCreatedByInput[]
+  updateMany?: Prisma.ApiKeyUpdateManyWithWhereWithoutCreatedByInput | Prisma.ApiKeyUpdateManyWithWhereWithoutCreatedByInput[]
+  deleteMany?: Prisma.ApiKeyScalarWhereInput | Prisma.ApiKeyScalarWhereInput[]
+}
+
+export type ApiKeyUncheckedUpdateManyWithoutCreatedByNestedInput = {
+  create?: Prisma.XOR<Prisma.ApiKeyCreateWithoutCreatedByInput, Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput> | Prisma.ApiKeyCreateWithoutCreatedByInput[] | Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput[]
+  connectOrCreate?: Prisma.ApiKeyCreateOrConnectWithoutCreatedByInput | Prisma.ApiKeyCreateOrConnectWithoutCreatedByInput[]
+  upsert?: Prisma.ApiKeyUpsertWithWhereUniqueWithoutCreatedByInput | Prisma.ApiKeyUpsertWithWhereUniqueWithoutCreatedByInput[]
+  createMany?: Prisma.ApiKeyCreateManyCreatedByInputEnvelope
+  set?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+  disconnect?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+  delete?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+  connect?: Prisma.ApiKeyWhereUniqueInput | Prisma.ApiKeyWhereUniqueInput[]
+  update?: Prisma.ApiKeyUpdateWithWhereUniqueWithoutCreatedByInput | Prisma.ApiKeyUpdateWithWhereUniqueWithoutCreatedByInput[]
+  updateMany?: Prisma.ApiKeyUpdateManyWithWhereWithoutCreatedByInput | Prisma.ApiKeyUpdateManyWithWhereWithoutCreatedByInput[]
+  deleteMany?: Prisma.ApiKeyScalarWhereInput | Prisma.ApiKeyScalarWhereInput[]
 }
 
 export type ApiKeyCreateNestedManyWithoutOrganizationInput = {
@@ -441,8 +507,21 @@ export type ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput = {
   deleteMany?: Prisma.ApiKeyScalarWhereInput | Prisma.ApiKeyScalarWhereInput[]
 }
 
-export type ApiKeyCreateWithoutOrganizationInput = {
+export type ApiKeyCreateWithoutCreatedByInput = {
   id?: string
+  name: string
+  keyHash: string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  lastUsedAt?: Date | string | null
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutApiKeysInput
+}
+
+export type ApiKeyUncheckedCreateWithoutCreatedByInput = {
+  id?: string
+  organizationId: string
   name: string
   keyHash: string
   permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
@@ -452,8 +531,63 @@ export type ApiKeyCreateWithoutOrganizationInput = {
   updatedAt?: Date | string
 }
 
+export type ApiKeyCreateOrConnectWithoutCreatedByInput = {
+  where: Prisma.ApiKeyWhereUniqueInput
+  create: Prisma.XOR<Prisma.ApiKeyCreateWithoutCreatedByInput, Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput>
+}
+
+export type ApiKeyCreateManyCreatedByInputEnvelope = {
+  data: Prisma.ApiKeyCreateManyCreatedByInput | Prisma.ApiKeyCreateManyCreatedByInput[]
+  skipDuplicates?: boolean
+}
+
+export type ApiKeyUpsertWithWhereUniqueWithoutCreatedByInput = {
+  where: Prisma.ApiKeyWhereUniqueInput
+  update: Prisma.XOR<Prisma.ApiKeyUpdateWithoutCreatedByInput, Prisma.ApiKeyUncheckedUpdateWithoutCreatedByInput>
+  create: Prisma.XOR<Prisma.ApiKeyCreateWithoutCreatedByInput, Prisma.ApiKeyUncheckedCreateWithoutCreatedByInput>
+}
+
+export type ApiKeyUpdateWithWhereUniqueWithoutCreatedByInput = {
+  where: Prisma.ApiKeyWhereUniqueInput
+  data: Prisma.XOR<Prisma.ApiKeyUpdateWithoutCreatedByInput, Prisma.ApiKeyUncheckedUpdateWithoutCreatedByInput>
+}
+
+export type ApiKeyUpdateManyWithWhereWithoutCreatedByInput = {
+  where: Prisma.ApiKeyScalarWhereInput
+  data: Prisma.XOR<Prisma.ApiKeyUpdateManyMutationInput, Prisma.ApiKeyUncheckedUpdateManyWithoutCreatedByInput>
+}
+
+export type ApiKeyScalarWhereInput = {
+  AND?: Prisma.ApiKeyScalarWhereInput | Prisma.ApiKeyScalarWhereInput[]
+  OR?: Prisma.ApiKeyScalarWhereInput[]
+  NOT?: Prisma.ApiKeyScalarWhereInput | Prisma.ApiKeyScalarWhereInput[]
+  id?: Prisma.StringFilter<"ApiKey"> | string
+  organizationId?: Prisma.StringFilter<"ApiKey"> | string
+  createdByUserId?: Prisma.StringNullableFilter<"ApiKey"> | string | null
+  name?: Prisma.StringFilter<"ApiKey"> | string
+  keyHash?: Prisma.StringFilter<"ApiKey"> | string
+  permissions?: Prisma.JsonFilter<"ApiKey">
+  lastUsedAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
+  expiresAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
+  createdAt?: Prisma.DateTimeFilter<"ApiKey"> | Date | string
+  updatedAt?: Prisma.DateTimeFilter<"ApiKey"> | Date | string
+}
+
+export type ApiKeyCreateWithoutOrganizationInput = {
+  id?: string
+  name: string
+  keyHash: string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  lastUsedAt?: Date | string | null
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  createdBy?: Prisma.UserCreateNestedOneWithoutCreatedApiKeysInput
+}
+
 export type ApiKeyUncheckedCreateWithoutOrganizationInput = {
   id?: string
+  createdByUserId?: string | null
   name: string
   keyHash: string
   permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
@@ -489,23 +623,57 @@ export type ApiKeyUpdateManyWithWhereWithoutOrganizationInput = {
   data: Prisma.XOR<Prisma.ApiKeyUpdateManyMutationInput, Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationInput>
 }
 
-export type ApiKeyScalarWhereInput = {
-  AND?: Prisma.ApiKeyScalarWhereInput | Prisma.ApiKeyScalarWhereInput[]
-  OR?: Prisma.ApiKeyScalarWhereInput[]
-  NOT?: Prisma.ApiKeyScalarWhereInput | Prisma.ApiKeyScalarWhereInput[]
-  id?: Prisma.StringFilter<"ApiKey"> | string
-  organizationId?: Prisma.StringFilter<"ApiKey"> | string
-  name?: Prisma.StringFilter<"ApiKey"> | string
-  keyHash?: Prisma.StringFilter<"ApiKey"> | string
-  permissions?: Prisma.JsonFilter<"ApiKey">
-  lastUsedAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
-  expiresAt?: Prisma.DateTimeNullableFilter<"ApiKey"> | Date | string | null
-  createdAt?: Prisma.DateTimeFilter<"ApiKey"> | Date | string
-  updatedAt?: Prisma.DateTimeFilter<"ApiKey"> | Date | string
+export type ApiKeyCreateManyCreatedByInput = {
+  id?: string
+  organizationId: string
+  name: string
+  keyHash: string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  lastUsedAt?: Date | string | null
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type ApiKeyUpdateWithoutCreatedByInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  keyHash?: Prisma.StringFieldUpdateOperationsInput | string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutApiKeysNestedInput
+}
+
+export type ApiKeyUncheckedUpdateWithoutCreatedByInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  keyHash?: Prisma.StringFieldUpdateOperationsInput | string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type ApiKeyUncheckedUpdateManyWithoutCreatedByInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  keyHash?: Prisma.StringFieldUpdateOperationsInput | string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  lastUsedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type ApiKeyCreateManyOrganizationInput = {
   id?: string
+  createdByUserId?: string | null
   name: string
   keyHash: string
   permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
@@ -524,10 +692,12 @@ export type ApiKeyUpdateWithoutOrganizationInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdBy?: Prisma.UserUpdateOneWithoutCreatedApiKeysNestedInput
 }
 
 export type ApiKeyUncheckedUpdateWithoutOrganizationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   keyHash?: Prisma.StringFieldUpdateOperationsInput | string
   permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
@@ -539,6 +709,7 @@ export type ApiKeyUncheckedUpdateWithoutOrganizationInput = {
 
 export type ApiKeyUncheckedUpdateManyWithoutOrganizationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  createdByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   keyHash?: Prisma.StringFieldUpdateOperationsInput | string
   permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
@@ -553,6 +724,7 @@ export type ApiKeyUncheckedUpdateManyWithoutOrganizationInput = {
 export type ApiKeySelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   organizationId?: boolean
+  createdByUserId?: boolean
   name?: boolean
   keyHash?: boolean
   permissions?: boolean
@@ -561,11 +733,13 @@ export type ApiKeySelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   createdAt?: boolean
   updatedAt?: boolean
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
+  createdBy?: boolean | Prisma.ApiKey$createdByArgs<ExtArgs>
 }, ExtArgs["result"]["apiKey"]>
 
 export type ApiKeySelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   organizationId?: boolean
+  createdByUserId?: boolean
   name?: boolean
   keyHash?: boolean
   permissions?: boolean
@@ -574,11 +748,13 @@ export type ApiKeySelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   createdAt?: boolean
   updatedAt?: boolean
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
+  createdBy?: boolean | Prisma.ApiKey$createdByArgs<ExtArgs>
 }, ExtArgs["result"]["apiKey"]>
 
 export type ApiKeySelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   organizationId?: boolean
+  createdByUserId?: boolean
   name?: boolean
   keyHash?: boolean
   permissions?: boolean
@@ -587,11 +763,13 @@ export type ApiKeySelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   createdAt?: boolean
   updatedAt?: boolean
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
+  createdBy?: boolean | Prisma.ApiKey$createdByArgs<ExtArgs>
 }, ExtArgs["result"]["apiKey"]>
 
 export type ApiKeySelectScalar = {
   id?: boolean
   organizationId?: boolean
+  createdByUserId?: boolean
   name?: boolean
   keyHash?: boolean
   permissions?: boolean
@@ -601,25 +779,30 @@ export type ApiKeySelectScalar = {
   updatedAt?: boolean
 }
 
-export type ApiKeyOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "organizationId" | "name" | "keyHash" | "permissions" | "lastUsedAt" | "expiresAt" | "createdAt" | "updatedAt", ExtArgs["result"]["apiKey"]>
+export type ApiKeyOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "organizationId" | "createdByUserId" | "name" | "keyHash" | "permissions" | "lastUsedAt" | "expiresAt" | "createdAt" | "updatedAt", ExtArgs["result"]["apiKey"]>
 export type ApiKeyInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
+  createdBy?: boolean | Prisma.ApiKey$createdByArgs<ExtArgs>
 }
 export type ApiKeyIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
+  createdBy?: boolean | Prisma.ApiKey$createdByArgs<ExtArgs>
 }
 export type ApiKeyIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
+  createdBy?: boolean | Prisma.ApiKey$createdByArgs<ExtArgs>
 }
 
 export type $ApiKeyPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ApiKey"
   objects: {
     organization: Prisma.$OrganizationPayload<ExtArgs>
+    createdBy: Prisma.$UserPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     organizationId: string
+    createdByUserId: string | null
     name: string
     keyHash: string
     permissions: runtime.JsonValue
@@ -1022,6 +1205,7 @@ readonly fields: ApiKeyFieldRefs;
 export interface Prisma__ApiKeyClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   organization<T extends Prisma.OrganizationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganizationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganizationClient<runtime.Types.Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  createdBy<T extends Prisma.ApiKey$createdByArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ApiKey$createdByArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1053,6 +1237,7 @@ export interface Prisma__ApiKeyClient<T, Null = never, ExtArgs extends runtime.T
 export interface ApiKeyFieldRefs {
   readonly id: Prisma.FieldRef<"ApiKey", 'String'>
   readonly organizationId: Prisma.FieldRef<"ApiKey", 'String'>
+  readonly createdByUserId: Prisma.FieldRef<"ApiKey", 'String'>
   readonly name: Prisma.FieldRef<"ApiKey", 'String'>
   readonly keyHash: Prisma.FieldRef<"ApiKey", 'String'>
   readonly permissions: Prisma.FieldRef<"ApiKey", 'Json'>
@@ -1458,6 +1643,25 @@ export type ApiKeyDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many ApiKeys to delete.
    */
   limit?: number
+}
+
+/**
+ * ApiKey.createdBy
+ */
+export type ApiKey$createdByArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the User
+   */
+  select?: Prisma.UserSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the User
+   */
+  omit?: Prisma.UserOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserInclude<ExtArgs> | null
+  where?: Prisma.UserWhereInput
 }
 
 /**

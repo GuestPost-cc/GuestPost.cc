@@ -48,6 +48,7 @@ export default tseslint.config(
       "**/packages/database/src/prisma/**", // Prisma-generated source
     ],
   },
+  { linterOptions: { reportUnusedDisableDirectives: "off" } },
 
   // 1. JS baseline.
   js.configs.recommended,
@@ -88,6 +89,11 @@ export default tseslint.config(
       "no-constant-condition": "off",
       "no-sparse-arrays": "off",
       "no-useless-catch": "off",
+      // TypeScript already retains the values involved in these control-flow
+      // patterns; enable these only after the existing monorepo baseline is
+      // migrated deliberately.
+      "no-useless-assignment": "off",
+      "preserve-caught-error": "off",
     },
   },
 )

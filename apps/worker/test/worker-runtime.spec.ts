@@ -17,7 +17,6 @@ const ALL_FACTORIES = [
   "email",
   "report",
   "notification",
-  "verification",
   "payout",
   "reconciliation",
   "website-verification",
@@ -150,7 +149,6 @@ test("builds exact all, realtime, and on-demand runtime plans", () => {
     capabilities: ["connections", "on-demand-drain"],
     workerFactories: [
       "report",
-      "verification",
       "payout",
       "publisher-trust",
       "domain-metrics",
@@ -269,7 +267,6 @@ test("on-demand and scheduled modes complete and clean up deterministically", as
   assert.deepEqual(onDemandFixture.events, [
     "connections",
     "create:report",
-    "create:verification",
     "create:payout",
     "create:publisher-trust",
     "create:domain-metrics",
@@ -281,7 +278,6 @@ test("on-demand and scheduled modes complete and clean up deterministically", as
     "close:domain-metrics",
     "close:publisher-trust",
     "close:payout",
-    "close:verification",
     "close:report",
     "close:redis",
     "close:database",

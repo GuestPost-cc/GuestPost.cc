@@ -54,6 +54,7 @@ import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-b
 import { PrismaService } from "./common/prisma.service"
 import { getQueueConnection, getRedisClient } from "./common/redis-client"
 import { validateStripeEnvironment } from "./common/stripe-client"
+import { resolveVerificationRateLimitConfig } from "./common/verification-config"
 import {
   createWebhookIngressLimiter,
   isSignedWebhookIngressRequest,
@@ -96,6 +97,15 @@ function validateEnv(): void {
     bootstrapLogger.error(
       "BETTER_AUTH_SECRET must be a random value of at least 32 characters",
     )
+    process.exit(1)
+  }
+
+  try {
+    resolveVerificationRateLimitConfig(process.env)
+  } catch (error) {
+    bootstrapLogger.error("Website verification configuration is invalid", {
+      error: error instanceof Error ? error.message : String(error),
+    })
     process.exit(1)
   }
 

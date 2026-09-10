@@ -395,6 +395,7 @@ export type CancellationRequestStatus =
   | "ESCALATED"
   | "APPROVED"
   | "REJECTED"
+  | "WITHDRAWN"
   | "DISPUTED"
 
 export interface CancellationRequestResponse {

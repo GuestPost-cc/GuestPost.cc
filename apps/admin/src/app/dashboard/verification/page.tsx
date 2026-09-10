@@ -72,14 +72,18 @@ function VerificationCenterPageInner() {
   const [tab, setTab] = useState<"review" | "force">("review")
   const [domain, setDomain] = useState("")
   const [status, setStatus] = useState("all")
+  const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const pageSize = 50
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["verification-center", domain, status],
+    queryKey: ["verification-center", domain, status, page],
     queryFn: () =>
       api.admin.verificationReviewCenter({
         domain: domain || undefined,
         status: status === "all" ? undefined : status,
+        take: pageSize,
+        skip: page * pageSize,
       }),
   })
 
@@ -123,7 +127,7 @@ function VerificationCenterPageInner() {
 
   const exportCsv = () => {
     downloadCsv(
-      "domain-verification-review.csv",
+      `domain-verification-review-page-${page + 1}.csv`,
       [
         "Domain",
         "Status",
@@ -203,6 +207,7 @@ function VerificationCenterPageInner() {
             onClear={() => {
               setDomain("")
               setStatus("all")
+              setPage(0)
               setSelected(new Set())
             }}
           >
@@ -211,11 +216,20 @@ function VerificationCenterPageInner() {
               <Input
                 placeholder="Filter by domain..."
                 value={domain}
-                onChange={(e) => setDomain(e.target.value)}
+                onChange={(e) => {
+                  setDomain(e.target.value)
+                  setPage(0)
+                }}
                 className="bg-background pl-9"
               />
             </div>
-            <Select value={status} onValueChange={setStatus}>
+            <Select
+              value={status}
+              onValueChange={(value) => {
+                setStatus(value)
+                setPage(0)
+              }}
+            >
               <SelectTrigger className="w-full bg-background sm:w-56">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -227,9 +241,13 @@ function VerificationCenterPageInner() {
                 <SelectItem value="REVOKED">Revoked</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={exportCsv}>
+            <Button
+              variant="outline"
+              onClick={exportCsv}
+              disabled={websites.length === 0}
+            >
               <Download className="h-4 w-4 mr-1" />
-              Export CSV
+              Export page
             </Button>
             <Button
               disabled={selected.size === 0 || bulkRetry.isPending}
@@ -322,6 +340,30 @@ function VerificationCenterPageInner() {
                 </TableBody>
               </Table>
             )}
+          </div>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>
+              {data?.total ?? 0} matching website
+              {(data?.total ?? 0) === 1 ? "" : "s"}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                disabled={page === 0 || isLoading}
+                onClick={() => setPage((current) => Math.max(0, current - 1))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                disabled={
+                  (page + 1) * pageSize >= (data?.total ?? 0) || isLoading
+                }
+                onClick={() => setPage((current) => current + 1)}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </>
       ) : (
