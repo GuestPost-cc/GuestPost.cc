@@ -222,9 +222,7 @@ test("paginates beyond old off-bucket cases so later due cases are not starved",
     orderCancellationRequest: {
       findMany: async (args: any) => {
         queries.push(args)
-        const start = args.cursor
-          ? cases.findIndex((item) => item.id === args.cursor.id) + 1
-          : 0
+        const start = queries.length === 1 ? 0 : 2
         return cases.slice(start, start + args.take)
       },
     },
@@ -236,12 +234,87 @@ test("paginates beyond old off-bucket cases so later due cases are not starved",
   })
 
   assert.equal(queries.length, 2)
-  assert.deepEqual(queries[1].cursor, { id: "offbucket-19" })
-  assert.equal(queries[1].skip, 1)
+  assert.deepEqual(queries[1].where.AND[1], {
+    OR: [
+      { updatedAt: { gt: new Date("2026-08-05T12:00:00.000Z") } },
+      {
+        updatedAt: new Date("2026-08-05T12:00:00.000Z"),
+        id: { gt: "offbucket-19" },
+      },
+    ],
+  })
   assert.equal(result.staleScanned, 3)
   assert.equal(result.nudged, 1)
+  assert.equal(result.nextCursor, null)
   assert.equal(
     base.recorded[0].dedupKey,
     "staff:cancellation-case:due-17:stall:17",
   )
+})
+
+test("returns a stable cursor when the scan cap is reached", async () => {
+  const cases = [
+    stalledCase({
+      id: "due-17-a",
+      orderId: "order-a",
+      updatedAt: new Date("2026-08-07T12:00:00.000Z"),
+    }),
+    stalledCase({
+      id: "due-17-b",
+      orderId: "order-b",
+      updatedAt: new Date("2026-08-07T12:00:00.000Z"),
+    }),
+  ]
+  const base = harness(cases)
+
+  const result = await nudgeStaleCancellationCases(base.prisma, NOW, CONFIG, {
+    take: 2,
+    maxScan: 2,
+    recordOutbox: base.recordOutbox,
+  })
+
+  assert.deepEqual(result.nextCursor, {
+    updatedAt: "2026-08-07T12:00:00.000Z",
+    id: "due-17-b",
+  })
+})
+
+test("starts after a saved cross-run cursor", async () => {
+  const laterCase = stalledCase({
+    id: "due-10",
+    orderId: "order-later",
+    status: "PENDING_FINANCE",
+    updatedAt: new Date("2026-08-14T12:00:00.000Z"),
+  })
+  const base = harness([laterCase])
+  let query: any
+  const prisma = {
+    ...base.prisma,
+    orderCancellationRequest: {
+      findMany: async (args: any) => {
+        query = args
+        return [laterCase]
+      },
+    },
+  }
+
+  const result = await nudgeStaleCancellationCases(prisma, NOW, CONFIG, {
+    startAfter: {
+      updatedAt: "2026-08-07T12:00:00.000Z",
+      id: "due-17-b",
+    },
+    recordOutbox: base.recordOutbox,
+  })
+
+  assert.deepEqual(query.where.AND[1], {
+    OR: [
+      { updatedAt: { gt: new Date("2026-08-07T12:00:00.000Z") } },
+      {
+        updatedAt: new Date("2026-08-07T12:00:00.000Z"),
+        id: { gt: "due-17-b" },
+      },
+    ],
+  })
+  assert.equal(result.nudged, 1)
+  assert.equal(result.nextCursor, null)
 })

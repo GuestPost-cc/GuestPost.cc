@@ -33,6 +33,16 @@ tests. Nest, worker, shared, database, API-client, and UI TypeScript build stage
 pass. Full Next.js production bundling is deferred to GitHub CI because
 Turbopack cannot bind its internal IPC port in the local execution sandbox.
 
+PR #122 review follow-up closes the three actionable automated findings:
+already-reminded orders are excluded before the bounded review-reminder query,
+the capped cancellation-stall scan rotates across runs using a validated Redis
+cursor, and legacy scoped `generate-report` jobs remain executable while
+unknown report jobs fail closed. Twelve focused worker regressions, all 482
+shared tests, worker/shared builds, and the complete repository check pass.
+The full worker suite's 102 functional tests passed; two unrelated Poppler PDF
+assertions could not run locally because this shell provides `pdftoppm` but
+not `pdffonts`/`pdftotext`; they remain covered by the GitHub CI rerun.
+
 ## Full staged application RLS
 
 PR #116 now contains an inert four-command policy surface for 98 Prisma models

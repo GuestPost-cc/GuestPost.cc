@@ -21,14 +21,68 @@ import { createLogger } from "@guestpost/shared/dist/observability/structured-lo
 import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
 import * as Sentry from "@sentry/node"
 import { processAcceptanceTimeoutOrderInTransaction } from "../lib/acceptance-timeout-refund"
-import { nudgeStaleCancellationCases } from "../lib/cancellation-stall-nudge"
+import {
+  type CancellationStallCursor,
+  nudgeStaleCancellationCases,
+} from "../lib/cancellation-stall-nudge"
 import { dispatchCommunicationEventsBestEffort } from "../lib/communication-outbox-dispatch"
 import { recordPublisherTierCommunications } from "../lib/publisher-tier-communications"
 import { createObservableWorker } from "../lib/queue-observability"
+import { buildReviewReminderWhere } from "../lib/review-reminder-query"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.auto-accept")
+const CANCELLATION_STALL_CURSOR_KEY =
+  "guestpost:worker:cancellation-stall-scan-cursor:v1"
+const CANCELLATION_STALL_CURSOR_TTL_SECONDS = 30 * 24 * 60 * 60
+
+async function loadCancellationStallCursor(): Promise<
+  CancellationStallCursor | undefined
+> {
+  try {
+    const raw = await connection.get(CANCELLATION_STALL_CURSOR_KEY)
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw) as Partial<CancellationStallCursor>
+    if (
+      typeof parsed.id !== "string" ||
+      parsed.id.length === 0 ||
+      parsed.id.length > 200 ||
+      typeof parsed.updatedAt !== "string" ||
+      !Number.isFinite(new Date(parsed.updatedAt).getTime())
+    ) {
+      await connection.del(CANCELLATION_STALL_CURSOR_KEY)
+      return undefined
+    }
+    return { id: parsed.id, updatedAt: parsed.updatedAt }
+  } catch (error) {
+    logger.warn("cancellation stall cursor read failed", {
+      err: error instanceof Error ? error.message : String(error),
+    })
+    return undefined
+  }
+}
+
+async function saveCancellationStallCursor(
+  cursor: CancellationStallCursor | null,
+): Promise<void> {
+  try {
+    if (!cursor) {
+      await connection.del(CANCELLATION_STALL_CURSOR_KEY)
+      return
+    }
+    await connection.set(
+      CANCELLATION_STALL_CURSOR_KEY,
+      JSON.stringify(cursor),
+      "EX",
+      CANCELLATION_STALL_CURSOR_TTL_SECONDS,
+    )
+  } catch (error) {
+    logger.warn("cancellation stall cursor write failed", {
+      err: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
 
 const decision = new WorkflowDecisionService()
 
@@ -104,11 +158,13 @@ export function createAutoAcceptWorker() {
       ) {
         assertFinanceOperationAllowed("operator_decision")
         const escalatedResult = await runCancellationResponseTimeoutSweep()
+        const startAfter = await loadCancellationStallCursor()
         const stallResult = await nudgeStaleCancellationCases(
           prisma,
           new Date(),
           resolveOrderCancellationConfig(process.env),
           {
+            startAfter,
             onError: (requestId, error) => {
               logger.error("cancellation stall nudge failed", {
                 requestId,
@@ -120,10 +176,16 @@ export function createAutoAcceptWorker() {
             },
           },
         )
+        await saveCancellationStallCursor(stallResult.nextCursor)
         await dispatchCommunicationEventsBestEffort(
           stallResult.communicationEventIds,
         )
-        return { ...escalatedResult, ...stallResult }
+        return {
+          ...escalatedResult,
+          staleScanned: stallResult.staleScanned,
+          nudged: stallResult.nudged,
+          communicationEventIds: stallResult.communicationEventIds,
+        }
       }
 
       if (
@@ -768,15 +830,7 @@ async function runReviewReminderSweep(): Promise<ReminderResult> {
   const reminderDays = defaultWorkflowConfig.reminderDays
 
   const pending = await prisma.order.findMany({
-    where: {
-      status: "VERIFIED",
-      OR: reminderDays.map((day) => ({
-        autoAcceptAt: {
-          gte: new Date(now.getTime() + day * dayMs),
-          lt: new Date(now.getTime() + (day + 1) * dayMs),
-        },
-      })),
-    },
+    where: buildReviewReminderWhere(now, reminderDays),
     select: {
       id: true,
       autoAcceptAt: true,

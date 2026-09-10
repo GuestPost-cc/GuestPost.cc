@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-08-15
+updated: 2026-09-10
 ---
 
 # GuestPost.cc
@@ -301,6 +301,15 @@ historical audit batches.
   provider event ID when available and otherwise by the verified raw-payload
   hash; Redis is not the webhook acknowledgement boundary.
 - Platform-fulfilled orders create platform revenue and complete directly rather than creating publisher settlements. Worker sweeps enforce the acceptance and cancellation-response deadlines. Dispute refunds require Finance/Super Admin plus explicit responsibility rather than inferring fault from the listing channel.
+- Review-reminder selection excludes durable per-day reminder markers before its
+  row limit, so completed work cannot starve later orders. The capped
+  cancellation-stall sweep persists a compound `(updatedAt, id)` cursor in
+  Redis across scheduled runs and resets after reaching the end; database
+  ordering and the cursor comparison must remain aligned.
+- Report workers accept the scoped legacy `generate-report` job name during
+  rolling deployments, but every legacy and current job must carry an
+  `organizationId` and unknown job names fail closed. Remove the compatibility
+  name only after every environment's Redis report queue is confirmed drained.
 - Prisma migrations are an API/worker release prerequisite. Generate the client from the migrated schema, apply migrations before serving requests that select new fields, and verify `prisma migrate status` during the release; otherwise shared reads such as order and billing queries can fail together with HTTP 500 responses.
 - The customer portal is an order-focused workbench. Its dashboard uses exact server totals for attention, active work, and delivered results; `/dashboard/orders` is a server-paginated queue with stage, campaign, service, search, and sort controls; campaign and report totals page through the complete tenant-scoped data set rather than silently truncating at the API page limit.
 - Customer actions are role-aware in the UI but remain server-authorized. An organization OWNER can act across the organization and manage Billing; a MEMBER can mutate only orders they created. Billing is hidden from member navigation and direct member access fails closed. Wallet display uses authoritative available and reserved balances from the billing API; no payment, refund, payout, or settlement behavior is derived in the client.

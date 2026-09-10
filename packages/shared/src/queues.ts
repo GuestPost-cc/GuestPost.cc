@@ -31,6 +31,9 @@ export const QUEUE_JOBS = {
     GENERATE_PDF: "generate-pdf",
     GENERATE_CSV: "generate-csv",
     EXPORT_REPORT: "export-report",
+    // Rolling-deployment compatibility. Remove only after every environment's
+    // report queue has been drained of jobs produced before the typed split.
+    LEGACY_GENERATE: "generate-report",
   },
   [QUEUES.NOTIFICATION]: {
     PUSH_IN_APP: "push-in-app",
