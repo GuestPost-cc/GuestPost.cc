@@ -15,12 +15,22 @@ interface Step {
 
 const STEPS: Step[] = [
   {
+    name: "Dependency compatibility policy",
+    cmd: "pnpm",
+    args: ["deps:policy"],
+  },
+  {
     name: "Biome (format + lint + imports)",
     cmd: "pnpm",
     args: ["lint:format"],
   },
   { name: "ESLint (hooks + TS rules)", cmd: "pnpm", args: ["lint"] },
   { name: "TypeScript (tsc --noEmit)", cmd: "pnpm", args: ["typecheck"] },
+  {
+    name: "Website documentation registry",
+    cmd: "pnpm",
+    args: ["check:website-docs"],
+  },
   {
     name: "Dependency graph",
     cmd: "pnpm",
@@ -45,7 +55,7 @@ async function main() {
     process.stdout.write(`  ${step.name}... `.padEnd(50))
     const start = Date.now()
     try {
-      await $(step.cmd, step.args, { stdio: "pipe" })
+      await $(step.cmd, step.args, { stdio: "inherit" })
       const ms = Date.now() - start
       console.log(`✅ ${ms}ms`)
       results.push({ name: step.name, ok: true, ms })

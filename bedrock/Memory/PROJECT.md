@@ -58,16 +58,16 @@ historical audit batches.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 1,016 unit tests + integration tests
-- **apps/worker** — BullMQ queue processor (14 tests)
+- **apps/api** — NestJS REST API with unit and real-PostgreSQL integration suites
+- **apps/worker** — BullMQ queue processor with recursive Node test discovery
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard
 - **apps/publisher** — Publisher dashboard
 - **apps/website** — Public marketing site
-- **packages/shared** — Shared utilities (122 tests)
+- **packages/shared** — Shared domain and worker-core utilities
 - **packages/database** — Prisma schema + migrations
 - **packages/ui** — Shared component library
-- **packages/api-client** — Generated API client
+- **packages/api-client** — Handwritten typed HTTP client
 
 ## Key Patterns
 

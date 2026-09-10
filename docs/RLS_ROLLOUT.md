@@ -58,6 +58,29 @@ are an application context channel—not authentication for hostile arbitrary
 SQL. Protect credentials, prohibit user-controlled raw SQL, retain API guards
 and projections, and alert on unexpected role use.
 
+### API-key lifecycle
+
+API keys are additive credentials for organization automation; browser session
+behavior is unchanged. A key is accepted only when all of the following remain
+true at request time:
+
+- the opaque `gp_` credential hashes to the single row exposed by the
+  `API_KEY_AUTH` policy;
+- the key has an explicit creator and has not expired (new keys default to 90
+  days and cannot exceed 365 days);
+- the creator is an unbanned, email-verified customer and is still an active
+  OWNER of the exact organization stored on the key; and
+- the target route explicitly opts into API keys and every required permission
+  is present. Routes without permission metadata deny keys by default.
+
+Legacy keys have no trustworthy creator, remain nullable through the additive
+migration, and deliberately cannot authenticate. An organization owner must
+rotate them. The raw key is returned once, only its SHA-256 digest is stored,
+and presenting a key together with a cookie or Authorization header is rejected
+as ambiguous credentials. Revoking or expiring a key, banning its creator, or
+removing the creator's ownership takes effect on the next request without
+changing the owner's interactive active context.
+
 ## Runtime context and pool safety
 
 The API initializes an `AsyncLocalStorage` scope before global guards. Better

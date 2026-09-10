@@ -10,7 +10,8 @@
  * Defaults: 1000 users, 50 in flight. Requires API on :4000, seeded DB.
  */
 
-import { randomBytes } from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
+import { runReconciliation } from "@guestpost/shared"
 import { prisma } from "../packages/database/src"
 import { fundOrganizationWalletForTest } from "./test-wallet-funding"
 
@@ -19,18 +20,18 @@ const H = {
   "Content-Type": "application/json",
   Origin: "http://localhost:3001",
 }
-const USERS = Number(process.argv[2] ?? 1000)
-const CONCURRENCY = Number(process.argv[3] ?? 50)
+const USERS = Number.parseInt(process.argv[2] ?? "1000", 10)
+const CONCURRENCY = Number.parseInt(process.argv[3] ?? "50", 10)
 
 async function call(
   method: string,
   path: string,
-  token?: string,
+  apiKey?: string,
   body?: unknown,
 ) {
   const res = await fetch(`${API}/api/v1${path}`, {
     method,
-    headers: { ...H, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { ...H, ...(apiKey ? { "X-API-Key": apiKey } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   })
   let data: any
@@ -43,25 +44,14 @@ async function call(
   return { status: res.status, data }
 }
 
-async function signIn(email: string, password: string) {
-  const r = await call("POST", "/auth/sign-in/email", undefined, {
-    email,
-    password,
-  })
-  if (r.status !== 200)
-    throw new Error(`sign-in failed: ${email} ${JSON.stringify(r.data)}`)
-  return r.data.token as string
-}
-
-// Provision a user directly in the DB and mint a bearer session token.
-// Auth endpoints are (correctly) rate-limited, so bulk HTTP signup is not an
-// option — this bypasses the limiter for load setup only. The session token is
-// a real Session row the bearer plugin accepts on subsequent requests.
-async function provisionUserWithSession(
+// Provision a user and a narrowly-scoped API key directly in the disposable
+// development database. This avoids testing an obsolete bearer-session shape
+// or disabling production-correct sign-in throttles just for load setup.
+async function provisionUserWithApiKey(
   email: string,
   name: string,
   slug: string,
-): Promise<string> {
+): Promise<{ apiKey: string; orgId: string; userId: string }> {
   const user = await prisma.user.create({
     data: { email, name, userType: "CUSTOMER", emailVerified: true },
   })
@@ -81,15 +71,18 @@ async function provisionUserWithSession(
   await prisma.activeContext.create({
     data: { userId: user.id, activeOrganizationId: org.id },
   })
-  const token = randomBytes(24).toString("hex")
-  await prisma.session.create({
+  const apiKey = `gp_${randomBytes(32).toString("hex")}`
+  await prisma.apiKey.create({
     data: {
-      token,
-      userId: user.id,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      organizationId: org.id,
+      createdByUserId: user.id,
+      name: `Load test ${slug}`,
+      keyHash: createHash("sha256").update(apiKey).digest("hex"),
+      permissions: ["orders:write"],
+      expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
     },
   })
-  return { token, orgId: org.id }
+  return { apiKey, orgId: org.id, userId: user.id }
 }
 
 /** Run async tasks with a bounded concurrency pool. */
@@ -112,6 +105,19 @@ async function pool<T>(
 }
 
 async function main() {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Load-test provisioning is forbidden in production")
+  }
+  if (!Number.isSafeInteger(USERS) || USERS < 1 || USERS > 10_000) {
+    throw new Error("users must be an integer between 1 and 10000")
+  }
+  if (
+    !Number.isSafeInteger(CONCURRENCY) ||
+    CONCURRENCY < 1 ||
+    CONCURRENCY > 500
+  ) {
+    throw new Error("concurrency must be an integer between 1 and 500")
+  }
   console.log(`── Load test: ${USERS} users, ${CONCURRENCY} concurrent`)
   const runId = randomBytes(4).toString("hex")
 
@@ -119,32 +125,34 @@ async function main() {
   const site = await prisma.website.findFirstOrThrow({
     where: { domain: "techinsider.example.com" },
   })
-  const listing = await prisma.marketplaceListing.findFirstOrThrow({
-    where: { websiteId: site.id, status: "APPROVED", type: "GUEST_POST" },
+  const listingService = await prisma.listingService.findFirstOrThrow({
+    where: {
+      serviceType: "GUEST_POST",
+      availability: "AVAILABLE",
+      listing: { websiteId: site.id, status: "APPROVED" },
+    },
   })
-  const price = Number(listing.price)
+  const price = Number(listingService.price)
 
   // ── Provision: N customers, each with their own org + funded wallet ──
   console.log("── Provisioning users + wallets...")
   const provisionStart = Date.now()
-  const users: Array<{ token: string; email: string }> = []
+  const users: Array<{ apiKey: string; email: string }> = []
   const ids = Array.from({ length: USERS }, (_, i) => i)
   await pool(ids, CONCURRENCY, async (i) => {
     const email = `load-${runId}-${i}@guestpost.local`
-    const { token, orgId } = await provisionUserWithSession(
+    const { apiKey, orgId, userId } = await provisionUserWithApiKey(
       email,
       `Load User ${i}`,
       `load-${runId}-${i}`,
     )
-    const userId = (await prisma.user.findUniqueOrThrow({ where: { email } }))
-      .id
     await fundOrganizationWalletForTest(prisma, {
       organizationId: orgId,
       userId,
       amount: price,
       reference: `load-${runId}-${i}`,
     })
-    users[i] = { token, email }
+    users[i] = { apiKey, email }
   })
   console.log(
     `   provisioned ${users.length} users in ${((Date.now() - provisionStart) / 1000).toFixed(1)}s`,
@@ -159,23 +167,44 @@ async function main() {
   await pool(users, CONCURRENCY, async (u) => {
     const t0 = Date.now()
     try {
-      const order = (
-        await call("POST", "/orders", u.token, {
-          type: "GUEST_POST",
-          title: `load order ${runId}`,
-          items: [
-            {
-              websiteId: site.id,
-              targetUrl: "https://example.com/load",
-              anchorText: "load",
-            },
-          ],
-        })
-      ).data
+      const create = await call("POST", "/orders", u.apiKey, {
+        type: "GUEST_POST",
+        title: `load order ${runId}`,
+        idempotencyKey: `load-${runId}-${u.email}`,
+        listingServiceId: listingService.id,
+        expectedListingServiceVersion: listingService.version,
+        expectedPrice: String(listingService.price),
+        expectedCurrency: listingService.currency,
+        briefData: {
+          title: `Load-test article ${runId}`,
+          topic: "Database integrity testing under concurrent order load",
+          targetUrl: "https://example.com/load",
+          anchorText: "load testing",
+          targetKeywords: ["load testing"],
+          wordCount: 800,
+          notes: "Synthetic non-production load test order",
+        },
+        items: [
+          {
+            websiteId: site.id,
+            targetUrl: "https://example.com/load",
+            anchorText: "load",
+          },
+        ],
+      })
+      if (create.status >= 400) {
+        throw new Error(`order create failed: ${JSON.stringify(create.data)}`)
+      }
+      const order = create.data
       const pay = await call(
         "POST",
         `/orders/${order.id}/submit-payment`,
-        u.token,
+        u.apiKey,
+        {
+          expectedVersion: order.version,
+          expectedAmount: String(listingService.price),
+          expectedCurrency: listingService.currency,
+        },
       )
       if (pay.status < 400) ok++
       else errors++
@@ -210,7 +239,6 @@ async function main() {
   const purchaseAgg = await prisma.transaction.aggregate({
     where: {
       type: "PURCHASE",
-      description: { contains: "" },
       order: { title: `load order ${runId}` },
     },
     _sum: { amount: true },
@@ -239,13 +267,7 @@ async function main() {
     { totalDebited, expected: paidOrders * price },
   )
 
-  const recon = (
-    await call(
-      "GET",
-      "/admin/reconciliation",
-      await signIn("admin@guestpost.local", "Admin123!"),
-    )
-  ).data
+  const recon = await runReconciliation(prisma)
   expect(
     "reconciliation: zero drift after storm",
     recon.ok === true,
