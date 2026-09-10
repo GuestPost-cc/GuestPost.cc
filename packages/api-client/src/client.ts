@@ -150,6 +150,13 @@ export class HttpClient {
     // attach it to the ApiError so toasts/error reports can surface it.
     const requestId = generateRequestId()
     headers["X-Request-ID"] = requestId
+    const url = this.buildUrl(path, params)
+    if (
+      this.config.apiKey &&
+      new URL(url).origin !== new URL(this.config.baseUrl).origin
+    ) {
+      throw new Error("API key requests must target the configured API origin")
+    }
     if (this.config.apiKey) headers["X-API-Key"] = this.config.apiKey
     const init: RequestInit = {
       ...rest,
@@ -167,7 +174,7 @@ export class HttpClient {
       init.body = JSON.stringify(body)
     }
 
-    const res = await fetch(this.buildUrl(path, params), init)
+    const res = await fetch(url, init)
 
     const responseRequestId = res.headers.get("X-Request-ID") ?? requestId
     if (!res.ok) {

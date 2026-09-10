@@ -40,4 +40,32 @@ describe("HttpClient cookie-only CSRF protection", () => {
     const [, init] = (globalThis.fetch as jest.Mock).mock.calls[0]
     expect(init.headers).not.toHaveProperty("X-CSRF-Protection")
   })
+
+  it("never sends an API key to an absolute cross-origin URL", async () => {
+    mockResponse()
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      apiKey: `gp_${"a".repeat(64)}`,
+    })
+
+    await expect(client.get("https://attacker.example/orders")).rejects.toThrow(
+      /configured API origin/,
+    )
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+  })
+
+  it("sends an API key without cookies to the configured origin", async () => {
+    mockResponse()
+    const apiKey = `gp_${"a".repeat(64)}`
+    const client = new HttpClient({
+      baseUrl: "https://api.example.com",
+      apiKey,
+    })
+
+    await client.get("https://api.example.com/orders")
+
+    const [, init] = (globalThis.fetch as jest.Mock).mock.calls[0]
+    expect(init.credentials).toBe("omit")
+    expect(init.headers).toMatchObject({ "X-API-Key": apiKey })
+  })
 })

@@ -88,17 +88,6 @@ export async function nudgeStaleCancellationCases(
   let staleScanned = 0
   let nudged = 0
   const communicationEventIds: string[] = []
-  const reviewerRoles = [...new Set(Object.values(REVIEWER_ROLES).flat())]
-  const reviewers = await prisma.staffMembership.findMany({
-    where: { role: { in: reviewerRoles }, user: { banned: false } },
-    select: { userId: true, role: true },
-  })
-  const reviewerIdsByRole = new Map<string, string[]>()
-  for (const reviewer of reviewers) {
-    const ids = reviewerIdsByRole.get(reviewer.role) ?? []
-    ids.push(reviewer.userId)
-    reviewerIdsByRole.set(reviewer.role, ids)
-  }
 
   while (staleScanned < maxScan) {
     const take = Math.min(batchSize, maxScan - staleScanned)
@@ -167,16 +156,22 @@ export async function nudgeStaleCancellationCases(
         continue
       }
       if (existingKeys.has(`${request.orderId}:${stalledDays}`)) continue
-      const recipientUserIds = [
-        ...new Set(
-          (REVIEWER_ROLES[request.status] ?? []).flatMap(
-            (role) => reviewerIdsByRole.get(role) ?? [],
-          ),
-        ),
-      ]
-      if (recipientUserIds.length === 0) continue
       try {
         const eventId = await prisma.$transaction(async (tx: any) => {
+          const reviewers = await tx.staffMembership.findMany({
+            where: {
+              role: { in: REVIEWER_ROLES[request.status] ?? [] },
+              user: { banned: false },
+            },
+            select: { userId: true },
+          })
+          const recipientUserIds = [
+            ...new Set<string>(
+              reviewers.map((reviewer: { userId: string }) => reviewer.userId),
+            ),
+          ]
+          if (recipientUserIds.length === 0) return null
+
           await tx.orderEvent.create({
             data: {
               orderId: request.orderId,

@@ -178,9 +178,9 @@ test("does not consume the reminder bucket when no eligible staff exist", async 
   const createdEvents: any[] = []
   const prisma = {
     ...base.prisma,
-    staffMembership: { findMany: async () => [] },
     $transaction: async (fn: (tx: any) => Promise<unknown>) =>
       fn({
+        staffMembership: { findMany: async () => [] },
         orderEvent: {
           create: async ({ data }: { data: any }) => {
             createdEvents.push(data)
@@ -197,6 +197,40 @@ test("does not consume the reminder bucket when no eligible staff exist", async 
   assert.equal(createdEvents.length, 0)
   assert.equal(base.recorded.length, 0)
   assert.equal(result.nudged, 0)
+})
+
+test("revalidates reviewer authorization inside the write transaction", async () => {
+  const base = harness([stalledCase()])
+  let authorizationQuery: any
+  const prisma = {
+    ...base.prisma,
+    $transaction: async (fn: (tx: any) => Promise<unknown>) =>
+      fn({
+        staffMembership: {
+          findMany: async (args: any) => {
+            authorizationQuery = args
+            return [{ userId: "still-authorized" }]
+          },
+        },
+        orderEvent: {
+          create: async () => ({ id: "trail-1" }),
+        },
+      }),
+  }
+
+  const result = await nudgeStaleCancellationCases(prisma, NOW, CONFIG, {
+    recordOutbox: base.recordOutbox,
+  })
+
+  assert.deepEqual(authorizationQuery, {
+    where: {
+      role: { in: ["OPERATIONS", "SUPER_ADMIN"] },
+      user: { banned: false },
+    },
+    select: { userId: true },
+  })
+  assert.deepEqual(base.recorded[0].recipientUserIds, ["still-authorized"])
+  assert.equal(result.nudged, 1)
 })
 
 test("paginates beyond old off-bucket cases so later due cases are not starved", async () => {

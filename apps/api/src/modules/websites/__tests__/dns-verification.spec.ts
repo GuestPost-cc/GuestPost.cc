@@ -346,7 +346,17 @@ describe("runWebsiteReverifySweep", () => {
     expect(prisma.website.findMany).toHaveBeenCalledWith({
       where: expect.objectContaining({
         OR: expect.arrayContaining([
-          { verificationMethod: "SUPER_ADMIN_OVERRIDE" },
+          expect.objectContaining({
+            verificationMethod: "SUPER_ADMIN_OVERRIDE",
+            OR: [
+              { verificationOverrideExpiresAt: null },
+              {
+                verificationOverrideExpiresAt: {
+                  lte: new Date("2026-07-31T00:00:00Z"),
+                },
+              },
+            ],
+          }),
           expect.objectContaining({
             AND: expect.arrayContaining([
               expect.objectContaining({
@@ -370,6 +380,30 @@ describe("runWebsiteReverifySweep", () => {
         publisher: { select: { organizationId: true } },
       }),
     })
+  })
+
+  it("continues a capped sweep after the prior run's website cursor", async () => {
+    prisma.website.findMany.mockResolvedValue([
+      { ...verifiedSite, id: "w2" },
+      { ...verifiedSite, id: "w3" },
+    ])
+
+    const result = await runWebsiteReverifySweep({
+      prisma,
+      checkDns: jest.fn().mockRejectedValue(new Error("temporary outage")),
+      sweepMaxSites: 2,
+      sweepStartAfterId: "w1",
+    })
+
+    expect(prisma.website.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: { gt: "w1" } }),
+        orderBy: { id: "asc" },
+        take: 2,
+      }),
+    )
+    expect(result.nextCursorId).toBe("w3")
+    expect(prisma.website.updateMany).not.toHaveBeenCalled()
   })
 
   it("REVOKES + enforces + notifies on the 3rd consecutive miss", async () => {

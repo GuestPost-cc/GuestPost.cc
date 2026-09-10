@@ -33,15 +33,15 @@ tests. Nest, worker, shared, database, API-client, and UI TypeScript build stage
 pass. Full Next.js production bundling is deferred to GitHub CI because
 Turbopack cannot bind its internal IPC port in the local execution sandbox.
 
-PR #122 review follow-up closes the three actionable automated findings:
-already-reminded orders are excluded before the bounded review-reminder query,
-the capped cancellation-stall scan rotates across runs using a validated Redis
-cursor, and legacy scoped `generate-report` jobs remain executable while
-unknown report jobs fail closed. Twelve focused worker regressions, all 482
-shared tests, worker/shared builds, and the complete repository check pass.
-The full worker suite's 102 functional tests passed; two unrelated Poppler PDF
-assertions could not run locally because this shell provides `pdftoppm` but
-not `pdffonts`/`pdftotext`; they remain covered by the GitHub CI rerun.
+PR #122's completed CodeRabbit and Codex reviews produced nine valid findings.
+The follow-up excludes completed reminders before bounded selection; rotates
+cancellation and website sweeps across runs; reauthorizes staff recipients at
+the write boundary; preserves scoped legacy report jobs; filters public report
+events before truncation; keeps API keys on the anonymous rate tier until
+authentication; fences API-client keys to the configured origin; labels the
+verification CSV as a current-page export; and moves new indexes/FK validation
+to online, staged migrations. The review fixes have focused regression
+coverage; the final combined GitHub CI rerun is the remaining merge gate.
 
 ## Full staged application RLS
 
