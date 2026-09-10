@@ -23,6 +23,8 @@ export interface VerificationDeps {
   // Hard cap protects a worker invocation from monopolizing the database.
   // Due rows beyond the cap remain eligible for the next repeatable run.
   sweepMaxSites?: number
+  // Validated worker-owned cursor used to rotate a capped sweep across runs.
+  sweepStartAfterId?: string
   // Optional hook to trigger event-driven publisher trust recompute.
   onTrustEvent?: (
     publisherId: string | null | undefined,
@@ -252,6 +254,7 @@ export interface SweepResult {
   revoked: number
   refreshed: number
   warned: number
+  nextCursorId: string | null
 }
 
 // Revocation enforcement: marketplace visibility and checkout fail closed on
@@ -316,8 +319,15 @@ export async function runWebsiteReverifySweep(
     where: {
       verificationStatus: "VERIFIED",
       publisherId: { not: null },
+      id: deps.sweepStartAfterId ? { gt: deps.sweepStartAfterId } : undefined,
       OR: [
-        { verificationMethod: "SUPER_ADMIN_OVERRIDE" },
+        {
+          verificationMethod: "SUPER_ADMIN_OVERRIDE",
+          OR: [
+            { verificationOverrideExpiresAt: null },
+            { verificationOverrideExpiresAt: { lte: sweepNow } },
+          ],
+        },
         {
           AND: [
             {
@@ -545,5 +555,13 @@ export async function runWebsiteReverifySweep(
       )
     }
   }
-  return { ok: true, total: sites.length, revoked, refreshed, warned }
+  return {
+    ok: true,
+    total: sites.length,
+    revoked,
+    refreshed,
+    warned,
+    nextCursorId:
+      sites.length === maxSites ? (sites[sites.length - 1]?.id ?? null) : null,
+  }
 }

@@ -52,6 +52,10 @@ describe("ReportingService", () => {
     expect(query.select.platformRevenue).toBeUndefined()
     expect(query.select.customer).toBeUndefined()
     expect(query.select.events.take).toBe(101)
+    expect(query.select.events.where.eventType.in).toContain("ORDER_CREATED")
+    expect(query.select.events.where.eventType.in).not.toContain(
+      "PAYOUT_APPROVED",
+    )
     expect(result).not.toHaveProperty("platformRevenue")
     expect(result).not.toHaveProperty("customer")
     expect(result.events).toHaveLength(1)

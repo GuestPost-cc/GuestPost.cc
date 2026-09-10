@@ -2,7 +2,7 @@ import { buildOrderStakeholderTimeline } from "./order-stakeholder-timeline"
 
 type ExternalOrderActor = "CUSTOMER" | "PUBLISHER"
 
-const PUBLIC_EVENT_TYPES = new Set([
+export const PUBLIC_ORDER_EVENT_TYPES = [
   "ORDER_CREATED",
   "ITEM_ADDED",
   "ITEM_REMOVED",
@@ -36,7 +36,9 @@ const PUBLIC_EVENT_TYPES = new Set([
   "CANCELLATION_RESPONDED",
   "CANCELLATION_RESOLVED",
   "ORDER_DECLINED",
-])
+] as const
+
+const PUBLIC_EVENT_TYPES = new Set<string>(PUBLIC_ORDER_EVENT_TYPES)
 
 const FINANCIAL_EVENT_MESSAGES: Record<
   string,

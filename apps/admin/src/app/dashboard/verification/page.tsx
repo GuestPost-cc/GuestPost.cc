@@ -127,7 +127,7 @@ function VerificationCenterPageInner() {
 
   const exportCsv = () => {
     downloadCsv(
-      "domain-verification-review.csv",
+      `domain-verification-review-page-${page + 1}.csv`,
       [
         "Domain",
         "Status",
@@ -241,9 +241,13 @@ function VerificationCenterPageInner() {
                 <SelectItem value="REVOKED">Revoked</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={exportCsv}>
+            <Button
+              variant="outline"
+              onClick={exportCsv}
+              disabled={websites.length === 0}
+            >
               <Download className="h-4 w-4 mr-1" />
-              Export CSV
+              Export page
             </Button>
             <Button
               disabled={selected.size === 0 || bulkRetry.isPending}

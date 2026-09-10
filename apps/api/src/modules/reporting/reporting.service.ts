@@ -3,7 +3,10 @@ import { QUEUE_JOBS, QUEUES } from "@guestpost/shared"
 import { Injectable, NotFoundException } from "@nestjs/common"
 import { canCustomerViewWebsite } from "../../common/customer-website-access"
 import { PrismaService } from "../../common/prisma.service"
-import { projectExternalOrder } from "../orders/order-visibility"
+import {
+  PUBLIC_ORDER_EVENT_TYPES,
+  projectExternalOrder,
+} from "../orders/order-visibility"
 import { QueueService } from "../queues/queue.service"
 
 const REPORT_EVENT_LIMIT = 100
@@ -63,6 +66,7 @@ const CUSTOMER_REPORT_ORDER_SELECT = {
     },
   },
   events: {
+    where: { eventType: { in: [...PUBLIC_ORDER_EVENT_TYPES] } },
     orderBy: { createdAt: "desc" as const },
     take: REPORT_EVENT_LIMIT + 1,
     select: {

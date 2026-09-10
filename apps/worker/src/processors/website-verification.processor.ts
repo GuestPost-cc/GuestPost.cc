@@ -15,6 +15,45 @@ import { isRepeatableJob } from "../repeatable-job-registry"
 import { enqueueTrustRecompute } from "../trust-enqueue"
 
 const logger = createLogger("worker.website-verification")
+const REVERIFY_SWEEP_CURSOR_KEY =
+  "guestpost:worker:website-reverify-scan-cursor:v1"
+const REVERIFY_SWEEP_CURSOR_TTL_SECONDS = 30 * 24 * 60 * 60
+
+async function loadReverifySweepCursor(): Promise<string | undefined> {
+  try {
+    const cursor = await connection.get(REVERIFY_SWEEP_CURSOR_KEY)
+    if (!cursor) return undefined
+    if (cursor.length > 200) {
+      await connection.del(REVERIFY_SWEEP_CURSOR_KEY)
+      return undefined
+    }
+    return cursor
+  } catch (error) {
+    logger.warn("website re-verify cursor read failed", {
+      err: error instanceof Error ? error.message : String(error),
+    })
+    return undefined
+  }
+}
+
+async function saveReverifySweepCursor(cursor: string | null): Promise<void> {
+  try {
+    if (!cursor) {
+      await connection.del(REVERIFY_SWEEP_CURSOR_KEY)
+      return
+    }
+    await connection.set(
+      REVERIFY_SWEEP_CURSOR_KEY,
+      cursor,
+      "EX",
+      REVERIFY_SWEEP_CURSOR_TTL_SECONDS,
+    )
+  } catch (error) {
+    logger.warn("website re-verify cursor write failed", {
+      err: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
 
 // DNS TXT domain-ownership verification worker. Thin adapter over the pure
 // state machine in @guestpost/shared (website-verification-core), injecting the
@@ -63,9 +102,20 @@ export function createWebsiteVerificationWorker() {
           return res
         }
         case "website-reverify-sweep": {
-          const res = await runWebsiteReverifySweep(deps)
+          const sweepStartAfterId = await loadReverifySweepCursor()
+          const res = await runWebsiteReverifySweep({
+            ...deps,
+            sweepStartAfterId,
+          })
+          await saveReverifySweepCursor(res.nextCursorId)
           logger.info("website re-verify sweep complete", { result: res })
-          return res
+          return {
+            ok: res.ok,
+            total: res.total,
+            revoked: res.revoked,
+            refreshed: res.refreshed,
+            warned: res.warned,
+          }
         }
         default:
           logger.warn("unknown job name", { jobName: job.name })
