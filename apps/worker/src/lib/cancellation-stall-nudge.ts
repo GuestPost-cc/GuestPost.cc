@@ -54,12 +54,17 @@ export async function nudgeStaleCancellationCases(
   config: CancellationStallConfig,
   options: {
     take?: number
+    maxScan?: number
     recordOutbox?: RecordOutbox
     onError?: (requestId: string, error: unknown) => void
   } = {},
 ): Promise<CancellationStallNudgeResult> {
   const recordOutbox = options.recordOutbox ?? recordCommunicationOutbox
   const batchSize = Math.max(1, Math.min(Math.trunc(options.take ?? 100), 1000))
+  const maxScan = Math.max(
+    batchSize,
+    Math.min(Math.trunc(options.maxScan ?? 1_000), 10_000),
+  )
   const cutoff = new Date(
     now.getTime() - config.caseStallFirstReminderDays * 86_400_000,
   )
@@ -67,8 +72,20 @@ export async function nudgeStaleCancellationCases(
   let staleScanned = 0
   let nudged = 0
   const communicationEventIds: string[] = []
+  const reviewerRoles = [...new Set(Object.values(REVIEWER_ROLES).flat())]
+  const reviewers = await prisma.staffMembership.findMany({
+    where: { role: { in: reviewerRoles }, user: { banned: false } },
+    select: { userId: true, role: true },
+  })
+  const reviewerIdsByRole = new Map<string, string[]>()
+  for (const reviewer of reviewers) {
+    const ids = reviewerIdsByRole.get(reviewer.role) ?? []
+    ids.push(reviewer.userId)
+    reviewerIdsByRole.set(reviewer.role, ids)
+  }
 
-  while (true) {
+  while (staleScanned < maxScan) {
+    const take = Math.min(batchSize, maxScan - staleScanned)
     const stalled: CancellationStallCase[] =
       await prisma.orderCancellationRequest.findMany({
         where: {
@@ -83,12 +100,25 @@ export async function nudgeStaleCancellationCases(
           order: { select: { organizationId: true } },
         },
         orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-        take: batchSize,
+        take,
         ...(cursor ? { cursor, skip: 1 } : {}),
       })
 
     if (stalled.length === 0) break
     staleScanned += stalled.length
+    const existingEvents = await prisma.orderEvent.findMany({
+      where: {
+        orderId: { in: stalled.map((request) => request.orderId) },
+        eventType: "CANCELLATION_STALL_REMINDER",
+      },
+      select: { orderId: true, metadata: true },
+    })
+    const existingKeys = new Set(
+      existingEvents.map((event: { orderId: string; metadata: unknown }) => {
+        const metadata = event.metadata as { stalledDays?: unknown } | null
+        return `${event.orderId}:${String(metadata?.stalledDays)}`
+      }),
+    )
 
     for (const request of stalled) {
       const stalledDays = Math.floor(
@@ -103,27 +133,17 @@ export async function nudgeStaleCancellationCases(
       ) {
         continue
       }
+      if (existingKeys.has(`${request.orderId}:${stalledDays}`)) continue
+      const recipientUserIds = [
+        ...new Set(
+          (REVIEWER_ROLES[request.status] ?? []).flatMap(
+            (role) => reviewerIdsByRole.get(role) ?? [],
+          ),
+        ),
+      ]
+      if (recipientUserIds.length === 0) continue
       try {
         const eventId = await prisma.$transaction(async (tx: any) => {
-          const existing = await tx.orderEvent.findFirst({
-            where: {
-              orderId: request.orderId,
-              eventType: "CANCELLATION_STALL_REMINDER",
-              metadata: { path: ["stalledDays"], equals: stalledDays },
-            },
-            select: { id: true },
-          })
-          if (existing) return null
-
-          const staff = await tx.staffMembership.findMany({
-            where: {
-              role: { in: [...(REVIEWER_ROLES[request.status] ?? [])] },
-              user: { banned: false },
-            },
-            select: { userId: true },
-          })
-          if (staff.length === 0) return null
-
           await tx.orderEvent.create({
             data: {
               orderId: request.orderId,
@@ -154,9 +174,7 @@ export async function nudgeStaleCancellationCases(
               stalledDays,
             },
             dedupKey: `staff:cancellation-case:${request.id}:stall:${stalledDays}`,
-            recipientUserIds: staff.map(
-              (item: { userId: string }) => item.userId,
-            ),
+            recipientUserIds,
           })
           return event.eventId
         })
@@ -170,7 +188,7 @@ export async function nudgeStaleCancellationCases(
     }
 
     cursor = { id: stalled[stalled.length - 1].id }
-    if (stalled.length < batchSize) break
+    if (stalled.length < take) break
   }
 
   return { staleScanned, nudged, communicationEventIds }

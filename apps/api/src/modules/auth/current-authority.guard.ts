@@ -6,6 +6,7 @@ import {
   Injectable,
 } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
+import { API_KEY_PERMISSIONS_KEY } from "../../common/decorators/api-key-permissions.decorator"
 import { IS_PUBLIC_KEY } from "../../common/decorators/public.decorator"
 import { CurrentAuthorityService } from "./current-authority.service"
 import { requiresEmailVerification } from "./email-verification-policy"
@@ -32,6 +33,20 @@ export class CurrentAuthorityGuard implements CanActivate {
       throw new ForbiddenException("Authenticated session authority required")
     }
     const authority = await this.authorities.resolveRequest(request)
+
+    if (request.apiKey) {
+      const required = this.reflector.getAllAndOverride<readonly string[]>(
+        API_KEY_PERMISSIONS_KEY,
+        [context.getHandler(), context.getClass()],
+      )
+      if (!required?.length) {
+        throw new ForbiddenException("API key is not allowed on this route")
+      }
+      const granted = new Set(request.apiKey.permissions)
+      if (required.some((permission) => !granted.has(permission))) {
+        throw new ForbiddenException("API key permission denied")
+      }
+    }
 
     if (authority.userType === "CUSTOMER") {
       setRlsRequestContext({

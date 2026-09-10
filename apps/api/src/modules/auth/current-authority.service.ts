@@ -226,4 +226,54 @@ export class CurrentAuthorityService {
       staffPermissions: normalizePermissions(staffMembership?.permissions),
     }) as DurableCurrentAuthority
   }
+
+  /**
+   * Resolves an API key against the organization it was issued for. This does
+   * not consult or mutate the creator's interactive ActiveContext, so a key
+   * cannot inherit or switch a browser session's current tenant.
+   */
+  async resolveApiKeyOwner(
+    userId: string,
+    organizationId: string,
+  ): Promise<CustomerAuthority> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        userType: true,
+        role: true,
+        banned: true,
+        emailVerified: true,
+        memberships: {
+          where: { organizationId, status: "ACTIVE", role: "OWNER" },
+          select: { role: true },
+          take: 1,
+        },
+      },
+    })
+    const membership = user?.memberships[0]
+    if (
+      !user ||
+      user.banned ||
+      user.userType !== "CUSTOMER" ||
+      !user.emailVerified ||
+      !membership
+    ) {
+      throw new UnauthorizedException("API key owner is no longer eligible")
+    }
+    return Object.freeze({
+      id: user.id,
+      userType: "CUSTOMER",
+      role: user.role,
+      emailVerified: true,
+      organizationId,
+      publisherId: null,
+      publisherOrganizationId: null,
+      customerRole: membership.role,
+      memberRole: membership.role,
+      publisherRole: null,
+      staffRole: null,
+      staffPermissions: Object.freeze([]),
+    }) as CustomerAuthority
+  }
 }

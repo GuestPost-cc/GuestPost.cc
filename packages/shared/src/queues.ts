@@ -2,9 +2,6 @@ export const QUEUES = {
   EMAIL: "email",
   REPORT: "report",
   NOTIFICATION: "notification",
-  IMPORT: "import",
-  AI: "ai",
-  VERIFICATION: "verification",
   WEBSITE_VERIFICATION: "website-verification",
   DELIVERY_VERIFICATION: "delivery-verification",
   PUBLISHER_TRUST: "publisher-trust",
@@ -38,18 +35,6 @@ export const QUEUE_JOBS = {
   [QUEUES.NOTIFICATION]: {
     PUSH_IN_APP: "push-in-app",
     PUSH_EMAIL: "push-email",
-  },
-  [QUEUES.IMPORT]: {
-    BULK_ORDERS: "bulk-orders",
-    BULK_PUBLISHERS: "bulk-publishers",
-  },
-  [QUEUES.AI]: {
-    GENERATE_CONTENT: "generate-content",
-    SUGGEST_ANCHORS: "suggest-anchors",
-    MATCH_PUBLISHER: "match-publisher",
-  },
-  [QUEUES.VERIFICATION]: {
-    VERIFY_LINK: "verify-link",
   },
   [QUEUES.WEBSITE_VERIFICATION]: {
     VERIFY: "website-verify",

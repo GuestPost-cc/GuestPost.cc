@@ -3137,6 +3137,18 @@ async function checkStuckPayouts(
 export async function runReconciliation(
   prisma: AnyPrisma,
 ): Promise<ReconciliationReport> {
+  // A reconciliation invariant is meaningful only when every check observes
+  // the same committed database state. Prisma transaction clients do not
+  // expose $transaction, so the recursive call executes the checks exactly
+  // once inside a REPEATABLE READ snapshot. Lightweight unit mocks continue
+  // to run directly.
+  if (typeof prisma.$transaction === "function") {
+    return prisma.$transaction((tx: AnyPrisma) => runReconciliation(tx), {
+      isolationLevel: "RepeatableRead",
+      maxWait: 5_000,
+      timeout: 120_000,
+    })
+  }
   const startedAt = Date.now()
   const stats: DriftStats = {
     checkedWallets: 0,

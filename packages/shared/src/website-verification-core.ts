@@ -20,6 +20,9 @@ export interface VerificationDeps {
   // The sweep itself may run daily to expire overrides promptly; real DNS
   // checks remain on this slower cadence.
   dnsRecheckAfterMs?: number
+  // Hard cap protects a worker invocation from monopolizing the database.
+  // Due rows beyond the cap remain eligible for the next repeatable run.
+  sweepMaxSites?: number
   // Optional hook to trigger event-driven publisher trust recompute.
   onTrustEvent?: (
     publisherId: string | null | undefined,
@@ -308,6 +311,7 @@ export async function runWebsiteReverifySweep(
   const dnsCutoff = new Date(
     sweepNow.getTime() - (deps.dnsRecheckAfterMs ?? 30 * 86_400_000),
   )
+  const maxSites = Math.min(Math.max(deps.sweepMaxSites ?? 1_000, 1), 5_000)
   const sites = await prisma.website.findMany({
     where: {
       verificationStatus: "VERIFIED",
@@ -332,21 +336,33 @@ export async function runWebsiteReverifySweep(
         },
       ],
     },
-    select: { id: true },
+    orderBy: { id: "asc" },
+    take: maxSites,
+    select: {
+      id: true,
+      url: true,
+      domain: true,
+      publisherId: true,
+      verificationToken: true,
+      activeVerifiedToken: true,
+      verificationStatus: true,
+      verificationMethod: true,
+      verificationOverrideExpiresAt: true,
+      verifiedByUserId: true,
+      verificationVersion: true,
+      consecutiveFailures: true,
+      publisher: { select: { organizationId: true } },
+    },
   })
 
   let revoked = 0
   let refreshed = 0
   let warned = 0
-  for (const { id } of sites) {
-    const website = await prisma.website.findUnique({ where: { id } })
-    if (!website?.publisherId) continue
+  for (const website of sites) {
+    if (!website.publisherId) continue
     if (website.verificationStatus !== "VERIFIED") continue
 
-    const publisher = await prisma.publisher.findUnique({
-      where: { id: website.publisherId },
-    })
-    const organizationId = publisher?.organizationId ?? null
+    const organizationId = website.publisher?.organizationId ?? null
     const expectedVersion = website.verificationVersion
     const now = sweepNow
 

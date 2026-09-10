@@ -19,6 +19,7 @@ import {
 import { PrismaService } from "../../common/prisma.service"
 import { isTrustedOrigin } from "../../common/security/trusted-origins"
 import { ActiveContextService } from "../active-context/active-context.service"
+import { ApiKeyAuthenticationService } from "./api-key-authentication.service"
 import { requiresEmailVerification } from "./email-verification-policy"
 
 const PUBLIC_SESSION_ABSOLUTE_AGE_MS = 24 * 60 * 60 * 1000
@@ -30,6 +31,7 @@ export class AuthGuard implements CanActivate {
     private reflector: Reflector,
     private readonly prisma: PrismaService,
     private readonly activeContext: ActiveContextService,
+    private readonly apiKeyAuthentication: ApiKeyAuthenticationService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -47,6 +49,30 @@ export class AuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest()
+    const presentedApiKey = request.headers["x-api-key"]
+    if (presentedApiKey !== undefined) {
+      if (request.headers.cookie || request.headers.authorization) {
+        throw new UnauthorizedException("Ambiguous authentication credentials")
+      }
+      const principal = await this.apiKeyAuthentication.authenticate(
+        Array.isArray(presentedApiKey) ? undefined : presentedApiKey,
+      )
+      request.authenticatedUserId = principal.authority.id
+      request.currentAuthority = principal.authority
+      request.apiKey = {
+        id: principal.keyId,
+        permissions: principal.permissions,
+      }
+      request.user = principal.authority
+      setRlsRequestContext({
+        workload: "API",
+        actorId: principal.authority.id,
+        actorKind: "CUSTOMER",
+        organizationId: principal.authority.organizationId,
+        organizationRole: principal.authority.customerRole,
+      })
+      return true
+    }
     const session = await auth.api.getSession({
       headers: request.headers,
     })

@@ -1,7 +1,7 @@
 /**
  * Phase 7.14 — structured-log emission regression guard for the body-cap
- * silent-failure finding (#14). Asserts that both worker fetch boundaries that
- * use readBodyWithCap emit the structured fields (reason, maxBodySize,
+ * silent-failure finding (#14). Asserts that the live worker fetch boundary
+ * using readBodyWithCap emits the structured fields (reason, maxBodySize,
  * contentLength) in their BODY_TOO_LARGE handler.
  *
  * Same defense-in-depth class as phase-7-11-safe-fetch-adoption.spec.ts.
@@ -22,10 +22,7 @@ const WORKER_SRC_DIR = join(
   "src",
 )
 
-const TARGET_FILES = [
-  join(WORKER_SRC_DIR, "delivery-verification-fetch.ts"),
-  join(WORKER_SRC_DIR, "processors", "verification.processor.ts"),
-]
+const TARGET_FILES = [join(WORKER_SRC_DIR, "delivery-verification-fetch.ts")]
 
 const REQUIRED_FIELDS = [
   'reason: "body_size_exceeded"',

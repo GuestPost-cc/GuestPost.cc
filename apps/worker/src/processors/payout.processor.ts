@@ -462,38 +462,43 @@ async function promoteStalePayoutStages(
         version: true,
         updatedAt: true,
       },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: 100,
     })
     for (const candidate of candidates) {
-      await client.$transaction(async (tx: any) => {
-        // All payout writers use the same parent-first order. This makes a
-        // delayed provider response and stale-stage recovery serialize without
-        // deadlocking or overwriting the evidence that won the race.
-        await tx.$queryRawUnsafe(
-          'SELECT "id" FROM "Withdrawal" WHERE "id" = $1 FOR UPDATE',
-          candidate.withdrawalId,
-        )
-        await tx.$queryRawUnsafe(
-          'SELECT "id" FROM "PayoutExecution" WHERE "id" = $1 AND "withdrawalId" = $2 FOR UPDATE',
-          candidate.id,
-          candidate.withdrawalId,
-        )
-        await tx.payoutExecution.updateMany({
-          where: {
-            id: candidate.id,
-            withdrawalId: candidate.withdrawalId,
-            version: candidate.version,
-            status: "PROCESSING",
-            stage: promotion.from,
-            ...promotion.referenceWhere,
-            updatedAt: candidate.updatedAt,
-          },
-          data: {
-            stage: promotion.to,
-            version: { increment: 1 },
-            errorMessage: promotion.errorMessage,
-          },
-        })
-      })
+      await client.$transaction(
+        async (tx: any) => {
+          // All payout writers use the same parent-first order. This makes a
+          // delayed provider response and stale-stage recovery serialize without
+          // deadlocking or overwriting the evidence that won the race.
+          await tx.$queryRawUnsafe(
+            'SELECT "id" FROM "Withdrawal" WHERE "id" = $1 FOR UPDATE',
+            candidate.withdrawalId,
+          )
+          await tx.$queryRawUnsafe(
+            'SELECT "id" FROM "PayoutExecution" WHERE "id" = $1 AND "withdrawalId" = $2 FOR UPDATE',
+            candidate.id,
+            candidate.withdrawalId,
+          )
+          await tx.payoutExecution.updateMany({
+            where: {
+              id: candidate.id,
+              withdrawalId: candidate.withdrawalId,
+              version: candidate.version,
+              status: "PROCESSING",
+              stage: promotion.from,
+              ...promotion.referenceWhere,
+              updatedAt: candidate.updatedAt,
+            },
+            data: {
+              stage: promotion.to,
+              version: { increment: 1 },
+              errorMessage: promotion.errorMessage,
+            },
+          })
+        },
+        { isolationLevel: "Serializable" },
+      )
     }
   }
 }

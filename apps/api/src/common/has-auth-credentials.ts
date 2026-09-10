@@ -19,10 +19,12 @@ interface HasAuthCredentialsRequest {
   headers: {
     authorization?: string
     cookie?: string
+    "x-api-key"?: string
   }
 }
 
 export function hasAuthCredentials(req: HasAuthCredentialsRequest): boolean {
+  if (/^gp_[a-f0-9]{64}$/.test(req.headers["x-api-key"] ?? "")) return true
   if (req.headers.authorization?.startsWith("Bearer ")) return true
   const cookie = req.headers.cookie
   if (typeof cookie !== "string") return false

@@ -140,6 +140,9 @@ describe("MarketplaceService search", () => {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      marketplaceReview: {
+        groupBy: jest.fn().mockResolvedValue([]),
+      },
     }
     service = new MarketplaceService(prisma, {} as any)
   })

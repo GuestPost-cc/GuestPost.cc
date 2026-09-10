@@ -587,6 +587,7 @@ model User {
   websiteImportBatches          WebsiteImportBatch[]
   publisherCompensationsDecided PublisherCompensation[]       @relation("PublisherCompensationDecider")
   moderationEvents              ModerationEvent[]             @relation("ModerationEventActor")
+  createdApiKeys                ApiKey[]                      @relation("ApiKeyCreator")
 
   @@index([userType, banned])
   @@index([suspendedByUserId])
@@ -963,6 +964,7 @@ model Website {
   @@index([managedByUserId, ownershipType])
   @@index([importBatchId])
   @@index([verificationOverrideExpiresAt])
+  @@index([verificationStatus, verificationMethod, lastVerificationCheckAt, id], map: "Website_reverify_sweep_idx")
 }
 
 // Canonical current value for each source-specific website metric. Provider
@@ -1174,6 +1176,7 @@ model Order {
   @@index([listingId])
   @@index([listingServiceId])
   @@index([fulfillmentChannel, status])
+  @@index([status, autoAcceptAt, id], map: "Order_auto_accept_sweep_idx")
 }
 
 model Campaign {
@@ -1311,6 +1314,7 @@ model OrderCancellationRequest {
   @@index([orderId, status])
   @@index([status, responseDeadlineAt])
   @@index([createdAt])
+  @@index([status, updatedAt, id], map: "OrderCancellationRequest_stall_sweep_idx")
 }
 
 // Explicit financial disposition for a post-publication publisher order that
@@ -1910,6 +1914,7 @@ model PayoutExecution {
   @@index([initiatedByUserId])
   @@index([completionActorUserId])
   @@index([cancellationActorUserId])
+  @@index([status, stage, updatedAt, id], map: "PayoutExecution_stale_stage_idx")
 }
 
 // Durable authorization for an external payout call. The database permits one
@@ -2025,19 +2030,22 @@ model PayoutBatch {
 }
 
 model ApiKey {
-  id             String    @id @default(cuid())
-  organizationId String
-  name           String
-  keyHash        String    @unique
-  permissions    Json      @default("[]")
-  lastUsedAt     DateTime?
-  expiresAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  organizationId  String
+  createdByUserId String?
+  name            String
+  keyHash         String    @unique
+  permissions     Json      @default("[]")
+  lastUsedAt      DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
+  createdBy    User?        @relation("ApiKeyCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
+  @@index([createdByUserId])
 }
 
 model ContentOrder {
@@ -2115,6 +2123,7 @@ model Report {
   format     String    @default("pdf")
   exportedAt DateTime?
   orderId    String
+  dedupKey   String?   @unique @db.VarChar(256)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -2786,6 +2795,8 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@index([action])
+  @@index([action, createdAt, id], map: "AuditLog_action_createdAt_id_idx")
+  @@index([userId, action, createdAt], map: "AuditLog_user_action_createdAt_idx")
   // Partial unique index (WHERE requestId IS NOT NULL) — see migration
   // 20260616130000_phase77_audit_request_id_column. Prisma doesn't model
   // partial predicates; this @@index mirrors the SQL constraint name.
@@ -3033,6 +3044,7 @@ model MarketplaceListing {
   // Sorting/filtering by price now hits the ListingService(availability,
   // serviceType, price) composite index.
   @@index([ownerType, status])
+  @@index([websiteId], map: "MarketplaceListing_websiteId_idx")
   @@index([activeModerationAuthority, activeModerationAction])
 }
 
@@ -3175,6 +3187,7 @@ model MarketplaceReview {
   user    User               @relation(fields: [userId], references: [id])
 
   @@index([listingId])
+  @@index([listingId, status], map: "MarketplaceReview_listingId_status_idx")
   @@index([userId])
 }
 

@@ -272,6 +272,14 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
     where: {
       status: "VERIFIED",
       autoAcceptAt: { lte: now },
+      activeDeliveryVersionId: { not: null },
+      OR: [
+        { dispute: null },
+        { dispute: { status: { notIn: ["OPEN", "UNDER_REVIEW"] } } },
+      ],
+      cancellationRequests: {
+        none: { status: { in: [...ACTIVE_CANCELLATION_REQUEST_STATUSES] } },
+      },
     },
     include: {
       dispute: { select: { status: true } },
@@ -289,6 +297,8 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
         select: { id: true, publishedUrl: true },
       },
     },
+    orderBy: [{ autoAcceptAt: "asc" }, { id: "asc" }],
+    take: 100,
   })
 
   let accepted = 0
@@ -754,11 +764,18 @@ interface ReminderResult {
 async function runReviewReminderSweep(): Promise<ReminderResult> {
   const startedAt = Date.now()
   const now = new Date()
+  const dayMs = 24 * 60 * 60 * 1000
+  const reminderDays = defaultWorkflowConfig.reminderDays
 
   const pending = await prisma.order.findMany({
     where: {
       status: "VERIFIED",
-      autoAcceptAt: { not: null },
+      OR: reminderDays.map((day) => ({
+        autoAcceptAt: {
+          gte: new Date(now.getTime() + day * dayMs),
+          lt: new Date(now.getTime() + (day + 1) * dayMs),
+        },
+      })),
     },
     select: {
       id: true,
@@ -779,7 +796,25 @@ async function runReviewReminderSweep(): Promise<ReminderResult> {
         },
       },
     },
+    orderBy: [{ autoAcceptAt: "asc" }, { id: "asc" }],
+    take: 200,
   })
+
+  const existingReminders = pending.length
+    ? await prisma.orderEvent.findMany({
+        where: {
+          orderId: { in: pending.map((order) => order.id) },
+          eventType: "REVIEW_REMINDER",
+        },
+        select: { orderId: true, metadata: true },
+      })
+    : []
+  const existingReminderKeys = new Set(
+    existingReminders.map((event) => {
+      const metadata = event.metadata as { day?: unknown } | null
+      return `${event.orderId}:${String(metadata?.day)}`
+    }),
+  )
 
   let reminded = 0
 
@@ -787,23 +822,15 @@ async function runReviewReminderSweep(): Promise<ReminderResult> {
     if (!order.autoAcceptAt) continue
 
     const daysRemaining = Math.floor(
-      (order.autoAcceptAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
+      (order.autoAcceptAt.getTime() - now.getTime()) / dayMs,
     )
 
-    const reminderDays = defaultWorkflowConfig.reminderDays
     const shouldRemindToday = reminderDays.includes(daysRemaining)
 
     if (!shouldRemindToday) continue
 
     // Check if already reminded for this day bucket
-    const existing = await prisma.orderEvent.findFirst({
-      where: {
-        orderId: order.id,
-        eventType: "REVIEW_REMINDER",
-        metadata: { path: ["day"], equals: daysRemaining },
-      },
-    })
-    if (existing) continue
+    if (existingReminderKeys.has(`${order.id}:${daysRemaining}`)) continue
 
     try {
       const communicationEventId = await prisma.$transaction(async (tx) => {
