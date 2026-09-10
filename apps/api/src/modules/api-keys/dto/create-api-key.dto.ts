@@ -1,9 +1,11 @@
+import { API_KEY_PERMISSIONS } from "@guestpost/shared"
 import {
   ArrayMaxSize,
   IsArray,
+  IsDateString,
+  IsIn,
   IsOptional,
   IsString,
-  Matches,
   MaxLength,
   MinLength,
 } from "class-validator"
@@ -15,14 +17,8 @@ import {
 // (length, format). class-validator + global ValidationPipe now enforce:
 //
 //   - name: bounded length, printable characters only
-//   - permissions: array of `domain:action` slugs (lowercase, ≤ 50 chars
-//     each), max 32 entries
-//
-// We do NOT enforce an allowlist of permission strings here — the
-// ApiKeysService stores them as opaque JSON and the consumer of the key
-// checks them against its own contract. A future iteration could add a
-// shared API_KEY_PERMISSIONS allowlist; until then, format validation
-// blocks the obvious junk + oversize attacks.
+//   - permissions: closed server-owned allowlist, max 32 entries
+//   - expiresAt: optional ISO-8601 timestamp; service enforces future/max age
 export class CreateApiKeyDto {
   @IsString()
   @MinLength(3, { message: "Name must be at least 3 characters" })
@@ -34,10 +30,13 @@ export class CreateApiKeyDto {
   @ArrayMaxSize(32)
   @IsString({ each: true })
   @MaxLength(50, { each: true })
-  @Matches(/^[a-z0-9_]+:[a-z0-9_]+$/, {
+  @IsIn(API_KEY_PERMISSIONS, {
     each: true,
-    message:
-      "Each permission must be a `domain:action` slug (lowercase letters, digits, underscores)",
+    message: "Each API key permission must be a supported permission",
   })
   permissions?: string[]
+
+  @IsOptional()
+  @IsDateString({ strict: true })
+  expiresAt?: string
 }

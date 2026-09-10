@@ -28,7 +28,6 @@ function harness(cases: CancellationStallCase[]) {
   const createdEvents: any[] = []
   const tx = {
     orderEvent: {
-      findFirst: async () => null,
       create: async ({ data }: { data: any }) => {
         createdEvents.push(data)
         return { id: `event-${createdEvents.length}` }
@@ -41,6 +40,13 @@ function harness(cases: CancellationStallCase[]) {
   const prisma = {
     orderCancellationRequest: {
       findMany: async () => cases,
+    },
+    orderEvent: { findMany: async () => [] },
+    staffMembership: {
+      findMany: async () => [
+        { userId: "staff-1", role: "OPERATIONS" },
+        { userId: "staff-2", role: "SUPER_ADMIN" },
+      ],
     },
     $transaction: async (fn: (tx: any) => Promise<unknown>) => fn(tx),
   }
@@ -107,16 +113,19 @@ test("is idempotent per day bucket via the existing order-event trail", async ()
   const { prisma, recorded, recordOutbox } = harness([stalledCase()])
   const withExisting = {
     ...prisma,
+    orderEvent: {
+      findMany: async () => [
+        { orderId: "order-1", metadata: { stalledDays: 3 } },
+      ],
+    },
     $transaction: async (fn: (tx: any) => Promise<unknown>) =>
       fn({
         ...harness([]).prisma.$transaction,
         orderEvent: {
-          findFirst: async () => ({ id: "existing-event" }),
           create: async () => {
             throw new Error("must not create duplicate trail")
           },
         },
-        staffMembership: { findMany: async () => [{ userId: "staff-1" }] },
       } as any),
   }
 
@@ -140,6 +149,10 @@ test("continues past failing cases without losing the rest", async () => {
         stalledCase({ id: "bad" }),
         stalledCase({ id: "good", orderId: "order-2" }),
       ],
+    },
+    orderEvent: { findMany: async () => [] },
+    staffMembership: {
+      findMany: async () => [{ userId: "staff-1", role: "SUPER_ADMIN" }],
     },
     $transaction: async () => {
       throw new Error("boom")
@@ -165,16 +178,15 @@ test("does not consume the reminder bucket when no eligible staff exist", async 
   const createdEvents: any[] = []
   const prisma = {
     ...base.prisma,
+    staffMembership: { findMany: async () => [] },
     $transaction: async (fn: (tx: any) => Promise<unknown>) =>
       fn({
         orderEvent: {
-          findFirst: async () => null,
           create: async ({ data }: { data: any }) => {
             createdEvents.push(data)
             return { id: "trail-1" }
           },
         },
-        staffMembership: { findMany: async () => [] },
       } as any),
   }
 

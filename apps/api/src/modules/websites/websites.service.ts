@@ -25,8 +25,10 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common"
+import * as Sentry from "@sentry/node"
 import { normalizeDomain } from "../../common/domain"
 import { PrismaService } from "../../common/prisma.service"
 import {
@@ -34,6 +36,7 @@ import {
   isMarketplaceLanguage,
   requireActiveMarketplaceCategories,
 } from "../../common/utils/marketplace-categories"
+import { resolveVerificationRateLimitConfig } from "../../common/verification-config"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
@@ -58,6 +61,8 @@ const canonicalPublisherWebsiteListingOrder = [
 
 @Injectable()
 export class WebsitesService {
+  private readonly logger = new Logger(WebsitesService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -408,8 +413,15 @@ export class WebsitesService {
         { websiteIds: [website.id], trigger: "WEBSITE_CREATED" },
         { jobId: `domain-metrics-${website.id}` },
       )
-    } catch {
+    } catch (error) {
       // Scheduled/backfill sync can recover; creation remains successful.
+      this.logger.error(
+        `Domain metric enrichment enqueue failed websiteId=${website.id}`,
+      )
+      Sentry.captureException(error, {
+        tags: { operation: "website-metrics-enqueue" },
+        extra: { websiteId: website.id },
+      })
     }
 
     return website
@@ -458,8 +470,8 @@ export class WebsitesService {
     }
 
     // ── Rate limiting (anti DNS-abuse / verification spam) ────────────────────
-    const COOLDOWN_MS = Number(process.env.VERIFY_COOLDOWN_SECONDS ?? 60) * 1000
-    const cooldownStart = new Date(Date.now() - COOLDOWN_MS)
+    const verificationLimits = resolveVerificationRateLimitConfig(process.env)
+    const cooldownStart = new Date(Date.now() - verificationLimits.cooldownMs)
     const cooldownOk = await this.prisma.website.updateMany({
       where: {
         id: website.id,
@@ -477,7 +489,6 @@ export class WebsitesService {
       })
     }
     // Per-publisher hourly cap across all their websites.
-    const HOURLY_CAP = Number(process.env.VERIFY_HOURLY_CAP ?? 20)
     const recent = await this.prisma.auditLog.count({
       where: {
         action: "WEBSITE_VERIFICATION_REQUESTED",
@@ -485,7 +496,7 @@ export class WebsitesService {
         createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
       },
     })
-    if (recent >= HOURLY_CAP) {
+    if (recent >= verificationLimits.hourlyCap) {
       throw new BadRequestException({
         code: "VERIFICATION_RATE_LIMITED",
         message: "Hourly verification request limit reached. Try again later.",

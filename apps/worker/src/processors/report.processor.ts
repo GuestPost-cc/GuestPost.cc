@@ -1,5 +1,5 @@
 import { prisma } from "@guestpost/database"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUE_JOBS, QUEUES } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { createObservableWorker } from "../lib/queue-observability"
@@ -22,61 +22,80 @@ export function createReportWorker() {
         throw new Error("Invalid job signature")
       }
 
-      const { orderId, format } = job.data
+      const { orderId, format, organizationId } = job.data
 
       switch (job.name) {
-        case "generate-pdf":
-        case "generate-csv":
-        case "export-report":
-        case "generate-report": {
-          const order = await prisma.order.findUnique({
-            where: { id: orderId },
-            include: { website: true, customer: true },
+        case QUEUE_JOBS[QUEUES.REPORT].GENERATE_PDF:
+        case QUEUE_JOBS[QUEUES.REPORT].GENERATE_CSV:
+        case QUEUE_JOBS[QUEUES.REPORT].EXPORT_REPORT: {
+          if (typeof organizationId !== "string" || !organizationId) {
+            throw new Error("Report job is missing organization scope")
+          }
+          const resolvedFormat =
+            job.name === QUEUE_JOBS[QUEUES.REPORT].GENERATE_CSV
+              ? "csv"
+              : job.name === QUEUE_JOBS[QUEUES.REPORT].GENERATE_PDF
+                ? "pdf"
+                : format === "csv"
+                  ? "csv"
+                  : "pdf"
+          const order = await prisma.order.findFirst({
+            where: { id: orderId, organizationId },
+            select: {
+              id: true,
+              type: true,
+              status: true,
+              targetUrl: true,
+              publishedUrl: true,
+              anchorText: true,
+              fulfillmentChannel: true,
+              listingId: true,
+              listingServiceId: true,
+              turnaroundDays: true,
+              publishedAt: true,
+              listingService: { select: { price: true } },
+            },
           })
           if (!order) throw new Error(`Order ${orderId} not found`)
-
-          // Phase 6: pull the per-service unitPrice off the snapshotted
-          // ListingService so the export carries it without re-deriving
-          // from a possibly-edited live row.
-          let unitPrice: any = null
-          if (order.listingServiceId) {
-            const ls = await prisma.listingService.findUnique({
-              where: { id: order.listingServiceId },
-              select: { price: true },
-            })
-            unitPrice = ls?.price ?? null
+          const dedupKey = `generated:${orderId}:${resolvedFormat}`
+          const reportData = {
+            orderId: order.id,
+            type: order.type,
+            status: order.status,
+            targetUrl: order.targetUrl,
+            publishedUrl: order.publishedUrl,
+            anchorText: order.anchorText,
+            fulfillmentChannel: order.fulfillmentChannel ?? null,
+            listingId: order.listingId ?? null,
+            listingServiceId: order.listingServiceId ?? null,
+            serviceType: order.type,
+            unitPrice: order.listingService?.price
+              ? String(order.listingService.price)
+              : null,
+            turnaroundDays: order.turnaroundDays ?? null,
+            publishedAt: order.publishedAt,
+            campaignProgress: "100%",
           }
 
-          await prisma.report.create({
-            data: {
+          await prisma.report.upsert({
+            where: { dedupKey },
+            create: {
               orderId,
+              dedupKey,
               type: "generated",
-              format: format ?? "pdf",
+              format: resolvedFormat,
               exportedAt: new Date(),
-              data: {
-                orderId: order.id,
-                type: order.type,
-                status: order.status,
-                targetUrl: order.targetUrl,
-                publishedUrl: order.publishedUrl,
-                anchorText: order.anchorText,
-                website: order.website?.url,
-                publisher: order.website?.publisherId,
-                ownershipType: order.website?.ownershipType,
-                fulfillmentChannel: order.fulfillmentChannel ?? null,
-                // Phase 6 reporting snapshot trio (per-service truth).
-                listingId: order.listingId ?? null,
-                listingServiceId: order.listingServiceId ?? null,
-                serviceType: order.type,
-                unitPrice: unitPrice ? String(unitPrice) : null,
-                turnaroundDays: order.turnaroundDays ?? null,
-                publishedAt: order.publishedAt,
-                campaignProgress: "100%",
-              },
+              data: reportData,
+            },
+            update: {
+              type: "generated",
+              format: resolvedFormat,
+              exportedAt: new Date(),
+              data: reportData,
             },
           })
 
-          logger.info("report generated", { orderId, format: format ?? "pdf" })
+          logger.info("report generated", { orderId, format: resolvedFormat })
           break
         }
         default:

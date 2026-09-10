@@ -16,7 +16,6 @@ export const WORKER_FACTORY_NAMES = [
   "email",
   "report",
   "notification",
-  "verification",
   "payout",
   "reconciliation",
   "website-verification",
@@ -70,7 +69,6 @@ const ALL_WORKERS = [
   "email",
   "report",
   "notification",
-  "verification",
   "payout",
   "reconciliation",
   "website-verification",
@@ -93,7 +91,6 @@ const REALTIME_WORKERS = [
 
 const ON_DEMAND_WORKERS = [
   "report",
-  "verification",
   "payout",
   "publisher-trust",
   "domain-metrics",

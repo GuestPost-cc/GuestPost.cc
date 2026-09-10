@@ -30,6 +30,7 @@ export type ReportMinAggregateOutputType = {
   format: string | null
   exportedAt: Date | null
   orderId: string | null
+  dedupKey: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -40,6 +41,7 @@ export type ReportMaxAggregateOutputType = {
   format: string | null
   exportedAt: Date | null
   orderId: string | null
+  dedupKey: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -51,6 +53,7 @@ export type ReportCountAggregateOutputType = {
   format: number
   exportedAt: number
   orderId: number
+  dedupKey: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -63,6 +66,7 @@ export type ReportMinAggregateInputType = {
   format?: true
   exportedAt?: true
   orderId?: true
+  dedupKey?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -73,6 +77,7 @@ export type ReportMaxAggregateInputType = {
   format?: true
   exportedAt?: true
   orderId?: true
+  dedupKey?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -84,6 +89,7 @@ export type ReportCountAggregateInputType = {
   format?: true
   exportedAt?: true
   orderId?: true
+  dedupKey?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -168,6 +174,7 @@ export type ReportGroupByOutputType = {
   format: string
   exportedAt: Date | null
   orderId: string
+  dedupKey: string | null
   createdAt: Date
   updatedAt: Date
   _count: ReportCountAggregateOutputType | null
@@ -200,6 +207,7 @@ export type ReportWhereInput = {
   format?: Prisma.StringFilter<"Report"> | string
   exportedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
   orderId?: Prisma.StringFilter<"Report"> | string
+  dedupKey?: Prisma.StringNullableFilter<"Report"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
@@ -212,6 +220,7 @@ export type ReportOrderByWithRelationInput = {
   format?: Prisma.SortOrder
   exportedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  dedupKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   order?: Prisma.OrderOrderByWithRelationInput
@@ -219,6 +228,7 @@ export type ReportOrderByWithRelationInput = {
 
 export type ReportWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  dedupKey?: string
   AND?: Prisma.ReportWhereInput | Prisma.ReportWhereInput[]
   OR?: Prisma.ReportWhereInput[]
   NOT?: Prisma.ReportWhereInput | Prisma.ReportWhereInput[]
@@ -230,7 +240,7 @@ export type ReportWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
-}, "id">
+}, "id" | "dedupKey">
 
 export type ReportOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -239,6 +249,7 @@ export type ReportOrderByWithAggregationInput = {
   format?: Prisma.SortOrder
   exportedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  dedupKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.ReportCountOrderByAggregateInput
@@ -256,6 +267,7 @@ export type ReportScalarWhereWithAggregatesInput = {
   format?: Prisma.StringWithAggregatesFilter<"Report"> | string
   exportedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Report"> | Date | string | null
   orderId?: Prisma.StringWithAggregatesFilter<"Report"> | string
+  dedupKey?: Prisma.StringNullableWithAggregatesFilter<"Report"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Report"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Report"> | Date | string
 }
@@ -266,6 +278,7 @@ export type ReportCreateInput = {
   data?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   format?: string
   exportedAt?: Date | string | null
+  dedupKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutReportsInput
@@ -278,6 +291,7 @@ export type ReportUncheckedCreateInput = {
   format?: string
   exportedAt?: Date | string | null
   orderId: string
+  dedupKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -288,6 +302,7 @@ export type ReportUpdateInput = {
   data?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   format?: Prisma.StringFieldUpdateOperationsInput | string
   exportedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutReportsNestedInput
@@ -300,6 +315,7 @@ export type ReportUncheckedUpdateInput = {
   format?: Prisma.StringFieldUpdateOperationsInput | string
   exportedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -311,6 +327,7 @@ export type ReportCreateManyInput = {
   format?: string
   exportedAt?: Date | string | null
   orderId: string
+  dedupKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -321,6 +338,7 @@ export type ReportUpdateManyMutationInput = {
   data?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   format?: Prisma.StringFieldUpdateOperationsInput | string
   exportedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -332,6 +350,7 @@ export type ReportUncheckedUpdateManyInput = {
   format?: Prisma.StringFieldUpdateOperationsInput | string
   exportedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -353,6 +372,7 @@ export type ReportCountOrderByAggregateInput = {
   format?: Prisma.SortOrder
   exportedAt?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  dedupKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -363,6 +383,7 @@ export type ReportMaxOrderByAggregateInput = {
   format?: Prisma.SortOrder
   exportedAt?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  dedupKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -373,6 +394,7 @@ export type ReportMinOrderByAggregateInput = {
   format?: Prisma.SortOrder
   exportedAt?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
+  dedupKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -425,6 +447,7 @@ export type ReportCreateWithoutOrderInput = {
   data?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   format?: string
   exportedAt?: Date | string | null
+  dedupKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -435,6 +458,7 @@ export type ReportUncheckedCreateWithoutOrderInput = {
   data?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   format?: string
   exportedAt?: Date | string | null
+  dedupKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -475,6 +499,7 @@ export type ReportScalarWhereInput = {
   format?: Prisma.StringFilter<"Report"> | string
   exportedAt?: Prisma.DateTimeNullableFilter<"Report"> | Date | string | null
   orderId?: Prisma.StringFilter<"Report"> | string
+  dedupKey?: Prisma.StringNullableFilter<"Report"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Report"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Report"> | Date | string
 }
@@ -485,6 +510,7 @@ export type ReportCreateManyOrderInput = {
   data?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   format?: string
   exportedAt?: Date | string | null
+  dedupKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -495,6 +521,7 @@ export type ReportUpdateWithoutOrderInput = {
   data?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   format?: Prisma.StringFieldUpdateOperationsInput | string
   exportedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -505,6 +532,7 @@ export type ReportUncheckedUpdateWithoutOrderInput = {
   data?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   format?: Prisma.StringFieldUpdateOperationsInput | string
   exportedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -515,6 +543,7 @@ export type ReportUncheckedUpdateManyWithoutOrderInput = {
   data?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   format?: Prisma.StringFieldUpdateOperationsInput | string
   exportedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -528,6 +557,7 @@ export type ReportSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   format?: boolean
   exportedAt?: boolean
   orderId?: boolean
+  dedupKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
@@ -540,6 +570,7 @@ export type ReportSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   format?: boolean
   exportedAt?: boolean
   orderId?: boolean
+  dedupKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
@@ -552,6 +583,7 @@ export type ReportSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   format?: boolean
   exportedAt?: boolean
   orderId?: boolean
+  dedupKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
@@ -564,11 +596,12 @@ export type ReportSelectScalar = {
   format?: boolean
   exportedAt?: boolean
   orderId?: boolean
+  dedupKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type ReportOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "data" | "format" | "exportedAt" | "orderId" | "createdAt" | "updatedAt", ExtArgs["result"]["report"]>
+export type ReportOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "data" | "format" | "exportedAt" | "orderId" | "dedupKey" | "createdAt" | "updatedAt", ExtArgs["result"]["report"]>
 export type ReportInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
 }
@@ -591,6 +624,7 @@ export type $ReportPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     format: string
     exportedAt: Date | null
     orderId: string
+    dedupKey: string | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["report"]>
@@ -1023,6 +1057,7 @@ export interface ReportFieldRefs {
   readonly format: Prisma.FieldRef<"Report", 'String'>
   readonly exportedAt: Prisma.FieldRef<"Report", 'DateTime'>
   readonly orderId: Prisma.FieldRef<"Report", 'String'>
+  readonly dedupKey: Prisma.FieldRef<"Report", 'String'>
   readonly createdAt: Prisma.FieldRef<"Report", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Report", 'DateTime'>
 }
