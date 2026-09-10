@@ -87,6 +87,32 @@ describe("SettlementIntegrityGroup enum", () => {
 })
 
 describe("runReconciliation with mock prisma", () => {
+  it("opens exactly one repeatable-read snapshot for extended transaction clients", async () => {
+    const transactionClient = {
+      ...mockPrisma(),
+      $transaction: jest
+        .fn()
+        .mockRejectedValue(new Error("nested transaction must not run")),
+    }
+    const prisma = {
+      $transaction: jest.fn(
+        async (work: (tx: typeof transactionClient) => unknown) =>
+          work(transactionClient),
+      ),
+    }
+
+    await expect(runReconciliation(prisma as any)).resolves.toMatchObject({
+      ok: true,
+    })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "RepeatableRead",
+      maxWait: 5_000,
+      timeout: 120_000,
+    })
+    expect(transactionClient.$transaction).not.toHaveBeenCalled()
+  })
+
   it("returns ok=true with empty data", async () => {
     const prisma = mockPrisma()
     const report = await runReconciliation(prisma as any)
