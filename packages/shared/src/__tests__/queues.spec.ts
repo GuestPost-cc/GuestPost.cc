@@ -1,5 +1,11 @@
 import { deliveryVerificationJobId, QUEUE_JOBS, QUEUES } from "../queues"
 
+describe("report queue compatibility", () => {
+  it("retains the scoped legacy job name during rolling deployments", () => {
+    expect(QUEUE_JOBS[QUEUES.REPORT].LEGACY_GENERATE).toBe("generate-report")
+  })
+})
+
 describe("settlement queue routing", () => {
   it("keeps auto-approve and auto-release on distinct BullMQ queues", () => {
     expect(QUEUES.SETTLEMENT_RELEASE).not.toBe(QUEUES.SETTLEMENT)
