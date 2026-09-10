@@ -8,7 +8,7 @@
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js 15, React 19, TypeScript, Tailwind, TanStack Query, Radix UI |
+| Frontend | Next.js 16, React 19, TypeScript 6, Tailwind, TanStack Query, Radix UI |
 | Backend | NestJS, Prisma ORM |
 | Database | PostgreSQL |
 | Queue/Cache | Redis, BullMQ |
@@ -140,24 +140,29 @@ const listing = await api.marketplace.getListing(slug)
 
 ---
 
-## Module Inventory (14 modules)
+## Module Inventory (19 modules)
 
 | Module | Status | Purpose |
 |--------|--------|---------|
 | auth | Complete | Session management via better-auth |
+| active-context | Complete | Interactive tenant/publisher selection |
 | identity | Complete | Org/team/user management |
 | marketplace | Complete | Listings, search, categories, reviews |
 | orders | Complete | Full order lifecycle |
 | campaigns | Complete | Order grouping |
 | billing | Complete | Wallet, deposits, withdrawals |
+| communications | Complete | Durable transactional communication outbox |
+| integrations | Complete | Publisher/platform integration lifecycle |
+| notifications | Complete | In-app notification delivery |
 | settlements | Complete | Publisher payment workflow |
 | publisher-payouts | Complete | Balance, withdrawals |
-| reporting | Partial | Analytics endpoints |
+| reporting | Complete | Bounded analytics and export endpoints |
 | support | Complete | Ticket system |
 | api-keys | Complete | Organization API access |
 | admin | Complete | Staff admin operations |
 | audit | Complete | Action logging |
-| queues | Partial | BullMQ setup |
+| queues | Complete | Signed BullMQ jobs and worker wake-up |
+| websites | Complete | Website ownership and metric lifecycle |
 
 ---
 
@@ -174,9 +179,8 @@ const listing = await api.marketplace.getListing(slug)
 - Marketing website
 
 ### In Progress
-- Worker/queue processing (stubbed)
-- Email notifications
-- Reporting UI
+- Broader multi-actor browser coverage
+- Reporting UI expansion
 
 ### Not Started
 - WebSocket notifications

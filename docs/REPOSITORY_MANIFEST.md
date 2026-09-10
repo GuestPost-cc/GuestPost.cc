@@ -6,14 +6,14 @@
 |----------|-------|
 | **Name** | GuestPost Platform |
 | **Package manager** | pnpm 11.5.1 |
-| **Node.js** | 22+ |
-| **TypeScript** | 5.7 |
-| **Framework** | Next.js 15 (apps), NestJS (API) |
+| **Node.js** | 22.22+ (`.node-version` and CI) |
+| **TypeScript** | 6.0 |
+| **Framework** | Next.js 16 (apps), NestJS 11 (API) |
 | **Database** | PostgreSQL 17 via Prisma |
 | **Cache** | Redis 7 |
-| **Task orchestrator** | Turborepo 2.9 |
+| **Task orchestrator** | Turborepo 2.10 |
 | **Formatter/linter** | Biome 2.5 |
-| **Legacy linter** | ESLint 9 (React Hooks only) |
+| **Secondary linter** | ESLint 10 (all apps, packages, scripts, and e2e) |
 | **CI** | GitHub Actions |
 
 ## Directory Structure
