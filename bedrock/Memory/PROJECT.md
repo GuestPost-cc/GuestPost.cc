@@ -26,6 +26,9 @@ updated: 2026-09-12
 - Security updates bypass routine cooldowns. CI requires dependency review,
   the resolved-version compatibility policy, a production audit, migrations,
   tests, and all production builds.
+- CI's isolated S3-compatible E2E service uses a digest-pinned MinIO image from
+  MinIO's official Quay registry; do not switch it back to the unavailable
+  Docker Hub alias or replace the digest with an unpinned tag.
 - Current transitive advisory floors include `brace-expansion@5.0.8` for the
   5.x line, `js-yaml@3.15.1` and `js-yaml@4.3.1` for the two development-tool
   major lines, and `valibot@1.4.2`. These are temporary workspace overrides
