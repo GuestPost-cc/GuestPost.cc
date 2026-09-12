@@ -45,6 +45,9 @@ hardening findings: direct API-key clients now enforce HTTPS except on loopback,
 and concurrent-index retries fail closed on an invalid remnant with an exact
 valid/invalid/absent recovery procedure. Focused regression coverage passes;
 the final combined GitHub CI rerun on this last follow-up is the remaining gate.
+The first rerun passed every code, migration, RLS, test, and production-build
+stage before Docker Hub stopped serving the pinned MinIO digest; CI now pulls
+that exact verified digest from MinIO's official Quay registry.
 
 ## Full staged application RLS
 
