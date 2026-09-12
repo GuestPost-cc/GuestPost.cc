@@ -1,7 +1,7 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-10
+updated: 2026-09-12
 ---
 
 # Current focus
@@ -27,21 +27,24 @@ remain stored but cannot authenticate; rotate them after the migration. No RLS
 activation or hosted database change is part of this branch.
 
 Local validation is green for repository policy/format/lint/type/docs/dependency
-checks, Prisma validation and generation, all 1,854 API unit tests, all 480
-shared tests, all 127 API-client tests, and the focused worker runtime/sweep
+checks, Prisma validation and generation, all 1,858 API unit tests, all 482
+shared tests, all 131 API-client tests, and the focused worker runtime/sweep
 tests. Nest, worker, shared, database, API-client, and UI TypeScript build stages
-pass. Full Next.js production bundling is deferred to GitHub CI because
-Turbopack cannot bind its internal IPC port in the local execution sandbox.
+pass. GitHub run 34481816022 passed the complete migration, unit, integration,
+RLS, package, UI, production-build, and browser matrix on commit `37aa2bd`.
 
-PR #122's completed CodeRabbit and Codex reviews produced nine valid findings.
+PR #122's initial CodeRabbit and Codex reviews produced nine valid findings.
 The follow-up excludes completed reminders before bounded selection; rotates
 cancellation and website sweeps across runs; reauthorizes staff recipients at
 the write boundary; preserves scoped legacy report jobs; filters public report
 events before truncation; keeps API keys on the anonymous rate tier until
 authentication; fences API-client keys to the configured origin; labels the
 verification CSV as a current-page export; and moves new indexes/FK validation
-to online, staged migrations. The review fixes have focused regression
-coverage; the final combined GitHub CI rerun is the remaining merge gate.
+to online, staged migrations. CodeRabbit's incremental review added two valid
+hardening findings: direct API-key clients now enforce HTTPS except on loopback,
+and concurrent-index retries fail closed on an invalid remnant with an exact
+valid/invalid/absent recovery procedure. Focused regression coverage passes;
+the final combined GitHub CI rerun on this last follow-up is the remaining gate.
 
 ## Full staged application RLS
 
