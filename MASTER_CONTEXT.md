@@ -88,8 +88,14 @@ Order verified → Settlement auto-created → 7-day window → Approved → Bal
 
 ### Authentication
 - Session cookies via better-auth
-- `AuthGuard` populates `request.user` with full context
-- Multi-tenant: `user.organizationId`, `user.publisherId`, `user.staffRole`
+- Organization automation may use creator-bound `X-API-Key` credentials only
+  on explicitly permissioned order/report routes
+- `AuthGuard` verifies the credential; `CurrentAuthorityGuard` reloads durable
+  customer, publisher, or staff authority before the handler
+- Tenant context is transaction-scoped for PostgreSQL RLS; route guards,
+  service checks, and response projections remain mandatory
+- Canonical API-key and RLS contracts: `docs/API_KEY_SECURITY.md` and
+  `docs/RLS_ROLLOUT.md`
 
 ### Key Endpoints
 
@@ -98,9 +104,11 @@ Order verified → Settlement auto-created → 7-day window → Approved → Bal
 | marketplace | GET /listings, GET /listings/:slug, GET /categories, POST /favorites |
 | orders | POST /, GET /, GET /:id, PATCH /:id/status |
 | campaigns | POST /, GET /, GET /:id, PUT /:id |
-| billing | GET /wallet, POST /deposit, POST /withdrawal |
+| billing | GET /wallet, POST /wallet/:id/checkout, GET /transactions |
 | publishers | POST /, GET /:id, POST /:id/websites |
-| admin | GET /users, GET /orders, GET /settlements |
+| reports | GET /reports, GET /reports/:id, GET /reports/orders/:id, GET /reports/campaigns/:id, POST /reports/orders/:id/generate |
+| API keys | POST /api-keys, GET /api-keys, DELETE /api-keys/:id (customer owner session only) |
+| admin | GET /users, GET /orders, GET /settlements, GET /websites/verification |
 
 ### API Client Usage
 ```typescript
@@ -200,9 +208,14 @@ const listing = await api.marketplace.getListing(slug)
 1. **Prisma**: Always add reverse relation fields on both models
 2. **API Client**: Returns JSON directly (no `.data` wrapper)
 3. **TanStack Table**: Use flexRender for headers, not string cast
-4. **Multi-tenancy**: Filter by `organizationId` for all customer data
-5. **Dev mode**: Rate limiting disabled in `main.ts`
-6. **API URL**: `NEXT_PUBLIC_API_URL=http://localhost:4000` + `/api/v1` in api.ts
+4. **Multi-tenancy**: Use explicit tenant selectors and audience projections;
+   RLS is defence in depth and does not mask columns
+5. **Rate limiting**: Environment-aware limits remain enabled in development
+   at higher thresholds; API-key syntax stays anonymous until authenticated
+6. **API URL**: Browser sessions use the configured API origin. API-key clients
+   require that exact origin and HTTPS, except explicit loopback development
+7. **Large queries**: Filter before caps, page deterministically, aggregate or
+   batch relations, and follow `docs/QUERY_AND_WORKER_HARDENING.md`
 
 ---
 

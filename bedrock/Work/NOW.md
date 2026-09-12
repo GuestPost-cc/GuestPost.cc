@@ -1,7 +1,7 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-12
+updated: 2026-09-13
 ---
 
 # Current focus
@@ -46,8 +46,16 @@ and concurrent-index retries fail closed on an invalid remnant with an exact
 valid/invalid/absent recovery procedure. Focused regression coverage passes;
 the final combined GitHub CI rerun on this last follow-up is the remaining gate.
 The first rerun passed every code, migration, RLS, test, and production-build
-stage before Docker Hub stopped serving the pinned MinIO digest; CI now pulls
-that exact verified digest from MinIO's official Quay registry.
+stage before Docker Hub stopped serving the pinned MinIO digest. CI now pulls
+that exact verified digest from MinIO's official Quay registry, and final run
+34708411250 passed the complete matrix on commit `1010833`.
+
+Canonical documentation now records the API-key lifecycle, permission/route
+matrix, same-origin HTTPS transport boundary, bounded request queries, N+1
+batching, sweep cursor fairness, report-queue compatibility, and the exact CI
+and RLS assurance boundaries. Stale session-only authentication, gateway-only
+rate-limit, disabled-development-limit, and generic verification-worker claims
+were removed.
 
 ## Full staged application RLS
 
@@ -179,9 +187,9 @@ again before merge.
 
 ## Next actions
 
-1. Commit and push `codex/security-query-hardening`, open it against
-   `codex/staged-api-key-rls`, and require the complete GitHub matrix plus review
-   resolution before merge. Retarget it to `main` only after PR #116 lands.
+1. Keep PR #122 based on `codex/staged-api-key-rls`, require a fresh complete
+   GitHub matrix for its documentation head, and retarget it to `main` only
+   after PR #116 lands.
 2. Keep PR #116 unchanged and keep hosted databases unchanged. After merge,
    rehearse the canonical
    lockout-safe sequence from `docs/RLS_ROLLOUT.md` on a current staging clone,

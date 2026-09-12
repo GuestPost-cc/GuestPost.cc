@@ -40,6 +40,14 @@
 | `lint-staged.config.js` | Pre-commit hook tasks |
 | `docs/REPOSITORY_CONTRACT.md` | Repository constitution |
 | `docs/TOOLCHAIN.md` | Toolchain division of labour |
+| `docs/SECURITY_GUIDELINES.md` | Security controls and review principles |
+| `docs/API_KEY_SECURITY.md` | API-key lifecycle, permissions, and transport contract |
+| `docs/RLS_ROLLOUT.md` | Full RLS boundary and lockout-safe activation |
+| `docs/QUERY_AND_WORKER_HARDENING.md` | Bounded queries, N+1 prevention, and sweep fairness |
+| `docs/WORKER_ARCHITECTURE.md` | Worker lanes, scheduled tasks, and operations |
+| `docs/TESTING.md` | Local test commands and assurance boundaries |
+| `docs/CI.md` | Authoritative GitHub gate and deployment boundary |
+| `docs/PRODUCTION_RUNBOOK.md` | Runtime configuration and incident procedures |
 
 ## Workspace packages
 

@@ -20,18 +20,40 @@
 
 ## API security
 
-- All endpoints validate input via Zod schemas or DTOs.
-- Authentication: Better Auth (session + JWT).
-- Authorization: role-based access control (SUPER_ADMIN, OPERATIONS,
-  OWNER, MEMBER).
-- Rate limiting: applied at the API gateway / reverse proxy level.
+- HTTP inputs must use bounded DTO/schema validation; service validation must
+  also protect direct and background callers where the same rule applies.
+- Authentication: Better Auth sessions for people; creator-bound,
+  organization-scoped API keys only on explicitly opted-in automation routes.
+- Authorization: live customer, publisher, and staff authority is resolved on
+  each protected request, then enforced by guards, service checks, explicit
+  projections, and PostgreSQL RLS when enabled.
+- API-key requests reject mixed cookie/Authorization credentials, remain on
+  the anonymous rate-limit tier until authenticated, and require exact route
+  permissions. See `docs/API_KEY_SECURITY.md`.
+- Rate limiting: environment-aware in-process limits cover auth, anonymous and
+  authenticated API traffic, marketplace, admin, billing, webhooks, and
+  verification triggers. The gateway is an additional layer, not the only one.
 - CORS: configured per-environment, production allows only known origins.
 
 ## Web security
 
 - Content-Security-Policy headers.
 - XSS protection via `isomorphic-dompurify` for user-generated content.
-- CSRF protection via SameSite cookies and token-based auth.
+- Cookie-authenticated mutations use SameSite cookies, trusted Origin/Referer
+  checks, Fetch Metadata checks, and the non-simple `X-CSRF-Protection` header.
+  API-key clients omit cookies and follow the same-origin HTTPS transport
+  contract documented in `docs/API_KEY_SECURITY.md`.
+
+## Data and background-work boundaries
+
+- RLS covers customer, publisher, staff, auth, webhook, worker, and catalog
+  workloads, but is activated only through the guarded procedure in
+  `docs/RLS_ROLLOUT.md`.
+- RLS is row isolation, not column masking. Public and cross-role responses
+  must continue using explicit field selections and audience projections.
+- Bounded query and sweep rules, including N+1 prevention, deterministic
+  paging, cursor fairness, and write-boundary reauthorization, are in
+  `docs/QUERY_AND_WORKER_HARDENING.md`.
 
 ## Dependency security
 
