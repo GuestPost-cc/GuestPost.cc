@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-09-12
+updated: 2026-09-13
 ---
 
 # GuestPost.cc
@@ -74,6 +74,14 @@ historical audit batches.
 
 ## Key Patterns
 
+- Canonical security/query documentation is split by concern:
+  `docs/API_KEY_SECURITY.md` owns the API-key lifecycle, permission, and
+  transport contract; `docs/RLS_ROLLOUT.md` owns database isolation and
+  lockout-safe activation; `docs/QUERY_AND_WORKER_HARDENING.md` owns bounded
+  paging, N+1 prevention, and recurring-sweep fairness. Keep summaries in
+  `MASTER_CONTEXT.md`, `docs/SECURITY_GUIDELINES.md`, and
+  `docs/WORKER_ARCHITECTURE.md` linked to those sources rather than duplicating
+  divergent rules.
 - User communications use a PostgreSQL-backed transactional outbox rather than
   sending mail inside request transactions. `CommunicationEvent` is the
   idempotent domain-event boundary; per-recipient `CommunicationDelivery` rows

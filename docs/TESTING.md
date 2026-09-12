@@ -76,6 +76,43 @@ and Super Admin sessions. A real multi-actor support journey remains a paid-
 launch acceptance gate; its required assertions are listed in
 `docs/SUPPORT_MESSAGING.md`.
 
+## Security and query-hardening gates
+
+Run these focused checks while changing API-key, reporting, bounded-query, or
+worker-sweep behavior:
+
+```bash
+# API-key lifecycle, authentication, current authority, permissions, and rate tier
+pnpm --filter @guestpost/api exec jest --selectProjects=unit --runInBand \
+  api-keys api-key-authentication current-authority has-auth-credentials
+
+# Reporting projection/pagination and migration contract
+pnpm --filter @guestpost/api exec jest --selectProjects=unit --runInBand \
+  reporting security-query-hardening-migration
+
+# Website verification and marketplace query behavior
+pnpm --filter @guestpost/api exec jest --selectProjects=unit --runInBand \
+  dns-verification verification-hardening marketplace-search \
+  marketplace-domain-availability
+
+# Worker fairness, deduplication, authorization, and legacy report compatibility
+pnpm --filter @guestpost/worker exec tsx --test \
+  test/cancellation-stall-nudge.spec.ts test/review-reminder-query.spec.ts \
+  test/report-job.spec.ts test/worker-runtime.spec.ts
+
+# API-client header, cookie omission, same-origin, and HTTPS contract
+pnpm --filter @guestpost/api-client exec jest --runInBand csrf-header
+```
+
+API-key RLS isolation requires the disposable PostgreSQL template and the API
+integration project. The authoritative GitHub workflow also provisions and
+activates all application RLS roles in its own destructive database, runs
+`scripts/test-full-rls-boundary.sql`, reapplies role provisioning, and runs the
+matrix again. Never point that script at a shared or hosted database.
+
+The required edge cases and query-review checklist are documented in
+`docs/API_KEY_SECURITY.md` and `docs/QUERY_AND_WORKER_HARDENING.md`.
+
 ## Before committing
 
 `pnpm check` validates the gate (Biome + ESLint + typecheck + depcruise).

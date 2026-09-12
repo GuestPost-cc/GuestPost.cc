@@ -81,6 +81,10 @@ as ambiguous credentials. Revoking or expiring a key, banning its creator, or
 removing the creator's ownership takes effect on the next request without
 changing the owner's interactive active context.
 
+The closed permission catalog, route matrix, management endpoints, rate-limit
+classification, and same-origin HTTPS client rules are maintained in
+`docs/API_KEY_SECURITY.md`.
+
 ## Runtime context and pool safety
 
 The API initializes an `AsyncLocalStorage` scope before global guards. Better
