@@ -55,7 +55,9 @@ matrix, same-origin HTTPS transport boundary, bounded request queries, N+1
 batching, sweep cursor fairness, report-queue compatibility, and the exact CI
 and RLS assurance boundaries. Stale session-only authentication, gateway-only
 rate-limit, disabled-development-limit, and generic verification-worker claims
-were removed.
+were removed. Documentation commit `abc89f1` passed the complete GitHub matrix
+in run 34722318918, including migrations, integration tests, the destructive
+RLS boundary, packages, production builds, and browser journeys.
 
 ## Full staged application RLS
 
@@ -187,9 +189,9 @@ again before merge.
 
 ## Next actions
 
-1. Keep PR #122 based on `codex/staged-api-key-rls`, require a fresh complete
-   GitHub matrix for its documentation head, and retarget it to `main` only
-   after PR #116 lands.
+1. Keep PR #122 based on `codex/staged-api-key-rls` and retarget it to `main`
+   only after PR #116 lands. Preserve the complete green workflow evidence and
+   resolved review state through that sequence.
 2. Keep PR #116 unchanged and keep hosted databases unchanged. After merge,
    rehearse the canonical
    lockout-safe sequence from `docs/RLS_ROLLOUT.md` on a current staging clone,
