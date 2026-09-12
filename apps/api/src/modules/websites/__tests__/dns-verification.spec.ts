@@ -287,21 +287,19 @@ describe("runWebsiteReverifySweep", () => {
     verificationToken: "tok",
     activeVerifiedToken: "tok",
     verificationStatus: "VERIFIED",
+    verificationMethod: "DNS_TXT",
+    verificationOverrideExpiresAt: null,
+    verifiedByUserId: null,
     verificationVersion: 3,
     consecutiveFailures: 0,
+    publisher: { organizationId: "org1" },
   }
 
   beforeEach(() => {
     prisma = {
       website: {
-        findMany: jest.fn().mockResolvedValue([{ id: "w1" }]),
-        findUnique: jest.fn().mockResolvedValue({ ...verifiedSite }),
+        findMany: jest.fn().mockResolvedValue([{ ...verifiedSite }]),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      },
-      publisher: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: "pub1", organizationId: "org1" }),
       },
       publisherMembership: {
         findMany: jest.fn().mockResolvedValue([{ userId: "u1" }]),
@@ -348,7 +346,17 @@ describe("runWebsiteReverifySweep", () => {
     expect(prisma.website.findMany).toHaveBeenCalledWith({
       where: expect.objectContaining({
         OR: expect.arrayContaining([
-          { verificationMethod: "SUPER_ADMIN_OVERRIDE" },
+          expect.objectContaining({
+            verificationMethod: "SUPER_ADMIN_OVERRIDE",
+            OR: [
+              { verificationOverrideExpiresAt: null },
+              {
+                verificationOverrideExpiresAt: {
+                  lte: new Date("2026-07-31T00:00:00Z"),
+                },
+              },
+            ],
+          }),
           expect.objectContaining({
             AND: expect.arrayContaining([
               expect.objectContaining({
@@ -365,16 +373,47 @@ describe("runWebsiteReverifySweep", () => {
           }),
         ]),
       }),
-      select: { id: true },
+      orderBy: { id: "asc" },
+      take: 1000,
+      select: expect.objectContaining({
+        id: true,
+        publisher: { select: { organizationId: true } },
+      }),
     })
+  })
+
+  it("continues a capped sweep after the prior run's website cursor", async () => {
+    prisma.website.findMany.mockResolvedValue([
+      { ...verifiedSite, id: "w2" },
+      { ...verifiedSite, id: "w3" },
+    ])
+
+    const result = await runWebsiteReverifySweep({
+      prisma,
+      checkDns: jest.fn().mockRejectedValue(new Error("temporary outage")),
+      sweepMaxSites: 2,
+      sweepStartAfterId: "w1",
+    })
+
+    expect(prisma.website.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: { gt: "w1" } }),
+        orderBy: { id: "asc" },
+        take: 2,
+      }),
+    )
+    expect(result.nextCursorId).toBe("w3")
+    expect(prisma.website.updateMany).not.toHaveBeenCalled()
   })
 
   it("REVOKES + enforces + notifies on the 3rd consecutive miss", async () => {
     // 2 prior failures -> this miss is the 3rd, which revokes.
-    prisma.website.findUnique.mockResolvedValue({
-      ...verifiedSite,
-      consecutiveFailures: 2,
-    })
+    prisma.website.findMany.mockResolvedValue([
+      {
+        ...verifiedSite,
+        consecutiveFailures: 2,
+      },
+    ])
     const checkDns = jest.fn().mockResolvedValue({
       found: false,
       matchedHost: null,
@@ -428,11 +467,13 @@ describe("runWebsiteReverifySweep", () => {
   })
 
   it("does not query DNS while a temporary override is unexpired", async () => {
-    prisma.website.findUnique.mockResolvedValue({
-      ...verifiedSite,
-      verificationMethod: "SUPER_ADMIN_OVERRIDE",
-      verificationOverrideExpiresAt: new Date("2026-08-01T00:00:00Z"),
-    })
+    prisma.website.findMany.mockResolvedValue([
+      {
+        ...verifiedSite,
+        verificationMethod: "SUPER_ADMIN_OVERRIDE",
+        verificationOverrideExpiresAt: new Date("2026-08-01T00:00:00Z"),
+      },
+    ])
     const checkDns = jest.fn()
     const result = await runWebsiteReverifySweep({
       prisma,
@@ -446,12 +487,14 @@ describe("runWebsiteReverifySweep", () => {
   })
 
   it("revokes and hides listings when a temporary override expires", async () => {
-    prisma.website.findUnique.mockResolvedValue({
-      ...verifiedSite,
-      verificationMethod: "SUPER_ADMIN_OVERRIDE",
-      verificationOverrideExpiresAt: new Date("2026-07-21T00:00:00Z"),
-      verifiedByUserId: "admin1",
-    })
+    prisma.website.findMany.mockResolvedValue([
+      {
+        ...verifiedSite,
+        verificationMethod: "SUPER_ADMIN_OVERRIDE",
+        verificationOverrideExpiresAt: new Date("2026-07-21T00:00:00Z"),
+        verifiedByUserId: "admin1",
+      },
+    ])
     const checkDns = jest.fn()
     const result = await runWebsiteReverifySweep({
       prisma,

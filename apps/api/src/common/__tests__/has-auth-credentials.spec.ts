@@ -11,11 +11,21 @@ const REAL_SHAPED_SIG = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop=="
 const REAL_SHAPED_VALUE = `${REAL_SHAPED_TOKEN}.${REAL_SHAPED_SIG}`
 const REAL_SHAPED_VALUE_URL_ENCODED = encodeURIComponent(REAL_SHAPED_VALUE)
 
-function req(opts: { authorization?: string; cookie?: string }) {
+function req(opts: {
+  authorization?: string
+  cookie?: string
+  "x-api-key"?: string
+}) {
   return { headers: opts }
 }
 
 describe("hasAuthCredentials", () => {
+  it("does not elevate an API key before authentication validates it", () => {
+    expect(
+      hasAuthCredentials(req({ "x-api-key": `gp_${"a".repeat(64)}` })),
+    ).toBe(false)
+  })
+
   describe("Bearer token", () => {
     it("returns true for any Bearer authorization header", () => {
       expect(hasAuthCredentials(req({ authorization: "Bearer abc.def" }))).toBe(

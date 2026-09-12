@@ -3,7 +3,7 @@ jest.mock("@guestpost/auth", () => ({
 }))
 
 import { auth } from "@guestpost/auth"
-import { ForbiddenException } from "@nestjs/common"
+import { ForbiddenException, UnauthorizedException } from "@nestjs/common"
 import {
   clearAuthContextCache,
   setCachedAuthContext,
@@ -64,9 +64,12 @@ async function runAuthPipeline(
   const executionContext = context(request)
   const authorities = new CurrentAuthorityService(prisma as any)
 
-  await new AuthGuard(reflector(false), prisma as any, {} as any).canActivate(
-    executionContext,
-  )
+  await new AuthGuard(
+    reflector(false),
+    prisma as any,
+    {} as any,
+    {} as any,
+  ).canActivate(executionContext)
   await new CurrentAuthorityGuard(reflector(false), authorities).canActivate(
     executionContext,
   )
@@ -192,5 +195,71 @@ describe("fresh authority when cache invalidation is dropped", () => {
         result.authorities,
       ).canActivate(result.executionContext),
     ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+})
+
+describe("AuthGuard API-key credential boundary", () => {
+  const authority = {
+    id: "owner-1",
+    userType: "CUSTOMER",
+    role: "SEO_SPECIALIST",
+    emailVerified: true,
+    organizationId: "org-1",
+    publisherId: null,
+    publisherOrganizationId: null,
+    customerRole: "OWNER",
+    memberRole: "OWNER",
+    publisherRole: null,
+    staffRole: null,
+    staffPermissions: [],
+  }
+
+  beforeEach(() => getSession.mockReset())
+
+  it("rejects ambiguous cookie and API-key credentials", async () => {
+    const apiKeys = { authenticate: jest.fn() }
+    const request = {
+      headers: { "x-api-key": `gp_${"a".repeat(64)}`, cookie: "session=x" },
+    }
+
+    await expect(
+      new AuthGuard(
+        reflector(false),
+        {} as any,
+        {} as any,
+        apiKeys as any,
+      ).canActivate(context(request)),
+    ).rejects.toBeInstanceOf(UnauthorizedException)
+    expect(apiKeys.authenticate).not.toHaveBeenCalled()
+    expect(getSession).not.toHaveBeenCalled()
+  })
+
+  it("attaches only the principal returned by API-key authentication", async () => {
+    const rawKey = `gp_${"b".repeat(64)}`
+    const apiKeys = {
+      authenticate: jest.fn().mockResolvedValue({
+        keyId: "key-1",
+        permissions: ["orders:read"],
+        authority,
+      }),
+    }
+    const request: any = { headers: { "x-api-key": rawKey } }
+
+    await expect(
+      new AuthGuard(
+        reflector(false),
+        {} as any,
+        {} as any,
+        apiKeys as any,
+      ).canActivate(context(request)),
+    ).resolves.toBe(true)
+    expect(apiKeys.authenticate).toHaveBeenCalledWith(rawKey)
+    expect(request).toMatchObject({
+      authenticatedUserId: "owner-1",
+      currentAuthority: authority,
+      user: authority,
+      apiKey: { id: "key-1", permissions: ["orders:read"] },
+    })
+    expect(getSession).not.toHaveBeenCalled()
   })
 })

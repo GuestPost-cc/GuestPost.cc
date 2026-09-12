@@ -2,14 +2,18 @@
 
 ## Test types
 
-| Type | Tool | Location | Coverage target |
+| Type | Tool | Location | Primary assurance |
 |------|------|----------|-----------------|
-| Unit (API) | Jest | `apps/api/src/__tests__/` and module `__tests__/` | 80%+ |
+| Unit (API) | Jest | `apps/api/src/__tests__/` and module `__tests__/` | Service and authorization behavior |
 | Contract (API client) | Jest + TypeScript | `packages/api-client/src/__tests__/` | Request/response boundary |
-| Unit (UI) | Vitest | `packages/ui/src/` | 80%+ |
+| Unit (UI) | Vitest | `packages/ui/src/` | Component behavior with coverage artifacts |
 | E2E | Playwright | `e2e/` | Critical paths |
 | PostgreSQL integration | Jest | `apps/api/src/__tests__/integration/` | Transactions, locks, invariants |
 | Scenario integration | Scripts | `scripts/` | Provider/domain journeys |
+
+The repository currently publishes coverage artifacts but does not enforce a
+repo-wide numeric threshold. Do not describe 80% as a release gate until a
+measured, package-specific baseline is committed to the test configuration.
 
 ## Running tests
 
@@ -71,6 +75,43 @@ harness has no safe fixture for simultaneous customer, publisher, Operations,
 and Super Admin sessions. A real multi-actor support journey remains a paid-
 launch acceptance gate; its required assertions are listed in
 `docs/SUPPORT_MESSAGING.md`.
+
+## Security and query-hardening gates
+
+Run these focused checks while changing API-key, reporting, bounded-query, or
+worker-sweep behavior:
+
+```bash
+# API-key lifecycle, authentication, current authority, permissions, and rate tier
+pnpm --filter @guestpost/api exec jest --selectProjects=unit --runInBand \
+  api-keys api-key-authentication current-authority has-auth-credentials
+
+# Reporting projection/pagination and migration contract
+pnpm --filter @guestpost/api exec jest --selectProjects=unit --runInBand \
+  reporting security-query-hardening-migration
+
+# Website verification and marketplace query behavior
+pnpm --filter @guestpost/api exec jest --selectProjects=unit --runInBand \
+  dns-verification verification-hardening marketplace-search \
+  marketplace-domain-availability
+
+# Worker fairness, deduplication, authorization, and legacy report compatibility
+pnpm --filter @guestpost/worker exec tsx --test \
+  test/cancellation-stall-nudge.spec.ts test/review-reminder-query.spec.ts \
+  test/report-job.spec.ts test/worker-runtime.spec.ts
+
+# API-client header, cookie omission, same-origin, and HTTPS contract
+pnpm --filter @guestpost/api-client exec jest --runInBand csrf-header
+```
+
+API-key RLS isolation requires the disposable PostgreSQL template and the API
+integration project. The authoritative GitHub workflow also provisions and
+activates all application RLS roles in its own destructive database, runs
+`scripts/test-full-rls-boundary.sql`, reapplies role provisioning, and runs the
+matrix again. Never point that script at a shared or hosted database.
+
+The required edge cases and query-review checklist are documented in
+`docs/API_KEY_SECURITY.md` and `docs/QUERY_AND_WORKER_HARDENING.md`.
 
 ## Before committing
 

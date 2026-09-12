@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
-    "lint": "pnpm -r --filter @guestpost/website --filter @guestpost/portal --filter @guestpost/admin --filter @guestpost/publisher run lint",
+    "lint": "eslint apps packages scripts e2e --max-warnings=0",
     "lint:format": "biome check .",
     "format": "biome check --write .",
     "setup": "pnpm tsx scripts/setup.ts",
@@ -19,7 +22,7 @@
     "repo:health": "pnpm depcruise apps packages scripts e2e --include-only '^(apps|packages|scripts|e2e)/'",
     "deps:policy": "pnpm tsx scripts/check-dependency-policy.ts",
     "check:website-docs": "pnpm tsx scripts/check-website-docs.ts",
-    "repo:check": "biome check . && pnpm lint && pnpm typecheck && pnpm check:website-docs && pnpm depcruise apps packages scripts e2e --include-only '^(apps|packages|scripts|e2e)/'",
+    "repo:check": "pnpm deps:policy && biome check . && pnpm lint && pnpm typecheck && pnpm check:website-docs && pnpm depcruise apps packages scripts e2e --include-only '^(apps|packages|scripts|e2e)/'",
     "services:up": "docker compose --env-file .env.development -f infrastructure/docker/docker-compose.yml up -d && bash scripts/ensure-dev-database-sentinel.sh && bash scripts/ensure-dev-object-storage.sh",
     "services:down": "docker compose --env-file .env.development -f infrastructure/docker/docker-compose.yml down",
     "db:migrations:status": "pnpm --filter @guestpost/database exec prisma migrate status",

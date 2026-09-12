@@ -8,8 +8,15 @@ import {
   OAuthStateService,
   SyncService,
 } from "@guestpost/integrations"
-import { Injectable } from "@nestjs/common"
-import { Redis } from "ioredis"
+import { Injectable, Logger } from "@nestjs/common"
+import * as Sentry from "@sentry/node"
+import { getRedisClient } from "../../common/redis-client"
+
+const SAFE_PROVIDER_ERRORS = new Set([
+  "access_denied",
+  "temporarily_unavailable",
+  "server_error",
+])
 
 @Injectable()
 export class IntegrationsApiService {
@@ -17,13 +24,12 @@ export class IntegrationsApiService {
   private readonly syncService: SyncService
   private readonly oauthStateService: OAuthStateService
   private readonly discoveryService: DiscoveryService
-  private readonly redis: Redis
+  private readonly logger = new Logger(IntegrationsApiService.name)
 
   constructor() {
-    this.redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379")
     this.integrationService = new IntegrationService()
     this.syncService = new SyncService()
-    this.oauthStateService = new OAuthStateService(this.redis)
+    this.oauthStateService = new OAuthStateService(getRedisClient())
     this.discoveryService = new DiscoveryService()
   }
 
@@ -86,11 +92,16 @@ export class IntegrationsApiService {
         }),
       }
     } catch (error) {
+      this.logger.error(
+        `OAuth callback failed for provider=${provider} ownerType=${owner.ownerType}`,
+      )
+      Sentry.captureException(error, {
+        tags: { integrationProvider: provider, ownerType: owner.ownerType },
+      })
       return {
         externalAccountId: null,
         redirectUrl: this.buildFrontendReturnUrl(statePayload, {
-          error:
-            error instanceof Error ? error.message : "OAuth callback failed",
+          error: "oauth_callback_failed",
         }),
       }
     }
@@ -103,8 +114,17 @@ export class IntegrationsApiService {
   ): Promise<{ redirectUrl: string }> {
     const statePayload = await this.oauthStateService.consumeState(state)
     this.assertCallbackProvider(provider, statePayload)
+    const normalizedError = error.trim().toLowerCase()
+    const publicError = SAFE_PROVIDER_ERRORS.has(normalizedError)
+      ? normalizedError
+      : "oauth_provider_error"
+    this.logger.warn(
+      `OAuth provider rejected callback provider=${provider} code=${publicError}`,
+    )
     return {
-      redirectUrl: this.buildFrontendReturnUrl(statePayload, { error }),
+      redirectUrl: this.buildFrontendReturnUrl(statePayload, {
+        error: publicError,
+      }),
     }
   }
 

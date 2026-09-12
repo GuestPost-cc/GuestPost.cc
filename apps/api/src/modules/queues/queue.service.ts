@@ -80,17 +80,6 @@ export class QueueService {
     return job
   }
 
-  async generateReport(
-    jobName: string,
-    data: { orderId: string; format?: string },
-  ) {
-    const job = await this.addJob(QUEUES.REPORT, jobName, data)
-    this.logger.log(
-      `Report queued: ${jobName} for order ${data.orderId} (job ${job.id})`,
-    )
-    return job
-  }
-
   // Phase 7.4 (audit #12) — `dedupKey` is optional. When supplied (preferred
   // for retry-prone events: reconciliation drift, support fan-out, etc.),
   // the worker's notification processor catches Prisma P2002 unique-violation
@@ -148,6 +137,37 @@ export class QueueService {
       void this.workerWakeup.wake(`${queueName}/${jobName}`)
     }
     return job
+  }
+
+  async addJobs<T>(
+    queueName: string,
+    jobs: ReadonlyArray<{ name: string; data: T; overrides?: JobsOptions }>,
+  ) {
+    if (jobs.length === 0) return []
+    const base = (QUEUE_CONFIGS[queueName]?.defaultJobOptions ??
+      DEFAULT_JOB_OPTIONS) as JobsOptions
+    const requestId = getRequestId()
+    const queued = await this.getQueue(queueName).addBulk(
+      jobs.map(({ name, data, overrides }) => {
+        const source = data as Record<string, unknown>
+        const dataWithRequestId =
+          requestId && !source.requestId ? { ...source, requestId } : source
+        return {
+          name,
+          data: signJobPayload(dataWithRequestId),
+          opts: { ...base, ...(overrides ?? {}) },
+        }
+      }),
+    )
+    this.logger.log(`Jobs queued: ${queueName} count=${queued.length}`)
+    if (
+      queueName === QUEUES.REPORT ||
+      queueName === QUEUES.PUBLISHER_TRUST ||
+      queueName === QUEUES.DOMAIN_METRICS
+    ) {
+      void this.workerWakeup.wake(`${queueName}/bulk`)
+    }
+    return queued
   }
 
   // Event-driven publisher trust recompute. jobId dedup + delay debounce so a

@@ -1,5 +1,7 @@
 import { ForbiddenException } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
+import { API_KEY_PERMISSIONS_KEY } from "../../../common/decorators/api-key-permissions.decorator"
+import { IS_PUBLIC_KEY } from "../../../common/decorators/public.decorator"
 import { CurrentAuthorityGuard } from "../current-authority.guard"
 
 describe("CurrentAuthorityGuard", () => {
@@ -142,5 +144,75 @@ describe("CurrentAuthorityGuard", () => {
         }),
       ),
     ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it("fails closed for API keys on routes without an explicit permission", async () => {
+    const reflector = new Reflector()
+    jest
+      .spyOn(reflector, "getAllAndOverride")
+      .mockImplementation((key) => (key === IS_PUBLIC_KEY ? false : undefined))
+    const authority = {
+      id: "owner-1",
+      userType: "CUSTOMER",
+      emailVerified: true,
+      organizationId: "org-1",
+      customerRole: "OWNER",
+      staffPermissions: [],
+    }
+    const authorities = {
+      resolveRequest: jest.fn().mockResolvedValue(authority),
+    }
+
+    await expect(
+      new CurrentAuthorityGuard(reflector, authorities as any).canActivate(
+        context({
+          authenticatedUserId: "owner-1",
+          currentAuthority: authority,
+          apiKey: { permissions: ["orders:read"] },
+        }),
+      ),
+    ).rejects.toThrow("API key is not allowed on this route")
+  })
+
+  it("requires every declared API-key permission", async () => {
+    const reflector = new Reflector()
+    jest.spyOn(reflector, "getAllAndOverride").mockImplementation((key) => {
+      if (key === IS_PUBLIC_KEY) return false
+      if (key === API_KEY_PERMISSIONS_KEY)
+        return ["orders:read", "reports:read"]
+      return undefined
+    })
+    const authority = {
+      id: "owner-1",
+      userType: "CUSTOMER",
+      emailVerified: true,
+      organizationId: "org-1",
+      customerRole: "OWNER",
+      staffPermissions: [],
+    }
+    const guard = new CurrentAuthorityGuard(reflector, {
+      resolveRequest: jest.fn().mockResolvedValue(authority),
+    } as any)
+
+    await expect(
+      guard.canActivate(
+        context({
+          authenticatedUserId: "owner-1",
+          currentAuthority: authority,
+          apiKey: { permissions: ["orders:read"] },
+        }),
+      ),
+    ).rejects.toThrow("API key permission denied")
+
+    await expect(
+      guard.canActivate(
+        context({
+          method: "GET",
+          authenticatedUserId: "owner-1",
+          currentAuthority: authority,
+          apiKey: { permissions: ["reports:read", "orders:read"] },
+        }),
+      ),
+    ).resolves.toBe(true)
   })
 })

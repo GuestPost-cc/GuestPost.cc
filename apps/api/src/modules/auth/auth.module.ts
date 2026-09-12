@@ -5,6 +5,7 @@ import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { OrderOwnershipGuard } from "../../common/guards/order-ownership.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
 import { ActiveContextModule } from "../active-context/active-context.module"
+import { ApiKeyAuthenticationService } from "./api-key-authentication.service"
 import { AuthGuard } from "./auth.guard"
 import { CurrentAuthorityGuard } from "./current-authority.guard"
 import { CurrentAuthorityService } from "./current-authority.service"
@@ -14,6 +15,7 @@ import { CurrentAuthorityService } from "./current-authority.service"
   imports: [ActiveContextModule],
   providers: [
     CurrentAuthorityService,
+    ApiKeyAuthenticationService,
     ActorTypeGuard,
     MemberRolesGuard,
     StaffRolesGuard,
@@ -29,6 +31,7 @@ import { CurrentAuthorityService } from "./current-authority.service"
   ],
   exports: [
     CurrentAuthorityService,
+    ApiKeyAuthenticationService,
     ActorTypeGuard,
     MemberRolesGuard,
     StaffRolesGuard,

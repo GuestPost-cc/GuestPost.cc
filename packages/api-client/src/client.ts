@@ -1,5 +1,9 @@
+import { resolveApiOrigin } from "./api-origin"
+
 export interface ApiClientConfig {
   baseUrl: string
+  /** Opaque server API key. When set, cookies are never sent. */
+  apiKey?: string
   /**
    * Invoked on a 401 from a NON-auth endpoint. The HttpClient skips this
    * callback for sign-in / sign-up / magic-link / sign-out / verify-email
@@ -148,10 +152,24 @@ export class HttpClient {
     // attach it to the ApiError so toasts/error reports can surface it.
     const requestId = generateRequestId()
     headers["X-Request-ID"] = requestId
+    const url = this.buildUrl(path, params)
+    if (this.config.apiKey) {
+      // Apply the same HTTPS-with-loopback-development-exception policy used
+      // by browser clients even when a caller constructs HttpClient directly.
+      const configuredApiOrigin = resolveApiOrigin({
+        configuredUrl: this.config.baseUrl,
+      })
+      if (new URL(url).origin !== configuredApiOrigin) {
+        throw new Error(
+          "API key requests must target the configured API origin",
+        )
+      }
+    }
+    if (this.config.apiKey) headers["X-API-Key"] = this.config.apiKey
     const init: RequestInit = {
       ...rest,
       method,
-      credentials: "include",
+      credentials: this.config.apiKey ? "omit" : "include",
       headers,
     }
     if (body instanceof FormData) {
@@ -164,7 +182,7 @@ export class HttpClient {
       init.body = JSON.stringify(body)
     }
 
-    const res = await fetch(this.buildUrl(path, params), init)
+    const res = await fetch(url, init)
 
     const responseRequestId = res.headers.get("X-Request-ID") ?? requestId
     if (!res.ok) {

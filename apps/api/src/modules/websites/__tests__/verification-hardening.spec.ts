@@ -118,17 +118,19 @@ describe("runWebsiteReverifySweep health check", () => {
     return {
       _updates: updates,
       website: {
-        findMany: jest.fn().mockResolvedValue([{ id: site.id }]),
-        findUnique: jest.fn().mockResolvedValue(site),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            verificationMethod: "DNS_TXT",
+            verificationOverrideExpiresAt: null,
+            verifiedByUserId: null,
+            ...site,
+            publisher: { organizationId: "o1" },
+          },
+        ]),
         updateMany: jest.fn().mockImplementation((args: any) => {
           updates.push(args.data)
           return Promise.resolve({ count: 1 })
         }),
-      },
-      publisher: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: "p1", organizationId: "o1" }),
       },
       publisherMembership: {
         findMany: jest.fn().mockResolvedValue([{ userId: "u1" }]),

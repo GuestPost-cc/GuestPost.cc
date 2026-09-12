@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-08-15
+updated: 2026-09-13
 ---
 
 # GuestPost.cc
@@ -26,6 +26,9 @@ updated: 2026-08-15
 - Security updates bypass routine cooldowns. CI requires dependency review,
   the resolved-version compatibility policy, a production audit, migrations,
   tests, and all production builds.
+- CI's isolated S3-compatible E2E service uses a digest-pinned MinIO image from
+  MinIO's official Quay registry; do not switch it back to the unavailable
+  Docker Hub alias or replace the digest with an unpinned tag.
 - Current transitive advisory floors include `brace-expansion@5.0.8` for the
   5.x line, `js-yaml@3.15.1` and `js-yaml@4.3.1` for the two development-tool
   major lines, and `valibot@1.4.2`. These are temporary workspace overrides
@@ -58,19 +61,27 @@ historical audit batches.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 1,016 unit tests + integration tests
-- **apps/worker** — BullMQ queue processor (14 tests)
+- **apps/api** — NestJS REST API with unit and real-PostgreSQL integration suites
+- **apps/worker** — BullMQ queue processor with recursive Node test discovery
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard
 - **apps/publisher** — Publisher dashboard
 - **apps/website** — Public marketing site
-- **packages/shared** — Shared utilities (122 tests)
+- **packages/shared** — Shared domain and worker-core utilities
 - **packages/database** — Prisma schema + migrations
 - **packages/ui** — Shared component library
-- **packages/api-client** — Generated API client
+- **packages/api-client** — Handwritten typed HTTP client
 
 ## Key Patterns
 
+- Canonical security/query documentation is split by concern:
+  `docs/API_KEY_SECURITY.md` owns the API-key lifecycle, permission, and
+  transport contract; `docs/RLS_ROLLOUT.md` owns database isolation and
+  lockout-safe activation; `docs/QUERY_AND_WORKER_HARDENING.md` owns bounded
+  paging, N+1 prevention, and recurring-sweep fairness. Keep summaries in
+  `MASTER_CONTEXT.md`, `docs/SECURITY_GUIDELINES.md`, and
+  `docs/WORKER_ARCHITECTURE.md` linked to those sources rather than duplicating
+  divergent rules.
 - User communications use a PostgreSQL-backed transactional outbox rather than
   sending mail inside request transactions. `CommunicationEvent` is the
   idempotent domain-event boundary; per-recipient `CommunicationDelivery` rows
@@ -301,6 +312,31 @@ historical audit batches.
   provider event ID when available and otherwise by the verified raw-payload
   hash; Redis is not the webhook acknowledgement boundary.
 - Platform-fulfilled orders create platform revenue and complete directly rather than creating publisher settlements. Worker sweeps enforce the acceptance and cancellation-response deadlines. Dispute refunds require Finance/Super Admin plus explicit responsibility rather than inferring fault from the listing channel.
+- Review-reminder selection excludes durable per-day reminder markers before its
+  row limit, so completed work cannot starve later orders. The capped
+  cancellation-stall sweep persists a compound `(updatedAt, id)` cursor in
+  Redis across scheduled runs and resets after reaching the end; database
+  ordering and the cursor comparison must remain aligned. Its staff recipients
+  are reauthorized inside the same transaction that writes projections.
+- The capped website ownership sweep excludes unexpired Super Admin overrides
+  before its row limit and persists its ordered website cursor across runs, so
+  transient DNS outages cannot pin the first batch indefinitely.
+- Report workers accept the scoped legacy `generate-report` job name during
+  rolling deployments, but every legacy and current job must carry an
+  `organizationId` and unknown job names fail closed. Remove the compatibility
+  name only after every environment's Redis report queue is confirmed drained.
+- API-key syntax is never sufficient for the authenticated rate-limit tier,
+  and the typed API client refuses to attach a key to an absolute URL whose
+  origin differs from its configured API origin. API-key transport additionally
+  requires HTTPS, with HTTP accepted only for normalized loopback development
+  hosts. Customer report events are filtered to the public event catalog before
+  the bounded query limit.
+- New indexes on populated tables use one `CREATE INDEX CONCURRENTLY` statement
+  per Prisma migration. Additive foreign keys use `NOT VALID` first and a later
+  `VALIDATE CONSTRAINT` migration so the add lock does not also scan old rows.
+  Concurrent creates omit `IF NOT EXISTS`, so an interrupted invalid index
+  cannot be silently accepted; the production runbook distinguishes absent,
+  invalid, and valid remnants before resolving a failed Prisma migration.
 - Prisma migrations are an API/worker release prerequisite. Generate the client from the migrated schema, apply migrations before serving requests that select new fields, and verify `prisma migrate status` during the release; otherwise shared reads such as order and billing queries can fail together with HTTP 500 responses.
 - The customer portal is an order-focused workbench. Its dashboard uses exact server totals for attention, active work, and delivered results; `/dashboard/orders` is a server-paginated queue with stage, campaign, service, search, and sort controls; campaign and report totals page through the complete tenant-scoped data set rather than silently truncating at the API page limit.
 - Customer actions are role-aware in the UI but remain server-authorized. An organization OWNER can act across the organization and manage Billing; a MEMBER can mutate only orders they created. Billing is hidden from member navigation and direct member access fails closed. Wallet display uses authoritative available and reserved balances from the billing API; no payment, refund, payout, or settlement behavior is derived in the client.
