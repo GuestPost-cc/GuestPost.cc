@@ -1,3 +1,5 @@
+import { resolveApiOrigin } from "./api-origin"
+
 export interface ApiClientConfig {
   baseUrl: string
   /** Opaque server API key. When set, cookies are never sent. */
@@ -151,11 +153,17 @@ export class HttpClient {
     const requestId = generateRequestId()
     headers["X-Request-ID"] = requestId
     const url = this.buildUrl(path, params)
-    if (
-      this.config.apiKey &&
-      new URL(url).origin !== new URL(this.config.baseUrl).origin
-    ) {
-      throw new Error("API key requests must target the configured API origin")
+    if (this.config.apiKey) {
+      // Apply the same HTTPS-with-loopback-development-exception policy used
+      // by browser clients even when a caller constructs HttpClient directly.
+      const configuredApiOrigin = resolveApiOrigin({
+        configuredUrl: this.config.baseUrl,
+      })
+      if (new URL(url).origin !== configuredApiOrigin) {
+        throw new Error(
+          "API key requests must target the configured API origin",
+        )
+      }
     }
     if (this.config.apiKey) headers["X-API-Key"] = this.config.apiKey
     const init: RequestInit = {

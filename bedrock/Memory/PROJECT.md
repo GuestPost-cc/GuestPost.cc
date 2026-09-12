@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-09-10
+updated: 2026-09-12
 ---
 
 # GuestPost.cc
@@ -316,11 +316,16 @@ historical audit batches.
   name only after every environment's Redis report queue is confirmed drained.
 - API-key syntax is never sufficient for the authenticated rate-limit tier,
   and the typed API client refuses to attach a key to an absolute URL whose
-  origin differs from its configured API origin. Customer report events are
-  filtered to the public event catalog before the bounded query limit.
+  origin differs from its configured API origin. API-key transport additionally
+  requires HTTPS, with HTTP accepted only for normalized loopback development
+  hosts. Customer report events are filtered to the public event catalog before
+  the bounded query limit.
 - New indexes on populated tables use one `CREATE INDEX CONCURRENTLY` statement
   per Prisma migration. Additive foreign keys use `NOT VALID` first and a later
   `VALIDATE CONSTRAINT` migration so the add lock does not also scan old rows.
+  Concurrent creates omit `IF NOT EXISTS`, so an interrupted invalid index
+  cannot be silently accepted; the production runbook distinguishes absent,
+  invalid, and valid remnants before resolving a failed Prisma migration.
 - Prisma migrations are an API/worker release prerequisite. Generate the client from the migrated schema, apply migrations before serving requests that select new fields, and verify `prisma migrate status` during the release; otherwise shared reads such as order and billing queries can fail together with HTTP 500 responses.
 - The customer portal is an order-focused workbench. Its dashboard uses exact server totals for attention, active work, and delivered results; `/dashboard/orders` is a server-paginated queue with stage, campaign, service, search, and sort controls; campaign and report totals page through the complete tenant-scoped data set rather than silently truncating at the API page limit.
 - Customer actions are role-aware in the UI but remain server-authorized. An organization OWNER can act across the organization and manage Billing; a MEMBER can mutate only orders they created. Billing is hidden from member navigation and direct member access fails closed. Wallet display uses authoritative available and reserved balances from the billing API; no payment, refund, payout, or settlement behavior is derived in the client.

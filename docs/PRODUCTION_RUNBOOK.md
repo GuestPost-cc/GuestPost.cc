@@ -646,6 +646,62 @@ its original policy is independently proven.
 
 Container path: `docker build -f apps/api/Dockerfile .` / `apps/worker/Dockerfile` from repo root; same env contract; compose healthcheck hits `/api/v1/health`.
 
+### Concurrent-index migration recovery
+
+The security/query-hardening indexes are each built by a single-statement
+`CREATE INDEX CONCURRENTLY` migration. Those migrations intentionally omit
+`IF NOT EXISTS`: an interrupted build can leave a same-named
+`pg_index.indisvalid = false` relation, and accepting that relation on retry
+would mark the migration complete without installing a usable index.
+
+If `prisma migrate deploy` fails in migration `20260910100100` through
+`20260910101000`, keep the release stopped at the migration gate and inspect
+only the ten expected index names through the direct schema-owner connection:
+
+```sql
+SELECT
+  index_namespace.nspname AS schema_name,
+  index_relation.relname AS index_name,
+  index_state.indisready,
+  index_state.indisvalid,
+  pg_get_indexdef(index_relation.oid) AS definition
+FROM pg_index AS index_state
+JOIN pg_class AS index_relation
+  ON index_relation.oid = index_state.indexrelid
+JOIN pg_namespace AS index_namespace
+  ON index_namespace.oid = index_relation.relnamespace
+WHERE index_namespace.nspname = 'public'
+  AND index_relation.relname = ANY (ARRAY[
+    'ApiKey_createdByUserId_idx',
+    'Report_dedupKey_key',
+    'Website_reverify_sweep_idx',
+    'Order_auto_accept_sweep_idx',
+    'OrderCancellationRequest_stall_sweep_idx',
+    'PayoutExecution_stale_stage_idx',
+    'AuditLog_action_createdAt_id_idx',
+    'AuditLog_user_action_createdAt_idx',
+    'MarketplaceListing_websiteId_idx',
+    'MarketplaceReview_listingId_status_idx'
+  ]);
+```
+
+- If the failed migration's index is absent, verify that its one SQL statement
+  left no other effect, mark that exact migration `--rolled-back`, and rerun
+  `migrate deploy`.
+- If the index exists with `indisvalid = false`, run one standalone
+  `DROP INDEX CONCURRENTLY IF EXISTS public."<exact index name>";` statement.
+  Do not wrap it in a transaction, use `CASCADE`, or interpolate an unverified
+  name. Then mark only the exact failed migration `--rolled-back` and rerun it.
+- If the index is valid, do not drop it. Compare `pg_get_indexdef` with the
+  tracked migration. Mark the exact migration `--applied` only when the
+  definition semantically matches, including uniqueness, columns, ordering,
+  and any predicate; otherwise stop for a reviewed forward fix.
+
+After recovery, repeat the query and require all ten expected indexes to be
+present and `indisvalid = true` before starting application or worker images.
+Never edit an already-applied migration or mark a failed migration resolved
+without accounting for its exact database effect.
+
 ### Required cutover for the payout-evidence migration
 
 The payout-evidence migration is additive in shape but intentionally

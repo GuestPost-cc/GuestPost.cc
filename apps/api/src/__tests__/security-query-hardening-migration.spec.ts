@@ -40,17 +40,18 @@ describe("security query hardening migration rollout", () => {
   it("builds each new index concurrently in its own single-statement migration", () => {
     expect(baseSql).not.toMatch(/CREATE (?:UNIQUE )?INDEX/)
     for (const sql of onlineIndexMigrations) {
+      const executableSql = sql
+        .split("\n")
+        .filter((line) => !line.trimStart().startsWith("--"))
+        .join("\n")
       expect(sql.match(/CREATE (?:UNIQUE )?INDEX CONCURRENTLY/g)).toHaveLength(
         1,
       )
       expect(sql).not.toMatch(/\bBEGIN;|\bCOMMIT;/)
-      expect(
-        sql
-          .split("\n")
-          .filter((line) => !line.trimStart().startsWith("--"))
-          .join("\n")
-          .match(/;/g),
-      ).toHaveLength(1)
+      // A failed concurrent build can leave an indisvalid=false relation.
+      // Retrying must fail loudly instead of letting IF NOT EXISTS accept it.
+      expect(executableSql).not.toMatch(/\bIF NOT EXISTS\b/)
+      expect(executableSql.match(/;/g)).toHaveLength(1)
     }
   })
 })
