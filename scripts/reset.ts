@@ -1,5 +1,6 @@
 import { existsSync, rmSync } from "node:fs"
 import { join } from "node:path"
+import { assertDevelopmentSeedSafety } from "../packages/shared/src/development-seed-safety"
 import { $ } from "./_utils"
 import { loadRootEnv } from "./env"
 
@@ -9,8 +10,13 @@ async function main() {
   console.log("Resetting GuestPost development environment...\n")
   loadRootEnv({
     createDevelopmentFromExample: true,
-    required: ["DATABASE_URL"],
+    required: ["NODE_ENV", "DATABASE_URL"],
   })
+  assertDevelopmentSeedSafety(
+    process.env.NODE_ENV,
+    process.env.DATABASE_URL,
+    "http://localhost:4000",
+  )
 
   // Step 1: Clean node_modules
   console.log("1. Removing node_modules...")
