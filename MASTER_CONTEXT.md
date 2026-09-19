@@ -8,7 +8,7 @@
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js 15, React 19, TypeScript, Tailwind, TanStack Query, Radix UI |
+| Frontend | Next.js 16, React 19, TypeScript 6, Tailwind, TanStack Query, Radix UI |
 | Backend | NestJS, Prisma ORM |
 | Database | PostgreSQL |
 | Queue/Cache | Redis, BullMQ |
@@ -88,8 +88,14 @@ Order verified → Settlement auto-created → 7-day window → Approved → Bal
 
 ### Authentication
 - Session cookies via better-auth
-- `AuthGuard` populates `request.user` with full context
-- Multi-tenant: `user.organizationId`, `user.publisherId`, `user.staffRole`
+- Organization automation may use creator-bound `X-API-Key` credentials only
+  on explicitly permissioned order/report routes
+- `AuthGuard` verifies the credential; `CurrentAuthorityGuard` reloads durable
+  customer, publisher, or staff authority before the handler
+- Tenant context is transaction-scoped for PostgreSQL RLS; route guards,
+  service checks, and response projections remain mandatory
+- Canonical API-key and RLS contracts: `docs/API_KEY_SECURITY.md` and
+  `docs/RLS_ROLLOUT.md`
 
 ### Key Endpoints
 
@@ -98,9 +104,11 @@ Order verified → Settlement auto-created → 7-day window → Approved → Bal
 | marketplace | GET /listings, GET /listings/:slug, GET /categories, POST /favorites |
 | orders | POST /, GET /, GET /:id, PATCH /:id/status |
 | campaigns | POST /, GET /, GET /:id, PUT /:id |
-| billing | GET /wallet, POST /deposit, POST /withdrawal |
+| billing | GET /wallet, POST /wallet/:id/checkout, GET /transactions |
 | publishers | POST /, GET /:id, POST /:id/websites |
-| admin | GET /users, GET /orders, GET /settlements |
+| reports | GET /reports, GET /reports/:id, GET /reports/orders/:id, GET /reports/campaigns/:id, POST /reports/orders/:id/generate |
+| API keys | POST /api-keys, GET /api-keys, DELETE /api-keys/:id (customer owner session only) |
+| admin | GET /users, GET /orders, GET /settlements, GET /websites/verification |
 
 ### API Client Usage
 ```typescript
@@ -140,24 +148,29 @@ const listing = await api.marketplace.getListing(slug)
 
 ---
 
-## Module Inventory (14 modules)
+## Module Inventory (19 modules)
 
 | Module | Status | Purpose |
 |--------|--------|---------|
 | auth | Complete | Session management via better-auth |
+| active-context | Complete | Interactive tenant/publisher selection |
 | identity | Complete | Org/team/user management |
 | marketplace | Complete | Listings, search, categories, reviews |
 | orders | Complete | Full order lifecycle |
 | campaigns | Complete | Order grouping |
 | billing | Complete | Wallet, deposits, withdrawals |
+| communications | Complete | Durable transactional communication outbox |
+| integrations | Complete | Publisher/platform integration lifecycle |
+| notifications | Complete | In-app notification delivery |
 | settlements | Complete | Publisher payment workflow |
 | publisher-payouts | Complete | Balance, withdrawals |
-| reporting | Partial | Analytics endpoints |
+| reporting | Complete | Bounded analytics and export endpoints |
 | support | Complete | Ticket system |
 | api-keys | Complete | Organization API access |
 | admin | Complete | Staff admin operations |
 | audit | Complete | Action logging |
-| queues | Partial | BullMQ setup |
+| queues | Complete | Signed BullMQ jobs and worker wake-up |
+| websites | Complete | Website ownership and metric lifecycle |
 
 ---
 
@@ -174,9 +187,8 @@ const listing = await api.marketplace.getListing(slug)
 - Marketing website
 
 ### In Progress
-- Worker/queue processing (stubbed)
-- Email notifications
-- Reporting UI
+- Broader multi-actor browser coverage
+- Reporting UI expansion
 
 ### Not Started
 - WebSocket notifications
@@ -196,9 +208,14 @@ const listing = await api.marketplace.getListing(slug)
 1. **Prisma**: Always add reverse relation fields on both models
 2. **API Client**: Returns JSON directly (no `.data` wrapper)
 3. **TanStack Table**: Use flexRender for headers, not string cast
-4. **Multi-tenancy**: Filter by `organizationId` for all customer data
-5. **Dev mode**: Rate limiting disabled in `main.ts`
-6. **API URL**: `NEXT_PUBLIC_API_URL=http://localhost:4000` + `/api/v1` in api.ts
+4. **Multi-tenancy**: Use explicit tenant selectors and audience projections;
+   RLS is defence in depth and does not mask columns
+5. **Rate limiting**: Environment-aware limits remain enabled in development
+   at higher thresholds; API-key syntax stays anonymous until authenticated
+6. **API URL**: Browser sessions use the configured API origin. API-key clients
+   require that exact origin and HTTPS, except explicit loopback development
+7. **Large queries**: Filter before caps, page deterministically, aggregate or
+   batch relations, and follow `docs/QUERY_AND_WORKER_HARDENING.md`
 
 ---
 

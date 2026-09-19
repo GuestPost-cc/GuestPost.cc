@@ -17,13 +17,41 @@ rollback. It is not the recommended production shape.
 | Lane | `WORKER_MODE` | Lifetime | Work |
 |---|---|---|---|
 | Realtime | `realtime` | Continuous, one replica | Email, in-app notifications, requested website DNS verification, requested delivery/link verification |
-| On demand | `on-demand` | Starts on API wake-up, drains, exits | Reports, generic verification, publisher trust recomputation, integration discovery/sync, legacy payout queue drain, payout webhook inbox |
+| On demand | `on-demand` | Starts on API wake-up, drains, exits | Reports, publisher trust recomputation, domain metrics, integration discovery/sync, legacy payout queue drain, payout webhook inbox |
 | Scheduled | `scheduled` | Due maintenance tasks, then exits | Payout reconciliation, financial reconciliation, settlement automation, order deadlines/reminders, link monitoring, website re-verification |
 | Compatibility | `all` | Continuous | All legacy workers and BullMQ repeatable schedules |
 
 The realtime lane deliberately excludes payout. The API sends a payout to the
 provider synchronously under a finance-authorized endpoint. Worker-side payout
 code only reconciles provider truth; it never initiates a transfer.
+
+The obsolete generic verification worker and its unused queue families have
+been removed. Requested website and delivery verification use their dedicated
+realtime consumers; scheduled reverification uses the website-verification
+consumer. Do not enqueue a generic verification job.
+
+## Bounded sweeps and compatibility
+
+High-cardinality maintenance work follows the shared contract in
+`docs/QUERY_AND_WORKER_HARDENING.md`: filter before the cap, order with a unique
+tie-breaker, batch related reads, isolate per-item failures, and recheck live
+authority in the write transaction.
+
+- Review reminders exclude already-recorded day buckets before selecting at
+  most 200 orders, so a completed prefix cannot starve later rows.
+- Cancellation-stall nudges scan a bounded `(updatedAt, id)` window and persist
+  a validated 30-day Redis cursor between runs. They resolve currently active,
+  unbanned staff recipients inside the same transaction as the durable event
+  and communication outbox write.
+- Website reverification selects only due DNS rows or expired/missing temporary
+  overrides before its cap, advances by website ID with a validated 30-day
+  Redis cursor, and resets after reaching the end.
+
+The report consumer retains both legacy job names—`generate-report`
+(`LEGACY_GENERATE`) and `export-report` (`EXPORT_REPORT`)—only to drain
+persisted jobs during rolling deployment. Legacy and current report jobs still
+require `organizationId`; unsupported names fail instead of acknowledging work
+without an artifact.
 
 ## Payout safety model
 

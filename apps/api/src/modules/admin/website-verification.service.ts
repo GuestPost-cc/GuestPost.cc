@@ -1,4 +1,9 @@
-import { computeTrustScore, QUEUES, trustBand } from "@guestpost/shared"
+import {
+  computeTrustScore,
+  QUEUE_JOBS,
+  QUEUES,
+  trustBand,
+} from "@guestpost/shared"
 import { BadRequestException, Injectable } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
@@ -179,22 +184,31 @@ export class WebsiteVerificationService {
       take: 500,
     })
 
-    // Resolve listing -> website/domain/publisher for each override.
-    const rows = []
-    for (const o of overrides) {
+    const listingIds = [
+      ...new Set(
+        overrides
+          .map((override) => override.entityId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ]
+    const listings = listingIds.length
+      ? await this.prisma.marketplaceListing.findMany({
+          where: { id: { in: listingIds } },
+          select: {
+            id: true,
+            website: { select: { domain: true, canonicalDomain: true } },
+            publisher: { select: { name: true, email: true } },
+          },
+        })
+      : []
+    const listingsById = new Map(
+      listings.map((listing) => [listing.id, listing]),
+    )
+
+    const rows = overrides.map((o) => {
       const meta: any = o.metadata ?? {}
-      const listing = o.entityId
-        ? await this.prisma.marketplaceListing
-            .findUnique({
-              where: { id: o.entityId },
-              include: {
-                website: { select: { domain: true, canonicalDomain: true } },
-                publisher: { select: { name: true, email: true } },
-              },
-            })
-            .catch(() => null)
-        : null
-      rows.push({
+      const listing = o.entityId ? listingsById.get(o.entityId) : null
+      return {
         auditId: o.id,
         listingId: o.entityId,
         domain:
@@ -206,8 +220,8 @@ export class WebsiteVerificationService {
         reason: meta.reason ?? null,
         timestamp: o.createdAt,
         publisher: listing?.publisher ?? null,
-      })
-    }
+      }
+    })
 
     const [verified, pending, failed, revoked] = await Promise.all([
       this.prisma.website.count({ where: { verificationStatus: "VERIFIED" } }),
@@ -248,6 +262,8 @@ export class WebsiteVerificationService {
     status?: string
     from?: string
     to?: string
+    take?: number
+    skip?: number
   }) {
     const where: any = { ownershipType: "PUBLISHER" }
     if (filters.publisherId) where.publisherId = filters.publisherId
@@ -260,40 +276,50 @@ export class WebsiteVerificationService {
       if (filters.to) where.createdAt.lte = new Date(filters.to)
     }
 
-    const websites = await this.prisma.website.findMany({
-      where,
-      orderBy: { updatedAt: "desc" },
-      take: 500,
-      include: { publisher: { select: { id: true, name: true, email: true } } },
-    })
+    const take = Math.min(Math.max(filters.take ?? 50, 1), 100)
+    const skip = Math.max(filters.skip ?? 0, 0)
 
-    const [pending, failed, revoked, recentlyVerified] = await Promise.all([
-      this.prisma.website.count({
-        where: {
-          ownershipType: "PUBLISHER",
-          verificationStatus: "PENDING_VERIFICATION",
-        },
-      }),
-      this.prisma.website.count({
-        where: {
-          ownershipType: "PUBLISHER",
-          verificationStatus: "VERIFICATION_FAILED",
-        },
-      }),
-      this.prisma.website.count({
-        where: { ownershipType: "PUBLISHER", verificationStatus: "REVOKED" },
-      }),
-      this.prisma.website.count({
-        where: {
-          ownershipType: "PUBLISHER",
-          verificationStatus: "VERIFIED",
-          verifiedAt: { gte: new Date(Date.now() - 7 * 86_400_000) },
-        },
-      }),
-    ])
+    const [websites, total, pending, failed, revoked, recentlyVerified] =
+      await Promise.all([
+        this.prisma.website.findMany({
+          where,
+          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+          take,
+          skip,
+          include: {
+            publisher: { select: { id: true, name: true, email: true } },
+          },
+        }),
+        this.prisma.website.count({ where }),
+        this.prisma.website.count({
+          where: {
+            ownershipType: "PUBLISHER",
+            verificationStatus: "PENDING_VERIFICATION",
+          },
+        }),
+        this.prisma.website.count({
+          where: {
+            ownershipType: "PUBLISHER",
+            verificationStatus: "VERIFICATION_FAILED",
+          },
+        }),
+        this.prisma.website.count({
+          where: { ownershipType: "PUBLISHER", verificationStatus: "REVOKED" },
+        }),
+        this.prisma.website.count({
+          where: {
+            ownershipType: "PUBLISHER",
+            verificationStatus: "VERIFIED",
+            verifiedAt: { gte: new Date(Date.now() - 7 * 86_400_000) },
+          },
+        }),
+      ])
 
     return {
       sections: { pending, failed, revoked, recentlyVerified },
+      total,
+      take,
+      skip,
       websites: websites.map((w: any) => ({
         id: w.id,
         url: w.url,
@@ -312,30 +338,37 @@ export class WebsiteVerificationService {
 
   // Bulk re-trigger verification for a set of websites.
   async bulkRetry(websiteIds: string[], actorUserId: string) {
-    let queued = 0
-    for (const id of websiteIds) {
-      const w = await this.prisma.website.findUnique({
-        where: { id },
-        select: { id: true, verificationStatus: true },
-      })
-      if (!w || w.verificationStatus === "VERIFIED") continue
-      await this.queue.addJob(
-        QUEUES.WEBSITE_VERIFICATION,
-        "website-verify",
-        { websiteId: id, actorUserId },
-        {
-          jobId: `website-verify-${id}-${Date.now()}`,
+    const uniqueIds = [...new Set(websiteIds)]
+    const websites = await this.prisma.website.findMany({
+      where: {
+        id: { in: uniqueIds },
+        verificationStatus: { not: "VERIFIED" },
+      },
+      select: { id: true },
+    })
+    const attempt = Date.now()
+    const jobs = await this.queue.addJobs(
+      QUEUES.WEBSITE_VERIFICATION,
+      websites.map(({ id }) => ({
+        name: QUEUE_JOBS[QUEUES.WEBSITE_VERIFICATION].VERIFY,
+        data: { websiteId: id, actorUserId },
+        overrides: {
+          jobId: `website-verify-${id}-${attempt}`,
           removeOnComplete: { count: 50 },
           removeOnFail: { count: 50 },
         },
-      )
-      queued++
-    }
+      })),
+    )
+    const queued = jobs.length
     await this.audit.log({
       action: "WEBSITE_VERIFICATION_BULK_RETRY",
       entityType: "Website",
       entityId: undefined,
-      metadata: { requested: websiteIds.length, queued },
+      metadata: {
+        requested: websiteIds.length,
+        unique: uniqueIds.length,
+        queued,
+      },
       userId: actorUserId,
       organizationId: null,
     })

@@ -21,9 +21,11 @@ The `CI / build-and-test` check performs:
 5. Integration-test template database creation and migration
 6. TypeScript, Biome, ESLint, and dependency-graph validation
 7. API unit and database-backed integration tests
-8. Shared package and UI coverage tests
-9. A complete production build of every workspace target
-10. Chromium onboarding journeys against self-started API, customer, and
+8. Full role provisioning, activation, rerun safety, and destructive
+   application-RLS boundary verification in an isolated database
+9. Shared, API-client, worker-supporting package, and UI coverage tests
+10. A complete production build of every workspace target
+11. Chromium onboarding journeys against self-started API, customer, and
     publisher processes backed by the migrated disposable CI database, Redis,
     and an isolated MinIO readiness fixture
 
@@ -32,6 +34,14 @@ credentials, does not expose deployment secrets, pins third-party Actions and
 service images, cancels superseded runs, and has a 60-minute timeout. Browser
 failures retain a seven-day trace/screenshot/video artifact; the CI fixture ID
 is run- and retry-scoped and never targets a remote application origin.
+The MinIO fixture is pulled from MinIO's official Quay registry at an immutable
+digest; it is readiness/evidence storage for the disposable browser run, not a
+deployment dependency.
+
+Because pull-request CI triggers only when the target branch is `main`, stacked
+PRs with an intermediate base must run the same workflow through manual
+dispatch on the exact head branch. Record the run URL and commit SHA in the PR;
+a green run for an earlier head is not release evidence for a later commit.
 
 `pnpm deps:policy` reads `.github/dependency-policy.json`. It rejects mixed
 direct Sentry/TypeScript/PostCSS versions, multiple resolved ioredis or Smithy

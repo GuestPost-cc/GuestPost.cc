@@ -727,7 +727,6 @@ export class MarketplaceService {
       categories: { include: { category: true } },
       tags: { include: { tag: true } },
       images: { where: { isPrimary: true }, take: 1 },
-      reviews: { where: { status: "APPROVED" }, select: { rating: true } },
       publisher: { include: { profile: true } },
       website: { include: publicWebsiteInclude },
       // Card view: surface only AVAILABLE services so listing cards can
@@ -784,19 +783,29 @@ export class MarketplaceService {
       ])
     }
 
+    const reviewStats = listings.length
+      ? await this.prisma.marketplaceReview.groupBy({
+          by: ["listingId"],
+          where: {
+            listingId: { in: listings.map((listing) => listing.id) },
+            status: "APPROVED",
+          },
+          _count: { id: true },
+          _avg: { rating: true },
+        })
+      : []
+    const reviewStatsByListing = new Map(
+      reviewStats.map((stats) => [stats.listingId, stats]),
+    )
     const listingsWithStats = listings.map((listing) => {
-      const avgRating =
-        listing.reviews.length > 0
-          ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) /
-            listing.reviews.length
-          : null
+      const stats = reviewStatsByListing.get(listing.id)
       return this.toPublicListing(
         {
           ...listing,
           tags: listing.tags.map((t) => t.tag),
           image: listing.images[0]?.url || null,
-          reviewCount: listing.reviews.length,
-          avgRating,
+          reviewCount: stats?._count.id ?? 0,
+          avgRating: stats?._avg.rating ?? null,
         },
         websiteUnlocked,
         metricsAsOf,
@@ -3184,7 +3193,10 @@ export class MarketplaceService {
     ] = await Promise.all([
       this.prisma.marketplaceListing.count({ where: buyerVisibleListing }),
       this.prisma.marketplaceListing.count({
-        where: buyerVisibleListing,
+        where: {
+          ...buyerVisibleListing,
+          services: { some: { availability: "AVAILABLE" } },
+        },
       }),
       this.prisma.marketplaceReview.count({
         where: { status: "APPROVED", listing: buyerVisibleListing },
@@ -3225,14 +3237,16 @@ export class MarketplaceService {
       take: 5,
     })
 
-    const categoryData = await Promise.all(
-      topCategories.map(async (c) => {
-        const category = await this.prisma.marketplaceCategory.findUnique({
-          where: { id: c.categoryId },
-        })
-        return { category, count: c._count.listingId }
-      }),
+    const categories = await this.prisma.marketplaceCategory.findMany({
+      where: { id: { in: topCategories.map((row) => row.categoryId) } },
+    })
+    const categoriesById = new Map(
+      categories.map((category) => [category.id, category]),
     )
+    const categoryData = topCategories.map((row) => ({
+      category: categoriesById.get(row.categoryId) ?? null,
+      count: row._count.listingId,
+    }))
 
     return {
       totalListings,

@@ -3,6 +3,7 @@ import { QUEUES } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { createObservableWorker } from "../lib/queue-observability"
+import { resolveReportJobFormat } from "../lib/report-job"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
@@ -22,66 +23,68 @@ export function createReportWorker() {
         throw new Error("Invalid job signature")
       }
 
-      const { orderId, format } = job.data
-
-      switch (job.name) {
-        case "generate-pdf":
-        case "generate-csv":
-        case "export-report":
-        case "generate-report": {
-          const order = await prisma.order.findUnique({
-            where: { id: orderId },
-            include: { website: true, customer: true },
-          })
-          if (!order) throw new Error(`Order ${orderId} not found`)
-
-          // Phase 6: pull the per-service unitPrice off the snapshotted
-          // ListingService so the export carries it without re-deriving
-          // from a possibly-edited live row.
-          let unitPrice: any = null
-          if (order.listingServiceId) {
-            const ls = await prisma.listingService.findUnique({
-              where: { id: order.listingServiceId },
-              select: { price: true },
-            })
-            unitPrice = ls?.price ?? null
-          }
-
-          await prisma.report.create({
-            data: {
-              orderId,
-              type: "generated",
-              format: format ?? "pdf",
-              exportedAt: new Date(),
-              data: {
-                orderId: order.id,
-                type: order.type,
-                status: order.status,
-                targetUrl: order.targetUrl,
-                publishedUrl: order.publishedUrl,
-                anchorText: order.anchorText,
-                website: order.website?.url,
-                publisher: order.website?.publisherId,
-                ownershipType: order.website?.ownershipType,
-                fulfillmentChannel: order.fulfillmentChannel ?? null,
-                // Phase 6 reporting snapshot trio (per-service truth).
-                listingId: order.listingId ?? null,
-                listingServiceId: order.listingServiceId ?? null,
-                serviceType: order.type,
-                unitPrice: unitPrice ? String(unitPrice) : null,
-                turnaroundDays: order.turnaroundDays ?? null,
-                publishedAt: order.publishedAt,
-                campaignProgress: "100%",
-              },
-            },
-          })
-
-          logger.info("report generated", { orderId, format: format ?? "pdf" })
-          break
-        }
-        default:
-          logger.warn("unknown job name", { jobName: job.name })
+      const { orderId, format, organizationId } = job.data
+      const resolvedFormat = resolveReportJobFormat(job.name, format)
+      if (typeof organizationId !== "string" || !organizationId) {
+        throw new Error("Report job is missing organization scope")
       }
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, organizationId },
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          targetUrl: true,
+          publishedUrl: true,
+          anchorText: true,
+          fulfillmentChannel: true,
+          listingId: true,
+          listingServiceId: true,
+          turnaroundDays: true,
+          publishedAt: true,
+          listingService: { select: { price: true } },
+        },
+      })
+      if (!order) throw new Error(`Order ${orderId} not found`)
+      const dedupKey = `generated:${orderId}:${resolvedFormat}`
+      const reportData = {
+        orderId: order.id,
+        type: order.type,
+        status: order.status,
+        targetUrl: order.targetUrl,
+        publishedUrl: order.publishedUrl,
+        anchorText: order.anchorText,
+        fulfillmentChannel: order.fulfillmentChannel ?? null,
+        listingId: order.listingId ?? null,
+        listingServiceId: order.listingServiceId ?? null,
+        serviceType: order.type,
+        unitPrice: order.listingService?.price
+          ? String(order.listingService.price)
+          : null,
+        turnaroundDays: order.turnaroundDays ?? null,
+        publishedAt: order.publishedAt,
+        campaignProgress: "100%",
+      }
+
+      await prisma.report.upsert({
+        where: { dedupKey },
+        create: {
+          orderId,
+          dedupKey,
+          type: "generated",
+          format: resolvedFormat,
+          exportedAt: new Date(),
+          data: reportData,
+        },
+        update: {
+          type: "generated",
+          format: resolvedFormat,
+          exportedAt: new Date(),
+          data: reportData,
+        },
+      })
+
+      logger.info("report generated", { orderId, format: resolvedFormat })
 
       return { generated: true, orderId }
     },

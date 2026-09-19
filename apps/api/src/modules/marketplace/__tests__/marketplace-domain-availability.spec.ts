@@ -126,6 +126,9 @@ describe("MarketplaceService domain availability", () => {
       marketplaceListingCategory: {
         groupBy: jest.fn().mockResolvedValue([]),
       },
+      marketplaceCategory: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     }
     const service = new MarketplaceService(prisma, {} as any)
     const buyerListing = {
@@ -136,9 +139,15 @@ describe("MarketplaceService domain availability", () => {
     await service.getMarketplaceStats()
 
     expect(prisma.marketplaceListing.count).toHaveBeenCalledTimes(2)
-    for (const [args] of prisma.marketplaceListing.count.mock.calls) {
-      expect(args).toEqual({ where: buyerListing })
-    }
+    expect(prisma.marketplaceListing.count).toHaveBeenNthCalledWith(1, {
+      where: buyerListing,
+    })
+    expect(prisma.marketplaceListing.count).toHaveBeenNthCalledWith(2, {
+      where: {
+        ...buyerListing,
+        services: { some: { availability: "AVAILABLE" } },
+      },
+    })
     expect(prisma.marketplaceReview.count).toHaveBeenCalledWith({
       where: { status: "APPROVED", listing: buyerListing },
     })

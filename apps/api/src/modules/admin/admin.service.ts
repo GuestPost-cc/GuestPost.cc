@@ -39,9 +39,11 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from "@nestjs/common"
+import * as Sentry from "@sentry/node"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { normalizeDomain } from "../../common/domain"
 import { PrismaService } from "../../common/prisma.service"
@@ -524,6 +526,8 @@ function buildOrderIntegrityReport(
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -3648,9 +3652,16 @@ export class AdminService {
         { websiteIds: [website.id], trigger: "PLATFORM_WEBSITE_CREATED" },
         { jobId: `domain-metrics-${website.id}` },
       )
-    } catch {
+    } catch (error) {
       // Provider availability must not roll back the durable website aggregate.
       // Scheduled/backfill collection will retry Ahrefs DR and OpenPageRank.
+      this.logger.error(
+        `Domain metric enrichment enqueue failed websiteId=${website.id}`,
+      )
+      Sentry.captureException(error, {
+        tags: { operation: "platform-website-metrics-enqueue" },
+        extra: { websiteId: website.id },
+      })
     }
 
     return website

@@ -1,9 +1,7 @@
 import * as crypto from "node:crypto"
+import { withOrganizationOwnerRlsContext } from "@guestpost/database"
 import {
-  withApiKeyValidationRlsContext,
-  withOrganizationOwnerRlsContext,
-} from "@guestpost/database"
-import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -15,6 +13,9 @@ import type { DurableCurrentAuthority } from "../auth/current-authority.service"
 function hashKey(key: string): string {
   return crypto.createHash("sha256").update(key).digest("hex")
 }
+
+const DEFAULT_API_KEY_LIFETIME_MS = 90 * 24 * 60 * 60 * 1000
+const MAX_API_KEY_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000
 
 function generateApiKey(): { raw: string; hash: string } {
   const raw = `gp_${crypto.randomBytes(32).toString("hex")}`
@@ -51,34 +52,62 @@ export class ApiKeysService {
     authority: DurableCurrentAuthority,
     name: string,
     permissions: string[],
+    requestedExpiresAt?: string,
   ) {
     const context = this.organizationOwnerContext(authority)
     const { raw, hash } = generateApiKey()
-
-    await withOrganizationOwnerRlsContext(this.prisma, context, async (tx) => {
-      await tx.apiKey.create({
-        data: {
-          organizationId: context.organizationId,
-          name,
-          keyHash: hash,
-          permissions,
-        },
-      })
-
-      await this.audit.log(
-        {
-          action: "API_KEY_CREATED",
-          entityType: "ApiKey",
-          metadata: { name, permissions },
-          userId: context.actorId,
-          organizationId: context.organizationId,
-        },
-        tx,
+    const now = new Date()
+    const expiresAt = requestedExpiresAt
+      ? new Date(requestedExpiresAt)
+      : new Date(now.getTime() + DEFAULT_API_KEY_LIFETIME_MS)
+    if (
+      !Number.isFinite(expiresAt.getTime()) ||
+      expiresAt <= now ||
+      expiresAt.getTime() - now.getTime() > MAX_API_KEY_LIFETIME_MS
+    ) {
+      throw new BadRequestException(
+        "API key expiry must be in the future and no more than 365 days away",
       )
-    })
+    }
+
+    const created = await withOrganizationOwnerRlsContext(
+      this.prisma,
+      context,
+      async (tx) => {
+        const key = await tx.apiKey.create({
+          data: {
+            organizationId: context.organizationId,
+            createdByUserId: context.actorId,
+            name,
+            keyHash: hash,
+            permissions,
+            expiresAt,
+          },
+          select: {
+            id: true,
+            name: true,
+            permissions: true,
+            expiresAt: true,
+            createdAt: true,
+          },
+        })
+
+        await this.audit.log(
+          {
+            action: "API_KEY_CREATED",
+            entityType: "ApiKey",
+            metadata: { name, permissions, expiresAt: expiresAt.toISOString() },
+            userId: context.actorId,
+            organizationId: context.organizationId,
+          },
+          tx,
+        )
+        return key
+      },
+    )
 
     return {
-      name,
+      ...created,
       key: raw,
       message: "Store this key securely — it will not be shown again",
     }
@@ -128,37 +157,5 @@ export class ApiKeysService {
 
       return { message: "API key revoked" }
     })
-  }
-
-  async validateKey(rawKey: string): Promise<{
-    valid: boolean
-    permissions?: string[]
-    organizationId?: string
-  }> {
-    const hash = hashKey(rawKey)
-    return withApiKeyValidationRlsContext(
-      this.prisma,
-      { keyHash: hash },
-      async (tx) => {
-        const key = await tx.apiKey.findUnique({
-          where: { keyHash: hash },
-        })
-        if (!key) return { valid: false }
-        if (key.expiresAt && key.expiresAt < new Date()) {
-          return { valid: false }
-        }
-
-        await tx.apiKey.update({
-          where: { id: key.id },
-          data: { lastUsedAt: new Date() },
-        })
-
-        return {
-          valid: true,
-          permissions: key.permissions as string[],
-          organizationId: key.organizationId,
-        }
-      },
-    )
   }
 }

@@ -1,10 +1,63 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-09
+updated: 2026-09-13
 ---
 
 # Current focus
+
+## Security and query hardening follow-up
+
+Branch `codex/security-query-hardening` is stacked on the exact PR #116 head so
+the staged full-RLS PR remains unchanged. The follow-up closes the audit items
+that are safe and valuable to address now: API-key authentication is explicit,
+creator-bound, expiring, permission-scoped, tenant-fenced, and fail-closed;
+report responses and generated artifacts use customer-safe allowlists; legacy
+stored report payloads are redacted; sweeps and admin review paths are bounded;
+and the confirmed website, marketplace, reminder, and cancellation N+1 query
+paths are replaced with batch queries. Supporting indexes and an additive
+migration accompany the query shapes.
+
+The branch also removes three unused queue families and the obsolete generic
+verification worker, makes repeatable registration failures visible, sanitizes
+integration callback errors, validates verification configuration at startup,
+and aligns the repository checks and operational documentation with the current
+Node/TypeScript/Next/Nest toolchain. Existing API keys without creator evidence
+remain stored but cannot authenticate; rotate them after the migration. No RLS
+activation or hosted database change is part of this branch.
+
+Local validation is green for repository policy/format/lint/type/docs/dependency
+checks, Prisma validation and generation, all 1,858 API unit tests, all 482
+shared tests, all 131 API-client tests, and the focused worker runtime/sweep
+tests. Nest, worker, shared, database, API-client, and UI TypeScript build stages
+pass. GitHub run 34481816022 passed the complete migration, unit, integration,
+RLS, package, UI, production-build, and browser matrix on commit `37aa2bd`.
+
+PR #122's initial CodeRabbit and Codex reviews produced nine valid findings.
+The follow-up excludes completed reminders before bounded selection; rotates
+cancellation and website sweeps across runs; reauthorizes staff recipients at
+the write boundary; preserves scoped legacy report jobs; filters public report
+events before truncation; keeps API keys on the anonymous rate tier until
+authentication; fences API-client keys to the configured origin; labels the
+verification CSV as a current-page export; and moves new indexes/FK validation
+to online, staged migrations. CodeRabbit's incremental review added two valid
+hardening findings: direct API-key clients now enforce HTTPS except on loopback,
+and concurrent-index retries fail closed on an invalid remnant with an exact
+valid/invalid/absent recovery procedure. Focused regression coverage passes;
+the final combined GitHub CI rerun on this last follow-up is the remaining gate.
+The first rerun passed every code, migration, RLS, test, and production-build
+stage before Docker Hub stopped serving the pinned MinIO digest. CI now pulls
+that exact verified digest from MinIO's official Quay registry, and final run
+34708411250 passed the complete matrix on commit `1010833`.
+
+Canonical documentation now records the API-key lifecycle, permission/route
+matrix, same-origin HTTPS transport boundary, bounded request queries, N+1
+batching, sweep cursor fairness, report-queue compatibility, and the exact CI
+and RLS assurance boundaries. Stale session-only authentication, gateway-only
+rate-limit, disabled-development-limit, and generic verification-worker claims
+were removed. Documentation commit `abc89f1` passed the complete GitHub matrix
+in run 34722318918, including migrations, integration tests, the destructive
+RLS boundary, packages, production builds, and browser journeys.
 
 ## Full staged application RLS
 
@@ -136,9 +189,11 @@ again before merge.
 
 ## Next actions
 
-1. Push the final PR #116 head and require the complete GitHub matrix plus all
-   resolved review threads before merge.
-2. Keep hosted databases unchanged. After merge, rehearse the canonical
+1. Keep PR #122 based on `codex/staged-api-key-rls` and retarget it to `main`
+   only after PR #116 lands. Preserve the complete green workflow evidence and
+   resolved review state through that sequence.
+2. Keep PR #116 unchanged and keep hosted databases unchanged. After merge,
+   rehearse the canonical
    lockout-safe sequence from `docs/RLS_ROLLOUT.md` on a current staging clone,
    including separate API/auth/worker credentials and pre-activation canaries.
 3. Treat activation on staging or production as a separate approved operations

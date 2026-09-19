@@ -19,6 +19,7 @@ interface HasAuthCredentialsRequest {
   headers: {
     authorization?: string
     cookie?: string
+    "x-api-key"?: string
   }
 }
 

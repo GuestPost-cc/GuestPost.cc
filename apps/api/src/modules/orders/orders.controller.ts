@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from "@nestjs/common"
 import { ActorType } from "../../common/decorators/actor-type.decorator"
+import { ApiKeyPermissions } from "../../common/decorators/api-key-permissions.decorator"
 import { CurrentAuthority } from "../../common/decorators/current-authority.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { RequireOrderOwnership } from "../../common/decorators/order-ownership.decorator"
@@ -58,6 +59,7 @@ export class OrdersController {
   // ─── CRUD ─────────────────────────────────────────────────
 
   @Post()
+  @ApiKeyPermissions("orders:write")
   @UseGuards(MemberRolesGuard)
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
@@ -70,6 +72,7 @@ export class OrdersController {
 
   @ActorType("CUSTOMER", "PUBLISHER")
   @Get()
+  @ApiKeyPermissions("orders:read")
   @UseGuards(MemberRolesGuard)
   @MemberRoles("OWNER", "MEMBER", "PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   list(
@@ -131,6 +134,7 @@ export class OrdersController {
   }
 
   @Get(":id")
+  @ApiKeyPermissions("orders:read")
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
@@ -145,6 +149,7 @@ export class OrdersController {
   }
 
   @Get(":id/events")
+  @ApiKeyPermissions("orders:read")
   @UseGuards(OrderOwnershipGuard)
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
@@ -233,6 +238,7 @@ export class OrdersController {
   // but the service enforces OWNER || creator. A non-creator MEMBER acting on
   // a sibling MEMBER's draft is now refused at the service layer.
   @Post(":id/submit-payment")
+  @ApiKeyPermissions("orders:write")
   @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
