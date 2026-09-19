@@ -45,10 +45,10 @@ describe("assertWebhookTimestampFresh", () => {
     ).not.toThrow()
   })
 
-  it("accepts at 299s future", () => {
+  it("accepts a small future clock skew", () => {
     expect(() =>
       assertWebhookTimestampFresh(
-        new Date(Date.now() + 299_000).toISOString(),
+        new Date(Date.now() + 60_000).toISOString(),
         TOLERANCE,
       ),
     ).not.toThrow()
@@ -65,13 +65,13 @@ describe("assertWebhookTimestampFresh", () => {
     ).not.toThrow()
   })
 
-  it("accepts at exactly 300s future", () => {
+  it("rejects a future timestamp beyond clock skew", () => {
     expect(() =>
       assertWebhookTimestampFresh(
-        new Date(Date.now() + 300_000).toISOString(),
+        new Date(Date.now() + 61_000).toISOString(),
         TOLERANCE,
       ),
-    ).not.toThrow()
+    ).toThrow(WebhookTimestampError)
   })
 
   // ─── Boundary: just outside (301s) ─────────────────────────────

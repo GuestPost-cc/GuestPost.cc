@@ -15,6 +15,7 @@ export const connectRequestSchema = z.object({
   platformWebsiteId: z.string().cuid().optional(),
   returnUrl: z
     .string()
+    .max(2_048)
     .refine(
       (value) => value.startsWith("/") && !value.startsWith("//"),
       "returnUrl must be an application-relative path",
@@ -25,9 +26,9 @@ export const connectRequestSchema = z.object({
 
 export const connectCallbackRequestSchema = z
   .object({
-    code: z.string().min(1).optional(),
-    state: z.string().min(1),
-    error: z.string().min(1).optional(),
+    code: z.string().min(1).max(4_096).optional(),
+    state: z.string().min(1).max(512),
+    error: z.string().min(1).max(1_024).optional(),
   })
   .refine((value) => Boolean(value.code || value.error), {
     message: "OAuth callback must include a code or error",

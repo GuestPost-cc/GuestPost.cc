@@ -83,6 +83,27 @@ describe("connectCallbackRequestSchema", () => {
       connectCallbackRequestSchema.parse({ code: "", state: "nonce" }),
     ).toThrow()
   })
+
+  it("bounds callback fields before they reach Redis or a redirect", () => {
+    expect(() =>
+      connectCallbackRequestSchema.parse({
+        code: "c".repeat(4_097),
+        state: "state",
+      }),
+    ).toThrow()
+    expect(() =>
+      connectCallbackRequestSchema.parse({
+        error: "access_denied",
+        state: "s".repeat(513),
+      }),
+    ).toThrow()
+    expect(() =>
+      connectCallbackRequestSchema.parse({
+        error: "e".repeat(1_025),
+        state: "state",
+      }),
+    ).toThrow()
+  })
 })
 
 describe("linkPropertyRequestSchema", () => {

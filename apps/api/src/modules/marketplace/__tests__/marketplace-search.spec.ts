@@ -361,6 +361,19 @@ describe("MarketplaceService search", () => {
     expect(query.sql).not.toContain('listing."domainRating"')
   })
 
+  it("treats SQL LIKE wildcards in filters as literal text", async () => {
+    await service.searchListings({
+      query: "50%_\\",
+      country: "U%",
+      sortBy: "traffic",
+    })
+
+    const query = prisma.$queryRaw.mock.calls[0][0] as any
+    expect(query.sql).toContain("ESCAPE '\\'")
+    expect(query.values).toContain("%50\\%\\_\\\\%")
+    expect(query.values).toContain("U\\%")
+  })
+
   it.each([
     "PUBLISHER_MANUAL",
     "STAFF_MANUAL",
