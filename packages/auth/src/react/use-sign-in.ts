@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { getErrorMessage, isAuthError } from "../client/errors"
+import { sanitizeClientReturnTo } from "../client/safe-redirect"
 import { signIn as signInTransport } from "../client/transport"
 import type { AuthError } from "../types"
 
@@ -38,9 +39,7 @@ export function useSignIn(): UseSignInReturn {
         // Hard navigation — forces the dashboard middleware to re-evaluate
         // the freshly-rotated session cookie. router.push() leaves the
         // Next.js layout with stale session state and bounces the user back.
-        const redirectTo =
-          input.returnTo ||
-          (input.portal === "publisher" ? "/dashboard" : "/dashboard")
+        const redirectTo = sanitizeClientReturnTo(input.returnTo)
         if (redirectTo && typeof window !== "undefined") {
           window.location.href = redirectTo
         }

@@ -1,5 +1,6 @@
 import {
   getSessionCookieValue,
+  hasPlausibleSessionCookie,
   requiresAuthRedirect,
   SECURE_SESSION_COOKIE_NAME,
   SESSION_COOKIE_NAME,
@@ -24,13 +25,27 @@ describe("middleware auth helpers", () => {
     expect(value).toBe("secure-session")
   })
 
-  it("allows protected paths when any supported session cookie is present", () => {
+  it("allows protected paths when a plausibly signed session cookie is present", () => {
     expect(
-      requiresAuthRedirect("/dashboard", "secure-session", {
+      requiresAuthRedirect(
+        "/dashboard",
+        `${"a".repeat(16)}.${"b".repeat(40)}`,
+        {
+          signInPath: "/",
+          protectedPaths: ["/dashboard"],
+        },
+      ),
+    ).toEqual({ needsRedirect: false })
+  })
+
+  it("redirects invalid cookie values instead of rendering the dashboard shell", () => {
+    expect(hasPlausibleSessionCookie("forged")).toBe(false)
+    expect(
+      requiresAuthRedirect("/dashboard", "forged", {
         signInPath: "/",
         protectedPaths: ["/dashboard"],
       }),
-    ).toEqual({ needsRedirect: false })
+    ).toMatchObject({ needsRedirect: true })
   })
 
   it("preserves the full query string in an unauthenticated return path", () => {
