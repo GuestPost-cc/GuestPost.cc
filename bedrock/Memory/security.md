@@ -25,6 +25,19 @@ updated: 2026-09-08
 - Stripe: HMAC verified before queueing (timing-safe, 300s tolerance)
 - Wise: RSA-SHA256 signature verified
 - Fail-closed: missing config → 503, bad sig → 401
+- Signed webhook timestamps allow only 60 seconds of future clock skew, so a
+  captured future-dated event cannot extend the normal replay window.
+
+## Fetch and Browser Boundaries
+
+- Worker URL verification follows redirects manually, validates every hop, and
+  uses an Undici connection-time DNS guard against private IPv4, IPv6, and
+  IPv4-mapped addresses.
+- Portal, publisher, and admin use nonce CSP proxies; the proxies retain the
+  former dashboard authentication redirects and reject unshaped session
+  cookies before rendering protected shells.
+- Detailed worker queue metrics require `WORKER_METRICS_TOKEN`; liveness and
+  readiness responses do not reveal dependency error strings or process IDs.
 
 ## Guards
 
