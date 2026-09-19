@@ -47,7 +47,8 @@ authority in the write transaction.
   overrides before its cap, advances by website ID with a validated 30-day
   Redis cursor, and resets after reaching the end.
 
-The report consumer retains the legacy `generate-report` name only to drain
+The report consumer retains both legacy job names—`generate-report`
+(`LEGACY_GENERATE`) and `export-report` (`EXPORT_REPORT`)—only to drain
 persisted jobs during rolling deployment. Legacy and current report jobs still
 require `organizationId`; unsupported names fail instead of acknowledging work
 without an artifact.
