@@ -89,6 +89,10 @@ const AUTHORITATIVE_DOMAIN_RATING_SOURCE_SQL = Prisma.join(
   ),
 )
 
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&")
+}
+
 type SqlSearchSort =
   | "recommended"
   | "traffic"
@@ -873,7 +877,9 @@ export class MarketplaceService {
       )
     }
     if (dto.country) {
-      listingConditions.push(Prisma.sql`listing."country" ILIKE ${dto.country}`)
+      listingConditions.push(
+        Prisma.sql`listing."country" ILIKE ${escapeLike(dto.country)} ESCAPE '\\'`,
+      )
     }
     const languages = dto.languages?.length
       ? dto.languages
@@ -959,26 +965,26 @@ export class MarketplaceService {
       )
     }
     if (dto.query) {
-      const pattern = `%${dto.query}%`
+      const pattern = `%${escapeLike(dto.query)}%`
       listingConditions.push(
         Prisma.sql`(
-          listing."title" ILIKE ${pattern}
-          OR listing."description" ILIKE ${pattern}
-          OR listing."slug" ILIKE ${pattern}
+          listing."title" ILIKE ${pattern} ESCAPE '\\'
+          OR listing."description" ILIKE ${pattern} ESCAPE '\\'
+          OR listing."slug" ILIKE ${pattern} ESCAPE '\\'
           OR EXISTS (
             SELECT 1
             FROM "MarketplaceListingCategory" listing_category
             JOIN "MarketplaceCategory" category
               ON category."id" = listing_category."categoryId"
             WHERE listing_category."listingId" = listing."id"
-              AND category."name" ILIKE ${pattern}
+              AND category."name" ILIKE ${pattern} ESCAPE '\\'
           )
           OR EXISTS (
             SELECT 1
             FROM "MarketplaceListingTag" listing_tag
             JOIN "MarketplaceTag" tag ON tag."id" = listing_tag."tagId"
             WHERE listing_tag."listingId" = listing."id"
-              AND tag."name" ILIKE ${pattern}
+              AND tag."name" ILIKE ${pattern} ESCAPE '\\'
           )
         )`,
       )
