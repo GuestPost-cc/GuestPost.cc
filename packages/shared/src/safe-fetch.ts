@@ -22,7 +22,7 @@
 // undici/dns mocking — the Agent's lookup callback is a thin wrapper.
 
 import dns from "node:dns"
-import { BlockList, isIP } from "node:net"
+import { BlockList, isIP, type LookupFunction } from "node:net"
 import { Agent, fetch as undiciFetch } from "undici"
 
 // Subnet-aware checks avoid format-sensitive IPv6 regexes. BlockList also
@@ -119,33 +119,27 @@ export function validateResolvedAddress(
 // The lookup callback is intentionally minimal — all validation logic
 // lives in validateResolvedAddress() above for direct unit-testability.
 //
-// Uses undici v7+ dns.lookup (Promise-based) instead of the deprecated
-// connect.lookup (callback-based) which broke in undici 7.x / Node 24+.
-// The undici type definitions don't include the dns property yet, so
-// the inner options are spread via a cast to avoid TS errors.
+// Undici passes `connect` options directly to node:net/tls. Keeping the
+// check in this callback ensures the address accepted by DNS is the address
+// used for the TCP connection.
+export function createSafeLookup(
+  lookup: LookupFunction = dns.lookup,
+): LookupFunction {
+  return (hostname, options, callback) => {
+    lookup(hostname, { ...options, all: false }, (error, address, family) => {
+      if (error) return callback(error, "", family)
+
+      const violation = validateResolvedAddress(hostname, address as string)
+      if (violation) return callback(violation, "", family)
+
+      callback(null, address, family)
+    })
+  }
+}
+
 const SAFE_LOOKUP_AGENT = new Agent({
   pipelining: 0,
-  ...({
-    dns: {
-      lookup: (hostname: string, options: object) => {
-        return new Promise<{ address: string; family: number }>(
-          (resolve, reject) => {
-            dns.lookup(
-              hostname,
-              { ...options, all: false },
-              (err, address, family) => {
-                if (err) return reject(err)
-                const addr = address as string
-                const violation = validateResolvedAddress(hostname, addr)
-                if (violation) return reject(violation)
-                resolve({ address: addr, family: family as number })
-              },
-            )
-          },
-        )
-      },
-    },
-  } as any),
+  connect: { lookup: createSafeLookup() },
 })
 
 /**
