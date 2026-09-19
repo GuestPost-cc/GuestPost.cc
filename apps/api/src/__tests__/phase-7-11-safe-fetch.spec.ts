@@ -10,7 +10,9 @@
 // Deep import: safe-fetch is intentionally NOT re-exported from
 // @guestpost/shared's root index (it imports node:dns + undici, which
 // the Next.js apps can't bundle). See packages/shared/src/index.ts.
+import type { LookupFunction } from "node:net"
 import {
+  createSafeLookup,
   isPrivateIpAddress,
   isSafePublicUrl,
   readBodyWithCap,
@@ -167,6 +169,21 @@ describe("Phase 7.11 — validateResolvedAddress (pure DNS-rebinding validator)"
     it("returns null for empty string (caller should check dns.lookup err first)", () => {
       expect(validateResolvedAddress("example.com", "")).toBeNull()
     })
+  })
+})
+
+describe("Phase 7.11 — connection DNS guard", () => {
+  it("rejects a hostname that resolves to loopback before connecting", async () => {
+    const rebindingLookup: LookupFunction = (_hostname, _options, callback) =>
+      callback(null, "127.0.0.1", 4)
+    const lookup = createSafeLookup(rebindingLookup)
+
+    const error = await new Promise<Error | null>((resolve) => {
+      lookup("rebound.example", {}, (err) => resolve(err))
+    })
+
+    expect(error).toBeInstanceOf(SafeFetchError)
+    expect((error as SafeFetchError).code).toBe("DNS_REBINDING")
   })
 })
 
