@@ -426,7 +426,7 @@ describe("PayoutWebhookController — signature verification", () => {
     expect(prismaMock.payoutWebhookEvent.create).not.toHaveBeenCalled()
   })
 
-  it("rejects Wise webhook with a future timestamp outside tolerance (+301s)", async () => {
+  it("rejects Wise webhook beyond the 60s future clock-skew allowance (+301s)", async () => {
     const { publicKey, privateKey } = generateKeyPairSync("rsa", {
       modulusLength: 2048,
     })
