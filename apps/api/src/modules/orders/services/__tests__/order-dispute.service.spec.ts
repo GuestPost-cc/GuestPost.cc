@@ -295,12 +295,11 @@ describe("OrderDisputeService refund authorization", () => {
           .mockResolvedValueOnce(0)
           .mockResolvedValueOnce(1),
       },
-      $transaction: jest
-        .fn()
-        .mockImplementation(async (operations: Promise<unknown>[]) =>
-          Promise.all(operations),
-        ),
+      $transaction: jest.fn(),
     }
+    prisma.$transaction.mockImplementation(async (operation: any) =>
+      operation(prisma),
+    )
     const service = new OrderDisputeService(
       prisma,
       { log: jest.fn() } as any,

@@ -1705,6 +1705,8 @@ export const MarketplaceReviewScalarFieldEnum = {
   id: 'id',
   listingId: 'listingId',
   userId: 'userId',
+  reviewerName: 'reviewerName',
+  reviewerImage: 'reviewerImage',
   rating: 'rating',
   title: 'title',
   content: 'content',

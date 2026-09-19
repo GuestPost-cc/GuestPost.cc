@@ -1995,42 +1995,44 @@ export class PublisherPayoutsService {
       ...(publisherId ? { publisherId } : {}),
       ...(statuses?.length ? { status: { in: statuses } } : {}),
     }
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.withdrawal.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          publisherId: true,
-          amount: true,
-          currency: true,
-          publicReference: true,
-          payoutFee: true,
-          netAmount: true,
-          feePolicyVersion: true,
-          method: true,
-          status: true,
-          availableAt: true,
-          createdAt: true,
-          publisher: true,
-          payoutMethod: { select: { id: true, type: true, label: true } },
-          allocations: {
-            where: { releasedAt: null },
-            orderBy: { sequence: "asc" },
-            select: {
-              amount: true,
-              currency: true,
-              sourceType: true,
-              serviceType: true,
-              orderId: true,
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.withdrawal.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            publisherId: true,
+            amount: true,
+            currency: true,
+            publicReference: true,
+            payoutFee: true,
+            netAmount: true,
+            feePolicyVersion: true,
+            method: true,
+            status: true,
+            availableAt: true,
+            createdAt: true,
+            publisher: true,
+            payoutMethod: { select: { id: true, type: true, label: true } },
+            allocations: {
+              where: { releasedAt: null },
+              orderBy: { sequence: "asc" },
+              select: {
+                amount: true,
+                currency: true,
+                sourceType: true,
+                serviceType: true,
+                orderId: true,
+              },
             },
           },
-        },
-        take,
-        skip,
-      }),
-      this.prisma.withdrawal.count({ where }),
-    ])
+          take,
+          skip,
+        }),
+        tx.withdrawal.count({ where }),
+      ]),
+    )
     return { items, total, take, skip }
   }
 }

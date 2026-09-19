@@ -2,15 +2,16 @@ import { PublisherPayoutsService } from "./publisher-payouts.service"
 
 describe("PublisherPayoutsService withdrawal list filtering", () => {
   it("uses the same controlled status filter for the page and exact total", async () => {
-    const prisma = {
+    const prisma: any = {
       withdrawal: {
         findMany: jest.fn().mockResolvedValue([{ id: "withdrawal-1" }]),
         count: jest.fn().mockResolvedValue(25),
       },
-      $transaction: jest.fn((queries: Array<Promise<unknown>>) =>
-        Promise.all(queries),
-      ),
+      $transaction: jest.fn(),
     }
+    prisma.$transaction.mockImplementation(async (operation: any) =>
+      operation(prisma),
+    )
     const service = new PublisherPayoutsService(
       prisma as any,
       {} as any,

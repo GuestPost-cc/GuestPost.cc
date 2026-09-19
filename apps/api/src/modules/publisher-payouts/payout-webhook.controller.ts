@@ -24,7 +24,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common"
 import { Request } from "express"
-import { Public } from "../../common/decorators/public.decorator"
+import { PublicWebhook } from "../../common/decorators/public.decorator"
 import { assertApiFinanceOperationAllowed } from "../../common/finance-runtime-mode"
 import { PrismaService } from "../../common/prisma.service"
 import { assertStripeObjectMode } from "../../common/stripe-client"
@@ -63,7 +63,7 @@ export class PayoutWebhookController {
   // Stripe platform and connected-account destinations are separate trust
   // domains. Never accept both signing secrets on one route: an event's
   // untrusted `account` field cannot be allowed to widen signature authority.
-  @Public()
+  @PublicWebhook("PAYOUT_PROVIDER")
   @Post("stripe_connect/platform")
   handleStripePlatformWebhook(
     @Headers() headers: Record<string, string>,
@@ -77,7 +77,7 @@ export class PayoutWebhookController {
     )
   }
 
-  @Public()
+  @PublicWebhook("PAYOUT_PROVIDER")
   @Post("stripe_connect/connected")
   handleStripeConnectedWebhook(
     @Headers() headers: Record<string, string>,
@@ -94,7 +94,7 @@ export class PayoutWebhookController {
   // Public: providers cannot authenticate with a session — the cryptographic
   // signature check below is the authentication for this route. The legacy
   // one-segment Stripe route is intentionally retired; Wise retains it.
-  @Public()
+  @PublicWebhook("PAYOUT_PROVIDER")
   @Post(":provider")
   handleWebhook(
     @Param("provider") provider: string,

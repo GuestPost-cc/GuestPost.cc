@@ -1,4 +1,7 @@
-import { createPrismaClient } from "@guestpost/database"
+import {
+  createPrismaClient,
+  createRlsAwarePrismaClient,
+} from "@guestpost/database"
 import {
   IntegrationEncryptionService,
   type IntegrationTokenIdentity,
@@ -18,7 +21,7 @@ import { getProvider } from "../providers"
 import type { OwnerContext } from "../types"
 import { ExternalAccountStatus } from "../types"
 
-const db = createPrismaClient()
+const db = createRlsAwarePrismaClient(createPrismaClient())
 let encryptionSingleton: IntegrationEncryptionService | undefined
 
 function integrationEncryption(): IntegrationEncryptionService {

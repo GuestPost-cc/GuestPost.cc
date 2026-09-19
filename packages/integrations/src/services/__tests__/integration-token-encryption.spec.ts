@@ -27,6 +27,7 @@ const mockDb = {
 
 jest.mock("@guestpost/database", () => ({
   createPrismaClient: () => mockDb,
+  createRlsAwarePrismaClient: (client: unknown) => client,
 }))
 jest.mock("../../adapters/encryption.adapter", () => ({
   IntegrationEncryptionService: jest.fn().mockImplementation(() => ({

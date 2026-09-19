@@ -13,7 +13,9 @@ evidence while refusing money mutations.
 
 | Var | Notes |
 |---|---|
-| `DATABASE_URL` | Real credentials are API/worker-only and use the least-privilege runtime DML role; must not own the schema/tables or have DDL, trigger, superuser, or `BYPASSRLS` authority. A frontend build may receive only the committed unreachable loopback placeholder needed by workspace Prisma generation, never a live credential. |
+| `DATABASE_URL` | Per-service least-privilege runtime URL: API uses `guestpost_api_runtime`; workers use `guestpost_worker_runtime`. Neither may own schema/tables or have DDL, trigger, superuser, or `BYPASSRLS`. Never share the two credentials. A frontend build may receive only the committed unreachable loopback placeholder needed by workspace Prisma generation, never a live credential. |
+| `AUTH_DATABASE_URL` | API process only: Better Auth's separate `guestpost_auth_runtime` URL. Required when full RLS enforcement is enabled so pre-tenant session and signup flows cannot be locked out. |
+| `RLS_ENFORCEMENT_ENABLED` | Exact `true` enables transaction-local context on API/worker Prisma clients. Roll out only in the staged order in `docs/RLS_ROLLOUT.md`; missing/other values keep the proxy inert. |
 | `DIRECT_DATABASE_URL` | isolated deploy/migration job only; schema-owner credential, never injected into API/worker/frontend/job runtimes |
 | `REDIS_URL` | API cache, rate limits, and pub/sub |
 | `QUEUE_REDIS_URL` | BullMQ; falls back to `REDIS_URL`, but use a separate production database |

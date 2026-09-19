@@ -1231,44 +1231,46 @@ export class OrderCancellationService {
       ...(params.status && { status: params.status }),
       ...(params.requestId && { id: params.requestId }),
     }
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.orderCancellationRequest.findMany({
-        where,
-        include: {
-          fraudFindings: {
-            where: { outcome: "CONFIRMED_FRAUD" },
-            select: { id: true },
-            take: 1,
-          },
-          order: {
-            include: {
-              website: {
-                select: {
-                  id: true,
-                  domain: true,
-                  publisherId: true,
-                  ownershipType: true,
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.orderCancellationRequest.findMany({
+          where,
+          include: {
+            fraudFindings: {
+              where: { outcome: "CONFIRMED_FRAUD" },
+              select: { id: true },
+              take: 1,
+            },
+            order: {
+              include: {
+                website: {
+                  select: {
+                    id: true,
+                    domain: true,
+                    publisherId: true,
+                    ownershipType: true,
+                  },
                 },
-              },
-              customer: { select: { id: true, name: true, email: true } },
-              settlements: {
-                where: { status: { not: "CANCELLED" } },
-                orderBy: { createdAt: "desc" },
-                take: 1,
-                select: {
-                  publisherAmount: true,
-                  currency: true,
+                customer: { select: { id: true, name: true, email: true } },
+                settlements: {
+                  where: { status: { not: "CANCELLED" } },
+                  orderBy: { createdAt: "desc" },
+                  take: 1,
+                  select: {
+                    publisherAmount: true,
+                    currency: true,
+                  },
                 },
               },
             },
           },
-        },
-        orderBy: { createdAt: "asc" },
-        take,
-        skip,
-      }),
-      this.prisma.orderCancellationRequest.count({ where }),
-    ])
+          orderBy: { createdAt: "asc" },
+          take,
+          skip,
+        }),
+        tx.orderCancellationRequest.count({ where }),
+      ]),
+    )
     return {
       items: items.map((request: any) => {
         const { fraudFindings, ...requestWithoutFraudFindings } = request

@@ -1,3 +1,4 @@
+import { setRlsRequestContext } from "@guestpost/database"
 import {
   type CanActivate,
   type ExecutionContext,
@@ -31,6 +32,32 @@ export class CurrentAuthorityGuard implements CanActivate {
       throw new ForbiddenException("Authenticated session authority required")
     }
     const authority = await this.authorities.resolveRequest(request)
+
+    if (authority.userType === "CUSTOMER") {
+      setRlsRequestContext({
+        workload: "API",
+        actorId: authority.id,
+        actorKind: "CUSTOMER",
+        organizationId: authority.organizationId,
+        organizationRole: authority.customerRole,
+      })
+    } else if (authority.userType === "PUBLISHER") {
+      setRlsRequestContext({
+        workload: "API",
+        actorId: authority.id,
+        actorKind: "PUBLISHER",
+        publisherId: authority.publisherId,
+        publisherRole: authority.publisherRole,
+      })
+    } else {
+      setRlsRequestContext({
+        workload: "API",
+        actorId: authority.id,
+        actorKind: "STAFF",
+        staffRole: authority.staffRole,
+        staffPermissions: authority.staffPermissions,
+      })
+    }
 
     if (!authority.emailVerified && requiresEmailVerification(request)) {
       throw new ForbiddenException("EMAIL_NOT_VERIFIED")

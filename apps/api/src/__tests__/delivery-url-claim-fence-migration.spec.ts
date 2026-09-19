@@ -31,6 +31,14 @@ const runtimeGrantSql = fs.readFileSync(
   path.join(repoRoot, "scripts/fixtures/grant-delivery-url-fence-runtime.sql"),
   "utf8",
 )
+const rlsProvisioningSql = fs.readFileSync(
+  path.join(repoRoot, "scripts/provision-rls-roles.sql"),
+  "utf8",
+)
+const rlsRolloutRunbook = fs.readFileSync(
+  path.join(repoRoot, "docs/RLS_ROLLOUT.md"),
+  "utf8",
+)
 
 describe("delivery URL claim fence migration contract", () => {
   it("uses the same advisory namespace as the application lock", () => {
@@ -124,5 +132,96 @@ describe("delivery URL claim fence migration contract", () => {
     expect(runtimeGrantSql).toMatch(/GRANT USAGE ON SCHEMA public/)
     expect(runtimeGrantSql).toMatch(/REVOKE CREATE ON SCHEMA public/)
     expect(financeRehearsalScript).toContain("ERROR:  40001:")
+  })
+
+  it("preserves the exact direct fence grant in the staged RLS role topology", () => {
+    expect(rlsProvisioningSql).toContain("\\set ON_ERROR_STOP on")
+    expect(rlsProvisioningSql).toMatch(
+      /database_name is required[\s\S]*\\quit 3/,
+    )
+    expect(rlsProvisioningSql).toMatch(
+      /SELECT current_database\(\) = :'database_name' AS target_database_matches \\gset[\s\S]*\\if :target_database_matches[\s\S]*\\quit 3/,
+    )
+    expect(rlsProvisioningSql).toContain(
+      "GRANT USAGE, CREATE ON SCHEMA public TO guestpost_schema_owner",
+    )
+    expect(rlsProvisioningSql).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\."acquire_delivery_url_claim_fence"\(text\)\s+TO guestpost_api_group, guestpost_worker_group/,
+    )
+    expect(rlsProvisioningSql).toContain(
+      "REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC",
+    )
+    const managedAclCleanup = rlsProvisioningSql.indexOf(
+      "REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM\n  guestpost_api_group",
+    )
+    const compatibilityGrant = rlsProvisioningSql.indexOf(
+      "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost_api_group",
+    )
+    expect(managedAclCleanup).toBeGreaterThan(-1)
+    expect(compatibilityGrant).toBeGreaterThan(managedAclCleanup)
+    expect(rlsProvisioningSql).toContain(
+      "ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM\n  guestpost_api_group",
+    )
+  })
+
+  it("atomically rebuilds the managed graph and leaves credentials disabled", () => {
+    const transactionStart = rlsProvisioningSql.indexOf("BEGIN;\n\nDO $roles$")
+    const membershipCleanup = rlsProvisioningSql.indexOf("DO $memberships$")
+    const intendedMemberships = rlsProvisioningSql.indexOf(
+      "GRANT guestpost_schema_owner TO guestpost_migrator",
+    )
+    const transactionCommit = rlsProvisioningSql.indexOf("\nCOMMIT;")
+
+    expect(transactionStart).toBeGreaterThan(-1)
+    expect(membershipCleanup).toBeGreaterThan(-1)
+    expect(membershipCleanup).toBeGreaterThan(transactionStart)
+    expect(intendedMemberships).toBeGreaterThan(membershipCleanup)
+    expect(transactionCommit).toBeGreaterThan(intendedMemberships)
+    expect(rlsProvisioningSql).toContain("'REVOKE %I FROM %I'")
+    expect(rlsProvisioningSql).toContain(
+      "ALTER ROLE guestpost_api_runtime NOLOGIN",
+    )
+    expect(rlsProvisioningSql).not.toMatch(
+      /^ALTER ROLE guestpost_(?:migrator|api_runtime|auth_runtime|worker_runtime|reporting_runtime) LOGIN;$/m,
+    )
+    expect(
+      rlsProvisioningSql.match(/^GRANT guestpost_\w+ TO guestpost_\w+ .+;$/gm),
+    ).toEqual([
+      "GRANT guestpost_schema_owner TO guestpost_migrator WITH INHERIT FALSE, SET TRUE;",
+      "GRANT guestpost_api_group TO guestpost_api_runtime WITH INHERIT TRUE, SET FALSE;",
+      "GRANT guestpost_auth_group TO guestpost_auth_runtime WITH INHERIT TRUE, SET FALSE;",
+      "GRANT guestpost_worker_group TO guestpost_worker_runtime WITH INHERIT TRUE, SET FALSE;",
+      "GRANT guestpost_reporting_group TO guestpost_reporting_runtime WITH INHERIT TRUE, SET FALSE;",
+    ])
+    expect(rlsProvisioningSql).toMatch(
+      /ALTER ROLE guestpost_migrator IN DATABASE :"database_name"\s+SET role TO 'guestpost_schema_owner'/,
+    )
+    expect(rlsProvisioningSql).toContain(
+      'ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name" RESET role',
+    )
+  })
+
+  it("requires object-specific grants in every relation-creating migration", () => {
+    expect(rlsRolloutRunbook).toContain("## Required migration grant checklist")
+    expect(rlsRolloutRunbook).toMatch(
+      /Every\s+migration that creates a table or sequence/,
+    )
+    expect(rlsRolloutRunbook).toContain(
+      "reject blanket application-role default privileges",
+    )
+    expect(rlsRolloutRunbook).toContain(
+      "FROM information_schema.table_privileges",
+    )
+    expect(rlsRolloutRunbook).toContain("WITH public_acl AS")
+    expect(rlsRolloutRunbook).toContain("leaves all credential roles `NOLOGIN`")
+    expect(rlsProvisioningSql).toContain(
+      "GRANT USAGE ON SCHEMA public TO guestpost_rls_authorizer",
+    )
+    expect(rlsProvisioningSql).toContain(
+      "GRANT SELECT ON ALL TABLES IN SCHEMA public TO guestpost_rls_authorizer",
+    )
+    expect(rlsRolloutRunbook).toContain(
+      "`guestpost_rls_authorizer` access for every new policy root",
+    )
   })
 })

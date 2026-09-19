@@ -1,4 +1,7 @@
-import { prisma } from "@guestpost/database"
+import {
+  createPrismaClient,
+  prisma as defaultPrisma,
+} from "@guestpost/database"
 import { CURRENT_TERMS_VERSION, TERMS_DOCUMENT_TYPE } from "@guestpost/shared"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
@@ -16,6 +19,16 @@ import {
   AUTH_SESSION_OPTIONS,
   googleProviderOptions,
 } from "./security-options.js"
+
+// Better Auth runs before the Nest request/tenant transaction exists. During
+// full RLS enforcement it therefore uses a separate least-privilege database
+// identity whose policies cover only authentication and birth-time account
+// provisioning. The fallback preserves local/test compatibility before the
+// staged role cutover; production startup rejects that fallback when full RLS
+// is enabled.
+const prisma = process.env.AUTH_DATABASE_URL
+  ? createPrismaClient({ databaseUrl: process.env.AUTH_DATABASE_URL })
+  : defaultPrisma
 
 export type { PasswordResetEmailContext } from "./email-templates/password-reset.js"
 export { renderPasswordResetEmail } from "./email-templates/password-reset.js"

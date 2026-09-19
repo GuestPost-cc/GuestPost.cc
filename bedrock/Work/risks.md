@@ -1,7 +1,7 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-08-23
+updated: 2026-09-08
 ---
 
 # Risks
@@ -13,6 +13,16 @@ fleet containment. Historical audit Views are snapshots, not current status;
 canonical launch-risk register.
 
 ## Current production-hold risk
+
+- **Row-level security is deliberately partial.** `ApiKey` has forced RLS and
+  a real two-tenant, non-owner-role CRUD test, but the other 98 Prisma models
+  have not yet received RLS policies. Existing API guards and ownership checks
+  remain required; neither a green RLS test nor custom transaction settings
+  makes a stolen runtime database credential safe. Before any environment role
+  cutover, inventory table/function access, validate Better Auth's pre-user
+  queries and worker/staff flows, transfer ownership under a controlled
+  migration role, then roll out each table family with explicit policies and
+  no `BYPASSRLS` or role-wide exemption. See `docs/RLS_ROLLOUT.md`.
 
 - **The marketplace moderation migrations are applied in the authorized Neon
   staging database, but neither is deployed to production.** Migration

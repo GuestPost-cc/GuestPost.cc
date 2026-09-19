@@ -38,6 +38,8 @@ export type MarketplaceReviewMinAggregateOutputType = {
   id: string | null
   listingId: string | null
   userId: string | null
+  reviewerName: string | null
+  reviewerImage: string | null
   rating: number | null
   title: string | null
   content: string | null
@@ -52,6 +54,8 @@ export type MarketplaceReviewMaxAggregateOutputType = {
   id: string | null
   listingId: string | null
   userId: string | null
+  reviewerName: string | null
+  reviewerImage: string | null
   rating: number | null
   title: string | null
   content: string | null
@@ -66,6 +70,8 @@ export type MarketplaceReviewCountAggregateOutputType = {
   id: number
   listingId: number
   userId: number
+  reviewerName: number
+  reviewerImage: number
   rating: number
   title: number
   content: number
@@ -90,6 +96,8 @@ export type MarketplaceReviewMinAggregateInputType = {
   id?: true
   listingId?: true
   userId?: true
+  reviewerName?: true
+  reviewerImage?: true
   rating?: true
   title?: true
   content?: true
@@ -104,6 +112,8 @@ export type MarketplaceReviewMaxAggregateInputType = {
   id?: true
   listingId?: true
   userId?: true
+  reviewerName?: true
+  reviewerImage?: true
   rating?: true
   title?: true
   content?: true
@@ -118,6 +128,8 @@ export type MarketplaceReviewCountAggregateInputType = {
   id?: true
   listingId?: true
   userId?: true
+  reviewerName?: true
+  reviewerImage?: true
   rating?: true
   title?: true
   content?: true
@@ -219,6 +231,8 @@ export type MarketplaceReviewGroupByOutputType = {
   id: string
   listingId: string
   userId: string
+  reviewerName: string | null
+  reviewerImage: string | null
   rating: number
   title: string | null
   content: string
@@ -256,6 +270,8 @@ export type MarketplaceReviewWhereInput = {
   id?: Prisma.StringFilter<"MarketplaceReview"> | string
   listingId?: Prisma.StringFilter<"MarketplaceReview"> | string
   userId?: Prisma.StringFilter<"MarketplaceReview"> | string
+  reviewerName?: Prisma.StringNullableFilter<"MarketplaceReview"> | string | null
+  reviewerImage?: Prisma.StringNullableFilter<"MarketplaceReview"> | string | null
   rating?: Prisma.IntFilter<"MarketplaceReview"> | number
   title?: Prisma.StringNullableFilter<"MarketplaceReview"> | string | null
   content?: Prisma.StringFilter<"MarketplaceReview"> | string
@@ -272,6 +288,8 @@ export type MarketplaceReviewOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  reviewerName?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewerImage?: Prisma.SortOrderInput | Prisma.SortOrder
   rating?: Prisma.SortOrder
   title?: Prisma.SortOrderInput | Prisma.SortOrder
   content?: Prisma.SortOrder
@@ -291,6 +309,8 @@ export type MarketplaceReviewWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.MarketplaceReviewWhereInput | Prisma.MarketplaceReviewWhereInput[]
   listingId?: Prisma.StringFilter<"MarketplaceReview"> | string
   userId?: Prisma.StringFilter<"MarketplaceReview"> | string
+  reviewerName?: Prisma.StringNullableFilter<"MarketplaceReview"> | string | null
+  reviewerImage?: Prisma.StringNullableFilter<"MarketplaceReview"> | string | null
   rating?: Prisma.IntFilter<"MarketplaceReview"> | number
   title?: Prisma.StringNullableFilter<"MarketplaceReview"> | string | null
   content?: Prisma.StringFilter<"MarketplaceReview"> | string
@@ -307,6 +327,8 @@ export type MarketplaceReviewOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  reviewerName?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewerImage?: Prisma.SortOrderInput | Prisma.SortOrder
   rating?: Prisma.SortOrder
   title?: Prisma.SortOrderInput | Prisma.SortOrder
   content?: Prisma.SortOrder
@@ -329,6 +351,8 @@ export type MarketplaceReviewScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"MarketplaceReview"> | string
   listingId?: Prisma.StringWithAggregatesFilter<"MarketplaceReview"> | string
   userId?: Prisma.StringWithAggregatesFilter<"MarketplaceReview"> | string
+  reviewerName?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceReview"> | string | null
+  reviewerImage?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceReview"> | string | null
   rating?: Prisma.IntWithAggregatesFilter<"MarketplaceReview"> | number
   title?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceReview"> | string | null
   content?: Prisma.StringWithAggregatesFilter<"MarketplaceReview"> | string
@@ -341,6 +365,8 @@ export type MarketplaceReviewScalarWhereWithAggregatesInput = {
 
 export type MarketplaceReviewCreateInput = {
   id?: string
+  reviewerName?: string | null
+  reviewerImage?: string | null
   rating: number
   title?: string | null
   content: string
@@ -357,6 +383,8 @@ export type MarketplaceReviewUncheckedCreateInput = {
   id?: string
   listingId: string
   userId: string
+  reviewerName?: string | null
+  reviewerImage?: string | null
   rating: number
   title?: string | null
   content: string
@@ -369,6 +397,8 @@ export type MarketplaceReviewUncheckedCreateInput = {
 
 export type MarketplaceReviewUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -385,6 +415,8 @@ export type MarketplaceReviewUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   listingId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -399,6 +431,8 @@ export type MarketplaceReviewCreateManyInput = {
   id?: string
   listingId: string
   userId: string
+  reviewerName?: string | null
+  reviewerImage?: string | null
   rating: number
   title?: string | null
   content: string
@@ -411,6 +445,8 @@ export type MarketplaceReviewCreateManyInput = {
 
 export type MarketplaceReviewUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -425,6 +461,8 @@ export type MarketplaceReviewUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   listingId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -449,6 +487,8 @@ export type MarketplaceReviewCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  reviewerName?: Prisma.SortOrder
+  reviewerImage?: Prisma.SortOrder
   rating?: Prisma.SortOrder
   title?: Prisma.SortOrder
   content?: Prisma.SortOrder
@@ -467,6 +507,8 @@ export type MarketplaceReviewMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  reviewerName?: Prisma.SortOrder
+  reviewerImage?: Prisma.SortOrder
   rating?: Prisma.SortOrder
   title?: Prisma.SortOrder
   content?: Prisma.SortOrder
@@ -481,6 +523,8 @@ export type MarketplaceReviewMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  reviewerName?: Prisma.SortOrder
+  reviewerImage?: Prisma.SortOrder
   rating?: Prisma.SortOrder
   title?: Prisma.SortOrder
   content?: Prisma.SortOrder
@@ -581,6 +625,8 @@ export type MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput = {
 
 export type MarketplaceReviewCreateWithoutUserInput = {
   id?: string
+  reviewerName?: string | null
+  reviewerImage?: string | null
   rating: number
   title?: string | null
   content: string
@@ -595,6 +641,8 @@ export type MarketplaceReviewCreateWithoutUserInput = {
 export type MarketplaceReviewUncheckedCreateWithoutUserInput = {
   id?: string
   listingId: string
+  reviewerName?: string | null
+  reviewerImage?: string | null
   rating: number
   title?: string | null
   content: string
@@ -638,6 +686,8 @@ export type MarketplaceReviewScalarWhereInput = {
   id?: Prisma.StringFilter<"MarketplaceReview"> | string
   listingId?: Prisma.StringFilter<"MarketplaceReview"> | string
   userId?: Prisma.StringFilter<"MarketplaceReview"> | string
+  reviewerName?: Prisma.StringNullableFilter<"MarketplaceReview"> | string | null
+  reviewerImage?: Prisma.StringNullableFilter<"MarketplaceReview"> | string | null
   rating?: Prisma.IntFilter<"MarketplaceReview"> | number
   title?: Prisma.StringNullableFilter<"MarketplaceReview"> | string | null
   content?: Prisma.StringFilter<"MarketplaceReview"> | string
@@ -650,6 +700,8 @@ export type MarketplaceReviewScalarWhereInput = {
 
 export type MarketplaceReviewCreateWithoutListingInput = {
   id?: string
+  reviewerName?: string | null
+  reviewerImage?: string | null
   rating: number
   title?: string | null
   content: string
@@ -664,6 +716,8 @@ export type MarketplaceReviewCreateWithoutListingInput = {
 export type MarketplaceReviewUncheckedCreateWithoutListingInput = {
   id?: string
   userId: string
+  reviewerName?: string | null
+  reviewerImage?: string | null
   rating: number
   title?: string | null
   content: string
@@ -703,6 +757,8 @@ export type MarketplaceReviewUpdateManyWithWhereWithoutListingInput = {
 export type MarketplaceReviewCreateManyUserInput = {
   id?: string
   listingId: string
+  reviewerName?: string | null
+  reviewerImage?: string | null
   rating: number
   title?: string | null
   content: string
@@ -715,6 +771,8 @@ export type MarketplaceReviewCreateManyUserInput = {
 
 export type MarketplaceReviewUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -729,6 +787,8 @@ export type MarketplaceReviewUpdateWithoutUserInput = {
 export type MarketplaceReviewUncheckedUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   listingId?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -742,6 +802,8 @@ export type MarketplaceReviewUncheckedUpdateWithoutUserInput = {
 export type MarketplaceReviewUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   listingId?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -755,6 +817,8 @@ export type MarketplaceReviewUncheckedUpdateManyWithoutUserInput = {
 export type MarketplaceReviewCreateManyListingInput = {
   id?: string
   userId: string
+  reviewerName?: string | null
+  reviewerImage?: string | null
   rating: number
   title?: string | null
   content: string
@@ -767,6 +831,8 @@ export type MarketplaceReviewCreateManyListingInput = {
 
 export type MarketplaceReviewUpdateWithoutListingInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -781,6 +847,8 @@ export type MarketplaceReviewUpdateWithoutListingInput = {
 export type MarketplaceReviewUncheckedUpdateWithoutListingInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -794,6 +862,8 @@ export type MarketplaceReviewUncheckedUpdateWithoutListingInput = {
 export type MarketplaceReviewUncheckedUpdateManyWithoutListingInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  reviewerName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewerImage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rating?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   content?: Prisma.StringFieldUpdateOperationsInput | string
@@ -810,6 +880,8 @@ export type MarketplaceReviewSelect<ExtArgs extends runtime.Types.Extensions.Int
   id?: boolean
   listingId?: boolean
   userId?: boolean
+  reviewerName?: boolean
+  reviewerImage?: boolean
   rating?: boolean
   title?: boolean
   content?: boolean
@@ -826,6 +898,8 @@ export type MarketplaceReviewSelectCreateManyAndReturn<ExtArgs extends runtime.T
   id?: boolean
   listingId?: boolean
   userId?: boolean
+  reviewerName?: boolean
+  reviewerImage?: boolean
   rating?: boolean
   title?: boolean
   content?: boolean
@@ -842,6 +916,8 @@ export type MarketplaceReviewSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   id?: boolean
   listingId?: boolean
   userId?: boolean
+  reviewerName?: boolean
+  reviewerImage?: boolean
   rating?: boolean
   title?: boolean
   content?: boolean
@@ -858,6 +934,8 @@ export type MarketplaceReviewSelectScalar = {
   id?: boolean
   listingId?: boolean
   userId?: boolean
+  reviewerName?: boolean
+  reviewerImage?: boolean
   rating?: boolean
   title?: boolean
   content?: boolean
@@ -868,7 +946,7 @@ export type MarketplaceReviewSelectScalar = {
   updatedAt?: boolean
 }
 
-export type MarketplaceReviewOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "listingId" | "userId" | "rating" | "title" | "content" | "response" | "respondedAt" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["marketplaceReview"]>
+export type MarketplaceReviewOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "listingId" | "userId" | "reviewerName" | "reviewerImage" | "rating" | "title" | "content" | "response" | "respondedAt" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["marketplaceReview"]>
 export type MarketplaceReviewInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   listing?: boolean | Prisma.MarketplaceListingDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -892,6 +970,8 @@ export type $MarketplaceReviewPayload<ExtArgs extends runtime.Types.Extensions.I
     id: string
     listingId: string
     userId: string
+    reviewerName: string | null
+    reviewerImage: string | null
     rating: number
     title: string | null
     content: string
@@ -1328,6 +1408,8 @@ export interface MarketplaceReviewFieldRefs {
   readonly id: Prisma.FieldRef<"MarketplaceReview", 'String'>
   readonly listingId: Prisma.FieldRef<"MarketplaceReview", 'String'>
   readonly userId: Prisma.FieldRef<"MarketplaceReview", 'String'>
+  readonly reviewerName: Prisma.FieldRef<"MarketplaceReview", 'String'>
+  readonly reviewerImage: Prisma.FieldRef<"MarketplaceReview", 'String'>
   readonly rating: Prisma.FieldRef<"MarketplaceReview", 'Int'>
   readonly title: Prisma.FieldRef<"MarketplaceReview", 'String'>
   readonly content: Prisma.FieldRef<"MarketplaceReview", 'String'>

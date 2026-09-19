@@ -1,4 +1,5 @@
 import { auth } from "@guestpost/auth"
+import { setRlsRequestContext } from "@guestpost/database"
 import {
   type CanActivate,
   type ExecutionContext,
@@ -11,7 +12,10 @@ import {
   getCachedAuthContext,
   setCachedAuthContext,
 } from "../../common/auth-context-cache"
-import { IS_PUBLIC_KEY } from "../../common/decorators/public.decorator"
+import {
+  IS_PUBLIC_KEY,
+  PUBLIC_RLS_CONTEXT_KEY,
+} from "../../common/decorators/public.decorator"
 import { PrismaService } from "../../common/prisma.service"
 import { isTrustedOrigin } from "../../common/security/trusted-origins"
 import { ActiveContextService } from "../active-context/active-context.service"
@@ -33,7 +37,14 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ])
-    if (isPublic) return true
+    if (isPublic) {
+      const publicContext = this.reflector.getAllAndOverride(
+        PUBLIC_RLS_CONTEXT_KEY,
+        [context.getHandler(), context.getClass()],
+      )
+      setRlsRequestContext(publicContext ?? { workload: "PUBLIC" })
+      return true
+    }
 
     const request = context.switchToHttp().getRequest()
     const session = await auth.api.getSession({
@@ -42,6 +53,20 @@ export class AuthGuard implements CanActivate {
 
     if (!session) throw new UnauthorizedException()
     request.authenticatedUserId = session.user.id
+
+    const sessionUserType = (session.user as { userType?: string }).userType
+    if (
+      sessionUserType !== "CUSTOMER" &&
+      sessionUserType !== "PUBLISHER" &&
+      sessionUserType !== "STAFF"
+    ) {
+      throw new UnauthorizedException("Invalid session audience")
+    }
+    setRlsRequestContext({
+      workload: "AUTH_BOOTSTRAP",
+      actorId: session.user.id,
+      actorKind: sessionUserType,
+    })
 
     // Better Auth reads this field from the user row on every session lookup.
     // Check it before the derived-context cache so a suspension performed by
@@ -55,7 +80,6 @@ export class AuthGuard implements CanActivate {
     }
 
     const createdAt = new Date(session.session.createdAt).getTime()
-    const sessionUserType = (session.user as { userType?: string }).userType
     const absoluteAge =
       sessionUserType === "CUSTOMER" || sessionUserType === "PUBLISHER"
         ? PUBLIC_SESSION_ABSOLUTE_AGE_MS

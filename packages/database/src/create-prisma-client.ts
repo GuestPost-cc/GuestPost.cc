@@ -7,6 +7,12 @@ export interface CreatePrismaAdapterOptions
   extends Omit<PoolConfig, "connectionString"> {}
 
 export interface CreatePrismaClientOptions {
+  /**
+   * Optional explicit connection string for a deliberately separate workload
+   * identity (for example Better Auth). Ordinary app/worker clients continue
+   * to read DATABASE_URL at call time.
+   */
+  databaseUrl?: string
   pool?: CreatePrismaAdapterOptions
   transactionOptions?: {
     maxWait?: number
@@ -53,8 +59,9 @@ export function parsePoolMax(raw: string | undefined): number {
 // confusing first-query failure into a clear startup-time error.
 export function createPrismaAdapter(
   options: CreatePrismaAdapterOptions = {},
+  databaseUrl = process.env.DATABASE_URL,
 ): PrismaPg {
-  if (!process.env.DATABASE_URL) {
+  if (!databaseUrl) {
     throw new Error("DATABASE_URL is required")
   }
 
@@ -75,7 +82,7 @@ export function createPrismaAdapter(
   }
 
   return new PrismaPg({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: databaseUrl,
     ...options,
     max: resolvedMax,
   })
@@ -90,7 +97,7 @@ export function createPrismaClient(
   options: CreatePrismaClientOptions = {},
 ): PrismaClient {
   return new PrismaClient({
-    adapter: createPrismaAdapter(options.pool),
+    adapter: createPrismaAdapter(options.pool, options.databaseUrl),
     ...(options.transactionOptions
       ? { transactionOptions: options.transactionOptions }
       : {}),

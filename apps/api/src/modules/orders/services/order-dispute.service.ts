@@ -55,40 +55,42 @@ export class OrderDisputeService {
     if (params.status && params.status !== "all") where.status = params.status
 
     const [rows, total, openCount, underReviewCount] =
-      await this.prisma.$transaction([
-        this.prisma.orderDispute.findMany({
-          where,
-          include: {
-            order: {
-              select: {
-                id: true,
-                title: true,
-                amount: true,
-                status: true,
-                fulfillmentChannel: true,
-                organizationId: true,
-                customer: { select: { id: true, name: true, email: true } },
-                website: {
-                  select: { domain: true, url: true, ownershipType: true },
-                },
-                settlements: {
-                  where: { status: { not: "CANCELLED" } },
-                  orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                  take: 1,
-                  select: { publisherAmount: true, currency: true },
+      await this.prisma.$transaction((tx) =>
+        Promise.all([
+          tx.orderDispute.findMany({
+            where,
+            include: {
+              order: {
+                select: {
+                  id: true,
+                  title: true,
+                  amount: true,
+                  status: true,
+                  fulfillmentChannel: true,
+                  organizationId: true,
+                  customer: { select: { id: true, name: true, email: true } },
+                  website: {
+                    select: { domain: true, url: true, ownershipType: true },
+                  },
+                  settlements: {
+                    where: { status: { not: "CANCELLED" } },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    take: 1,
+                    select: { publisherAmount: true, currency: true },
+                  },
                 },
               },
             },
-          },
-          // Active disputes (OPEN/UNDER_REVIEW) bubble up, then newest first.
-          orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-          take: limit,
-          skip: (page - 1) * limit,
-        }),
-        this.prisma.orderDispute.count({ where }),
-        this.prisma.orderDispute.count({ where: { status: "OPEN" } }),
-        this.prisma.orderDispute.count({ where: { status: "UNDER_REVIEW" } }),
-      ])
+            // Active disputes (OPEN/UNDER_REVIEW) bubble up, then newest first.
+            orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+            take: limit,
+            skip: (page - 1) * limit,
+          }),
+          tx.orderDispute.count({ where }),
+          tx.orderDispute.count({ where: { status: "OPEN" } }),
+          tx.orderDispute.count({ where: { status: "UNDER_REVIEW" } }),
+        ]),
+      )
 
     return {
       items: rows.map((d: any) => ({

@@ -116,16 +116,18 @@ export class ReportingService {
 
   async listReports(organizationId: string, take = 50, skip = 0) {
     const where = { order: { organizationId } }
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.report.findMany({
-        where,
-        include: { order: true },
-        orderBy: { createdAt: "desc" },
-        take,
-        skip,
-      }),
-      this.prisma.report.count({ where }),
-    ])
+    const [items, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.report.findMany({
+          where,
+          include: { order: true },
+          orderBy: { createdAt: "desc" },
+          take,
+          skip,
+        }),
+        tx.report.count({ where }),
+      ]),
+    )
     return { items, total, take, skip }
   }
 

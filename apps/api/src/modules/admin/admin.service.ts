@@ -4438,16 +4438,18 @@ export class AdminService {
       }
     }
 
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.auditLog.findMany({
-        where,
-        include: { user: { select: { id: true, name: true, email: true } } },
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: (page - 1) * limit,
-      }),
-      this.prisma.auditLog.count({ where }),
-    ])
+    const [rows, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.auditLog.findMany({
+          where,
+          include: { user: { select: { id: true, name: true, email: true } } },
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip: (page - 1) * limit,
+        }),
+        tx.auditLog.count({ where }),
+      ]),
+    )
 
     return {
       items: rows.map((r: any) => ({
@@ -4491,45 +4493,47 @@ export class AdminService {
         }
       : {}
 
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.publisher.findMany({
-        where,
-        include: {
-          balance: {
-            select: {
-              withdrawableBalance: true,
-              lifetimeEarnings: true,
-              debtBalance: true,
+    const [rows, total] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.publisher.findMany({
+          where,
+          include: {
+            balance: {
+              select: {
+                withdrawableBalance: true,
+                lifetimeEarnings: true,
+                debtBalance: true,
+              },
+            },
+            profile: {
+              select: {
+                trustScore: true,
+                rating: true,
+                totalReviews: true,
+                completionRate: true,
+              },
+            },
+            _count: {
+              select: {
+                websites: true,
+                marketplaceListings: true,
+                settlements: true,
+              },
+            },
+            publisherMemberships: {
+              take: 1,
+              include: {
+                user: { select: { id: true, email: true, banned: true } },
+              },
             },
           },
-          profile: {
-            select: {
-              trustScore: true,
-              rating: true,
-              totalReviews: true,
-              completionRate: true,
-            },
-          },
-          _count: {
-            select: {
-              websites: true,
-              marketplaceListings: true,
-              settlements: true,
-            },
-          },
-          publisherMemberships: {
-            take: 1,
-            include: {
-              user: { select: { id: true, email: true, banned: true } },
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: (page - 1) * limit,
-      }),
-      this.prisma.publisher.count({ where }),
-    ])
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip: (page - 1) * limit,
+        }),
+        tx.publisher.count({ where }),
+      ]),
+    )
 
     return {
       items: rows.map((p: any) => ({

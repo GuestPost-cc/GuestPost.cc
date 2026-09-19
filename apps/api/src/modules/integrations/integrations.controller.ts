@@ -19,7 +19,7 @@ import {
   Res,
 } from "@nestjs/common"
 import { Request, Response } from "express"
-import { Public } from "../../common/decorators/public.decorator"
+import { PublicWebhook } from "../../common/decorators/public.decorator"
 import { IntegrationsApiService } from "./integrations.service"
 import { OwnerResolver } from "./owner-resolver.service"
 
@@ -50,7 +50,7 @@ export class IntegrationsController {
     )
   }
 
-  @Public()
+  @PublicWebhook("INTEGRATION_OAUTH")
   @Get(":provider/callback")
   async handleCallback(
     @Param("provider") provider: string,

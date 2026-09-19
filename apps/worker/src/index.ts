@@ -14,7 +14,11 @@ import { validateEnv } from "./lib/env"
 
 validateEnv()
 
-import { prisma } from "@guestpost/database"
+import {
+  prisma,
+  runWithRlsRequestScope,
+  setRlsRequestContext,
+} from "@guestpost/database"
 import {
   QUEUE_JOBS,
   QUEUES,
@@ -1078,8 +1082,12 @@ installWorkerSignalHandlers(runtime, process, {
   },
 })
 
-runtime
-  .bootstrap(process.env)
+const bootstrap = runWithRlsRequestScope(() => {
+  setRlsRequestContext({ workload: "WORKER", worker: "worker_bootstrap" })
+  return runtime.bootstrap(process.env)
+})
+
+bootstrap
   .then(({ disposition }) => {
     if (disposition === "completed") process.exit(0)
   })

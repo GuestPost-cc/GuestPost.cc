@@ -13,10 +13,11 @@ describe("CampaignsService.listCampaigns", () => {
         findMany: jest.fn().mockResolvedValue([campaign]),
         count: jest.fn().mockResolvedValue(1),
       },
-      $transaction: jest.fn((operations: Array<Promise<unknown>>) =>
-        Promise.all(operations),
-      ),
+      $transaction: jest.fn(),
     }
+    prisma.$transaction.mockImplementation(async (operation: any) =>
+      operation(prisma),
+    )
     const service = new CampaignsService(
       prisma,
       {} as any,

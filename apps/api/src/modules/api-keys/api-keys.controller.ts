@@ -7,9 +7,10 @@ import {
   Post,
   UseGuards,
 } from "@nestjs/common"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { CurrentAuthority } from "../../common/decorators/current-authority.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import type { DurableCurrentAuthority } from "../auth/current-authority.service"
 import { ApiKeysService } from "./api-keys.service"
 import { CreateApiKeyDto } from "./dto/create-api-key.dto"
 
@@ -20,25 +21,26 @@ export class ApiKeysController {
   constructor(private readonly apiKeys: ApiKeysService) {}
 
   @Post()
-  create(@Body() body: CreateApiKeyDto, @CurrentUser() user: any) {
+  create(
+    @Body() body: CreateApiKeyDto,
+    @CurrentAuthority() authority: DurableCurrentAuthority,
+  ) {
     const permissions = body.permissions?.length
       ? body.permissions
       : ["orders:read"]
-    return this.apiKeys.createKey(
-      user.organizationId,
-      body.name,
-      permissions,
-      user.id,
-    )
+    return this.apiKeys.createKey(authority, body.name, permissions)
   }
 
   @Get()
-  list(@CurrentUser() user: any) {
-    return this.apiKeys.listKeys(user.organizationId)
+  list(@CurrentAuthority() authority: DurableCurrentAuthority) {
+    return this.apiKeys.listKeys(authority)
   }
 
   @Delete(":id")
-  revoke(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.apiKeys.revokeKey(id, user.organizationId, user.id)
+  revoke(
+    @Param("id") id: string,
+    @CurrentAuthority() authority: DurableCurrentAuthority,
+  ) {
+    return this.apiKeys.revokeKey(id, authority)
   }
 }

@@ -1,4 +1,7 @@
-import { createPrismaClient } from "@guestpost/database"
+import {
+  createPrismaClient,
+  createRlsAwarePrismaClient,
+} from "@guestpost/database"
 import {
   ProviderError,
   ReauthRequiredError,
@@ -13,7 +16,7 @@ const GA4_SCOPES = ["https://www.googleapis.com/auth/analytics.readonly"]
 const ADMIN_API = "https://analyticsadmin.googleapis.com/v1beta"
 const DATA_API = "https://analyticsdata.googleapis.com/v1beta"
 
-const db = createPrismaClient()
+const db = createRlsAwarePrismaClient(createPrismaClient())
 
 export class GoogleAnalyticsProvider
   implements DiscoveryProvider, SyncProvider

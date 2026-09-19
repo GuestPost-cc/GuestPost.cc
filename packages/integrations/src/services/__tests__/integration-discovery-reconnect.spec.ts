@@ -24,6 +24,7 @@ const mockDb = {
 
 jest.mock("@guestpost/database", () => ({
   createPrismaClient: () => mockDb,
+  createRlsAwarePrismaClient: (client: unknown) => client,
 }))
 jest.mock("@guestpost/shared/dist/job-signing", () => ({
   signJobPayload: (payload: unknown) => payload,

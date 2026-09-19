@@ -23,29 +23,31 @@ export class NotificationsService {
     if (params.unreadOnly) where.read = false
     if (params.type) where.type = params.type
 
-    const [items, total, unreadCount] = await this.prisma.$transaction([
-      this.prisma.notification.findMany({
-        where,
-        select: {
-          id: true,
-          type: true,
-          title: true,
-          message: true,
-          category: true,
-          severity: true,
-          actionPath: true,
-          read: true,
-          readAt: true,
-          organizationId: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: (page - 1) * limit,
-      }),
-      this.prisma.notification.count({ where }),
-      this.prisma.notification.count({ where: { userId, read: false } }),
-    ])
+    const [items, total, unreadCount] = await this.prisma.$transaction((tx) =>
+      Promise.all([
+        tx.notification.findMany({
+          where,
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            message: true,
+            category: true,
+            severity: true,
+            actionPath: true,
+            read: true,
+            readAt: true,
+            organizationId: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip: (page - 1) * limit,
+        }),
+        tx.notification.count({ where }),
+        tx.notification.count({ where: { userId, read: false } }),
+      ]),
+    )
 
     return {
       items,

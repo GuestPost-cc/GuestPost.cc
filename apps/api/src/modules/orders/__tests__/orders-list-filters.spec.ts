@@ -11,10 +11,11 @@ describe("OrdersService order-list scoping", () => {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
-      $transaction: jest.fn((operations: Array<Promise<unknown>>) =>
-        Promise.all(operations),
-      ),
+      $transaction: jest.fn(),
     }
+    prisma.$transaction.mockImplementation(async (operation: any) =>
+      operation(prisma),
+    )
     service = new OrdersService(prisma)
   })
 

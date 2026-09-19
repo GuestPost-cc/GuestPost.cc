@@ -1,3 +1,4 @@
+import { isRlsEnforcementEnabled, Prisma } from "@guestpost/database"
 import {
   type CustomerRole,
   QUEUES,
@@ -188,7 +189,16 @@ export class IdentityService {
         "Only organization owners can invite members",
       )
 
-    const user = await this.prisma.user.findUnique({ where: { email } })
+    const user = isRlsEnforcementEnabled()
+      ? (
+          await this.prisma.$queryRaw<Array<{ id: string; banned: boolean }>>(
+            Prisma.sql`
+              SELECT id, banned
+              FROM guestpost_rls.find_invitable_user(${email}, ${organizationId})
+            `,
+          )
+        )[0]
+      : await this.prisma.user.findUnique({ where: { email } })
     if (!user) throw new NotFoundException("User not found")
 
     if (user.banned) {
