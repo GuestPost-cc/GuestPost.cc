@@ -1,10 +1,25 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-13
+updated: 2026-09-20
 ---
 
 # Current focus
+
+## Security sweep PR #125
+
+Draft PR #125 (`fix/security-sweep-hardening`) is rebased on current `main`
+and contains verified SSRF redirect/DNS hardening, publisher-owner integration
+authorization, shared client redirect validation, edge session-cookie shape
+checks, literal marketplace search escaping, bounded OAuth/webhook inputs,
+dashboard nonce CSP proxies, restricted worker metrics, and guarded local
+setup/reset scripts. Each commit was submitted to CodeRabbit; its only
+actionable DNS/redirect findings were fixed, while later requests were
+rate-limited. GitHub CI run 35474188353 is in progress; its dependency audit
+and migration stages passed before this note was updated. The local dashboard
+build requires workspace package artifacts that are absent in the isolated
+worktree, while the proxy sources pass Biome and worker/shared/integration/API
+focused tests and touched package builds pass.
 
 ## Security and query hardening follow-up
 
