@@ -2,6 +2,7 @@ import { CURRENT_TERMS_VERSION } from "@guestpost/shared"
 import type { AuthError, AuthenticatedUser, SignInResult } from "../types"
 import { authClient } from "./auth-client"
 import { mapBetterAuthError } from "./errors"
+import { sanitizeClientCallbackUrl } from "./safe-redirect"
 import { getSession as serverGetSession } from "./session"
 
 export async function signIn(input: {
@@ -150,11 +151,7 @@ export async function forgotPassword(input: {
 }): Promise<void> {
   const { error } = await authClient.requestPasswordReset({
     email: input.email,
-    redirectTo:
-      input.redirectTo ??
-      (typeof window !== "undefined"
-        ? `${window.location.origin}/reset-password`
-        : "/reset-password"),
+    redirectTo: sanitizeClientCallbackUrl(input.redirectTo, "/reset-password"),
   })
   if (error) throw mapBetterAuthError(error)
 }

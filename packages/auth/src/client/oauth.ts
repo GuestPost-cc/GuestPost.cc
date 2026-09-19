@@ -2,6 +2,7 @@ import { CURRENT_TERMS_VERSION } from "@guestpost/shared"
 import type { AuthProvider } from "../types"
 import { authClient } from "./auth-client"
 import { mapBetterAuthError } from "./errors"
+import { sanitizeClientCallbackUrl } from "./safe-redirect"
 
 export async function signInWithProvider(
   provider: AuthProvider,
@@ -24,9 +25,9 @@ export async function signInWithProvider(
 
   const { error } = await authClient.signIn.social({
     provider: provider as any,
-    callbackURL: options.callbackURL,
-    errorCallbackURL: options.errorCallbackURL,
-    newUserCallbackURL: options.callbackURL,
+    callbackURL: sanitizeClientCallbackUrl(options.callbackURL, "/"),
+    errorCallbackURL: sanitizeClientCallbackUrl(options.errorCallbackURL, "/"),
+    newUserCallbackURL: sanitizeClientCallbackUrl(options.callbackURL, "/"),
     requestSignUp: options.flow === "signup",
     additionalData: {
       authFlow: options.flow,
