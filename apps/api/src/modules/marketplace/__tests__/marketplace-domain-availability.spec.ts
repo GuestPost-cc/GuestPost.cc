@@ -52,6 +52,48 @@ describe("MarketplaceService domain availability", () => {
     })
   })
 
+  it("aggregates publisher review ratings instead of loading every review", async () => {
+    const prisma: any = {
+      marketplaceListing: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "listing-1",
+            status: "APPROVED",
+            createdAt: new Date("2026-09-21T00:00:00.000Z"),
+            tags: [],
+            images: [],
+          },
+        ]),
+      },
+      marketplaceReview: {
+        groupBy: jest.fn().mockResolvedValue([
+          {
+            listingId: "listing-1",
+            _count: { id: 2 },
+            _avg: { rating: 4.5 },
+          },
+        ]),
+      },
+    }
+    const service: any = new MarketplaceService(prisma, {} as any)
+    jest.spyOn(service, "verifyPublisherAccess").mockResolvedValue(true)
+    jest
+      .spyOn(service, "toPublisherListing")
+      .mockImplementation((listing: unknown) => listing)
+
+    await expect(
+      service.getPublisherListings("publisher-1", "publisher-owner-user"),
+    ).resolves.toEqual([
+      expect.objectContaining({ reviewCount: 2, avgRating: 4.5 }),
+    ])
+    expect(prisma.marketplaceReview.groupBy).toHaveBeenCalledWith({
+      by: ["listingId"],
+      where: { listingId: { in: ["listing-1"] }, status: "APPROVED" },
+      _count: { id: true },
+      _avg: { rating: true },
+    })
+  })
+
   it("applies the same website predicate to favorites and saved-list projections", async () => {
     const prisma: any = {
       marketplaceFavorite: { findMany: jest.fn().mockResolvedValue([]) },
