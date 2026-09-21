@@ -1,3 +1,4 @@
+import { Prisma } from "@guestpost/database"
 import { WorkflowDecisionService } from "@guestpost/shared"
 import {
   ForbiddenException,
@@ -20,83 +21,91 @@ export class AdminVerificationQueueService {
     this.decision = new WorkflowDecisionService()
   }
 
-  async listQueue(role: string) {
+  async listQueue(role: string, take = 50, skip = 0) {
     if (!new Set(["SUPER_ADMIN", "OPERATIONS", "FINANCE"]).has(role)) {
       throw new ForbiddenException("Staff verification access is required")
     }
     const canViewFinancials = role !== "OPERATIONS"
     const canViewIdentity = role === "SUPER_ADMIN"
-    const orders = await this.prisma.order.findMany({
-      where: {
-        OR: [
-          {
-            status: "PUBLISHED",
-            activeDeliveryVersion: {
-              verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
-            },
-          },
-          {
-            status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
-            fraudHolds: {
-              some: {},
-            },
-          },
-        ],
-      },
-      include: {
-        website: {
-          select: {
-            id: true,
-            name: true,
-            url: true,
-            domain: true,
-            ownershipType: true,
-            publisherId: true,
-            publisher: {
-              select: { id: true, name: true, email: true, tier: true },
-            },
+    const limit = Math.min(Math.max(take, 1), 100)
+    const offset = Math.max(skip, 0)
+    const where: Prisma.OrderWhereInput = {
+      OR: [
+        {
+          status: "PUBLISHED",
+          activeDeliveryVersion: {
+            verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
           },
         },
-        customer: {
-          select: { id: true, name: true, email: true },
-        },
-        activeDeliveryVersion: {
-          include: {
-            evidence: { orderBy: { createdAt: "desc" }, take: 1 },
+        {
+          status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
+          fraudHolds: {
+            some: {},
           },
         },
-        fraudFlags: {
-          where: { hold: { isNot: null } },
-          orderBy: { createdAt: "asc" },
-          include: {
-            finding: true,
-            deliveryVersion: {
-              select: {
-                id: true,
-                version: true,
-                publishedUrl: true,
-                verificationStatus: true,
-                verificationVersion: true,
-                supersededByVersion: true,
-                evidence: {
-                  orderBy: { checkedAt: "desc" },
-                  take: 1,
-                  select: {
-                    httpStatus: true,
-                    resolvedUrl: true,
-                    anchorFound: true,
-                    linkFound: true,
-                    targetUrlMatched: true,
-                    checkedAt: true,
+      ],
+    }
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        include: {
+          website: {
+            select: {
+              id: true,
+              name: true,
+              url: true,
+              domain: true,
+              ownershipType: true,
+              publisherId: true,
+              publisher: {
+                select: { id: true, name: true, email: true, tier: true },
+              },
+            },
+          },
+          customer: {
+            select: { id: true, name: true, email: true },
+          },
+          activeDeliveryVersion: {
+            include: {
+              evidence: { orderBy: { createdAt: "desc" }, take: 1 },
+            },
+          },
+          fraudFlags: {
+            where: { hold: { isNot: null } },
+            orderBy: { createdAt: "asc" },
+            include: {
+              finding: true,
+              deliveryVersion: {
+                select: {
+                  id: true,
+                  version: true,
+                  publishedUrl: true,
+                  verificationStatus: true,
+                  verificationVersion: true,
+                  supersededByVersion: true,
+                  evidence: {
+                    orderBy: { checkedAt: "desc" },
+                    take: 1,
+                    select: {
+                      httpStatus: true,
+                      resolvedUrl: true,
+                      anchorFound: true,
+                      linkFound: true,
+                      targetUrlMatched: true,
+                      checkedAt: true,
+                    },
                   },
                 },
               },
             },
           },
         },
-      },
-      orderBy: { createdAt: "asc" },
-    })
+        orderBy: { createdAt: "asc" },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.order.count({ where }),
+    ])
 
     const now = Date.now()
     const items = (orders as any[]).map((order: any) => {
@@ -199,7 +208,7 @@ export class AdminVerificationQueueService {
     })
 
     items.sort((a: any, b: any) => b.priority.score - a.priority.score)
-    return items
+    return { items, total, take: limit, skip: offset }
   }
 
   async retry(orderId: string, userId: string, role: string) {

@@ -496,8 +496,22 @@ export class AdminController {
   // ── Verification queue ────────────────────────────────────────────────────
   @Get("verification-queue")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
-  listVerificationQueue(@CurrentAuthority() user: DurableCurrentAuthority) {
-    return this.verificationQueue.listQueue(user.staffRole ?? "")
+  listVerificationQueue(
+    @CurrentAuthority() user: DurableCurrentAuthority,
+    @Query("take") rawTake?: string,
+    @Query("skip") rawSkip?: string,
+  ) {
+    const take = rawTake === undefined ? 50 : Number(rawTake)
+    const skip = rawSkip === undefined ? 0 : Number(rawSkip)
+    if (!Number.isSafeInteger(take) || take < 1 || take > 100) {
+      throw new BadRequestException("take must be an integer between 1 and 100")
+    }
+    if (!Number.isSafeInteger(skip) || skip < 0 || skip > 1_000_000) {
+      throw new BadRequestException(
+        "skip must be an integer between 0 and 1000000",
+      )
+    }
+    return this.verificationQueue.listQueue(user.staffRole ?? "", take, skip)
   }
 
   @Post("verification-queue/:id/retry")

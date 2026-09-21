@@ -88,6 +88,7 @@ export default function DeliveryVerificationQueuePage() {
   if (loading) return null
   if (!allowed)
     return <ForbiddenPage requires="Operations, Finance, or Super Admin" />
+
   return (
     <DeliveryVerificationQueuePageInner staffRole={user?.staffRole ?? null} />
   )
@@ -98,6 +99,8 @@ function DeliveryVerificationQueuePageInner({
 }: {
   staffRole: string | null
 }) {
+  const [page, setPage] = useState(0)
+  const pageSize = 50
   const canOperate = staffRole === "SUPER_ADMIN" || staffRole === "OPERATIONS"
   const canResolveFraud = canOperate || staffRole === "FINANCE"
   const qc = useQueryClient()
@@ -145,8 +148,12 @@ function DeliveryVerificationQueuePageInner({
     error,
     refetch,
   } = useQuery({
-    queryKey: ["delivery-verification-queue"],
-    queryFn: () => api.admin.listVerificationQueue(),
+    queryKey: ["delivery-verification-queue", page],
+    queryFn: () =>
+      api.admin.listVerificationQueue({
+        take: pageSize,
+        skip: page * pageSize,
+      }),
   })
 
   const retry = useMutation({
@@ -264,7 +271,7 @@ function DeliveryVerificationQueuePageInner({
     },
   })
 
-  const items = queue ?? []
+  const items = queue?.items ?? []
   const actionPending =
     markVerified.isPending ||
     reject.isPending ||
@@ -295,7 +302,7 @@ function DeliveryVerificationQueuePageInner({
         }
         badges={
           !isLoading ? (
-            <Badge variant="secondary">{items.length} queued</Badge>
+            <Badge variant="secondary">{queue?.total ?? 0} queued</Badge>
           ) : null
         }
       />
@@ -801,6 +808,33 @@ function DeliveryVerificationQueuePageInner({
           </CardContent>
         </Card>
       )}
+
+      {queue && queue.total > pageSize ? (
+        <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+          <span>
+            Showing {page * pageSize + 1}–
+            {Math.min((page + 1) * pageSize, queue.total)} of {queue.total}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 0 || isLoading}
+              onClick={() => setPage((current) => current - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={(page + 1) * pageSize >= queue.total || isLoading}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <Dialog
         open={actionDialog !== null}
