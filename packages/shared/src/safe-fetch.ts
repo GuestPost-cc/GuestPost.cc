@@ -22,28 +22,35 @@
 // undici/dns mocking — the Agent's lookup callback is a thin wrapper.
 
 import dns from "node:dns"
-import { isIP } from "node:net"
+import { BlockList, isIP, type LookupFunction } from "node:net"
 import { Agent, fetch as undiciFetch } from "undici"
 
-// Single source of truth for private-IP patterns. Includes IPv4-mapped
-// IPv6 forms (e.g. ::ffff:127.0.0.1) that the original list missed.
-export const PRIVATE_IP_PATTERNS = [
-  /^127\./,
-  /^10\./,
-  /^192\.168\./,
-  /^169\.254\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^0\./,
-  /^::1$/,
-  /^f[cd]/i,
-  /^fe80:/i,
-  /^::ffff:127\./i,
-  /^::ffff:10\./i,
-  /^::ffff:192\.168\./i,
-  /^::ffff:169\.254\./i,
-  /^::ffff:172\.(1[6-9]|2\d|3[01])\./i,
-  /^::ffff:0\./i,
-]
+// Subnet-aware checks avoid format-sensitive IPv6 regexes. BlockList also
+// recognizes IPv4-mapped IPv6 addresses, so the literal and DNS paths share
+// the exact same policy.
+const PRIVATE_IP_BLOCKLIST = new BlockList()
+for (const [address, prefix, type] of [
+  ["0.0.0.0", 8, "ipv4"],
+  ["10.0.0.0", 8, "ipv4"],
+  ["127.0.0.0", 8, "ipv4"],
+  ["169.254.0.0", 16, "ipv4"],
+  ["172.16.0.0", 12, "ipv4"],
+  ["192.168.0.0", 16, "ipv4"],
+  ["::", 128, "ipv6"],
+  ["::1", 128, "ipv6"],
+  ["fc00::", 7, "ipv6"],
+  ["fe80::", 10, "ipv6"],
+] as const) {
+  PRIVATE_IP_BLOCKLIST.addSubnet(address, prefix, type)
+}
+
+export function isPrivateIpAddress(address: string): boolean {
+  const family = isIP(address)
+  return (
+    family > 0 &&
+    PRIVATE_IP_BLOCKLIST.check(address, family === 4 ? "ipv4" : "ipv6")
+  )
+}
 
 export type SafeFetchErrorCode =
   | "UNSAFE_URL" // protocol / host pattern / literal-private-IP fail
@@ -82,7 +89,7 @@ export function isSafePublicUrl(rawUrl: string): boolean {
     host.endsWith(".internal")
   )
     return false
-  if (isIP(host) && PRIVATE_IP_PATTERNS.some((p) => p.test(host))) return false
+  if (isPrivateIpAddress(host)) return false
   return true
 }
 
@@ -98,7 +105,7 @@ export function validateResolvedAddress(
   address: string,
 ): SafeFetchError | null {
   if (!address) return null
-  if (PRIVATE_IP_PATTERNS.some((p) => p.test(address))) {
+  if (isPrivateIpAddress(address)) {
     return new SafeFetchError(
       "DNS_REBINDING",
       `hostname ${hostname} resolved to private IP ${address}`,
@@ -112,33 +119,27 @@ export function validateResolvedAddress(
 // The lookup callback is intentionally minimal — all validation logic
 // lives in validateResolvedAddress() above for direct unit-testability.
 //
-// Uses undici v7+ dns.lookup (Promise-based) instead of the deprecated
-// connect.lookup (callback-based) which broke in undici 7.x / Node 24+.
-// The undici type definitions don't include the dns property yet, so
-// the inner options are spread via a cast to avoid TS errors.
+// Undici passes `connect` options directly to node:net/tls. Keeping the
+// check in this callback ensures the address accepted by DNS is the address
+// used for the TCP connection.
+export function createSafeLookup(
+  lookup: LookupFunction = dns.lookup,
+): LookupFunction {
+  return (hostname, options, callback) => {
+    lookup(hostname, { ...options, all: false }, (error, address, family) => {
+      if (error) return callback(error, "", family)
+
+      const violation = validateResolvedAddress(hostname, address as string)
+      if (violation) return callback(violation, "", family)
+
+      callback(null, address, family)
+    })
+  }
+}
+
 const SAFE_LOOKUP_AGENT = new Agent({
   pipelining: 0,
-  ...({
-    dns: {
-      lookup: (hostname: string, options: object) => {
-        return new Promise<{ address: string; family: number }>(
-          (resolve, reject) => {
-            dns.lookup(
-              hostname,
-              { ...options, all: false },
-              (err, address, family) => {
-                if (err) return reject(err)
-                const addr = address as string
-                const violation = validateResolvedAddress(hostname, addr)
-                if (violation) return reject(violation)
-                resolve({ address: addr, family: family as number })
-              },
-            )
-          },
-        )
-      },
-    },
-  } as any),
+  connect: { lookup: createSafeLookup() },
 })
 
 /**

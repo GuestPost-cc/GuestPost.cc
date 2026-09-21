@@ -22,6 +22,7 @@ describe("OwnerResolver", () => {
           id: "user-1",
           userType: "PUBLISHER",
           publisherId: "publisher-1",
+          publisherRole: "PUBLISHER_OWNER",
         }),
       ),
     ).resolves.toEqual({ ownerType: "PUBLISHER", ownerId: "publisher-1" })
@@ -102,6 +103,19 @@ describe("OwnerResolver", () => {
     await expect(
       resolver.resolve(
         requestWithUser({ id: "user-1", userType: "PUBLISHER" }),
+      ),
+    ).rejects.toThrow("Publisher not found")
+  })
+
+  it("denies publisher members from mutating owner-scoped integrations", async () => {
+    await expect(
+      resolver.resolve(
+        requestWithUser({
+          id: "user-1",
+          userType: "PUBLISHER",
+          publisherId: "publisher-1",
+          publisherRole: "PUBLISHER_MEMBER",
+        }),
       ),
     ).rejects.toThrow("Publisher not found")
   })

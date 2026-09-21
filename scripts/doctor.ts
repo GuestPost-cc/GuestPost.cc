@@ -90,8 +90,9 @@ function parseEnvFile(path: string): Record<string, string> {
   return vars
 }
 
-const REQUIRED = new Set(["DATABASE_URL", "REDIS_URL", "JWT_SECRET"])
+const REQUIRED = new Set(["DATABASE_URL", "REDIS_URL", "BETTER_AUTH_SECRET"])
 const RECOMMENDED = new Set([
+  "JWT_SECRET",
   "QUEUE_SIGNING_SECRET",
   "NEXT_PUBLIC_API_URL",
   "CORS_ORIGIN",

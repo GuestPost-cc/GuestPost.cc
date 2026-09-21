@@ -2166,10 +2166,10 @@ export class AdminService {
 
   // ── Phase 8 — Delivery verification queue (admin) ──
 
-  listVerificationQueue() {
-    return this.client.get<AdminDeliveryVerificationQueueItem[]>(
-      "/admin/verification-queue",
-    )
+  listVerificationQueue(params?: { take?: number; skip?: number }) {
+    return this.client.get<
+      PaginatedResponse<AdminDeliveryVerificationQueueItem>
+    >("/admin/verification-queue", { params })
   }
 
   retryVerification(id: string) {

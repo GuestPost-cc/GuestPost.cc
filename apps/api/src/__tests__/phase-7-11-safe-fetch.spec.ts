@@ -10,9 +10,11 @@
 // Deep import: safe-fetch is intentionally NOT re-exported from
 // @guestpost/shared's root index (it imports node:dns + undici, which
 // the Next.js apps can't bundle). See packages/shared/src/index.ts.
+import type { LookupFunction } from "node:net"
 import {
+  createSafeLookup,
+  isPrivateIpAddress,
   isSafePublicUrl,
-  PRIVATE_IP_PATTERNS,
   readBodyWithCap,
   SafeFetchError,
   validateResolvedAddress,
@@ -67,6 +69,8 @@ describe("Phase 7.11 — isSafePublicUrl (pre-flight URL check)", () => {
   describe("literal private IP rejection (IPv6)", () => {
     it.each([
       "http://[::1]/",
+      "http://[::]/",
+      "http://[0:0:0:0:0:0:0:1]/",
       "http://[fe80::1]/",
       "http://[fc00::1]/",
       "http://[fd00::1]/",
@@ -137,6 +141,8 @@ describe("Phase 7.11 — validateResolvedAddress (pure DNS-rebinding validator)"
   describe("rejects private IPv6", () => {
     it.each([
       "::1",
+      "::",
+      "0:0:0:0:0:0:0:1",
       "fe80::1",
       "fc00::1",
       "fd12:3456:789a::1",
@@ -163,6 +169,21 @@ describe("Phase 7.11 — validateResolvedAddress (pure DNS-rebinding validator)"
     it("returns null for empty string (caller should check dns.lookup err first)", () => {
       expect(validateResolvedAddress("example.com", "")).toBeNull()
     })
+  })
+})
+
+describe("Phase 7.11 — connection DNS guard", () => {
+  it("rejects a hostname that resolves to loopback before connecting", async () => {
+    const rebindingLookup: LookupFunction = (_hostname, _options, callback) =>
+      callback(null, "127.0.0.1", 4)
+    const lookup = createSafeLookup(rebindingLookup)
+
+    const error = await new Promise<Error | null>((resolve) => {
+      lookup("rebound.example", {}, (err) => resolve(err))
+    })
+
+    expect(error).toBeInstanceOf(SafeFetchError)
+    expect((error as SafeFetchError).code).toBe("DNS_REBINDING")
   })
 })
 
@@ -243,19 +264,17 @@ describe("Phase 7.11 — readBodyWithCap (response body size limit)", () => {
   })
 })
 
-describe("Phase 7.11 — PRIVATE_IP_PATTERNS sanity (regression guard)", () => {
-  it("includes IPv4-mapped IPv6 patterns (the bonus catch from this phase)", () => {
-    const ipv4Mapped = PRIVATE_IP_PATTERNS.filter((p) =>
-      p.source.includes("ffff"),
-    )
-    expect(ipv4Mapped.length).toBeGreaterThanOrEqual(5)
-  })
-
-  it("rejects every IPv4 private range via the same patterns isSafePublicUrl uses", () => {
-    expect(PRIVATE_IP_PATTERNS.some((p) => p.test("127.0.0.1"))).toBe(true)
-    expect(PRIVATE_IP_PATTERNS.some((p) => p.test("10.0.0.1"))).toBe(true)
-    expect(PRIVATE_IP_PATTERNS.some((p) => p.test("169.254.169.254"))).toBe(
-      true,
-    )
+describe("Phase 7.11 — private-IP policy sanity", () => {
+  it("uses one subnet-aware policy for IPv4, IPv6, and IPv4-mapped IPv6", () => {
+    for (const address of [
+      "127.0.0.1",
+      "10.0.0.1",
+      "169.254.169.254",
+      "::",
+      "0:0:0:0:0:0:0:1",
+      "::ffff:127.0.0.1",
+    ]) {
+      expect(isPrivateIpAddress(address)).toBe(true)
+    }
   })
 })

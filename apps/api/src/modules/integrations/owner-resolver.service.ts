@@ -52,7 +52,7 @@ export class OwnerResolver {
     // Never fall back to the user id: publisher integrations belong to the
     // active Publisher aggregate and must follow PublisherMembership context.
     const publisherId = user?.publisherId
-    if (!publisherId) {
+    if (!publisherId || user?.publisherRole !== "PUBLISHER_OWNER") {
       throw new IntegrationError("UNAUTHORIZED", "Publisher not found")
     }
     return { ownerType: IntegrationOwnerType.PUBLISHER, ownerId: publisherId }

@@ -20,7 +20,7 @@ describe("password recovery transport", () => {
     mockResetPassword.mockClear()
   })
 
-  it("calls Better Auth's request-password-reset endpoint", async () => {
+  it("uses the relative reset fallback outside a browser", async () => {
     await forgotPassword({
       email: "customer@example.com",
       redirectTo: "https://guestpost.example/reset-password",
@@ -28,8 +28,31 @@ describe("password recovery transport", () => {
 
     expect(mockRequestPasswordReset).toHaveBeenCalledWith({
       email: "customer@example.com",
-      redirectTo: "https://guestpost.example/reset-password",
+      redirectTo: "/reset-password",
     })
+  })
+
+  it("accepts an explicit same-origin reset URL in a browser", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "window")
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { location: { origin: "https://guestpost.example" } },
+    })
+
+    try {
+      await forgotPassword({
+        email: "customer@example.com",
+        redirectTo: "https://guestpost.example/reset-password",
+      })
+
+      expect(mockRequestPasswordReset).toHaveBeenCalledWith({
+        email: "customer@example.com",
+        redirectTo: "https://guestpost.example/reset-password",
+      })
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, "window", descriptor)
+      else Reflect.deleteProperty(globalThis, "window")
+    }
   })
 
   it("submits the reset token and new password", async () => {

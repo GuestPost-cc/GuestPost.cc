@@ -64,6 +64,7 @@ export async function fetchWithChain(
 
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location")
+      await response.body?.cancel().catch(() => undefined)
       if (!location) break
       try {
         const next = new URL(location, current).toString()

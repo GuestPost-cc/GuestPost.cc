@@ -89,6 +89,10 @@ const AUTHORITATIVE_DOMAIN_RATING_SOURCE_SQL = Prisma.join(
   ),
 )
 
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&")
+}
+
 type SqlSearchSort =
   | "recommended"
   | "traffic"
@@ -873,7 +877,9 @@ export class MarketplaceService {
       )
     }
     if (dto.country) {
-      listingConditions.push(Prisma.sql`listing."country" ILIKE ${dto.country}`)
+      listingConditions.push(
+        Prisma.sql`listing."country" ILIKE ${escapeLike(dto.country)} ESCAPE '\\'`,
+      )
     }
     const languages = dto.languages?.length
       ? dto.languages
@@ -959,26 +965,26 @@ export class MarketplaceService {
       )
     }
     if (dto.query) {
-      const pattern = `%${dto.query}%`
+      const pattern = `%${escapeLike(dto.query)}%`
       listingConditions.push(
         Prisma.sql`(
-          listing."title" ILIKE ${pattern}
-          OR listing."description" ILIKE ${pattern}
-          OR listing."slug" ILIKE ${pattern}
+          listing."title" ILIKE ${pattern} ESCAPE '\\'
+          OR listing."description" ILIKE ${pattern} ESCAPE '\\'
+          OR listing."slug" ILIKE ${pattern} ESCAPE '\\'
           OR EXISTS (
             SELECT 1
             FROM "MarketplaceListingCategory" listing_category
             JOIN "MarketplaceCategory" category
               ON category."id" = listing_category."categoryId"
             WHERE listing_category."listingId" = listing."id"
-              AND category."name" ILIKE ${pattern}
+              AND category."name" ILIKE ${pattern} ESCAPE '\\'
           )
           OR EXISTS (
             SELECT 1
             FROM "MarketplaceListingTag" listing_tag
             JOIN "MarketplaceTag" tag ON tag."id" = listing_tag."tagId"
             WHERE listing_tag."listingId" = listing."id"
-              AND tag."name" ILIKE ${pattern}
+              AND tag."name" ILIKE ${pattern} ESCAPE '\\'
           )
         )`,
       )
@@ -2942,7 +2948,6 @@ export class MarketplaceService {
         categories: { include: { category: true } },
         images: { where: { isPrimary: true }, take: 1 },
         tags: { include: { tag: true } },
-        reviews: { where: { status: "APPROVED" }, select: { rating: true } },
         moderationEvents: {
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           take: 20,
@@ -2996,16 +3001,29 @@ export class MarketplaceService {
       return b.createdAt.getTime() - a.createdAt.getTime()
     })
 
+    const reviewStats = listings.length
+      ? await this.prisma.marketplaceReview.groupBy({
+          by: ["listingId"],
+          where: {
+            listingId: { in: listings.map((listing) => listing.id) },
+            status: "APPROVED",
+          },
+          _count: { id: true },
+          _avg: { rating: true },
+        })
+      : []
+    const reviewStatsByListing = new Map(
+      reviewStats.map((stats) => [stats.listingId, stats]),
+    )
+
     return listings.map((l) => {
+      const reviewStats = reviewStatsByListing.get(l.id)
       const projected = {
         ...l,
         tags: l.tags.map((t) => t.tag),
         image: l.images[0]?.url ?? null,
-        reviewCount: l.reviews.length,
-        avgRating:
-          l.reviews.length > 0
-            ? l.reviews.reduce((sum, r) => sum + r.rating, 0) / l.reviews.length
-            : null,
+        reviewCount: reviewStats?._count.id ?? 0,
+        avgRating: reviewStats?._avg.rating ?? null,
       }
       return hasAccess
         ? this.toPublisherListing(projected)

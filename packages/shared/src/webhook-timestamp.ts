@@ -5,6 +5,8 @@ export class WebhookTimestampError extends Error {
   }
 }
 
+const MAX_FUTURE_TIMESTAMP_SKEW_SECONDS = 60
+
 export function assertWebhookTimestampFresh(
   timestamp: string | number | Date | undefined | null,
   toleranceSeconds: number,
@@ -33,10 +35,15 @@ export function assertWebhookTimestampFresh(
     throw new WebhookTimestampError("Invalid webhook timestamp")
   }
 
-  const ageSeconds = Math.abs(Date.now() / 1000 - epochSeconds)
+  const ageSeconds = Date.now() / 1000 - epochSeconds
   if (ageSeconds > toleranceSeconds) {
     throw new WebhookTimestampError(
       `Webhook timestamp outside tolerance (${Math.round(ageSeconds)}s > ${toleranceSeconds}s)`,
+    )
+  }
+  if (ageSeconds < -MAX_FUTURE_TIMESTAMP_SKEW_SECONDS) {
+    throw new WebhookTimestampError(
+      `Webhook timestamp is too far in the future (${Math.round(-ageSeconds)}s > ${MAX_FUTURE_TIMESTAMP_SKEW_SECONDS}s)`,
     )
   }
 }
