@@ -45,9 +45,54 @@ export class AdminVerificationQueueService {
         },
       ],
     }
+    const now = Date.now()
+    const candidates = await this.prisma.order.findMany({
+      where,
+      select: {
+        id: true,
+        amount: true,
+        createdAt: true,
+        website: {
+          select: {
+            publisher: { select: { tier: true } },
+          },
+        },
+        activeDeliveryVersion: { select: { createdAt: true } },
+        fraudFlags: {
+          where: { hold: { isNot: null } },
+          select: { id: true },
+        },
+      },
+    })
+    const priorityByOrderId = new Map(
+      candidates.map((order: any) => {
+        const queueTimeMs =
+          now - (order.activeDeliveryVersion?.createdAt?.getTime() ?? now)
+        const priority =
+          order.fraudFlags.length > 0
+            ? { score: 100, label: "CRITICAL" as const }
+            : this.decision.computeVerificationPriority(
+                { amount: Number(order.amount ?? 0) },
+                order.website?.publisher ?? null,
+                queueTimeMs,
+              )
+        return [order.id, priority] as const
+      }),
+    )
+    const pageOrderIds = candidates
+      .sort((a: any, b: any) => {
+        const score =
+          priorityByOrderId.get(b.id)!.score -
+          priorityByOrderId.get(a.id)!.score
+        if (score !== 0) return score
+        const createdAt = a.createdAt.getTime() - b.createdAt.getTime()
+        return createdAt !== 0 ? createdAt : a.id.localeCompare(b.id)
+      })
+      .slice(offset, offset + limit)
+      .map((order: any) => order.id)
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
-        where,
+        where: { AND: [where, { id: { in: pageOrderIds } }] },
         include: {
           website: {
             select: {
@@ -100,26 +145,16 @@ export class AdminVerificationQueueService {
             },
           },
         },
-        orderBy: { createdAt: "asc" },
-        take: limit,
-        skip: offset,
       }),
       this.prisma.order.count({ where }),
     ])
 
-    const now = Date.now()
+    const pageOrderIndex = new Map(
+      pageOrderIds.map((orderId, index) => [orderId, index]),
+    )
     const items = (orders as any[]).map((order: any) => {
       const version = order.activeDeliveryVersion
       const evidence = version?.evidence?.[0] ?? null
-      const queueTimeMs = now - (version?.createdAt?.getTime() ?? now)
-      const priority =
-        order.fraudFlags.length > 0
-          ? { score: 100, label: "CRITICAL" as const }
-          : this.decision.computeVerificationPriority(
-              { amount: Number(order.amount ?? 0) },
-              order.website?.publisher ?? null,
-              queueTimeMs,
-            )
 
       return {
         orderId: order.id,
@@ -203,11 +238,14 @@ export class AdminVerificationQueueService {
               })),
             }
           : null,
-        priority,
+        priority: priorityByOrderId.get(order.id)!,
       }
     })
 
-    items.sort((a: any, b: any) => b.priority.score - a.priority.score)
+    items.sort(
+      (a: any, b: any) =>
+        pageOrderIndex.get(a.orderId)! - pageOrderIndex.get(b.orderId)!,
+    )
     return { items, total, take: limit, skip: offset }
   }
 

@@ -1,6 +1,55 @@
 import { AdminVerificationQueueService } from "../verification-queue.service"
 
 describe("AdminVerificationQueueService", () => {
+  it("paginates after applying priority with a deterministic tie-breaker", async () => {
+    const createdAt = new Date("2026-07-16T08:00:00.000Z")
+    const lowPriority = {
+      id: "order-low",
+      version: 1,
+      status: "PUBLISHED",
+      title: "Low priority",
+      amount: 1,
+      targetUrl: null,
+      anchorText: null,
+      createdAt,
+      customer: null,
+      website: null,
+      activeDeliveryVersion: null,
+      fraudFlags: [],
+    }
+    const critical = {
+      ...lowPriority,
+      id: "order-critical",
+      title: "Critical priority",
+      fraudFlags: [{ id: "fraud-flag" }],
+    }
+    const prisma = {
+      order: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([lowPriority, critical])
+          .mockResolvedValueOnce([critical]),
+        count: jest.fn().mockResolvedValue(2),
+      },
+    }
+    const service = new AdminVerificationQueueService(
+      prisma as any,
+      {} as any,
+      {} as any,
+    )
+
+    const result = await service.listQueue("SUPER_ADMIN", 1, 0)
+
+    expect(result.items.map((item) => item.orderId)).toEqual(["order-critical"])
+    expect(prisma.order.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([{ id: { in: ["order-critical"] } }]),
+        }),
+      }),
+    )
+  })
+
   it("returns the order and delivery fields required by the staff queue", async () => {
     const submittedAt = new Date("2026-07-17T08:00:00.000Z")
     const prisma = {

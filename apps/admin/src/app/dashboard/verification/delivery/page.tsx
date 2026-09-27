@@ -42,7 +42,7 @@ import {
   Ticket,
 } from "lucide-react"
 import Link from "next/link"
-import { Fragment, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
   AdminEmptyState,
@@ -272,6 +272,13 @@ function DeliveryVerificationQueuePageInner({
   })
 
   const items = queue?.items ?? []
+  const lastPage = Math.max(Math.ceil((queue?.total ?? 0) / pageSize) - 1, 0)
+  const isCorrectingPage = page > lastPage
+
+  useEffect(() => {
+    if (isCorrectingPage) setPage(lastPage)
+  }, [isCorrectingPage, lastPage])
+
   const actionPending =
     markVerified.isPending ||
     reject.isPending ||
@@ -307,7 +314,7 @@ function DeliveryVerificationQueuePageInner({
         }
       />
 
-      {isLoading ? (
+      {isLoading || isCorrectingPage ? (
         <Skeleton className="h-64 w-full" />
       ) : error ? (
         <ErrorState
@@ -827,7 +834,7 @@ function DeliveryVerificationQueuePageInner({
             <Button
               variant="outline"
               size="sm"
-              disabled={(page + 1) * pageSize >= queue.total || isLoading}
+              disabled={page >= lastPage || isLoading}
               onClick={() => setPage((current) => current + 1)}
             >
               Next

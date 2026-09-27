@@ -25,8 +25,9 @@ updated: 2026-09-08
 - Stripe: HMAC verified before queueing (timing-safe, 300s tolerance)
 - Wise: RSA-SHA256 signature verified
 - Fail-closed: missing config → 503, bad sig → 401
-- Signed webhook timestamps allow only 60 seconds of future clock skew, so a
-  captured future-dated event cannot extend the normal replay window.
+- Signed webhook timestamps allow only 60 seconds of future clock skew. A
+  captured future-dated event can extend the normal replay window by no more
+  than that bounded tolerance.
 
 ## Fetch and Browser Boundaries
 

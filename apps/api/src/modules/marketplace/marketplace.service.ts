@@ -680,20 +680,25 @@ export class MarketplaceService {
     }
 
     if (query) {
+      const escapedQuery = escapeLike(query)
       where.OR = [
-        { title: { contains: query, mode: "insensitive" } },
-        { description: { contains: query, mode: "insensitive" } },
-        { slug: { contains: query, mode: "insensitive" } },
+        { title: { contains: escapedQuery, mode: "insensitive" } },
+        { description: { contains: escapedQuery, mode: "insensitive" } },
+        { slug: { contains: escapedQuery, mode: "insensitive" } },
         {
           categories: {
             some: {
-              category: { name: { contains: query, mode: "insensitive" } },
+              category: {
+                name: { contains: escapedQuery, mode: "insensitive" },
+              },
             },
           },
         },
         {
           tags: {
-            some: { tag: { name: { contains: query, mode: "insensitive" } } },
+            some: {
+              tag: { name: { contains: escapedQuery, mode: "insensitive" } },
+            },
           },
         },
       ]

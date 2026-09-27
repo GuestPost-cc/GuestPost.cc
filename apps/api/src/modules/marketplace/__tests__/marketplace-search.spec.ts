@@ -374,6 +374,29 @@ describe("MarketplaceService search", () => {
     expect(query.values).toContain("U\\%")
   })
 
+  it("treats Prisma substring wildcards as literal text", async () => {
+    await service.searchListings({ query: "50%_\\", sortBy: "newest" })
+
+    const where = prisma.marketplaceListing.findMany.mock.calls[0][0].where
+    expect(where.OR).toEqual(
+      expect.arrayContaining([
+        { title: { contains: "50\\%\\_\\\\", mode: "insensitive" } },
+        {
+          categories: {
+            some: {
+              category: {
+                name: {
+                  contains: "50\\%\\_\\\\",
+                  mode: "insensitive",
+                },
+              },
+            },
+          },
+        },
+      ]),
+    )
+  })
+
   it.each([
     "PUBLISHER_MANUAL",
     "STAFF_MANUAL",
