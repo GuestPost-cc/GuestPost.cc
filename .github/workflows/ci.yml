@@ -259,6 +259,44 @@ jobs:
             sleep 1
           done
 
+          pnpm --filter @guestpost/shared exec node -e '
+            const {
+              HeadObjectCommand,
+              PutObjectCommand,
+              S3Client,
+            } = require("@aws-sdk/client-s3")
+            const client = new S3Client({
+              endpoint: "http://localhost:9000",
+              region: "us-east-1",
+              forcePathStyle: true,
+              credentials: {
+                accessKeyId: "guestpost-ci",
+                secretAccessKey: "ci-only-minio-password-0123456789",
+              },
+            })
+            async function provisionReadinessSentinel() {
+              await client.send(
+                new PutObjectCommand({
+                  Bucket: "guestpost-ci",
+                  Key: ".guestpost/evidence-storage-ready-v1",
+                  Body: "GuestPost CI evidence storage readiness\n",
+                }),
+              )
+              await client.send(
+                new HeadObjectCommand({
+                  Bucket: "guestpost-ci",
+                  Key: ".guestpost/evidence-storage-ready-v1",
+                }),
+              )
+            }
+            provisionReadinessSentinel()
+              .finally(() => client.destroy())
+              .catch((error) => {
+                console.error(error)
+                process.exitCode = 1
+              })
+          '
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
