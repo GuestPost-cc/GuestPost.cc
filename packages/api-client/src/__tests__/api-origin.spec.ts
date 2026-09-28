@@ -25,6 +25,32 @@ describe("browser API origin resolution", () => {
   })
 
   it.each([
+    ["shohan.iam.bd", "https://api.shohan.iam.bd"],
+    ["app.shohan.iam.bd", "https://api.shohan.iam.bd"],
+    ["admin.guestpost.pro.bd", "https://api.guestpost.pro.bd"],
+  ])(
+    "selects the API sibling for %s even when a build URL is set",
+    (hostname, expected) => {
+      expect(
+        resolveApiOrigin({
+          configuredUrl: "https://api.guestpost.pro.bd",
+          browserLocation: { hostname, protocol: "https:" },
+          nodeEnv: "production",
+        }),
+      ).toBe(expected)
+    },
+  )
+
+  it("retains the configured API URL for other hosts", () => {
+    expect(
+      resolveApiOrigin({
+        configuredUrl: "https://api.example.com",
+        browserLocation: { hostname: "app.example.com", protocol: "https:" },
+      }),
+    ).toBe("https://api.example.com")
+  })
+
+  it.each([
     "http://api.example.com",
     "ftp://api.example.com",
     "https://user:secret@api.example.com",

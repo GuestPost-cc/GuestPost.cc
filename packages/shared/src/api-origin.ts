@@ -1,4 +1,5 @@
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"])
+const API_DOMAIN_FAMILIES = ["guestpost.pro.bd", "shohan.iam.bd"]
 
 function normalizedHostname(value: string): string {
   const hostname = value.trim().toLowerCase()
@@ -9,6 +10,14 @@ function normalizedHostname(value: string): string {
 
 function isLoopbackHostname(value: string): boolean {
   return LOOPBACK_HOSTS.has(normalizedHostname(value))
+}
+
+function apiOriginForHostname(hostname: string): string | null {
+  const normalized = normalizedHostname(hostname)
+  const domain = API_DOMAIN_FAMILIES.find(
+    (candidate) => normalized === candidate || normalized.endsWith(`.${candidate}`),
+  )
+  return domain ? `https://api.${domain}` : null
 }
 
 export interface ResolveApiOriginOptions {
@@ -52,18 +61,23 @@ function parseConfiguredOrigin(value: string): string {
 export function resolveApiOrigin(
   options: ResolveApiOriginOptions = {},
 ): string {
-  const configuredUrl = options.configuredUrl?.trim()
-  if (configuredUrl) return parseConfiguredOrigin(configuredUrl)
-
   const runtimeWindow = (
     globalThis as unknown as {
       window?: { location: { hostname: string; protocol: string } }
     }
   ).window
   const location = options.browserLocation ?? runtimeWindow?.location ?? null
+  // Staging may be opened on either approved domain family. Pick its sibling
+  // API hostname instead of using the other domain family's build-time URL.
+  const domainApiOrigin = location && apiOriginForHostname(location.hostname)
+  if (domainApiOrigin) return domainApiOrigin
+
+  const configuredUrl = options.configuredUrl?.trim()
+  if (configuredUrl) return parseConfiguredOrigin(configuredUrl)
+
   if (location && !isLoopbackHostname(location.hostname)) {
     throw new Error(
-      "NEXT_PUBLIC_API_URL is required for a non-loopback browser host",
+      "NEXT_PUBLIC_API_URL is required for an unrecognized non-loopback browser host",
     )
   }
   if (location?.protocol === "https:") {

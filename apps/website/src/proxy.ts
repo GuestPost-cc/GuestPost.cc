@@ -15,6 +15,8 @@ function contentSecurityPolicy(nonce: string) {
   const connectSources = [
     "'self'",
     configuredOrigin(process.env.NEXT_PUBLIC_API_URL),
+    "https://api.guestpost.pro.bd",
+    "https://api.shohan.iam.bd",
     configuredOrigin(process.env.NEXT_PUBLIC_PORTAL_URL),
     configuredOrigin(process.env.NEXT_PUBLIC_PUBLISHER_URL),
     "https://*.ingest.sentry.io",
