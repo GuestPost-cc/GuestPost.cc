@@ -11,6 +11,7 @@ export type {
 } from "@guestpost/integrations/client"
 export {
   apiV1Url,
+  hostnameFromHostHeader,
   resolveApiOrigin,
   resolveApiV1Url,
 } from "./api-origin"
