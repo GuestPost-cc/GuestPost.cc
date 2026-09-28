@@ -1,9 +1,4 @@
 import { hostnameFromHostHeader, resolveApiOrigin } from "@guestpost/api-client"
-import {
-  getSessionCookieValue,
-  PUBLISHER_MIDDLEWARE_CONFIG,
-  requiresAuthRedirect,
-} from "@guestpost/shared/dist/middleware-auth"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
@@ -46,18 +41,8 @@ function contentSecurityPolicy(nonce: string, request: NextRequest) {
 }
 
 export function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith("/dashboard")) {
-    const auth = requiresAuthRedirect(
-      `${request.nextUrl.pathname}${request.nextUrl.search}`,
-      getSessionCookieValue((name) => request.cookies.get(name)),
-      PUBLISHER_MIDDLEWARE_CONFIG,
-    )
-    if (auth.needsRedirect) {
-      const url = new URL(auth.signInPath, request.url)
-      url.searchParams.set("returnTo", auth.redirect!)
-      return NextResponse.redirect(url)
-    }
-  }
+  // The auth session is owned by the API host and may not be visible to this
+  // sibling app host. Dashboard layouts verify it through the API instead.
   const nonce = crypto.randomUUID().replaceAll("-", "")
   const policy = contentSecurityPolicy(nonce, request)
   const requestHeaders = new Headers(request.headers)
