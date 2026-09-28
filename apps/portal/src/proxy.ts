@@ -1,9 +1,9 @@
+import { resolveApiOrigin } from "@guestpost/api-client"
 import {
   getSessionCookieValue,
   PORTAL_MIDDLEWARE_CONFIG,
   requiresAuthRedirect,
 } from "@guestpost/shared/dist/middleware-auth"
-import { resolveApiOrigin } from "@guestpost/api-client"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 

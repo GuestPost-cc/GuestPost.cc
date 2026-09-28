@@ -1,6 +1,6 @@
+import { resolveApiOrigin } from "@guestpost/api-client"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
-import { resolveApiOrigin } from "@guestpost/api-client"
 
 function configuredOrigin(value: string | undefined) {
   if (!value) return null

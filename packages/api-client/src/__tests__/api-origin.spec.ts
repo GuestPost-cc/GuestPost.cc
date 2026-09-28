@@ -52,17 +52,18 @@ describe("browser API origin resolution", () => {
     ).toBe("https://api.example.com")
   })
 
-  it.each(["not-a-host", "customer.example.org:443", "203.0.113.10"])(
-    "uses the configured URL for a non-DNS or ambiguous host: %s",
-    (hostname) => {
-      expect(
-        resolveApiOrigin({
-          configuredUrl: "https://api.configured.example",
-          browserLocation: { hostname, protocol: "https:" },
-        }),
-      ).toBe("https://api.configured.example")
-    },
-  )
+  it.each([
+    "not-a-host",
+    "customer.example.org:443",
+    "203.0.113.10",
+  ])("uses the configured URL for a non-DNS or ambiguous host: %s", (hostname) => {
+    expect(
+      resolveApiOrigin({
+        configuredUrl: "https://api.configured.example",
+        browserLocation: { hostname, protocol: "https:" },
+      }),
+    ).toBe("https://api.configured.example")
+  })
 
   it.each([
     "http://api.example.com",
