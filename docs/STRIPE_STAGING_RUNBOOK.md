@@ -118,11 +118,14 @@ authoritative nameservers and Resend reports sending as verified.
    writer. Feature flags alone do not make a mixed-version fleet safe.
 3. Back up the database, then apply the finance migrations in the exact order
    documented in `docs/PRODUCTION_RUNBOOK.md`.
-4. With the old API fully stopped, change the platform and connected-account
-   Stripe Dashboard destinations from the retired shared URL to their explicit
-   `/platform` and `/connected` URLs above. A delivery during this short gap
-   may receive a non-2xx and must be allowed to retry; do not disable the
-   destination or rotate its secret.
+4. With the old API fully stopped, update all three Stripe Dashboard
+   destinations—including the deposit destination—to the canonical API origin
+   and exact paths above. Verify HTTPS/TLS reachability for all three routes
+   before enabling test actions. Keep old destinations available until each
+   new route has accepted a signed test event and exact redelivery; then retire
+   the old destinations. Stripe may deliver an event to both during the
+   overlap, so preserve provider-event idempotency and do not rotate a signing
+   secret without updating the matching API environment value.
 5. Start only the matching API/worker/app release. Verify old replica count is
    zero. Once evidence triggers are installed, an old image is not a rollback
    target; keep money gates closed and forward-fix.
