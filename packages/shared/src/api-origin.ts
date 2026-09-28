@@ -46,30 +46,57 @@ export function hostnameFromHostHeader(
   }
 }
 
-function apiOriginForHostname(hostname: string): string | null {
+function validDnsHostname(hostname: string): boolean {
+  if (!hostname || hostname.length > 253) return false
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return false
+
+  const labels = hostname.split(".")
+  return (
+    labels.length >= 2 &&
+    labels.every((label) =>
+      /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label),
+    )
+  )
+}
+
+function instanceDomainForHostname(hostname: string): string | null {
   const normalized = normalizedHostname(hostname).replace(/\.$/, "")
   if (isLoopbackHostname(normalized)) return null
-  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(normalized)) return null
+  if (!validDnsHostname(normalized)) return null
 
-  const labels = normalized.split(".").filter(Boolean)
-  if (labels.length < 2) return null
-  if (
-    labels.some(
-      (label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label),
-    )
-  ) {
-    return null
-  }
+  const labels = normalized.split(".")
   // Two-label hosts are treated as the configured instance domain even if
   // their first label happens to match a service name (for example app.com).
   if (labels.length > 2 && SERVICE_HOST_LABELS.has(labels[0])) labels.shift()
-  if (labels.length < 2) return null
+  return labels.join(".")
+}
 
-  return `https://api.${labels.join(".")}`
+function allowedInstanceDomains(
+  configuredDomains: string | readonly string[] | undefined,
+): Set<string> {
+  const configured =
+    typeof configuredDomains === "string"
+      ? configuredDomains.split(",")
+      : (configuredDomains ?? [])
+  return new Set(
+    configured
+      .map((domain) => normalizedHostname(domain).replace(/\.$/, ""))
+      .filter(validDnsHostname),
+  )
+}
+
+function apiOriginForHostname(
+  hostname: string,
+  allowedDomains: Set<string>,
+): string | null {
+  const instanceDomain = instanceDomainForHostname(hostname)
+  if (!instanceDomain || !allowedDomains.has(instanceDomain)) return null
+  return `https://api.${instanceDomain}`
 }
 
 export interface ResolveApiOriginOptions {
   configuredUrl?: string | null
+  allowedAppDomains?: string | readonly string[]
   browserLocation?: { hostname: string; protocol: string } | null
   nodeEnv?: string
 }
@@ -115,11 +142,15 @@ export function resolveApiOrigin(
     }
   ).window
   const location = options.browserLocation ?? runtimeWindow?.location ?? null
+  const allowedDomains = allowedInstanceDomains(
+    options.allowedAppDomains ?? process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+  )
   // App/API hosts follow a shared pattern across deployments: frontends use
   // the instance domain (or a known service subdomain) and the API uses
   // api.<instance-domain>. Derive it at request time, not from a build-time
   // hostname, so custom domains and aliases keep using their matching API.
-  const domainApiOrigin = location && apiOriginForHostname(location.hostname)
+  const domainApiOrigin =
+    location && apiOriginForHostname(location.hostname, allowedDomains)
   if (domainApiOrigin) return domainApiOrigin
 
   const configuredUrl = options.configuredUrl?.trim()

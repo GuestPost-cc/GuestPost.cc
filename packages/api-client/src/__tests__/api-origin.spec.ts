@@ -32,6 +32,7 @@ describe("browser API origin resolution", () => {
     expect(
       resolveApiOrigin({
         configuredUrl: "https://api.guestpost.pro.bd",
+        allowedAppDomains: ["shohan.iam.bd"],
         browserLocation: { hostname: hostname!, protocol: "https:" },
         nodeEnv: "production",
       }),
@@ -62,18 +63,39 @@ describe("browser API origin resolution", () => {
   })
 
   it.each([
-    ["shohan.iam.bd", "https://api.shohan.iam.bd"],
-    ["app.shohan.iam.bd", "https://api.shohan.iam.bd"],
-    ["admin.guestpost.pro.bd", "https://api.guestpost.pro.bd"],
-    ["publisher.client-example.net", "https://api.client-example.net"],
-    ["customer-example.org", "https://api.customer-example.org"],
-    ["api.customer-example.org", "https://api.customer-example.org"],
-    ["app.com", "https://api.app.com"],
-    ["WWW.Customer-Example.ORG.", "https://api.customer-example.org"],
-  ])("selects the API sibling for %s even when a build URL is set", (hostname, expected) => {
+    ["shohan.iam.bd", "https://api.shohan.iam.bd", "shohan.iam.bd"],
+    ["app.shohan.iam.bd", "https://api.shohan.iam.bd", "shohan.iam.bd"],
+    [
+      "admin.guestpost.pro.bd",
+      "https://api.guestpost.pro.bd",
+      "guestpost.pro.bd",
+    ],
+    [
+      "publisher.client-example.net",
+      "https://api.client-example.net",
+      "client-example.net",
+    ],
+    [
+      "customer-example.org",
+      "https://api.customer-example.org",
+      "customer-example.org",
+    ],
+    [
+      "api.customer-example.org",
+      "https://api.customer-example.org",
+      "customer-example.org",
+    ],
+    ["app.com", "https://api.app.com", "app.com"],
+    [
+      "WWW.Customer-Example.ORG.",
+      "https://api.customer-example.org",
+      "customer-example.org",
+    ],
+  ])("selects the API sibling for allow-listed host %s even when a build URL is set", (hostname, expected, allowedDomain) => {
     expect(
       resolveApiOrigin({
         configuredUrl: "https://api.guestpost.pro.bd",
+        allowedAppDomains: [allowedDomain],
         browserLocation: { hostname, protocol: "https:" },
         nodeEnv: "production",
       }),
@@ -83,10 +105,13 @@ describe("browser API origin resolution", () => {
   it("retains the configured API URL for other hosts", () => {
     expect(
       resolveApiOrigin({
-        configuredUrl: "https://api.example.com",
-        browserLocation: { hostname: "app.example.com", protocol: "https:" },
+        configuredUrl: "https://api.guestpost.pro.bd",
+        browserLocation: {
+          hostname: "guestpost-portal.onrender.com",
+          protocol: "https:",
+        },
       }),
-    ).toBe("https://api.example.com")
+    ).toBe("https://api.guestpost.pro.bd")
   })
 
   it.each([
@@ -119,6 +144,7 @@ describe("browser API origin resolution", () => {
           hostname: "admin.arbitrary-example.com",
           protocol: "https:",
         },
+        allowedAppDomains: ["arbitrary-example.com"],
         nodeEnv: "production",
       }),
     ).toBe("https://api.arbitrary-example.com")
@@ -135,6 +161,15 @@ describe("browser API origin resolution", () => {
           protocol: "https:",
         },
         nodeEnv: "development",
+      }),
+    ).toThrow(/required for an unrecognized non-loopback/)
+    expect(() =>
+      resolveApiOrigin({
+        browserLocation: {
+          hostname: "attacker.example",
+          protocol: "https:",
+        },
+        nodeEnv: "production",
       }),
     ).toThrow(/required for an unrecognized non-loopback/)
     expect(() =>
