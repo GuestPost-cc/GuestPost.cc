@@ -56,7 +56,7 @@ export function betterAuthBaseURL() {
 
     return {
       allowedHosts,
-      protocol: process.env.NODE_ENV === "production" ? "https" : "http",
+      protocol: process.env.NODE_ENV === "development" ? "http" : "https",
     } as const
   }
 

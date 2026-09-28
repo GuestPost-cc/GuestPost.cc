@@ -31,6 +31,22 @@ describe("auth security options", () => {
     })
   })
 
+  it("defaults dynamic auth hosts to HTTPS outside explicit local development", () => {
+    process.env.NODE_ENV = "staging"
+    process.env.BETTER_AUTH_ALLOWED_HOSTS = "api.example.com"
+
+    expect(betterAuthBaseURL()).toEqual({
+      allowedHosts: ["api.example.com"],
+      protocol: "https",
+    })
+
+    process.env.NODE_ENV = "development"
+    expect(betterAuthBaseURL()).toEqual({
+      allowedHosts: ["api.example.com"],
+      protocol: "http",
+    })
+  })
+
   it("rejects wildcard and URL entries in the auth host allowlist", () => {
     process.env.BETTER_AUTH_ALLOWED_HOSTS = "*.example.com"
     expect(() => betterAuthBaseURL()).toThrow(
