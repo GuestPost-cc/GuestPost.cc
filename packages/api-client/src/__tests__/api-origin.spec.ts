@@ -74,19 +74,31 @@ describe("browser API origin resolution", () => {
     expect(() => resolveApiOrigin({ configuredUrl })).toThrow()
   })
 
-  it("requires an explicit URL for production and non-loopback hosts", () => {
+  it("derives API origins for valid external hosts without an explicit URL", () => {
+    expect(
+      resolveApiOrigin({
+        browserLocation: {
+          hostname: "admin.arbitrary-example.com",
+          protocol: "https:",
+        },
+        nodeEnv: "production",
+      }),
+    ).toBe("https://api.arbitrary-example.com")
+  })
+
+  it("requires an explicit URL for production and invalid non-loopback hosts", () => {
     expect(() => resolveApiOrigin({ nodeEnv: "production" })).toThrow(
       /required in production/,
     )
     expect(() =>
       resolveApiOrigin({
         browserLocation: {
-          hostname: "admin.example.com",
+          hostname: "not-a-host",
           protocol: "https:",
         },
         nodeEnv: "development",
       }),
-    ).toThrow(/required for a non-loopback/)
+    ).toThrow(/required for an unrecognized non-loopback/)
     expect(() =>
       resolveApiOrigin({
         browserLocation: { hostname: "localhost", protocol: "https:" },
