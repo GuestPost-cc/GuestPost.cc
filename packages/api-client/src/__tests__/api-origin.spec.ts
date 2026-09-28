@@ -114,6 +114,19 @@ describe("browser API origin resolution", () => {
     ).toBe("https://api.guestpost.pro.bd")
   })
 
+  it("accepts a comma-separated public-domain allowlist", () => {
+    expect(
+      resolveApiOrigin({
+        configuredUrl: "https://api.guestpost.pro.bd",
+        allowedAppDomains: "guestpost.pro.bd, shohan.iam.bd",
+        browserLocation: {
+          hostname: "app.shohan.iam.bd",
+          protocol: "https:",
+        },
+      }),
+    ).toBe("https://api.shohan.iam.bd")
+  })
+
   it.each([
     "not-a-host",
     "customer.example.org:443",
