@@ -10,6 +10,7 @@ import type {
 import {
   moderationActionLabel,
   moderationReasonLabel,
+  resolveInstanceOrigin,
 } from "@guestpost/api-client"
 import type { ListingStatus } from "@guestpost/database"
 import {
@@ -64,7 +65,6 @@ import {
 import { api } from "../../../../lib/api"
 import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
 
-const PORTAL_URL = process.env.NEXT_PUBLIC_PORTAL_URL ?? "http://localhost:3001"
 const SERVICE_TYPES = [
   "GUEST_POST",
   "NICHE_EDIT",
@@ -348,7 +348,16 @@ function AdminListingDetailPageInner({
             {listing.status === "APPROVED" ? (
               <Button variant="outline" size="sm" asChild>
                 <a
-                  href={`${PORTAL_URL}/dashboard/marketplace/${listing.slug}`}
+                  href={`${resolveInstanceOrigin("portal", {
+                    configuredUrl: process.env.NEXT_PUBLIC_PORTAL_URL,
+                    browserLocation:
+                      typeof window !== "undefined"
+                        ? window.location
+                        : undefined,
+                    allowedAppDomains:
+                      process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+                    nodeEnv: process.env.NODE_ENV,
+                  })}/dashboard/marketplace/${listing.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

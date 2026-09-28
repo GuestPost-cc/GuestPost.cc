@@ -3,6 +3,7 @@ import {
   hostnameFromHostHeader,
   resolveApiOrigin,
   resolveApiV1Url,
+  resolveInstanceOrigin,
 } from "../api-origin"
 
 describe("browser API origin resolution", () => {
@@ -197,5 +198,46 @@ describe("browser API origin resolution", () => {
     expect(
       resolveApiOrigin({ configuredUrl: "http://[::1]:4000/api/v1" }),
     ).toBe("http://[::1]:4000")
+  })
+})
+
+describe("allow-listed instance app origin resolution", () => {
+  it.each([
+    ["website", "shohan.iam.bd", "https://shohan.iam.bd"],
+    ["portal", "shohan.iam.bd", "https://app.shohan.iam.bd"],
+    ["publisher", "shohan.iam.bd", "https://publisher.shohan.iam.bd"],
+    ["admin", "shohan.iam.bd", "https://admin.shohan.iam.bd"],
+    ["portal", "admin.client-example.net", "https://app.client-example.net"],
+  ] as const)("resolves %s on %s to %s", (surface, hostname, expected) => {
+    expect(
+      resolveInstanceOrigin(surface, {
+        configuredUrl: "https://app.guestpost.pro.bd",
+        allowedAppDomains: ["shohan.iam.bd", "client-example.net"],
+        browserLocation: { hostname, protocol: "https:" },
+        nodeEnv: "production",
+      }),
+    ).toBe(expected)
+  })
+
+  it("uses the configured app origin for hosts outside the allowlist", () => {
+    expect(
+      resolveInstanceOrigin("portal", {
+        configuredUrl: "https://app.guestpost.pro.bd",
+        allowedAppDomains: ["shohan.iam.bd"],
+        browserLocation: {
+          hostname: "preview.example.net",
+          protocol: "https:",
+        },
+        nodeEnv: "production",
+      }),
+    ).toBe("https://app.guestpost.pro.bd")
+  })
+
+  it("rejects unsafe configured destinations", () => {
+    expect(() =>
+      resolveInstanceOrigin("portal", {
+        configuredUrl: "https://attacker:secret@example.net/path",
+      }),
+    ).toThrow(/cannot contain credentials, a path, query, or fragment/)
   })
 })

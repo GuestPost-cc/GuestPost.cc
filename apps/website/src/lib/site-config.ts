@@ -1,3 +1,5 @@
+import { resolveInstanceOrigin } from "@guestpost/api-client"
+
 export const SITE_NAME = "GuestPost"
 export const SITE_DESCRIPTION =
   "A managed marketplace for accountable guest-post placements, verified delivery, and controlled settlement."
@@ -37,6 +39,23 @@ export const ACCOUNT_DESTINATIONS = {
   customer: PORTAL_URL,
   publisher: PUBLISHER_URL,
 } as const
+
+export function accountDestination(
+  audience: "customer" | "publisher",
+  path: string,
+): string {
+  const origin = resolveInstanceOrigin(
+    audience === "customer" ? "portal" : "publisher",
+    {
+      configuredUrl: ACCOUNT_DESTINATIONS[audience],
+      browserLocation:
+        typeof window !== "undefined" ? window.location : undefined,
+      allowedAppDomains: process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+      nodeEnv: process.env.NODE_ENV,
+    },
+  )
+  return new URL(path, origin).toString()
+}
 
 export const PUBLIC_CONTENT_UPDATED_AT = "2026-07-28"
 

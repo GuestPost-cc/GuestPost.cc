@@ -9,11 +9,16 @@ export type {
   SyncJob,
   TriggerSyncResponse,
 } from "@guestpost/integrations/client"
+export type {
+  InstanceSurface,
+  ResolveInstanceOriginOptions,
+} from "./api-origin"
 export {
   apiV1Url,
   hostnameFromHostHeader,
   resolveApiOrigin,
   resolveApiV1Url,
+  resolveInstanceOrigin,
 } from "./api-origin"
 export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, HttpClient } from "./client"

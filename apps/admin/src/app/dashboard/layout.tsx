@@ -284,8 +284,12 @@ export default function DashboardLayout({
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/")
-  }, [user, loading, router])
+    if (!loading && !user) {
+      router.replace(
+        `/?returnTo=${encodeURIComponent(pathname + window.location.search)}`,
+      )
+    }
+  }, [user, loading, router, pathname])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: navigation closes the mobile drawer
   useEffect(() => {
