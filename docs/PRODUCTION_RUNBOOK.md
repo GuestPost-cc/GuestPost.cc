@@ -54,6 +54,38 @@ listed in `docs/OPERATIONS.md`; controller signature, replay, allowlist, and
 raw-body checks remain authoritative. Monitor provider `429` responses and
 retry telemetry before tuning the 600/minute staging/production default.
 
+### Transactional email (Resend)
+
+The worker sends application-generated receipts, invoice PDFs, and payout
+notifications over SMTP; Stripe test mode does not send these emails. For the
+current staging sender, use the verified Resend domain `mail.shohan.iam.bd`:
+
+```text
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_REQUIRE_TLS=true
+SMTP_USER=resend
+EMAIL_FROM=GuestPost.cc <notifications@mail.shohan.iam.bd>
+```
+
+Set `SMTP_PASS` to a Resend API key with sending-only access, keep it as a
+runtime secret on the worker (never a build argument or browser variable), and
+keep the API's required `SMTP_HOST` and `EMAIL_FROM` values aligned. Set
+`EMAIL_DELIVERY_MODE=live` on the worker to send queued transactional
+messages; this is a worker-only setting. This staging setup intentionally
+permits mail to all registered staging users, so leave
+`EMAIL_ALLOWED_RECIPIENT_DOMAINS` unset. If you later restrict recipients,
+that variable filters recipient domains; it does not configure the sender.
+Neither `capture` nor `live` is a sink: both modes can send real messages to
+eligible recipients. Before enabling `live`, inspect pending and failed
+outbox deliveries and confirm the staging database contains only intended
+recipients; already-queued messages may be sent when delivery resumes.
+
+Email action links use the worker's configured customer, publisher, and admin
+origins. Keep those origins aligned with the current canonical HTTPS staging
+domains; do not derive them from an untrusted message or request host.
+
 ### Payout encryption rotation boundary
 
 Payout encryption uses the format-2 `p2:<key-id>:<payload>` envelope. The
