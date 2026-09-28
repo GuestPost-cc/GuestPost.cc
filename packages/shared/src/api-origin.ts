@@ -15,7 +15,8 @@ function isLoopbackHostname(value: string): boolean {
 function apiOriginForHostname(hostname: string): string | null {
   const normalized = normalizedHostname(hostname)
   const domain = API_DOMAIN_FAMILIES.find(
-    (candidate) => normalized === candidate || normalized.endsWith(`.${candidate}`),
+    (candidate) =>
+      normalized === candidate || normalized.endsWith(`.${candidate}`),
   )
   return domain ? `https://api.${domain}` : null
 }

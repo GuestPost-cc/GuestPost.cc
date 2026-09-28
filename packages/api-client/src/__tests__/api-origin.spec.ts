@@ -28,18 +28,15 @@ describe("browser API origin resolution", () => {
     ["shohan.iam.bd", "https://api.shohan.iam.bd"],
     ["app.shohan.iam.bd", "https://api.shohan.iam.bd"],
     ["admin.guestpost.pro.bd", "https://api.guestpost.pro.bd"],
-  ])(
-    "selects the API sibling for %s even when a build URL is set",
-    (hostname, expected) => {
-      expect(
-        resolveApiOrigin({
-          configuredUrl: "https://api.guestpost.pro.bd",
-          browserLocation: { hostname, protocol: "https:" },
-          nodeEnv: "production",
-        }),
-      ).toBe(expected)
-    },
-  )
+  ])("selects the API sibling for %s even when a build URL is set", (hostname, expected) => {
+    expect(
+      resolveApiOrigin({
+        configuredUrl: "https://api.guestpost.pro.bd",
+        browserLocation: { hostname, protocol: "https:" },
+        nodeEnv: "production",
+      }),
+    ).toBe(expected)
+  })
 
   it("retains the configured API URL for other hosts", () => {
     expect(
