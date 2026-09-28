@@ -115,7 +115,9 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace(`/?returnTo=${encodeURIComponent(pathname)}`)
+      router.replace(
+        `/?returnTo=${encodeURIComponent(pathname + window.location.search)}`,
+      )
     }
   }, [user, loading, router, pathname])
 

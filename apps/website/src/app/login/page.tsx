@@ -1,6 +1,6 @@
 "use client"
 
-import { sanitizeReturnTo } from "@guestpost/api-client"
+import { resolveInstanceOrigin, sanitizeReturnTo } from "@guestpost/api-client"
 import type { AuthError } from "@guestpost/auth"
 import {
   getErrorMessage,
@@ -22,11 +22,7 @@ import {
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useMemo, useState } from "react"
-import { ACCOUNT_DESTINATIONS } from "../../lib/site-config"
-
-function destination(audience: PublicAuthAudience, path: string): string {
-  return new URL(path, ACCOUNT_DESTINATIONS[audience]).toString()
-}
+import { accountDestination } from "../../lib/site-config"
 
 function LoginContent() {
   const searchParams = useSearchParams()
@@ -42,6 +38,16 @@ function LoginContent() {
     () => sanitizeReturnTo(searchParams.get("returnTo")) ?? "/dashboard",
     [searchParams],
   )
+  const adminLoginUrl =
+    error === "Staff accounts must sign in through the Admin portal."
+      ? resolveInstanceOrigin("admin", {
+          configuredUrl: process.env.NEXT_PUBLIC_ADMIN_URL,
+          browserLocation:
+            typeof window !== "undefined" ? window.location : undefined,
+          allowedAppDomains: process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+          nodeEnv: process.env.NODE_ENV,
+        })
+      : null
 
   useEffect(() => {
     const oauthError = getOAuthErrorMessage(searchParams.get("error"))
@@ -57,9 +63,9 @@ function LoginContent() {
       return
     }
     if (user.userType === "CUSTOMER") {
-      window.location.replace(destination("customer", returnTo))
+      window.location.replace(accountDestination("customer", returnTo))
     } else if (user.userType === "PUBLISHER") {
-      window.location.replace(destination("publisher", returnTo))
+      window.location.replace(accountDestination("publisher", returnTo))
     } else {
       setError("Staff accounts must sign in through the Admin portal.")
     }
@@ -101,7 +107,7 @@ function LoginContent() {
           recoverable: true,
         } as AuthError
       }
-      window.location.replace(destination(audience, returnTo))
+      window.location.replace(accountDestination(audience, returnTo))
     } catch (err: unknown) {
       setError(getErrorMessage(err))
       setSubmitting(false)
@@ -179,6 +185,14 @@ function LoginContent() {
               : "Open publisher dashboard"
           }
         />
+        {adminLoginUrl && (
+          <a
+            href={adminLoginUrl}
+            className="mt-4 block text-center text-sm font-semibold text-sky-300 hover:text-sky-200"
+          >
+            Continue to Admin login
+          </a>
+        )}
       </AuthCard>
     </AuthLayout>
   )

@@ -20,11 +20,7 @@ import {
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useMemo, useState } from "react"
-import { ACCOUNT_DESTINATIONS } from "../../lib/site-config"
-
-function destination(audience: PublicAuthAudience, path: string): string {
-  return new URL(path, ACCOUNT_DESTINATIONS[audience]).toString()
-}
+import { accountDestination } from "../../lib/site-config"
 
 function SignupContent() {
   const searchParams = useSearchParams()
@@ -47,9 +43,9 @@ function SignupContent() {
   useEffect(() => {
     if (sessionLoading || !user) return
     if (user.userType === "CUSTOMER") {
-      window.location.replace(destination("customer", returnTo))
+      window.location.replace(accountDestination("customer", returnTo))
     } else if (user.userType === "PUBLISHER") {
-      window.location.replace(destination("publisher", returnTo))
+      window.location.replace(accountDestination("publisher", returnTo))
     } else {
       setError("Staff accounts cannot be used to create a public account.")
     }
@@ -96,7 +92,7 @@ function SignupContent() {
           recoverable: true,
         } as AuthError
       }
-      window.location.replace(destination(audience, returnTo))
+      window.location.replace(accountDestination(audience, returnTo))
     } catch (err: unknown) {
       setError(getErrorMessage(err))
       setSubmitting(false)
