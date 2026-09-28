@@ -121,11 +121,16 @@ authoritative nameservers and Resend reports sending as verified.
 4. With the old API fully stopped, update all three Stripe Dashboard
    destinations—including the deposit destination—to the canonical API origin
    and exact paths above. Verify HTTPS/TLS reachability for all three routes
-   before enabling test actions. Keep old destinations available until each
-   new route has accepted a signed test event and exact redelivery; then retire
-   the old destinations. Stripe may deliver an event to both during the
-   overlap, so preserve provider-event idempotency and do not rotate a signing
-   secret without updating the matching API environment value.
+   before enabling test actions. Do not assume retries queued for the old URL
+   will follow a destination URL change: keep each old destination enabled,
+   inspect its Workbench delivery history, and explicitly resend every
+   recoverable failed/pending event to the canonical route while preserving
+   the original Stripe event ID. If a replacement destination is created,
+   keep the old one enabled until the replacement has accepted a signed test
+   event and exact redelivery and all old pending events are accounted for;
+   then disable the old destination. Stripe may deliver an event to both
+   during overlap, so preserve provider-event idempotency and do not rotate a
+   signing secret without updating the matching API environment value.
 5. Start only the matching API/worker/app release. Verify old replica count is
    zero. Once evidence triggers are installed, an old image is not a rollback
    target; keep money gates closed and forward-fix.
