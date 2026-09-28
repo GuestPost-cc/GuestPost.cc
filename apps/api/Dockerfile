@@ -6,19 +6,18 @@ WORKDIR /repo
 ENV NODE_OPTIONS=--max-old-space-size=2048 \
     PNPM_VERIFY_DEPS_BEFORE_RUN=false
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/
 COPY packages/database/package.json packages/database/
 COPY packages/shared/package.json packages/shared/
 COPY packages/auth/package.json packages/auth/
-COPY packages/billing/package.json packages/billing/
-COPY packages/notifications/package.json packages/notifications/
-COPY packages/reporting/package.json packages/reporting/
+COPY packages/integrations/package.json packages/integrations/
 RUN pnpm install --frozen-lockfile --filter @guestpost/api...
 
 COPY packages packages
 COPY apps/api apps/api
-RUN pnpm --filter @guestpost/database exec prisma generate \
+RUN export DATABASE_URL=postgresql://guestpost:guestpost@127.0.0.1:5432/guestpost \
+ && pnpm --filter @guestpost/database exec prisma generate \
  && pnpm --filter @guestpost/api... build
 
 FROM node:22-alpine
