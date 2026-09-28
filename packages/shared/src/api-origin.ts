@@ -19,6 +19,33 @@ function isLoopbackHostname(value: string): boolean {
   return LOOPBACK_HOSTS.has(normalizedHostname(value))
 }
 
+/**
+ * Read the hostname from an HTTP Host authority without accepting a URL,
+ * forwarded-host list, or userinfo. Reverse proxies may leave the public Host
+ * header intact while Next.js' request URL reflects an internal authority.
+ */
+export function hostnameFromHostHeader(
+  value: string | null | undefined,
+): string | null {
+  if (!value || value.length > 255 || /[\s,/@?#\\]/.test(value)) return null
+
+  try {
+    const url = new URL(`https://${value}`)
+    if (
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash
+    ) {
+      return null
+    }
+    return url.hostname
+  } catch {
+    return null
+  }
+}
+
 function apiOriginForHostname(hostname: string): string | null {
   const normalized = normalizedHostname(hostname).replace(/\.$/, "")
   if (isLoopbackHostname(normalized)) return null

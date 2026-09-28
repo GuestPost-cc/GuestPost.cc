@@ -1,6 +1,43 @@
-import { apiV1Url, resolveApiOrigin, resolveApiV1Url } from "../api-origin"
+import {
+  apiV1Url,
+  hostnameFromHostHeader,
+  resolveApiOrigin,
+  resolveApiV1Url,
+} from "../api-origin"
 
 describe("browser API origin resolution", () => {
+  it.each([
+    ["app.shohan.iam.bd", "app.shohan.iam.bd"],
+    ["app.shohan.iam.bd:443", "app.shohan.iam.bd"],
+    ["APP.SHOHAN.IAM.BD:8443", "app.shohan.iam.bd"],
+    ["[::1]:3000", "[::1]"],
+  ])("extracts a hostname from a valid Host authority: %s", (authority, expected) => {
+    expect(hostnameFromHostHeader(authority)).toBe(expected)
+  })
+
+  it.each([
+    null,
+    "",
+    "app.shohan.iam.bd, attacker.example",
+    "user@app.shohan.iam.bd",
+    "app.shohan.iam.bd/path",
+    "app.shohan.iam.bd:invalid",
+  ])("rejects an invalid Host authority: %s", (authority) => {
+    expect(hostnameFromHostHeader(authority)).toBeNull()
+  })
+
+  it("derives the matching API origin from the public Host header", () => {
+    const hostname = hostnameFromHostHeader("app.shohan.iam.bd:443")
+    expect(hostname).not.toBeNull()
+    expect(
+      resolveApiOrigin({
+        configuredUrl: "https://api.guestpost.pro.bd",
+        browserLocation: { hostname: hostname!, protocol: "https:" },
+        nodeEnv: "production",
+      }),
+    ).toBe("https://api.shohan.iam.bd")
+  })
+
   it.each([
     ["localhost", "http://localhost:4000"],
     ["127.0.0.1", "http://localhost:4000"],
