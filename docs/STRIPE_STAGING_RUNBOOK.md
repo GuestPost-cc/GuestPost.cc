@@ -3,6 +3,16 @@
 This runbook is for Stripe test mode on the deployed staging/dev environment.
 It does not authorize live money.
 
+For the current staging setup, use `https://api.shohan.iam.bd` as the one
+canonical Stripe webhook origin. Website, portal, admin, and publisher domains
+may change independently; Stripe destinations must not be generated from an
+incoming `Host` or `Origin` header and must not be duplicated per frontend
+domain. Stripe event IDs, not request hostnames, are the durable deduplication
+identity in GuestPost. Keep one enabled destination per event channel. If the
+canonical API origin itself ever changes, update all three Stripe destination
+URLs together while preserving their route, event scope, API version, and
+separate signing secrets. Do not use redirects as a domain-migration mechanism.
+
 ## 1. Preconditions
 
 - The migration `20260720090000_stripe_first_finance_groundwork` is deployed.
@@ -56,7 +66,7 @@ per environment and rotate it immediately if it is exposed.
 Create three webhook destinations so deposits, platform transfers, and
 connected-account payouts each have a separate rotation boundary:
 
-1. `https://api.guestpost.pro.bd/api/v1/billing/webhook/stripe`
+1. `https://api.shohan.iam.bd/api/v1/billing/webhook/stripe`
    - `checkout.session.completed`
    - `checkout.session.async_payment_succeeded`
    - `checkout.session.async_payment_failed`
@@ -64,12 +74,12 @@ connected-account payouts each have a separate rotation boundary:
    - `charge.dispute.created`
    - `charge.dispute.closed`
    - `radar.early_fraud_warning.created`
-2. `https://api.guestpost.pro.bd/api/v1/payout-webhooks/stripe_connect/platform`
+2. `https://api.shohan.iam.bd/api/v1/payout-webhooks/stripe_connect/platform`
    - listen to events on **your account**;
    - `transfer.created`
    - `transfer.updated`
    - `transfer.reversed`
-3. `https://api.guestpost.pro.bd/api/v1/payout-webhooks/stripe_connect/connected`
+3. `https://api.shohan.iam.bd/api/v1/payout-webhooks/stripe_connect/connected`
    - listen to events on **connected accounts**;
    - `account.updated`
    - `payout.created`
@@ -77,6 +87,11 @@ connected-account payouts each have a separate rotation boundary:
    - `payout.paid`
    - `payout.failed`
    - `payout.canceled`
+
+Use Stripe API version `2026-06-24.dahlia` for all three destinations, matching
+the API's pinned Stripe SDK version. The connected-account destination must be
+configured for connected-account events; the other two listen to platform
+account events.
 
 Copy each destination's signing secret to its matching environment variable.
 The payout destinations must not share a URL or secret. The platform route
@@ -88,6 +103,14 @@ top-level Connect account. The connected route accepts only
 row. Startup also rejects reused configured webhook secrets even while
 outbound Stripe feature flags are disabled.
 
+Stripe does not send receipt emails for test-mode charges. GuestPost owns its
+customer deposit receipts/invoices and publisher payout notices through the
+transactional email outbox and worker; configure that worker with the verified
+Resend sending domain and runtime-only SMTP credentials. Do not add duplicate
+Stripe email sends for the same customer/publisher event. A Resend domain is
+ready only after its required DNS records resolve from the domain's
+authoritative nameservers and Resend reports sending as verified.
+
 ## 4. Deployment order
 
 1. Build the evidence-aware release and record its SHA/image.
@@ -95,11 +118,19 @@ outbound Stripe feature flags are disabled.
    writer. Feature flags alone do not make a mixed-version fleet safe.
 3. Back up the database, then apply the finance migrations in the exact order
    documented in `docs/PRODUCTION_RUNBOOK.md`.
-4. With the old API fully stopped, change the platform and connected-account
-   Stripe Dashboard destinations from the retired shared URL to their explicit
-   `/platform` and `/connected` URLs above. A delivery during this short gap
-   may receive a non-2xx and must be allowed to retry; do not disable the
-   destination or rotate its secret.
+4. With the old API fully stopped, update all three Stripe Dashboard
+   destinations—including the deposit destination—to the canonical API origin
+   and exact paths above. Verify HTTPS/TLS reachability for all three routes
+   before enabling test actions. Do not assume retries queued for the old URL
+   will follow a destination URL change: keep each old destination enabled,
+   inspect its Workbench delivery history, and explicitly resend every
+   recoverable failed/pending event to the canonical route while preserving
+   the original Stripe event ID. If a replacement destination is created,
+   keep the old one enabled until the replacement has accepted a signed test
+   event and exact redelivery and all old pending events are accounted for;
+   then disable the old destination. Stripe may deliver an event to both
+   during overlap, so preserve provider-event idempotency and do not rotate a
+   signing secret without updating the matching API environment value.
 5. Start only the matching API/worker/app release. Verify old replica count is
    zero. Once evidence triggers are installed, an old image is not a rollback
    target; keep money gates closed and forward-fix.
