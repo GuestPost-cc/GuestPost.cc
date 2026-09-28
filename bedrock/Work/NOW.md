@@ -1,10 +1,27 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-13
+updated: 2026-09-28
 ---
 
 # Current focus
+
+## Security sweep PR #125
+
+PR #125 (`fix/security-sweep-hardening`) is rebased on current `main`
+and contains verified SSRF redirect/DNS hardening, publisher-owner integration
+authorization, shared client redirect validation, edge session-cookie shape
+checks, literal marketplace search escaping, bounded OAuth/webhook inputs,
+dashboard nonce CSP proxies, restricted worker metrics, and guarded local
+setup/reset scripts. A client-controlled prefetch-header matcher exemption was
+removed from all three proxies so it cannot skip dashboard redirects or CSP.
+Each commit was submitted to CodeRabbit; its only actionable DNS/redirect
+findings were fixed, while later requests were rate-limited. GitHub CI run
+36359452259 passed the complete protected matrix, including isolated object
+storage and browser E2E. The guarded Undici Agent explicitly disables automatic
+address-family selection so its single-address DNS validation callback matches
+the connection contract. The final CI and automated reviews must run after this
+last connection-boundary hardening commit.
 
 ## Security and query hardening follow-up
 

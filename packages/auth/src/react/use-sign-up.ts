@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { getErrorMessage, isAuthError } from "../client/errors"
+import { sanitizeClientReturnTo } from "../client/safe-redirect"
 import { signUp as signUpTransport } from "../client/transport"
 import type { AuthError } from "../types"
 
@@ -44,7 +45,7 @@ export function useSignUp(): UseSignUpReturn {
         // Hard navigation — forces the dashboard middleware to re-evaluate
         // the freshly-rotated session cookie after birth-time provisioning.
         // router.push() leaves the Next.js layout with stale session state.
-        const redirectTo = input.returnTo || "/dashboard"
+        const redirectTo = sanitizeClientReturnTo(input.returnTo)
         if (typeof window !== "undefined") {
           window.location.href = redirectTo
         }

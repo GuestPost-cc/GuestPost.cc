@@ -1,3 +1,4 @@
+import { Prisma } from "@guestpost/database"
 import { WorkflowDecisionService } from "@guestpost/shared"
 import {
   ForbiddenException,
@@ -20,97 +21,140 @@ export class AdminVerificationQueueService {
     this.decision = new WorkflowDecisionService()
   }
 
-  async listQueue(role: string) {
+  async listQueue(role: string, take = 50, skip = 0) {
     if (!new Set(["SUPER_ADMIN", "OPERATIONS", "FINANCE"]).has(role)) {
       throw new ForbiddenException("Staff verification access is required")
     }
     const canViewFinancials = role !== "OPERATIONS"
     const canViewIdentity = role === "SUPER_ADMIN"
-    const orders = await this.prisma.order.findMany({
-      where: {
-        OR: [
-          {
-            status: "PUBLISHED",
-            activeDeliveryVersion: {
-              verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
-            },
+    const limit = Math.min(Math.max(take, 1), 100)
+    const offset = Math.max(skip, 0)
+    const where: Prisma.OrderWhereInput = {
+      OR: [
+        {
+          status: "PUBLISHED",
+          activeDeliveryVersion: {
+            verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
           },
-          {
-            status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
-            fraudHolds: {
-              some: {},
-            },
+        },
+        {
+          status: { notIn: ["CANCELLED", "REFUNDED", "COMPLETED"] },
+          fraudHolds: {
+            some: {},
           },
-        ],
-      },
-      include: {
+        },
+      ],
+    }
+    const now = Date.now()
+    const candidates = await this.prisma.order.findMany({
+      where,
+      select: {
+        id: true,
+        amount: true,
+        createdAt: true,
         website: {
           select: {
-            id: true,
-            name: true,
-            url: true,
-            domain: true,
-            ownershipType: true,
-            publisherId: true,
-            publisher: {
-              select: { id: true, name: true, email: true, tier: true },
-            },
+            publisher: { select: { tier: true } },
           },
         },
-        customer: {
-          select: { id: true, name: true, email: true },
-        },
-        activeDeliveryVersion: {
-          include: {
-            evidence: { orderBy: { createdAt: "desc" }, take: 1 },
-          },
-        },
+        activeDeliveryVersion: { select: { createdAt: true } },
         fraudFlags: {
           where: { hold: { isNot: null } },
-          orderBy: { createdAt: "asc" },
-          include: {
-            finding: true,
-            deliveryVersion: {
-              select: {
-                id: true,
-                version: true,
-                publishedUrl: true,
-                verificationStatus: true,
-                verificationVersion: true,
-                supersededByVersion: true,
-                evidence: {
-                  orderBy: { checkedAt: "desc" },
-                  take: 1,
-                  select: {
-                    httpStatus: true,
-                    resolvedUrl: true,
-                    anchorFound: true,
-                    linkFound: true,
-                    targetUrlMatched: true,
-                    checkedAt: true,
+          select: { id: true },
+        },
+      },
+    })
+    const priorityByOrderId = new Map(
+      candidates.map((order: any) => {
+        const queueTimeMs =
+          now - (order.activeDeliveryVersion?.createdAt?.getTime() ?? now)
+        const priority =
+          order.fraudFlags.length > 0
+            ? { score: 100, label: "CRITICAL" as const }
+            : this.decision.computeVerificationPriority(
+                { amount: Number(order.amount ?? 0) },
+                order.website?.publisher ?? null,
+                queueTimeMs,
+              )
+        return [order.id, priority] as const
+      }),
+    )
+    const pageOrderIds = candidates
+      .sort((a: any, b: any) => {
+        const score =
+          priorityByOrderId.get(b.id)!.score -
+          priorityByOrderId.get(a.id)!.score
+        if (score !== 0) return score
+        const createdAt = a.createdAt.getTime() - b.createdAt.getTime()
+        return createdAt !== 0 ? createdAt : a.id.localeCompare(b.id)
+      })
+      .slice(offset, offset + limit)
+      .map((order: any) => order.id)
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { AND: [where, { id: { in: pageOrderIds } }] },
+        include: {
+          website: {
+            select: {
+              id: true,
+              name: true,
+              url: true,
+              domain: true,
+              ownershipType: true,
+              publisherId: true,
+              publisher: {
+                select: { id: true, name: true, email: true, tier: true },
+              },
+            },
+          },
+          customer: {
+            select: { id: true, name: true, email: true },
+          },
+          activeDeliveryVersion: {
+            include: {
+              evidence: { orderBy: { createdAt: "desc" }, take: 1 },
+            },
+          },
+          fraudFlags: {
+            where: { hold: { isNot: null } },
+            orderBy: { createdAt: "asc" },
+            include: {
+              finding: true,
+              deliveryVersion: {
+                select: {
+                  id: true,
+                  version: true,
+                  publishedUrl: true,
+                  verificationStatus: true,
+                  verificationVersion: true,
+                  supersededByVersion: true,
+                  evidence: {
+                    orderBy: { checkedAt: "desc" },
+                    take: 1,
+                    select: {
+                      httpStatus: true,
+                      resolvedUrl: true,
+                      anchorFound: true,
+                      linkFound: true,
+                      targetUrlMatched: true,
+                      checkedAt: true,
+                    },
                   },
                 },
               },
             },
           },
         },
-      },
-      orderBy: { createdAt: "asc" },
-    })
+      }),
+      this.prisma.order.count({ where }),
+    ])
 
-    const now = Date.now()
+    const pageOrderIndex = new Map(
+      pageOrderIds.map((orderId, index) => [orderId, index]),
+    )
     const items = (orders as any[]).map((order: any) => {
       const version = order.activeDeliveryVersion
       const evidence = version?.evidence?.[0] ?? null
-      const queueTimeMs = now - (version?.createdAt?.getTime() ?? now)
-      const priority =
-        order.fraudFlags.length > 0
-          ? { score: 100, label: "CRITICAL" as const }
-          : this.decision.computeVerificationPriority(
-              { amount: Number(order.amount ?? 0) },
-              order.website?.publisher ?? null,
-              queueTimeMs,
-            )
 
       return {
         orderId: order.id,
@@ -194,12 +238,15 @@ export class AdminVerificationQueueService {
               })),
             }
           : null,
-        priority,
+        priority: priorityByOrderId.get(order.id)!,
       }
     })
 
-    items.sort((a: any, b: any) => b.priority.score - a.priority.score)
-    return items
+    items.sort(
+      (a: any, b: any) =>
+        pageOrderIndex.get(a.orderId)! - pageOrderIndex.get(b.orderId)!,
+    )
+    return { items, total, take: limit, skip: offset }
   }
 
   async retry(orderId: string, userId: string, role: string) {

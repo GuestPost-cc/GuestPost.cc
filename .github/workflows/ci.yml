@@ -242,45 +242,59 @@ jobs:
         run: pnpm build
 
       - name: Start isolated object storage
-        env:
-          MINIO_BUCKET: guestpost-ci
-          MINIO_ROOT_USER: guestpost-ci
-          MINIO_ROOT_PASSWORD: ci-only-minio-password-0123456789
         run: |
-          docker run --detach --rm --name guestpost-ci-minio \
-            --publish 9000:9000 \
-            --env MINIO_ROOT_USER \
-            --env MINIO_ROOT_PASSWORD \
-            --env MINIO_BUCKET \
-            quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e \
-            server /data
+          docker run --detach --rm --name guestpost-ci-s3 \
+            --publish 9000:8333 \
+            chrislusf/seaweedfs@sha256:f83509b0721dfd8e2e07faf76c0a899f67a8a889c89abe2fa0a5227ba1320362 \
+            mini -dir=/data -ip.bind=0.0.0.0 -master.telemetry=false -bucket=guestpost-ci
 
           for attempt in {1..45}; do
-            if curl --fail --silent http://localhost:9000/minio/health/live >/dev/null; then
+            if curl --fail --silent http://localhost:9000/ >/dev/null; then
               break
             fi
             if [[ "${attempt}" -eq 45 ]]; then
-              docker logs guestpost-ci-minio
+              docker logs guestpost-ci-s3
               exit 1
             fi
             sleep 1
           done
 
-          docker exec guestpost-ci-minio sh -eu -c '
-            mc_config_dir=$(mktemp -d)
-            trap '\''rm -rf -- "${mc_config_dir}"'\'' EXIT
-            mc --config-dir "${mc_config_dir}" alias set \
-              guestpost-ci http://127.0.0.1:9000 \
-              "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null
-            mc --config-dir "${mc_config_dir}" mb --ignore-existing \
-              "guestpost-ci/${MINIO_BUCKET}" >/dev/null
-            printf "GuestPost CI evidence storage readiness\n" | \
-              mc --config-dir "${mc_config_dir}" pipe \
-                "guestpost-ci/${MINIO_BUCKET}/.guestpost/evidence-storage-ready-v1" \
-                >/dev/null
-            mc --config-dir "${mc_config_dir}" stat \
-              "guestpost-ci/${MINIO_BUCKET}/.guestpost/evidence-storage-ready-v1" \
-              >/dev/null
+          pnpm --filter @guestpost/shared exec node -e '
+            const {
+              HeadObjectCommand,
+              PutObjectCommand,
+              S3Client,
+            } = require("@aws-sdk/client-s3")
+            const client = new S3Client({
+              endpoint: "http://localhost:9000",
+              region: "us-east-1",
+              forcePathStyle: true,
+              credentials: {
+                accessKeyId: "guestpost-ci",
+                secretAccessKey: "ci-only-minio-password-0123456789",
+              },
+            })
+            async function provisionReadinessSentinel() {
+              await client.send(
+                new PutObjectCommand({
+                  Bucket: "guestpost-ci",
+                  Key: ".guestpost/evidence-storage-ready-v1",
+                  Body: "GuestPost CI evidence storage readiness\n",
+                }),
+              )
+              await client.send(
+                new HeadObjectCommand({
+                  Bucket: "guestpost-ci",
+                  Key: ".guestpost/evidence-storage-ready-v1",
+                }),
+              )
+            }
+            provisionReadinessSentinel()
+              .finally(() => client.destroy())
+              .catch((error) => {
+                console.error(error)
+                process.exitCode = 1
+              })
           '
 
       - name: Install Playwright Chromium
@@ -316,6 +330,6 @@ jobs:
       - name: Stop isolated object storage
         if: always()
         run: |
-          if docker container inspect guestpost-ci-minio >/dev/null 2>&1; then
-            docker stop guestpost-ci-minio >/dev/null
+          if docker container inspect guestpost-ci-s3 >/dev/null 2>&1; then
+            docker stop guestpost-ci-s3 >/dev/null
           fi

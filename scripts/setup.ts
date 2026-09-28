@@ -1,3 +1,4 @@
+import { assertDevelopmentSeedSafety } from "../packages/shared/src/development-seed-safety"
 import { $ } from "./_utils"
 import { loadRootEnv } from "./env"
 
@@ -5,8 +6,13 @@ async function main() {
   console.log("Setting up GuestPost development environment...")
   loadRootEnv({
     createDevelopmentFromExample: true,
-    required: ["DATABASE_URL"],
+    required: ["NODE_ENV", "DATABASE_URL"],
   })
+  assertDevelopmentSeedSafety(
+    process.env.NODE_ENV,
+    process.env.DATABASE_URL,
+    "http://localhost:4000",
+  )
 
   console.log("\n1. Installing dependencies...")
   await $("pnpm", ["install"])

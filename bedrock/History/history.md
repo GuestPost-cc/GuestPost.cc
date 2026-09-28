@@ -1,7 +1,7 @@
 ---
 area: history
 project: GuestPost.cc
-updated: 2026-08-28
+updated: 2026-09-19
 ---
 
 # Project History
@@ -13,14 +13,16 @@ This is not a git replacement.
 
 ## Timeline Notes
 
+- [2026-09-19-backfill](timeline/2026-09-19-backfill.md)
 - [2026-08-09-backfill](timeline/2026-08-09-backfill.md)
 - [2026-08-02-backfill](timeline/2026-08-02-backfill.md)
 - [2026-07-16-catchup](timeline/2026-07-16-catchup.md)
 - [2026-07-16-backfill](timeline/2026-07-16-backfill.md)
-- [2026-07-02-backfill](timeline/2026-07-02-backfill.md)
 
 ## Recent Activity
 
+- **2026-09-19** `backfill` — History backfill: 434 commits, 0 releases, 1 integrations
+- **2026-09-19** `integration_claude` — claude integration detected
 - **2026-08-02** `backfill` — History backfill: 394 commits, 0 releases, 2 integrations
 - **2026-08-02** `integration_claude` — claude integration detected
 - **2026-08-02** `integration_cursor` — cursor integration detected

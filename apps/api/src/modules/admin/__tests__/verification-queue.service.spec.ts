@@ -1,6 +1,55 @@
 import { AdminVerificationQueueService } from "../verification-queue.service"
 
 describe("AdminVerificationQueueService", () => {
+  it("paginates after applying priority with a deterministic tie-breaker", async () => {
+    const createdAt = new Date("2026-07-16T08:00:00.000Z")
+    const lowPriority = {
+      id: "order-low",
+      version: 1,
+      status: "PUBLISHED",
+      title: "Low priority",
+      amount: 1,
+      targetUrl: null,
+      anchorText: null,
+      createdAt,
+      customer: null,
+      website: null,
+      activeDeliveryVersion: null,
+      fraudFlags: [],
+    }
+    const critical = {
+      ...lowPriority,
+      id: "order-critical",
+      title: "Critical priority",
+      fraudFlags: [{ id: "fraud-flag" }],
+    }
+    const prisma = {
+      order: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([lowPriority, critical])
+          .mockResolvedValueOnce([critical]),
+        count: jest.fn().mockResolvedValue(2),
+      },
+    }
+    const service = new AdminVerificationQueueService(
+      prisma as any,
+      {} as any,
+      {} as any,
+    )
+
+    const result = await service.listQueue("SUPER_ADMIN", 1, 0)
+
+    expect(result.items.map((item) => item.orderId)).toEqual(["order-critical"])
+    expect(prisma.order.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([{ id: { in: ["order-critical"] } }]),
+        }),
+      }),
+    )
+  })
+
   it("returns the order and delivery fields required by the staff queue", async () => {
     const submittedAt = new Date("2026-07-17T08:00:00.000Z")
     const prisma = {
@@ -87,6 +136,7 @@ describe("AdminVerificationQueueService", () => {
             ],
           },
         ]),
+        count: jest.fn().mockResolvedValue(1),
       },
     }
     const service = new AdminVerificationQueueService(
@@ -95,38 +145,43 @@ describe("AdminVerificationQueueService", () => {
       {} as any,
     )
 
-    await expect(service.listQueue("SUPER_ADMIN")).resolves.toEqual([
-      expect.objectContaining({
-        orderId: "order-1",
-        website: {
-          id: "website-1",
-          name: "Example Site",
-          url: "https://example.com",
-          domain: "example.com",
-          ownershipType: "PUBLISHER",
-        },
-        publisher: {
-          id: "publisher-1",
-          name: "Example Publisher",
-          email: "publisher@example.com",
-          tier: "TRUSTED",
-        },
-        deliveryVersion: expect.objectContaining({
-          id: "delivery-1",
-          verificationStatus: "MANUAL_REVIEW",
-          publishedUrl: "https://example.com/article",
-          fraudFlags: [
-            expect.objectContaining({
-              id: "fraud-flag-1",
-              finding: expect.objectContaining({
-                id: "finding-1",
-                cancellationRequestId: "cancellation-1",
+    await expect(service.listQueue("SUPER_ADMIN")).resolves.toEqual({
+      items: [
+        expect.objectContaining({
+          orderId: "order-1",
+          website: {
+            id: "website-1",
+            name: "Example Site",
+            url: "https://example.com",
+            domain: "example.com",
+            ownershipType: "PUBLISHER",
+          },
+          publisher: {
+            id: "publisher-1",
+            name: "Example Publisher",
+            email: "publisher@example.com",
+            tier: "TRUSTED",
+          },
+          deliveryVersion: expect.objectContaining({
+            id: "delivery-1",
+            verificationStatus: "MANUAL_REVIEW",
+            publishedUrl: "https://example.com/article",
+            fraudFlags: [
+              expect.objectContaining({
+                id: "fraud-flag-1",
+                finding: expect.objectContaining({
+                  id: "finding-1",
+                  cancellationRequestId: "cancellation-1",
+                }),
               }),
-            }),
-          ],
+            ],
+          }),
         }),
-      }),
-    ])
+      ],
+      total: 1,
+      take: 50,
+      skip: 0,
+    })
     expect(prisma.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -149,8 +204,9 @@ describe("AdminVerificationQueueService", () => {
     const operations = await service.listQueue("OPERATIONS")
     const finance = await service.listQueue("FINANCE")
     const operationsFinding =
-      operations[0].deliveryVersion?.fraudFlags[0].finding
-    const financeFinding = finance[0].deliveryVersion?.fraudFlags[0].finding
+      operations.items[0].deliveryVersion?.fraudFlags[0].finding
+    const financeFinding =
+      finance.items[0].deliveryVersion?.fraudFlags[0].finding
     expect(operationsFinding).not.toHaveProperty("reason")
     expect(financeFinding).toMatchObject({
       reason: "The immutable evidence confirms intentional URL reuse.",

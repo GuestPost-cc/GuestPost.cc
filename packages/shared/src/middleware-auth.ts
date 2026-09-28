@@ -20,6 +20,18 @@ export const SESSION_COOKIE_NAMES = [
 
 type CookieLookupResult = { value?: string } | string | null | undefined
 
+const SIGNED_SESSION_COOKIE_RE =
+  /^[A-Za-z0-9_-]{16,}\.[A-Za-z0-9+/]{40,}={0,2}$/
+
+export function hasPlausibleSessionCookie(value: string | null | undefined) {
+  if (!value) return false
+  try {
+    return SIGNED_SESSION_COOKIE_RE.test(decodeURIComponent(value))
+  } catch {
+    return false
+  }
+}
+
 export function getSessionCookieValue(
   getCookie: (name: string) => CookieLookupResult,
 ): string | null {
@@ -47,7 +59,7 @@ export function requiresAuthRedirect(
   const isProtected = config.protectedPaths.some((p) => pathname.startsWith(p))
   if (!isProtected) return { needsRedirect: false }
 
-  if (!sessionCookie) {
+  if (!hasPlausibleSessionCookie(sessionCookie)) {
     return {
       needsRedirect: true,
       signInPath: config.signInPath,

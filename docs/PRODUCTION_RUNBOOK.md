@@ -43,6 +43,7 @@ evidence while refusing money mutations.
 | `CORS_ORIGIN` | comma-separated frontend origins |
 | `WEBHOOK_INGRESS_RATE_LIMIT_MAX` | optional exact signed-webhook per-IP/minute cap; production default 600, valid range 1..10,000; never use a prefix exemption |
 | `WORKER_MODE` | `realtime` for the continuous service; job modes are documented in `WORKER_ARCHITECTURE.md` |
+| `WORKER_METRICS_TOKEN` | 32+ random server-only bearer token required for `/metrics/queues`; use a distinct secret |
 | `WORKER_ON_DEMAND_TRIGGER_URL`, `WORKER_ON_DEMAND_TRIGGER_TOKEN` | least-privilege Northflank job wake-up; catch-up cron remains mandatory |
 
 `WEBHOOK_INGRESS_RATE_LIMIT_MAX` is pre-verification per-IP DoS protection,
@@ -880,7 +881,7 @@ Deployment verification:
    - `curl -f http://worker:3004/ready`  → 200 (Redis + Postgres connected)
 
 3. **Queue metrics** — Verify no signals of trouble:
-   - `curl -s http://worker:3004/metrics/queues` → `stalledHitsTotal` === 0
+   - `curl -s -H "Authorization: Bearer $WORKER_METRICS_TOKEN" http://worker:3004/metrics/queues` → `stalledHitsTotal` === 0
    - Active/waiting/failed counts are within expected range
 
 4. **Smoke tests** — Exercise the financial flow end-to-end:
@@ -898,7 +899,7 @@ After every deployment:
 □ API healthy       (curl -f http://api:3000/api/v1/health)
 □ Worker healthy    (curl -f http://worker:3004/health)
 □ Worker ready      (curl -f http://worker:3004/ready)
-□ Queue metrics     (curl -s http://worker:3004/metrics/queues → stalledHitsTotal === 0)
+□ Queue metrics     (curl -s -H "Authorization: Bearer $WORKER_METRICS_TOKEN" http://worker:3004/metrics/queues → stalledHitsTotal === 0)
 □ No stalled jobs
 □ Redis connected   (covered by /ready)
 □ Database connected (covered by /ready)

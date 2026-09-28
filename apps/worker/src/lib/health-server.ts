@@ -16,6 +16,7 @@
 //
 // Port defaults to 3004 (only free port in 3000–4000). Override via WORKER_HEALTH_PORT.
 
+import { timingSafeEqual } from "node:crypto"
 import {
   createServer,
   type IncomingMessage,
@@ -35,8 +36,6 @@ const logger = createLogger("worker.health-server")
 // init so uptime can be computed on every request without per-request work.
 const SERVICE_NAME = "guestpost-worker"
 const SERVICE_VERSION = process.env.npm_package_version ?? "unknown"
-const STARTED_AT = new Date()
-const PROCESS_PID = process.pid
 
 interface ReadinessCheck {
   status: "ok" | "error"
@@ -55,10 +54,10 @@ async function checkRedis(): Promise<ReadinessCheck> {
     if (result !== "PONG")
       return { status: "error", message: `unexpected PING response: ${result}` }
     return { status: "ok" }
-  } catch (err) {
+  } catch {
     return {
       status: "error",
-      message: err instanceof Error ? err.message : String(err),
+      message: "unavailable",
     }
   }
 }
@@ -67,10 +66,10 @@ async function checkDatabase(): Promise<ReadinessCheck> {
   try {
     await prisma.$queryRaw`SELECT 1`
     return { status: "ok" }
-  } catch (err) {
+  } catch {
     return {
       status: "error",
-      message: err instanceof Error ? err.message : String(err),
+      message: "unavailable",
     }
   }
 }
@@ -114,8 +113,8 @@ async function getQueueCounts(
       failed: counts.failed ?? 0,
       paused: counts.paused ?? 0,
     }
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) }
+  } catch {
+    return { error: "unavailable" }
   } finally {
     await queue.close().catch(() => {
       /* close failure is non-fatal — best-effort cleanup */
@@ -156,21 +155,30 @@ async function buildQueueMetrics() {
       totals.paused += counts.paused
     }
   }
-  // Phase 7.7 D — extended payload: cumulative counters + service block.
-  const uptimeMs = Date.now() - STARTED_AT.getTime()
   return {
     service: {
       name: SERVICE_NAME,
       version: SERVICE_VERSION,
-      pid: PROCESS_PID,
-      started_at: STARTED_AT.toISOString(),
-      uptime_s: Math.floor(uptimeMs / 1000),
     },
     queues,
     totals,
     dedupHitsTotal: getDedupHitsTotal(),
     stalledHitsTotal: getStalledHitsTotal(),
   }
+}
+
+function metricsAuthorized(req: IncomingMessage): boolean {
+  const configured = process.env.WORKER_METRICS_TOKEN?.trim()
+  const authorization = req.headers.authorization
+  if (!configured || !authorization?.startsWith("Bearer ")) return false
+
+  const provided = authorization.slice("Bearer ".length)
+  const expectedBuffer = Buffer.from(configured)
+  const providedBuffer = Buffer.from(provided)
+  return (
+    expectedBuffer.length === providedBuffer.length &&
+    timingSafeEqual(expectedBuffer, providedBuffer)
+  )
 }
 
 const METRICS_CACHE_MS = Math.max(
@@ -227,13 +235,16 @@ async function handleRequest(
       return
     }
     case "/metrics/queues": {
+      if (!metricsAuthorized(req)) {
+        writeJson(res, 404, { error: "not found" })
+        return
+      }
       try {
         const metrics = await getCachedQueueMetrics()
         writeJson(res, 200, metrics)
       } catch (err) {
         writeJson(res, 500, {
           error: "failed to collect queue metrics",
-          message: err instanceof Error ? err.message : String(err),
         })
       }
       return
