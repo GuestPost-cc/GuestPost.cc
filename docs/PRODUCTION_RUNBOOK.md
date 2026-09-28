@@ -54,6 +54,36 @@ listed in `docs/OPERATIONS.md`; controller signature, replay, allowlist, and
 raw-body checks remain authoritative. Monitor provider `429` responses and
 retry telemetry before tuning the 600/minute staging/production default.
 
+### Transactional email (Resend)
+
+The worker sends application-generated receipts, invoice PDFs, and payout
+notifications over SMTP; Stripe test mode does not send these emails. For the
+current staging sender, use the verified Resend domain `mail.shohan.iam.bd`:
+
+```text
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_REQUIRE_TLS=true
+SMTP_USER=resend
+EMAIL_FROM=GuestPost.cc <notifications@mail.shohan.iam.bd>
+```
+
+Set `SMTP_PASS` to a Resend API key with sending-only access, keep it as a
+runtime secret on the worker (never a build argument or browser variable), and
+keep the API's required `SMTP_HOST` and `EMAIL_FROM` values aligned. Production
+startup requires an explicit `EMAIL_DELIVERY_MODE`. For a restricted staging
+test, set `EMAIL_ALLOWED_RECIPIENT_DOMAINS` to the exact domains of controlled
+test inboxes. This is a recipient allowlist, not a sender-domain setting.
+Neither `capture` nor `live` is a sink: both modes can send real messages to
+eligible recipients. Leaving the allowlist unset intentionally enables
+delivery to every eligible registered account, so review pending/failed
+outbox deliveries before doing so to avoid replaying old mail.
+
+Email action links use the worker's configured customer, publisher, and admin
+origins. Keep those origins aligned with the current canonical HTTPS staging
+domains; do not derive them from an untrusted message or request host.
+
 ### Payout encryption rotation boundary
 
 Payout encryption uses the format-2 `p2:<key-id>:<payload>` envelope. The
