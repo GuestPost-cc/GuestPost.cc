@@ -1,4 +1,12 @@
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"])
+const SERVICE_HOST_LABELS = new Set([
+  "admin",
+  "api",
+  "app",
+  "portal",
+  "publisher",
+  "www",
+])
 
 function normalizedHostname(value: string): string {
   const hostname = value.trim().toLowerCase()
@@ -9,6 +17,28 @@ function normalizedHostname(value: string): string {
 
 function isLoopbackHostname(value: string): boolean {
   return LOOPBACK_HOSTS.has(normalizedHostname(value))
+}
+
+function apiOriginForHostname(hostname: string): string | null {
+  const normalized = normalizedHostname(hostname).replace(/\.$/, "")
+  if (isLoopbackHostname(normalized)) return null
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(normalized)) return null
+
+  const labels = normalized.split(".").filter(Boolean)
+  if (labels.length < 2) return null
+  if (
+    labels.some(
+      (label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label),
+    )
+  ) {
+    return null
+  }
+  // Two-label hosts are treated as the configured instance domain even if
+  // their first label happens to match a service name (for example app.com).
+  if (labels.length > 2 && SERVICE_HOST_LABELS.has(labels[0])) labels.shift()
+  if (labels.length < 2) return null
+
+  return `https://api.${labels.join(".")}`
 }
 
 export interface ResolveApiOriginOptions {
@@ -52,18 +82,25 @@ function parseConfiguredOrigin(value: string): string {
 export function resolveApiOrigin(
   options: ResolveApiOriginOptions = {},
 ): string {
-  const configuredUrl = options.configuredUrl?.trim()
-  if (configuredUrl) return parseConfiguredOrigin(configuredUrl)
-
   const runtimeWindow = (
     globalThis as unknown as {
       window?: { location: { hostname: string; protocol: string } }
     }
   ).window
   const location = options.browserLocation ?? runtimeWindow?.location ?? null
+  // App/API hosts follow a shared pattern across deployments: frontends use
+  // the instance domain (or a known service subdomain) and the API uses
+  // api.<instance-domain>. Derive it at request time, not from a build-time
+  // hostname, so custom domains and aliases keep using their matching API.
+  const domainApiOrigin = location && apiOriginForHostname(location.hostname)
+  if (domainApiOrigin) return domainApiOrigin
+
+  const configuredUrl = options.configuredUrl?.trim()
+  if (configuredUrl) return parseConfiguredOrigin(configuredUrl)
+
   if (location && !isLoopbackHostname(location.hostname)) {
     throw new Error(
-      "NEXT_PUBLIC_API_URL is required for a non-loopback browser host",
+      "NEXT_PUBLIC_API_URL is required for an unrecognized non-loopback browser host",
     )
   }
   if (location?.protocol === "https:") {

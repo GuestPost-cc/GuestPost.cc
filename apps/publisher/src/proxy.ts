@@ -1,3 +1,4 @@
+import { resolveApiOrigin } from "@guestpost/api-client"
 import {
   getSessionCookieValue,
   PUBLISHER_MIDDLEWARE_CONFIG,
@@ -6,11 +7,18 @@ import {
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
-function contentSecurityPolicy(nonce: string) {
+function contentSecurityPolicy(nonce: string, request: NextRequest) {
   const development = process.env.NODE_ENV !== "production"
   const connectSources = [
     "'self'",
-    process.env.NEXT_PUBLIC_API_URL,
+    resolveApiOrigin({
+      configuredUrl: process.env.NEXT_PUBLIC_API_URL,
+      browserLocation: {
+        hostname: request.nextUrl.hostname,
+        protocol: request.nextUrl.protocol,
+      },
+      nodeEnv: process.env.NODE_ENV,
+    }),
     "https://*.ingest.sentry.io",
     ...(development ? ["http:", "ws:", "wss:"] : []),
   ].filter(Boolean)
@@ -49,7 +57,7 @@ export function proxy(request: NextRequest) {
     }
   }
   const nonce = crypto.randomUUID().replaceAll("-", "")
-  const policy = contentSecurityPolicy(nonce)
+  const policy = contentSecurityPolicy(nonce, request)
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set("x-nonce", nonce)
   requestHeaders.set("Content-Security-Policy", policy)
