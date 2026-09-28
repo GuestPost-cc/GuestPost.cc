@@ -1,4 +1,4 @@
-import { resolveApiOrigin } from "@guestpost/api-client"
+import { hostnameFromHostHeader, resolveApiOrigin } from "@guestpost/api-client"
 import {
   ADMIN_MIDDLEWARE_CONFIG,
   getSessionCookieValue,
@@ -14,7 +14,9 @@ function contentSecurityPolicy(nonce: string, request: NextRequest) {
     resolveApiOrigin({
       configuredUrl: process.env.NEXT_PUBLIC_API_URL,
       browserLocation: {
-        hostname: request.nextUrl.hostname,
+        hostname:
+          hostnameFromHostHeader(request.headers.get("host")) ??
+          request.nextUrl.hostname,
         protocol: request.nextUrl.protocol,
       },
       nodeEnv: process.env.NODE_ENV,
