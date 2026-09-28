@@ -139,7 +139,7 @@ export function createSafeLookup(
 
 const SAFE_LOOKUP_AGENT = new Agent({
   pipelining: 0,
-  connect: { lookup: createSafeLookup() },
+  connect: { autoSelectFamily: false, lookup: createSafeLookup() },
 })
 
 /**

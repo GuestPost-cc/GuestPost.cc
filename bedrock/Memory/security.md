@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: security
 project: guestpost-platform
-updated: 2026-09-08
+updated: 2026-09-28
 ---
 
 # Security
@@ -36,7 +36,9 @@ updated: 2026-09-08
   IPv4-mapped addresses.
 - Portal, publisher, and admin use nonce CSP proxies; the proxies retain the
   former dashboard authentication redirects and reject unshaped session
-  cookies before rendering protected shells.
+  cookies before rendering protected shells. Their matchers have no
+  client-controlled prefetch-header exemption, so every matched dashboard
+  request receives the same redirect and CSP boundary.
 - Detailed worker queue metrics require `WORKER_METRICS_TOKEN`; liveness and
   readiness responses do not reveal dependency error strings or process IDs.
 
