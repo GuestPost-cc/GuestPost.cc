@@ -1,6 +1,6 @@
 "use client"
 
-import { sanitizeReturnTo } from "@guestpost/api-client"
+import { resolveInstanceOrigin, sanitizeReturnTo } from "@guestpost/api-client"
 import type { AuthError } from "@guestpost/auth"
 import {
   getErrorMessage,
@@ -14,18 +14,30 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useMemo, useState } from "react"
 
-const WEBSITE_URL =
+const CONFIGURED_WEBSITE_URL =
   process.env.NEXT_PUBLIC_WEBSITE_URL ?? "http://localhost:3000"
 
 function SignupContent() {
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [websiteUrl, setWebsiteUrl] = useState(CONFIGURED_WEBSITE_URL)
   const { user, loading: sessionLoading } = useSession()
   const returnTo = useMemo(
     () => sanitizeReturnTo(searchParams.get("returnTo")) ?? "/dashboard",
     [searchParams],
   )
+
+  useEffect(() => {
+    setWebsiteUrl(
+      resolveInstanceOrigin("website", {
+        configuredUrl: CONFIGURED_WEBSITE_URL,
+        browserLocation: window.location,
+        allowedAppDomains: process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+        nodeEnv: process.env.NODE_ENV,
+      }),
+    )
+  }, [])
 
   useEffect(() => {
     const oauthError = getOAuthErrorMessage(searchParams.get("error"))
@@ -126,7 +138,7 @@ function SignupContent() {
           loading={submitting}
           error={error ?? undefined}
           submitLabel="Create publisher account"
-          termsHref={`${WEBSITE_URL}/legal/terms`}
+          termsHref={`${websiteUrl}/legal/terms`}
           oauthProvider={{
             id: "google",
             label: "Sign up with Google",

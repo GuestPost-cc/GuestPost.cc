@@ -1,7 +1,7 @@
 import { Globe2, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import { FOOTER_DOCUMENTATION_LINKS } from "../lib/docs-registry"
-import { BLOG_URL, PORTAL_URL } from "../lib/site-config"
+import { BLOG_URL } from "../lib/site-config"
 
 const GROUPS = [
   {
@@ -9,7 +9,7 @@ const GROUPS = [
     links: [
       { href: "/pricing", label: "Pricing" },
       { href: "/publishers", label: "For Publishers" },
-      { href: PORTAL_URL, label: "Customer Portal", external: true },
+      { href: "/login", label: "Customer Portal" },
       { href: "/signup", label: "Get started" },
     ],
   },

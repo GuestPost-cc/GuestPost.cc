@@ -101,6 +101,85 @@ export interface ResolveApiOriginOptions {
   nodeEnv?: string
 }
 
+export type InstanceSurface = "website" | "portal" | "publisher" | "admin"
+
+export interface ResolveInstanceOriginOptions {
+  configuredUrl?: string | null
+  allowedAppDomains?: string | readonly string[]
+  browserLocation?: { hostname: string; protocol: string } | null
+  nodeEnv?: string
+}
+
+function parseConfiguredInstanceOrigin(value: string): string {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error("Configured app URL must be a valid absolute URL")
+  }
+  if (
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    (url.pathname !== "" && url.pathname !== "/")
+  ) {
+    throw new Error(
+      "Configured app URL cannot contain credentials, a path, query, or fragment",
+    )
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("Configured app URL must use HTTPS or loopback HTTP")
+  }
+  if (url.protocol === "http:" && !isLoopbackHostname(url.hostname)) {
+    throw new Error("Configured app URL may use HTTP only for loopback hosts")
+  }
+  return url.origin
+}
+
+/**
+ * Resolve another surface in this deployment only when the active hostname's
+ * instance domain is explicitly allow-listed. Otherwise use the configured
+ * destination, preserving safe behavior on preview and third-party hosts.
+ */
+export function resolveInstanceOrigin(
+  surface: InstanceSurface,
+  options: ResolveInstanceOriginOptions = {},
+): string {
+  const location = options.browserLocation ?? null
+  const allowedDomains = allowedInstanceDomains(
+    options.allowedAppDomains ?? process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+  )
+  const domain = location ? instanceDomainForHostname(location.hostname) : null
+  if (domain && allowedDomains.has(domain)) {
+    return surface === "website"
+      ? `https://${domain}`
+      : `https://${surface === "portal" ? "app" : surface}.${domain}`
+  }
+
+  const configuredUrl = options.configuredUrl?.trim()
+  if (configuredUrl) return parseConfiguredInstanceOrigin(configuredUrl)
+
+  if (
+    options.nodeEnv === "production" ||
+    location?.protocol === "https:" ||
+    (location && !isLoopbackHostname(location.hostname))
+  ) {
+    throw new Error(
+      "A configured app URL is required for an unrecognized or production host",
+    )
+  }
+  const port =
+    surface === "website"
+      ? 3000
+      : surface === "portal"
+        ? 3001
+        : surface === "publisher"
+          ? 3002
+          : 3003
+  return `http://localhost:${port}`
+}
+
 function parseConfiguredOrigin(value: string): string {
   let url: URL
   try {

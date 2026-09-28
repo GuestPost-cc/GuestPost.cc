@@ -1,6 +1,6 @@
 "use client"
 
-import { sanitizeReturnTo } from "@guestpost/api-client"
+import { resolveInstanceOrigin, sanitizeReturnTo } from "@guestpost/api-client"
 import type { AuthError } from "@guestpost/auth"
 import {
   getErrorMessage,
@@ -20,9 +20,6 @@ import {
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useMemo, useState } from "react"
-
-const CUSTOMER_URL =
-  process.env.NEXT_PUBLIC_PORTAL_URL ?? "http://localhost:3001"
 
 function LoginContent() {
   const searchParams = useSearchParams()
@@ -148,7 +145,13 @@ function LoginContent() {
         )}
         {user?.userType === "CUSTOMER" && (
           <a
-            href={`${CUSTOMER_URL}/dashboard`}
+            href={`${resolveInstanceOrigin("portal", {
+              configuredUrl: process.env.NEXT_PUBLIC_PORTAL_URL,
+              browserLocation:
+                typeof window !== "undefined" ? window.location : undefined,
+              allowedAppDomains: process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+              nodeEnv: process.env.NODE_ENV,
+            })}/dashboard`}
             className="mb-4 block rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-center text-sm font-semibold text-zinc-100 hover:bg-zinc-800"
           >
             Open Customer dashboard

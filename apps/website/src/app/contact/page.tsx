@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import { ProsePage } from "../../components/prose-page"
-import { PORTAL_URL, PUBLISHER_URL } from "../../components/site-chrome"
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -27,7 +26,7 @@ export default function ContactPage() {
         <li>
           <a
             className="text-primary underline-offset-4 hover:underline"
-            href={`${PORTAL_URL}/dashboard/support`}
+            href="/login?returnTo=%2Fdashboard%2Fsupport"
           >
             Customer support center
           </a>
@@ -35,7 +34,7 @@ export default function ContactPage() {
         <li>
           <a
             className="text-primary underline-offset-4 hover:underline"
-            href={`${PUBLISHER_URL}/dashboard/support`}
+            href="/login?audience=publisher&returnTo=%2Fdashboard%2Fsupport"
           >
             Publisher support center
           </a>
