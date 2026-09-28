@@ -1,5 +1,12 @@
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"])
-const API_DOMAIN_FAMILIES = ["guestpost.pro.bd", "shohan.iam.bd"]
+const SERVICE_HOST_LABELS = new Set([
+  "admin",
+  "api",
+  "app",
+  "portal",
+  "publisher",
+  "www",
+])
 
 function normalizedHostname(value: string): string {
   const hostname = value.trim().toLowerCase()
@@ -13,12 +20,25 @@ function isLoopbackHostname(value: string): boolean {
 }
 
 function apiOriginForHostname(hostname: string): string | null {
-  const normalized = normalizedHostname(hostname)
-  const domain = API_DOMAIN_FAMILIES.find(
-    (candidate) =>
-      normalized === candidate || normalized.endsWith(`.${candidate}`),
-  )
-  return domain ? `https://api.${domain}` : null
+  const normalized = normalizedHostname(hostname).replace(/\.$/, "")
+  if (isLoopbackHostname(normalized)) return null
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(normalized)) return null
+
+  const labels = normalized.split(".").filter(Boolean)
+  if (labels.length < 2) return null
+  if (
+    labels.some(
+      (label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label),
+    )
+  ) {
+    return null
+  }
+  // Two-label hosts are treated as the configured instance domain even if
+  // their first label happens to match a service name (for example app.com).
+  if (labels.length > 2 && SERVICE_HOST_LABELS.has(labels[0])) labels.shift()
+  if (labels.length < 2) return null
+
+  return `https://api.${labels.join(".")}`
 }
 
 export interface ResolveApiOriginOptions {
@@ -68,8 +88,10 @@ export function resolveApiOrigin(
     }
   ).window
   const location = options.browserLocation ?? runtimeWindow?.location ?? null
-  // Staging may be opened on either approved domain family. Pick its sibling
-  // API hostname instead of using the other domain family's build-time URL.
+  // App/API hosts follow a shared pattern across deployments: frontends use
+  // the instance domain (or a known service subdomain) and the API uses
+  // api.<instance-domain>. Derive it at request time, not from a build-time
+  // hostname, so custom domains and aliases keep using their matching API.
   const domainApiOrigin = location && apiOriginForHostname(location.hostname)
   if (domainApiOrigin) return domainApiOrigin
 

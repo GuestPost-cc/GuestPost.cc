@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+import { resolveApiOrigin } from "@guestpost/api-client"
 
 function configuredOrigin(value: string | undefined) {
   if (!value) return null
@@ -10,13 +11,18 @@ function configuredOrigin(value: string | undefined) {
   }
 }
 
-function contentSecurityPolicy(nonce: string) {
+function contentSecurityPolicy(nonce: string, request: NextRequest) {
   const development = process.env.NODE_ENV !== "production"
   const connectSources = [
     "'self'",
-    configuredOrigin(process.env.NEXT_PUBLIC_API_URL),
-    "https://api.guestpost.pro.bd",
-    "https://api.shohan.iam.bd",
+    resolveApiOrigin({
+      configuredUrl: process.env.NEXT_PUBLIC_API_URL,
+      browserLocation: {
+        hostname: request.nextUrl.hostname,
+        protocol: request.nextUrl.protocol,
+      },
+      nodeEnv: process.env.NODE_ENV,
+    }),
     configuredOrigin(process.env.NEXT_PUBLIC_PORTAL_URL),
     configuredOrigin(process.env.NEXT_PUBLIC_PUBLISHER_URL),
     "https://*.ingest.sentry.io",
@@ -45,7 +51,7 @@ function contentSecurityPolicy(nonce: string) {
 
 export function proxy(request: NextRequest) {
   const nonce = crypto.randomUUID().replaceAll("-", "")
-  const policy = contentSecurityPolicy(nonce)
+  const policy = contentSecurityPolicy(nonce, request)
   const requestHeaders = new Headers(request.headers)
 
   requestHeaders.set("x-nonce", nonce)

@@ -28,6 +28,11 @@ describe("browser API origin resolution", () => {
     ["shohan.iam.bd", "https://api.shohan.iam.bd"],
     ["app.shohan.iam.bd", "https://api.shohan.iam.bd"],
     ["admin.guestpost.pro.bd", "https://api.guestpost.pro.bd"],
+    ["publisher.client-example.net", "https://api.client-example.net"],
+    ["customer-example.org", "https://api.customer-example.org"],
+    ["api.customer-example.org", "https://api.customer-example.org"],
+    ["app.com", "https://api.app.com"],
+    ["WWW.Customer-Example.ORG.", "https://api.customer-example.org"],
   ])("selects the API sibling for %s even when a build URL is set", (hostname, expected) => {
     expect(
       resolveApiOrigin({
@@ -46,6 +51,18 @@ describe("browser API origin resolution", () => {
       }),
     ).toBe("https://api.example.com")
   })
+
+  it.each(["not-a-host", "customer.example.org:443", "203.0.113.10"])(
+    "uses the configured URL for a non-DNS or ambiguous host: %s",
+    (hostname) => {
+      expect(
+        resolveApiOrigin({
+          configuredUrl: "https://api.configured.example",
+          browserLocation: { hostname, protocol: "https:" },
+        }),
+      ).toBe("https://api.configured.example")
+    },
+  )
 
   it.each([
     "http://api.example.com",
