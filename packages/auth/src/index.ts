@@ -17,6 +17,7 @@ import { validateAuthRequest } from "./request-validation.js"
 import {
   AUTH_ACCOUNT_OPTIONS,
   AUTH_SESSION_OPTIONS,
+  betterAuthBaseURL,
   googleProviderOptions,
 } from "./security-options.js"
 
@@ -43,6 +44,15 @@ export { toNodeHandler }
 if (process.env.NODE_ENV === "production" && !process.env.TRUSTED_ORIGINS) {
   throw new Error(
     "TRUSTED_ORIGINS is required in production (comma-separated list of app origins)",
+  )
+}
+
+if (
+  process.env.NODE_ENV === "production" &&
+  !process.env.BETTER_AUTH_ALLOWED_HOSTS?.trim()
+) {
+  throw new Error(
+    "BETTER_AUTH_ALLOWED_HOSTS is required in production (comma-separated exact API hostnames)",
   )
 }
 
@@ -532,7 +542,7 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
   const authCookieDomain = process.env.AUTH_COOKIE_DOMAIN?.trim()
 
   return {
-    baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:4000",
+    baseURL: betterAuthBaseURL(),
     basePath: "/api/v1/auth",
     database: prismaAdapter(prisma, {
       provider: "postgresql",

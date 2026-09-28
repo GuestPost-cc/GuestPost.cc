@@ -22,6 +22,8 @@ evidence while refusing money mutations.
 | `JWT_SECRET` | 32+ random chars, never a documented default |
 | `QUEUE_SIGNING_SECRET` | must differ from JWT_SECRET |
 | `TRUSTED_ORIGINS` | comma-separated app origins — **API throws without it in production** |
+| `BETTER_AUTH_ALLOWED_HOSTS` | comma-separated exact API hostnames for OAuth callbacks — **API throws without it in production**; no wildcards. Register each `https://<host>/api/v1/auth/callback/google` URI with Google. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in/sign-up credentials; store only in the API secret environment, never in browser-exposed variables |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe deposit creation and signed evidence; prefer a least-privilege `rk_*` key whose mode matches the webhook |
 | `STRIPE_DEPOSIT_RECOVERY_KEY` | distinct least-privilege `rk_*` key with read access to Checkout Sessions, PaymentIntents, and Charges; required by authenticated deposit catch-up and must not equal `STRIPE_SECRET_KEY` |
 | `STRIPE_PAYOUT_WEBHOOK_SECRET` | Stripe platform-transfer route (`/payout-webhooks/stripe_connect/platform`) secret; no fallback/reuse |
