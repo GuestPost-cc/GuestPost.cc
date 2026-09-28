@@ -71,14 +71,16 @@ EMAIL_FROM=GuestPost.cc <notifications@mail.shohan.iam.bd>
 
 Set `SMTP_PASS` to a Resend API key with sending-only access, keep it as a
 runtime secret on the worker (never a build argument or browser variable), and
-keep the API's required `SMTP_HOST` and `EMAIL_FROM` values aligned. Production
-startup requires an explicit `EMAIL_DELIVERY_MODE`. For a restricted staging
-test, set `EMAIL_ALLOWED_RECIPIENT_DOMAINS` to the exact domains of controlled
-test inboxes. This is a recipient allowlist, not a sender-domain setting.
+keep the API's required `SMTP_HOST` and `EMAIL_FROM` values aligned. Set
+`EMAIL_DELIVERY_MODE=live` on the worker to send queued transactional
+messages; this is a worker-only setting. This staging setup intentionally
+permits mail to all registered staging users, so leave
+`EMAIL_ALLOWED_RECIPIENT_DOMAINS` unset. If you later restrict recipients,
+that variable filters recipient domains; it does not configure the sender.
 Neither `capture` nor `live` is a sink: both modes can send real messages to
-eligible recipients. Leaving the allowlist unset intentionally enables
-delivery to every eligible registered account, so review pending/failed
-outbox deliveries before doing so to avoid replaying old mail.
+eligible recipients. Before enabling `live`, inspect pending and failed
+outbox deliveries and confirm the staging database contains only intended
+recipients; already-queued messages may be sent when delivery resumes.
 
 Email action links use the worker's configured customer, publisher, and admin
 origins. Keep those origins aligned with the current canonical HTTPS staging
