@@ -379,7 +379,7 @@ describe("BillingService", () => {
             successUrl:
               "https://app.stage.example.com/dashboard/billing?success=true",
             cancelUrl:
-              "https://app.stage.example.com/dashboard/billing?canceled=true",
+              "https://app.stage.example.com/dashboard/billing?canceled=true&attempt=GP-DP-ABCD2345",
           }),
         )
       } finally {

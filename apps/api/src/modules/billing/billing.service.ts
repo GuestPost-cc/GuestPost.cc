@@ -1033,7 +1033,7 @@ export class BillingService {
         currency: USD_CURRENCY,
         idempotencyKey: `deposit-session-${attempt.id}`,
         successUrl: `${portalUrl}/dashboard/billing?success=true`,
-        cancelUrl: `${portalUrl}/dashboard/billing?canceled=true`,
+        cancelUrl: `${portalUrl}/dashboard/billing?canceled=true&attempt=${encodeURIComponent(attempt.publicReference)}`,
       })
       this.assertExactDepositSessionEvidence(
         session,
