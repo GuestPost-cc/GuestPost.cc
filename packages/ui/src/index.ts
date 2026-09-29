@@ -96,6 +96,7 @@ export type {
   FulfillmentChannelValue,
 } from "./components/fulfillment-channel-badge"
 export { FulfillmentChannelBadge } from "./components/fulfillment-channel-badge"
+export { GlobalLoadingBar } from "./components/global-loading-bar"
 export { GoogleIcon } from "./components/google-icon"
 export { Input } from "./components/input"
 export type {

@@ -1,6 +1,12 @@
 "use client"
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { GlobalLoadingBar } from "@guestpost/ui"
+import {
+  QueryClient,
+  QueryClientProvider,
+  useIsFetching,
+  useIsMutating,
+} from "@tanstack/react-query"
 import { ThemeProvider } from "next-themes"
 import { type ReactNode, useState } from "react"
 import { Toaster } from "sonner"
@@ -26,6 +32,7 @@ export function Providers({
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ActivityLoadingBar />
       <ThemeProvider
         attribute="class"
         defaultTheme="system"
@@ -37,4 +44,9 @@ export function Providers({
       </ThemeProvider>
     </QueryClientProvider>
   )
+}
+
+function ActivityLoadingBar() {
+  const active = useIsFetching() + useIsMutating() > 0
+  return <GlobalLoadingBar active={active} />
 }
