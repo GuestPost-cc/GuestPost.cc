@@ -242,14 +242,21 @@ jobs:
         run: pnpm build
 
       - name: Start isolated object storage
+        env:
+          AWS_ACCESS_KEY_ID: guestpost-ci
+          AWS_SECRET_ACCESS_KEY: ci-only-minio-password-0123456789
+          S3_BUCKET: guestpost-ci
         run: |
           docker run --detach --rm --name guestpost-ci-s3 \
             --publish 9000:8333 \
+            --env AWS_ACCESS_KEY_ID \
+            --env AWS_SECRET_ACCESS_KEY \
+            --env S3_BUCKET \
             chrislusf/seaweedfs@sha256:f83509b0721dfd8e2e07faf76c0a899f67a8a889c89abe2fa0a5227ba1320362 \
-            mini -dir=/data -ip.bind=0.0.0.0 -master.telemetry=false -bucket=guestpost-ci
+            mini -dir=/data -ip.bind=0.0.0.0 -master.telemetry=false -bucket="${S3_BUCKET}"
 
           for attempt in {1..45}; do
-            if curl --fail --silent http://localhost:9000/ >/dev/null; then
+            if curl --silent --output /dev/null http://localhost:9000/ >/dev/null; then
               break
             fi
             if [[ "${attempt}" -eq 45 ]]; then
@@ -270,21 +277,21 @@ jobs:
               region: "us-east-1",
               forcePathStyle: true,
               credentials: {
-                accessKeyId: "guestpost-ci",
-                secretAccessKey: "ci-only-minio-password-0123456789",
+                accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
               },
             })
             async function provisionReadinessSentinel() {
               await client.send(
                 new PutObjectCommand({
-                  Bucket: "guestpost-ci",
+                  Bucket: process.env.S3_BUCKET,
                   Key: ".guestpost/evidence-storage-ready-v1",
                   Body: "GuestPost CI evidence storage readiness\n",
                 }),
               )
               await client.send(
                 new HeadObjectCommand({
-                  Bucket: "guestpost-ci",
+                  Bucket: process.env.S3_BUCKET,
                   Key: ".guestpost/evidence-storage-ready-v1",
                 }),
               )
