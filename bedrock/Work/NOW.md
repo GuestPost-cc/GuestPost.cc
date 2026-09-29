@@ -8,18 +8,19 @@ updated: 2026-09-30
 
 ## Billing cancel-return resilience
 
-Local follow-up on current `main` (`6bd4dc1`): the staging browser currently
-renders billing for the reported canceled-return URL. The API already derives
-exact CORS origins from configured instance domains; this patch moves preflight
-handling ahead of rate limiters and prevents wallet/history fetch errors from
-replacing the whole billing page. Portal production build, typecheck/lint, API
-typecheck, and the focused CORS-origin test pass. A localhost preflight returned
-204 with the expected exact `Access-Control-Allow-Origin` and credentials
-headers. The authenticated UI smoke is still open: the guarded seed script
-refused to mutate a legacy local fixture missing exact consent evidence, so no
-account data was reset or repaired. Only localhost schema migrations were
-applied. Changes are not pushed or deployed; next use an isolated disposable
-local fixture database, then get CodeRabbit/Strix review and CI before staging.
+PR #143 (`fix/billing-cancel-return`) contains the follow-up to current `main`
+(`6bd4dc1`). The API keeps the configured exact-origin CORS policy before
+rate-limit middleware while allowing OPTIONS requests to continue through the
+existing per-route limits. Billing wallet and transaction failures render
+independently; deposits are gated on an available wallet, and failed history no
+longer reports zero total deposits. CodeRabbit and Strix review comments were
+verified and addressed in a follow-up commit; CI and reviews must pass again
+before merge. The final portal production build passed, and a local OPTIONS
+smoke confirmed the first preflight returns CORS headers while a repeated one
+is rate-limited with CORS headers intact. The authenticated local UI smoke
+remains open: the guarded seed script refused to mutate a legacy fixture missing
+exact consent evidence, so no account data was reset or repaired. Only
+localhost schema migrations were applied.
 
 ## Stripe return-domain repair
 

@@ -162,6 +162,12 @@ export default function BillingPage() {
 
   const depositAvailable =
     depositCapability?.available === true && !depositRuntimeUnavailable
+  const canDeposit =
+    depositAvailable &&
+    !depositCapabilityLoading &&
+    !walletLoading &&
+    !walletError &&
+    Boolean(walletData?.id)
   const depositUnavailableMessage = depositRuntimeUnavailable
     ? depositRuntimeUnavailable
     : depositCapabilityError
@@ -406,14 +412,18 @@ export default function BillingPage() {
         </div>
         <Button
           onClick={() => setShowDepositDialog(true)}
-          disabled={!depositAvailable || depositCapabilityLoading}
+          disabled={!canDeposit}
         >
           <Plus className="mr-2 h-4 w-4" />
           {depositCapabilityLoading
             ? "Checking deposits..."
-            : depositAvailable
-              ? "Deposit Funds"
-              : "Deposits unavailable"}
+            : walletLoading
+              ? "Loading wallet..."
+              : walletError || !walletData?.id
+                ? "Wallet unavailable"
+                : depositAvailable
+                  ? "Deposit Funds"
+                  : "Deposits unavailable"}
         </Button>
       </div>
 
@@ -510,10 +520,16 @@ export default function BillingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold font-mono">
-                  {formatCustomerMoney(totalDeposits, walletData.currency)}
+                  {transactionsLoading
+                    ? "Loading…"
+                    : transactionsError
+                      ? "Unavailable"
+                      : formatCustomerMoney(totalDeposits, walletData.currency)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  All time deposits
+                  {transactionsError
+                    ? "Transaction history unavailable"
+                    : "All time deposits"}
                 </p>
               </CardContent>
             </Card>
@@ -622,7 +638,7 @@ export default function BillingPage() {
 
       {/* Deposit Dialog */}
       <Dialog
-        open={showDepositDialog && depositAvailable}
+        open={showDepositDialog && canDeposit}
         onOpenChange={setShowDepositDialog}
       >
         <DialogContent className="sm:max-w-[400px]">
@@ -702,7 +718,10 @@ export default function BillingPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={depositMutation.isPending}>
+              <Button
+                type="submit"
+                disabled={depositMutation.isPending || !canDeposit}
+              >
                 {depositMutation.isPending
                   ? "Processing..."
                   : "Continue to Payment"}

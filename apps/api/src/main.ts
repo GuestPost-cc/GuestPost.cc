@@ -229,8 +229,8 @@ async function bootstrap() {
     /^https?:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$/i,
     /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/i,
   ]
-  // Handle preflight before rate limiters and routes so their responses don't
-  // lose CORS headers and appear to the browser as a failed network request.
+  // Attach CORS headers before rate limiters, but let preflights continue so
+  // they still consume the same per-route request budgets.
   server.use(
     cors({
       origin: (origin, callback) => {
@@ -241,6 +241,7 @@ async function bootstrap() {
         callback(null, false)
       },
       credentials: true,
+      preflightContinue: true,
     }),
   )
 
