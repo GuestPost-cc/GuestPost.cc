@@ -33,7 +33,7 @@ evidence while refusing money mutations.
 | `FINANCE_RUNTIME_MODE` | required in production: `normal`, `recovery_only`, or `locked`; missing/invalid values fail closed to `locked` |
 | `STRIPE_LIVE_MODE_ENABLED` | must remain false for test keys/staging; live-key boot gate |
 | `NEXT_PUBLIC_PORTAL_URL`, `NEXT_PUBLIC_PUBLISHER_URL` | exact HTTPS fallback return origins; required when the corresponding Stripe flow is enabled in production |
-| `NEXT_PUBLIC_ALLOWED_APP_DOMAINS` | comma-separated deployment instance domains (for example, `stage.example.com`); enables approved `app.<domain>`/`api.<domain>` routing and Stripe returns without a build-time hostname |
+| `NEXT_PUBLIC_ALLOWED_APP_DOMAINS` | comma-separated deployment instance domains (for example, `stage.example.com`); set on the API runtime and frontend builds. The API derives exact HTTPS origins for the configured website, `app`, `publisher`, and `admin` surfaces for CORS/CSRF/auth, while approved `app.<domain>`/`api.<domain>` routing and Stripe returns avoid build-time hostnames |
 | `PAYOUT_LEGACY_METHODS_ENABLED` | false for Stripe rollout; only enable after the selected legacy provider is certified |
 | `WISE_API_KEY`, `WISE_WEBHOOK_PUBLIC_KEY` | Reserved for Wise certification/webhook verification; automated Wise sends remain disabled until typed settlement and recovery evidence are approved |
 | `PAYOUT_ENCRYPTION_KEYS` | Required bounded JSON object (maximum 16) from opaque key IDs to distinct 64-hex data-encryption keys; all configured non-active IDs are decrypt-only |
