@@ -256,7 +256,7 @@ jobs:
             mini -dir=/data -ip.bind=0.0.0.0 -master.telemetry=false -bucket="${S3_BUCKET}"
 
           for attempt in {1..45}; do
-            if curl --fail --silent http://localhost:9000/ >/dev/null; then
+            if curl --silent --output /dev/null http://localhost:9000/ >/dev/null; then
               break
             fi
             if [[ "${attempt}" -eq 45 ]]; then
