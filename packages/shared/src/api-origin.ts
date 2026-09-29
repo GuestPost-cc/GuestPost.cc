@@ -85,6 +85,19 @@ function allowedInstanceDomains(
   )
 }
 
+/** Browser origins for the frontend surfaces belonging to configured instances. */
+export function getAllowedInstanceOrigins(
+  configuredDomains: string | readonly string[] | undefined = process.env
+    .NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+): string[] {
+  return [...allowedInstanceDomains(configuredDomains)].flatMap((domain) => [
+    `https://${domain}`,
+    `https://app.${domain}`,
+    `https://publisher.${domain}`,
+    `https://admin.${domain}`,
+  ])
+}
+
 function apiOriginForHostname(
   hostname: string,
   allowedDomains: Set<string>,
