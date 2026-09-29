@@ -559,6 +559,14 @@ async function bootstrap() {
     }),
   )
 
+  // CORS has already attached the requested preflight headers, and every
+  // route-specific limiter has now counted OPTIONS without sending it into an
+  // auth or controller handler that may not implement preflight responses.
+  server.use("/api/v1", (req, res, next) => {
+    if (req.method === "OPTIONS") return res.sendStatus(204)
+    next()
+  })
+
   // Phase 7.8 #26 — Better Auth instance with the email-keyed rate-limit
   // plugin. The IP-layer limiter (createAuthLimiter above) is the first
   // line; this plugin adds a second layer keyed by SHA-256(email) so
