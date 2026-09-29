@@ -168,8 +168,9 @@ historical audit batches.
   with a non-phrasing container rather than a paragraph to preserve valid HTML
   and hydration integrity.
 - Admin, customer, and publisher QueryClient providers mount the shared
-  `GlobalLoadingBar` while TanStack queries or mutations are active. It waits
-  briefly before appearing to avoid flashes on quick requests and respects
+  `GlobalLoadingBar` for initial TanStack query loads and active mutations.
+  Cached background refetches are quiet by default; queries may opt in through
+  `meta.globalLoadingBar`. It waits briefly before appearing and respects
   reduced-motion preferences.
 - Publisher website CSV import treats the website URL and global domain
   uniqueness as row-blocking identity boundaries. Unsupported optional cells

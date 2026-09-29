@@ -37,6 +37,10 @@ export function Providers({
 }
 
 function ActivityLoadingBar() {
-  const active = useIsFetching() + useIsMutating() > 0
+  const fetching = useIsFetching({
+    predicate: (query) =>
+      query.state.data === undefined || query.meta?.globalLoadingBar === true,
+  })
+  const active = fetching + useIsMutating() > 0
   return <GlobalLoadingBar active={active} />
 }
