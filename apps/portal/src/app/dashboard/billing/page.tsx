@@ -362,9 +362,6 @@ export default function BillingPage() {
     .filter((tx) => tx.type === "DEPOSIT")
     .reduce((sum, tx) => sum + Number(tx.amount), 0)
 
-  // Combine errors from all queries
-  const billingError = walletError || transactionsError
-
   if (user && !isOwner) {
     return (
       <Card className="mx-auto max-w-2xl rounded-2xl shadow-sm">
@@ -394,24 +391,6 @@ export default function BillingPage() {
           Your payment was successful. We&apos;re waiting for the confirmation
           to credit your wallet. This usually takes a few seconds.
         </p>
-      </div>
-    )
-  }
-
-  if (billingError) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-        </div>
-        <ErrorState
-          title="Something went wrong"
-          description={(billingError as Error).message}
-          onRetry={() => {
-            refetchWallet()
-            refetchTransactions()
-          }}
-        />
       </div>
     )
   }
@@ -472,6 +451,14 @@ export default function BillingPage() {
             <WalletSkeleton />
             <WalletSkeleton />
           </>
+        ) : walletError ? (
+          <div className="md:col-span-3">
+            <ErrorState
+              title="Wallet unavailable"
+              description="Your balance could not be loaded. Your funds have not been changed."
+              onRetry={() => void refetchWallet()}
+            />
+          </div>
         ) : walletData ? (
           <>
             <Card className="rounded-2xl shadow-sm">
@@ -556,6 +543,12 @@ export default function BillingPage() {
         <CardContent>
           {transactionsLoading ? (
             <TransactionsSkeleton />
+          ) : transactionsError ? (
+            <ErrorState
+              title="Transaction history unavailable"
+              description="Your wallet balance is unaffected. Retry to load transaction history."
+              onRetry={() => void refetchTransactions()}
+            />
           ) : filteredTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Wallet className="h-12 w-12 text-muted-foreground" />

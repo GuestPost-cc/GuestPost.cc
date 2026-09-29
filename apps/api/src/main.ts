@@ -220,6 +220,30 @@ async function bootstrap() {
     }),
   )
 
+  const configuredOrigins = getAllowedOrigins()
+  const isDev = process.env.NODE_ENV !== "production"
+  const localPatterns = [
+    /^https?:\/\/localhost(:\d+)?$/i,
+    /^https?:\/\/127\.\d+\.\d+\.\d+(:\d+)?$/i,
+    /^https?:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/i,
+    /^https?:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$/i,
+    /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/i,
+  ]
+  // Handle preflight before rate limiters and routes so their responses don't
+  // lose CORS headers and appear to the browser as a failed network request.
+  server.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin || configuredOrigins.includes(origin))
+          return callback(null, true)
+        if (isDev && localPatterns.some((p) => p.test(origin)))
+          return callback(null, true)
+        callback(null, false)
+      },
+      credentials: true,
+    }),
+  )
+
   // Health check - before rate limiting (liveness only — no dependency checks)
   server.get("/api/v1/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() })
@@ -531,28 +555,6 @@ async function bootstrap() {
       // Exact signed webhook paths were counted by their dedicated limiter.
       // Lookalikes and the retired shared Stripe route stay on this fallback.
       skip: isSignedWebhookIngressRequest,
-    }),
-  )
-
-  const configuredOrigins = getAllowedOrigins()
-  const isDev = process.env.NODE_ENV !== "production"
-  const localPatterns = [
-    /^https?:\/\/localhost(:\d+)?$/i,
-    /^https?:\/\/127\.\d+\.\d+\.\d+(:\d+)?$/i,
-    /^https?:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/i,
-    /^https?:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$/i,
-    /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/i,
-  ]
-  server.use(
-    cors({
-      origin: (origin, callback) => {
-        if (!origin || configuredOrigins.includes(origin))
-          return callback(null, true)
-        if (isDev && localPatterns.some((p) => p.test(origin)))
-          return callback(null, true)
-        callback(null, false)
-      },
-      credentials: true,
     }),
   )
 

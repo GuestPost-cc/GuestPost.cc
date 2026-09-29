@@ -1,10 +1,25 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-29
+updated: 2026-09-30
 ---
 
 # Current focus
+
+## Billing cancel-return resilience
+
+Local follow-up on current `main` (`6bd4dc1`): the staging browser currently
+renders billing for the reported canceled-return URL. The API already derives
+exact CORS origins from configured instance domains; this patch moves preflight
+handling ahead of rate limiters and prevents wallet/history fetch errors from
+replacing the whole billing page. Portal production build, typecheck/lint, API
+typecheck, and the focused CORS-origin test pass. A localhost preflight returned
+204 with the expected exact `Access-Control-Allow-Origin` and credentials
+headers. The authenticated UI smoke is still open: the guarded seed script
+refused to mutate a legacy local fixture missing exact consent evidence, so no
+account data was reset or repaired. Only localhost schema migrations were
+applied. Changes are not pushed or deployed; next use an isolated disposable
+local fixture database, then get CodeRabbit/Strix review and CI before staging.
 
 ## Stripe return-domain repair
 
