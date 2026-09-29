@@ -85,6 +85,10 @@ services:
         value: https://guestpost.pro.bd,https://app.guestpost.pro.bd,https://publisher.guestpost.pro.bd,https://admin.guestpost.pro.bd,https://api.guestpost.pro.bd
       - key: CORS_ORIGIN
         value: https://guestpost.pro.bd,https://app.guestpost.pro.bd,https://publisher.guestpost.pro.bd,https://admin.guestpost.pro.bd
+      # Comma-separated instance domains used to derive the exact frontend
+      # origins allowed by API CORS, CSRF, and auth checks. Set in Render.
+      - key: NEXT_PUBLIC_ALLOWED_APP_DOMAINS
+        sync: false
       - key: BETTER_AUTH_URL
         value: https://api.guestpost.pro.bd
       - key: AUTH_COOKIE_DOMAIN

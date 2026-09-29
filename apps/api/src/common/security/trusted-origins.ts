@@ -1,3 +1,5 @@
+import { getAllowedInstanceOrigins } from "@guestpost/shared"
+
 const DEVELOPMENT_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:3001",
@@ -11,7 +13,10 @@ export function getAllowedOrigins(): string[] {
     .map((value) => value.trim())
     .filter(Boolean)
 
-  return configured?.length ? configured : DEVELOPMENT_ORIGINS
+  return [
+    ...(configured?.length ? configured : DEVELOPMENT_ORIGINS),
+    ...getAllowedInstanceOrigins(),
+  ]
 }
 
 export function isTrustedOrigin(value: string | null | undefined): boolean {

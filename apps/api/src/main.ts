@@ -53,6 +53,7 @@ import { hasAuthCredentials } from "./common/has-auth-credentials"
 import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-business-context.interceptor"
 import { PrismaService } from "./common/prisma.service"
 import { getQueueConnection, getRedisClient } from "./common/redis-client"
+import { getAllowedOrigins } from "./common/security/trusted-origins"
 import { validateStripeEnvironment } from "./common/stripe-client"
 import { resolveVerificationRateLimitConfig } from "./common/verification-config"
 import {
@@ -533,12 +534,7 @@ async function bootstrap() {
     }),
   )
 
-  const configuredOrigins = process.env.CORS_ORIGIN?.split(",") ?? [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://localhost:3003",
-  ]
+  const configuredOrigins = getAllowedOrigins()
   const isDev = process.env.NODE_ENV !== "production"
   const localPatterns = [
     /^https?:\/\/localhost(:\d+)?$/i,
