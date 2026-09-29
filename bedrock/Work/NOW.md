@@ -12,7 +12,7 @@ Branch `fix/stripe-return-domain`, rebased on `origin/main` (`c8e1128`),
 contains the pending Stripe return-domain repair. Checkout and Stripe Connect account-link returns
 derive only exact canonical origins from `NEXT_PUBLIC_ALLOWED_APP_DOMAINS`,
 with the existing configured URLs as safe fallbacks; a cancelled Checkout clears
-only browser recovery state. It also runs the API and worker containers as the
+only the recovery state belonging to its exact opaque pending reference. It also runs the API and worker containers as the
 non-root `node` user. Focused API (108 tests) and API-client (45 tests)
 coverage passed, as did dependency-aware API and portal builds.
 

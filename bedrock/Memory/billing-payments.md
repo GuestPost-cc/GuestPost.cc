@@ -64,8 +64,10 @@ canonical customer host derived from `NEXT_PUBLIC_ALLOWED_APP_DOMAINS`; otherwis
 they use the validated `NEXT_PUBLIC_PORTAL_URL` fallback. This permits an
 allow-listed instance domain to route Stripe success/cancellation to its own
 `app.<instance-domain>` host without accepting an arbitrary redirect. A
-cancelled return removes client-side deposit recovery state without crediting
-the wallet.
+cancelled return removes client-side deposit recovery state only when its opaque
+attempt reference matches the pending attempt; unavailable browser storage
+leaves that state intact while still showing cancellation feedback. It never
+credits the wallet.
 
 Before persisting or returning a redirect, the Stripe adapter normalizes and
 verifies the Checkout object/session/PaymentIntent identity, client reference,
