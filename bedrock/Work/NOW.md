@@ -1,10 +1,26 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-29
+updated: 2026-09-30
 ---
 
 # Current focus
+
+## Billing cancel-return resilience
+
+PR #143 (`fix/billing-cancel-return`) contains the follow-up to current `main`
+(`6bd4dc1`). The API keeps the configured exact-origin CORS policy before
+rate-limit middleware while allowing OPTIONS requests to continue through the
+existing per-route limits, then respond before auth/controller handlers.
+Billing wallet and transaction failures render independently; deposits are
+gated on an available wallet, and failed history no longer reports zero total
+deposits. CodeRabbit and Strix review comments were verified and addressed in a
+follow-up commit; CI exposed an auth preflight regression, now fixed by the
+post-limiter responder. The final portal production build passed, and a local
+OPTIONS smoke confirmed rate-limited preflights retain CORS headers. The
+authenticated local UI smoke remains open: the guarded seed script refused to
+mutate a legacy fixture missing exact consent evidence, so no account data was
+reset or repaired. Only localhost schema migrations were applied.
 
 ## Stripe return-domain repair
 

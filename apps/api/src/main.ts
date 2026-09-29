@@ -220,6 +220,31 @@ async function bootstrap() {
     }),
   )
 
+  const configuredOrigins = getAllowedOrigins()
+  const isDev = process.env.NODE_ENV !== "production"
+  const localPatterns = [
+    /^https?:\/\/localhost(:\d+)?$/i,
+    /^https?:\/\/127\.\d+\.\d+\.\d+(:\d+)?$/i,
+    /^https?:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/i,
+    /^https?:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$/i,
+    /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/i,
+  ]
+  // Attach CORS headers before rate limiters, but let preflights continue so
+  // they still consume the same per-route request budgets.
+  server.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin || configuredOrigins.includes(origin))
+          return callback(null, true)
+        if (isDev && localPatterns.some((p) => p.test(origin)))
+          return callback(null, true)
+        callback(null, false)
+      },
+      credentials: true,
+      preflightContinue: true,
+    }),
+  )
+
   // Health check - before rate limiting (liveness only — no dependency checks)
   server.get("/api/v1/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() })
@@ -534,27 +559,13 @@ async function bootstrap() {
     }),
   )
 
-  const configuredOrigins = getAllowedOrigins()
-  const isDev = process.env.NODE_ENV !== "production"
-  const localPatterns = [
-    /^https?:\/\/localhost(:\d+)?$/i,
-    /^https?:\/\/127\.\d+\.\d+\.\d+(:\d+)?$/i,
-    /^https?:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/i,
-    /^https?:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$/i,
-    /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/i,
-  ]
-  server.use(
-    cors({
-      origin: (origin, callback) => {
-        if (!origin || configuredOrigins.includes(origin))
-          return callback(null, true)
-        if (isDev && localPatterns.some((p) => p.test(origin)))
-          return callback(null, true)
-        callback(null, false)
-      },
-      credentials: true,
-    }),
-  )
+  // CORS has already attached the requested preflight headers, and every
+  // route-specific limiter has now counted OPTIONS without sending it into an
+  // auth or controller handler that may not implement preflight responses.
+  server.use("/api/v1", (req, res, next) => {
+    if (req.method === "OPTIONS") return res.sendStatus(204)
+    next()
+  })
 
   // Phase 7.8 #26 — Better Auth instance with the email-keyed rate-limit
   // plugin. The IP-layer limiter (createAuthLimiter above) is the first

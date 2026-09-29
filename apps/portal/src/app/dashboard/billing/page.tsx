@@ -162,6 +162,12 @@ export default function BillingPage() {
 
   const depositAvailable =
     depositCapability?.available === true && !depositRuntimeUnavailable
+  const canDeposit =
+    depositAvailable &&
+    !depositCapabilityLoading &&
+    !walletLoading &&
+    !walletError &&
+    Boolean(walletData?.id)
   const depositUnavailableMessage = depositRuntimeUnavailable
     ? depositRuntimeUnavailable
     : depositCapabilityError
@@ -362,9 +368,6 @@ export default function BillingPage() {
     .filter((tx) => tx.type === "DEPOSIT")
     .reduce((sum, tx) => sum + Number(tx.amount), 0)
 
-  // Combine errors from all queries
-  const billingError = walletError || transactionsError
-
   if (user && !isOwner) {
     return (
       <Card className="mx-auto max-w-2xl rounded-2xl shadow-sm">
@@ -398,24 +401,6 @@ export default function BillingPage() {
     )
   }
 
-  if (billingError) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-        </div>
-        <ErrorState
-          title="Something went wrong"
-          description={(billingError as Error).message}
-          onRetry={() => {
-            refetchWallet()
-            refetchTransactions()
-          }}
-        />
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -427,14 +412,18 @@ export default function BillingPage() {
         </div>
         <Button
           onClick={() => setShowDepositDialog(true)}
-          disabled={!depositAvailable || depositCapabilityLoading}
+          disabled={!canDeposit}
         >
           <Plus className="mr-2 h-4 w-4" />
           {depositCapabilityLoading
             ? "Checking deposits..."
-            : depositAvailable
-              ? "Deposit Funds"
-              : "Deposits unavailable"}
+            : walletLoading
+              ? "Loading wallet..."
+              : walletError || !walletData?.id
+                ? "Wallet unavailable"
+                : depositAvailable
+                  ? "Deposit Funds"
+                  : "Deposits unavailable"}
         </Button>
       </div>
 
@@ -472,6 +461,14 @@ export default function BillingPage() {
             <WalletSkeleton />
             <WalletSkeleton />
           </>
+        ) : walletError ? (
+          <div className="md:col-span-3">
+            <ErrorState
+              title="Wallet unavailable"
+              description="Your balance could not be loaded. Your funds have not been changed."
+              onRetry={() => void refetchWallet()}
+            />
+          </div>
         ) : walletData ? (
           <>
             <Card className="rounded-2xl shadow-sm">
@@ -523,10 +520,16 @@ export default function BillingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold font-mono">
-                  {formatCustomerMoney(totalDeposits, walletData.currency)}
+                  {transactionsLoading
+                    ? "Loading…"
+                    : transactionsError
+                      ? "Unavailable"
+                      : formatCustomerMoney(totalDeposits, walletData.currency)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  All time deposits
+                  {transactionsError
+                    ? "Transaction history unavailable"
+                    : "All time deposits"}
                 </p>
               </CardContent>
             </Card>
@@ -556,6 +559,12 @@ export default function BillingPage() {
         <CardContent>
           {transactionsLoading ? (
             <TransactionsSkeleton />
+          ) : transactionsError ? (
+            <ErrorState
+              title="Transaction history unavailable"
+              description="Your wallet balance is unaffected. Retry to load transaction history."
+              onRetry={() => void refetchTransactions()}
+            />
           ) : filteredTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Wallet className="h-12 w-12 text-muted-foreground" />
@@ -629,7 +638,7 @@ export default function BillingPage() {
 
       {/* Deposit Dialog */}
       <Dialog
-        open={showDepositDialog && depositAvailable}
+        open={showDepositDialog && canDeposit}
         onOpenChange={setShowDepositDialog}
       >
         <DialogContent className="sm:max-w-[400px]">
@@ -709,7 +718,10 @@ export default function BillingPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={depositMutation.isPending}>
+              <Button
+                type="submit"
+                disabled={depositMutation.isPending || !canDeposit}
+              >
                 {depositMutation.isPending
                   ? "Processing..."
                   : "Continue to Payment"}
