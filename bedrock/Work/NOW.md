@@ -6,6 +6,18 @@ updated: 2026-09-28
 
 # Current focus
 
+## Stripe return-domain repair
+
+An isolated checkout at current `origin/main` (`faa7053`) contains the pending
+Stripe return-domain repair. Checkout and Stripe Connect account-link returns
+derive only exact canonical origins from `NEXT_PUBLIC_ALLOWED_APP_DOMAINS`,
+with the existing configured URLs as safe fallbacks; a cancelled Checkout clears
+only browser recovery state. Focused API (108 tests) and API-client (45 tests)
+coverage passed, as did dependency-aware API and portal builds. The next action
+is to review/merge the branch and configure the Coolify API plus every frontend
+build with the same instance-domain allowlist, CORS/trusted origins, and exact
+HTTPS fallback URLs before enabling test deposits.
+
 ## Security sweep PR #125
 
 PR #125 (`fix/security-sweep-hardening`) is rebased on current `main`

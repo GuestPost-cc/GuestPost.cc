@@ -25,6 +25,7 @@ RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
 WORKDIR /repo
 ENV NODE_ENV=production
 COPY --from=builder /repo .
+USER node
 EXPOSE 4000
 # Fail-fast env validation runs at boot (DATABASE_URL, REDIS_URL,
 # BETTER_AUTH_SECRET, QUEUE_SIGNING_SECRET, and TRUSTED_ORIGINS are required

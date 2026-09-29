@@ -349,6 +349,49 @@ describe("BillingService", () => {
       })
     })
 
+    it("uses the approved request domain for Stripe return URLs", async () => {
+      const previousDomains = process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS
+      const previousPortalUrl = process.env.NEXT_PUBLIC_PORTAL_URL
+      process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS = "stage.example.com"
+      process.env.NEXT_PUBLIC_PORTAL_URL = "https://app.old.example.com"
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(null)
+      prismaMock.depositAttempt.create.mockResolvedValue(
+        depositAttemptFixture(),
+      )
+      prismaMock.depositAttempt.updateMany.mockResolvedValue({ count: 1 })
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest.fn().mockResolvedValue(depositSessionFixture()),
+      }
+
+      try {
+        await service.createCheckoutSession(
+          "wallet-1",
+          25,
+          mockUser,
+          "request-1",
+          "https://app.stage.example.com",
+        )
+        expect(
+          (service as any).depositProvider.createSession,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            successUrl:
+              "https://app.stage.example.com/dashboard/billing?success=true",
+            cancelUrl:
+              "https://app.stage.example.com/dashboard/billing?canceled=true",
+          }),
+        )
+      } finally {
+        if (previousDomains === undefined)
+          delete process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS
+        else process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS = previousDomains
+        if (previousPortalUrl === undefined)
+          delete process.env.NEXT_PUBLIC_PORTAL_URL
+        else process.env.NEXT_PUBLIC_PORTAL_URL = previousPortalUrl
+      }
+    })
+
     it("fails the capability closed when the explicit flag or finance mode blocks deposits", () => {
       const previousMode = process.env.FINANCE_RUNTIME_MODE
       process.env.STRIPE_DEPOSITS_ENABLED = "false"

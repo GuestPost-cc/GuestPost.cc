@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto"
-import { isUniqueViolation } from "@guestpost/shared"
+import {
+  isUniqueViolation,
+  resolveRequestInstanceOrigin,
+} from "@guestpost/shared"
 import {
   isRetryablePrismaTransactionError,
   prismaTransactionRetryDelayMs,
@@ -163,7 +166,11 @@ export class StripeConnectService {
     )
   }
 
-  async createOnboardingLink(publisherId: string, userId: string) {
+  async createOnboardingLink(
+    publisherId: string,
+    userId: string,
+    requestOrigin?: string,
+  ) {
     await this.assertMember(userId, publisherId)
     // Creating or extending a provider payout route is a normal-mode-only
     // liability operation. Gate before Stripe or local state can mutate.
@@ -260,9 +267,14 @@ export class StripeConnectService {
     if (!local) {
       throw new Error("Stripe account persistence did not return an account")
     }
-    const baseUrl = (
+    const fallbackBaseUrl = (
       process.env.NEXT_PUBLIC_PUBLISHER_URL ?? "http://localhost:3002"
     ).replace(/\/$/, "")
+    const baseUrl =
+      resolveRequestInstanceOrigin("publisher", requestOrigin, {
+        allowedAppDomains: process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+        nodeEnv: process.env.NODE_ENV,
+      }) ?? fallbackBaseUrl
     const link = await this.callStripeForContext(
       {
         source: "publisher_refresh",

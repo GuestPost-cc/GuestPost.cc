@@ -42,12 +42,14 @@ export class BillingController {
     @Param("id") walletId: string,
     @Body() body: DepositDto,
     @CurrentUser() user: any,
+    @Headers("origin") origin?: string,
   ) {
     return this.billing.createCheckoutSession(
       walletId,
       body.amount,
       user,
       body.idempotencyKey,
+      origin,
     )
   }
 

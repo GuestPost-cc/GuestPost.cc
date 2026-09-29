@@ -7,6 +7,7 @@ import {
   isUniqueViolation,
   normalizeFinancialReference,
   resolveFinanceRuntimeMode,
+  resolveRequestInstanceOrigin,
   USD_CURRENCY,
 } from "@guestpost/shared"
 import {
@@ -100,6 +101,20 @@ type NormalizedStripeDisputeFacts = Omit<
 >
 type PersistablePaymentDisputeEvent = FingerprintablePaymentDisputeEvent & {
   eventFingerprint: string
+}
+
+function portalReturnOrigin(requestOrigin?: string): string {
+  const fallback =
+    process.env.NEXT_PUBLIC_PORTAL_URL?.replace(/\/$/, "") ??
+    "http://localhost:3001"
+  if (!requestOrigin) return fallback
+
+  return (
+    resolveRequestInstanceOrigin("portal", requestOrigin, {
+      allowedAppDomains: process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS,
+      nodeEnv: process.env.NODE_ENV,
+    }) ?? fallback
+  )
 }
 
 interface PaymentProviderEventEnvelope {
@@ -869,6 +884,7 @@ export class BillingService {
     amount: number,
     user: any,
     idempotencyKey?: string,
+    requestOrigin?: string,
   ) {
     assertApiFinanceOperationAllowed("new_liability")
     const wallet = await this.prisma.wallet.findUnique({
@@ -1004,8 +1020,7 @@ export class BillingService {
       }
     }
 
-    const portalUrl =
-      process.env.NEXT_PUBLIC_PORTAL_URL || "http://localhost:3001"
+    const portalUrl = portalReturnOrigin(requestOrigin)
     let session: Awaited<ReturnType<DepositProviderAdapter["createSession"]>>
     try {
       session = await this.depositProvider.createSession({

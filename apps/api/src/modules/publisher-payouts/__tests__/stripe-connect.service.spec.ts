@@ -113,6 +113,7 @@ describe("StripeConnectService", () => {
   })
 
   it("uses one stable provider idempotency key and never persists the onboarding URL", async () => {
+    process.env.NEXT_PUBLIC_ALLOWED_APP_DOMAINS = "stage.example.com"
     const { service, prisma, audit } = makeService()
     const createAccount = jest.fn().mockResolvedValue({
       id: "acct_1",
@@ -129,7 +130,11 @@ describe("StripeConnectService", () => {
     } as any)
 
     await expect(
-      service.createOnboardingLink("pub-1", "user-1"),
+      service.createOnboardingLink(
+        "pub-1",
+        "user-1",
+        "https://publisher.stage.example.com",
+      ),
     ).resolves.toMatchObject({
       url: "https://connect.stripe.test/single-use-secret",
     })
@@ -140,6 +145,14 @@ describe("StripeConnectService", () => {
         capabilities: { transfers: { requested: true } },
       }),
       { idempotencyKey: "stripe-connect-account-pub-1" },
+    )
+    expect(createLink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        refresh_url:
+          "https://publisher.stage.example.com/dashboard/payout-methods?stripe=refresh",
+        return_url:
+          "https://publisher.stage.example.com/dashboard/payout-methods?stripe=return",
+      }),
     )
     expect(
       JSON.stringify(prisma.publisherProviderAccount.create.mock.calls),
