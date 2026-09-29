@@ -25,6 +25,7 @@ RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
 WORKDIR /repo
 ENV NODE_ENV=production
 COPY --from=builder /repo .
+USER node
 # One image serves the realtime service and short-lived job modes. WORKER_MODE
 # selects the runtime; see docs/WORKER_ARCHITECTURE.md.
 CMD ["node", "apps/worker/dist/index.js"]

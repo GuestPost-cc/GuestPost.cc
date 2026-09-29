@@ -1,10 +1,31 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-28
+updated: 2026-09-29
 ---
 
 # Current focus
+
+## Stripe return-domain repair
+
+Branch `fix/stripe-return-domain`, rebased on `origin/main` (`c8e1128`),
+contains the pending Stripe return-domain repair. Checkout and Stripe Connect account-link returns
+derive only exact canonical origins from `NEXT_PUBLIC_ALLOWED_APP_DOMAINS`,
+with the existing configured URLs as safe fallbacks; a cancelled Checkout clears
+only the recovery state belonging to its exact opaque pending reference. It also runs the API and worker containers as the
+non-root `node` user. Focused API (108 tests) and API-client (45 tests)
+coverage passed, as did dependency-aware API and portal builds.
+
+The same branch contains the reviewed Dependabot updates for AWS S3,
+react-hook-form, Next 16.3.5, and Undici plus minimal dependency floors for
+fast-uri 3.1.7, ip-address 10.5.1, multer 2.4.0, and Nodemailer 10.0.2+.
+`pnpm audit --prod` reports zero vulnerabilities and `pnpm deps:policy` passes.
+GitHub's signed Coolify push webhook is already configured at the public HTTPS
+endpoint and its latest deliveries returned HTTP 200; do not replace it with
+the private port-8000 URL shown in Coolify's internal display. The next action
+is CI/review completion, then merge and deploy API, portal, publisher, worker,
+website, and admin with the exact staging domain allowlist, CORS/trusted origins,
+and HTTPS fallback URLs before testing a cancellation or deposit.
 
 ## Security sweep PR #125
 

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Query,
@@ -36,8 +37,15 @@ export class PublisherPayoutsController {
   @UseGuards(MemberRolesGuard)
   @MemberRoles("PUBLISHER_OWNER")
   @Post("stripe-connect/onboarding-link")
-  createStripeConnectOnboardingLink(@CurrentAuthority() user: any) {
-    return this.stripeConnect.createOnboardingLink(user.publisherId, user.id)
+  createStripeConnectOnboardingLink(
+    @CurrentAuthority() user: any,
+    @Headers("origin") origin?: string,
+  ) {
+    return this.stripeConnect.createOnboardingLink(
+      user.publisherId,
+      user.id,
+      origin,
+    )
   }
 
   @UseGuards(MemberRolesGuard)

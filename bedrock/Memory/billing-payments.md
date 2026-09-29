@@ -59,6 +59,16 @@ truncated and must be 1-191 ASCII letters, numbers, underscores, or hyphens.
 Each retry is bound to the exact actor, organization, wallet, method, provider,
 USD amount, zero-fee shape, and empty order/ledger linkage.
 
+Checkout return URLs use the browser's request origin only if it is the exact
+canonical customer host derived from `NEXT_PUBLIC_ALLOWED_APP_DOMAINS`; otherwise
+they use the validated `NEXT_PUBLIC_PORTAL_URL` fallback. This permits an
+allow-listed instance domain to route Stripe success/cancellation to its own
+`app.<instance-domain>` host without accepting an arbitrary redirect. A
+cancelled return removes client-side deposit recovery state only when its opaque
+attempt reference matches the pending attempt; unavailable browser storage
+leaves that state intact while still showing cancellation feedback. It never
+credits the wallet.
+
 Before persisting or returning a redirect, the Stripe adapter normalizes and
 verifies the Checkout object/session/PaymentIntent identity, client reference,
 metadata, USD minor amount, mode, status, expiration, and HTTPS URL. Production

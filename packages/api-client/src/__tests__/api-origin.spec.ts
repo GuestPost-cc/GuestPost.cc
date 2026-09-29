@@ -4,6 +4,7 @@ import {
   resolveApiOrigin,
   resolveApiV1Url,
   resolveInstanceOrigin,
+  resolveRequestInstanceOrigin,
 } from "../api-origin"
 
 describe("browser API origin resolution", () => {
@@ -239,5 +240,20 @@ describe("allow-listed instance app origin resolution", () => {
         configuredUrl: "https://attacker:secret@example.net/path",
       }),
     ).toThrow(/cannot contain credentials, a path, query, or fragment/)
+  })
+
+  it("accepts only an exact allow-listed request origin", () => {
+    expect(
+      resolveRequestInstanceOrigin("portal", "https://app.stage.example.com", {
+        allowedAppDomains: ["stage.example.com"],
+        nodeEnv: "production",
+      }),
+    ).toBe("https://app.stage.example.com")
+    expect(
+      resolveRequestInstanceOrigin("portal", "https://attacker.example.com", {
+        allowedAppDomains: ["stage.example.com"],
+        nodeEnv: "production",
+      }),
+    ).toBeNull()
   })
 })

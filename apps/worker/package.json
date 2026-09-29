@@ -29,7 +29,7 @@
     "bullmq": "^5.81.5",
     "dotenv": "^17.4.2",
     "ioredis": "^5.11.1",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.0.2",
     "pdf-lib": "1.17.1",
     "regenerator-runtime": "0.14.1"
   },

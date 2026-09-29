@@ -32,7 +32,8 @@ evidence while refusing money mutations.
 | `PAYOUT_EXECUTION_ENABLED` | global gate for **new payout sends**; production defaults off unless explicitly `true`; recovery, polling, verified webhooks, and evidence-backed cancellation remain available |
 | `FINANCE_RUNTIME_MODE` | required in production: `normal`, `recovery_only`, or `locked`; missing/invalid values fail closed to `locked` |
 | `STRIPE_LIVE_MODE_ENABLED` | must remain false for test keys/staging; live-key boot gate |
-| `NEXT_PUBLIC_PORTAL_URL`, `NEXT_PUBLIC_PUBLISHER_URL` | exact HTTPS, credential-free return origins; required when the corresponding Stripe flow is enabled in production |
+| `NEXT_PUBLIC_PORTAL_URL`, `NEXT_PUBLIC_PUBLISHER_URL` | exact HTTPS fallback return origins; required when the corresponding Stripe flow is enabled in production |
+| `NEXT_PUBLIC_ALLOWED_APP_DOMAINS` | comma-separated deployment instance domains (for example, `stage.example.com`); enables approved `app.<domain>`/`api.<domain>` routing and Stripe returns without a build-time hostname |
 | `PAYOUT_LEGACY_METHODS_ENABLED` | false for Stripe rollout; only enable after the selected legacy provider is certified |
 | `WISE_API_KEY`, `WISE_WEBHOOK_PUBLIC_KEY` | Reserved for Wise certification/webhook verification; automated Wise sends remain disabled until typed settlement and recovery evidence are approved |
 | `PAYOUT_ENCRYPTION_KEYS` | Required bounded JSON object (maximum 16) from opaque key IDs to distinct 64-hex data-encryption keys; all configured non-active IDs are decrypt-only |

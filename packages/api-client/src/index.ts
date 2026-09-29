@@ -19,6 +19,7 @@ export {
   resolveApiOrigin,
   resolveApiV1Url,
   resolveInstanceOrigin,
+  resolveRequestInstanceOrigin,
 } from "./api-origin"
 export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, HttpClient } from "./client"

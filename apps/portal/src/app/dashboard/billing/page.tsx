@@ -251,6 +251,24 @@ export default function BillingPage() {
     }
     if (ret) setReturnTo(ret)
 
+    if (sp.get("canceled") === "true") {
+      try {
+        if (
+          sp.get("attempt") ===
+          sessionStorage.getItem("deposit_publicReference")
+        ) {
+          sessionStorage.removeItem("deposit_publicReference")
+          sessionStorage.removeItem("deposit_expectedAmount")
+          sessionStorage.removeItem("deposit_timestamp")
+          sessionStorage.removeItem("deposit_returnTo")
+          depositRequest.current = null
+          toast("Payment cancelled. No wallet funds were added.")
+        }
+      } catch {
+        toast("Payment cancelled. No wallet funds were added.")
+      }
+    }
+
     if (sp.get("success") === "true") {
       // The return URL carries no Stripe object identifier. The app uses only
       // its own opaque reference at the authenticated boundary.

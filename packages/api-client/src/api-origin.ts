@@ -7,4 +7,5 @@ export {
   resolveApiOrigin,
   resolveApiV1Url,
   resolveInstanceOrigin,
+  resolveRequestInstanceOrigin,
 } from "@guestpost/shared"

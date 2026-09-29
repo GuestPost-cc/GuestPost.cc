@@ -48,6 +48,11 @@ PAYOUT_EXECUTION_ENABLED=false                 # no new sends during cutover
 PAYOUT_LEGACY_METHODS_ENABLED=false
 NEXT_PUBLIC_PORTAL_URL=https://app.guestpost.pro.bd
 NEXT_PUBLIC_PUBLISHER_URL=https://publisher.guestpost.pro.bd
+# For a separate VPS staging instance such as `stage.example.com`, set this
+# in both the API and frontend build environments. The canonical hosts are
+# `app.stage.example.com`, `publisher.stage.example.com`, and
+# `api.stage.example.com`.
+NEXT_PUBLIC_ALLOWED_APP_DOMAINS=guestpost.pro.bd
 ```
 
 The API must fail at boot if an enabled feature lacks its key/webhook secret.

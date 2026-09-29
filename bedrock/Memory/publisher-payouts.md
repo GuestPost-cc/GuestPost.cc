@@ -86,6 +86,12 @@ failures, runtime pauses, invalid provider bindings/readiness, positive debt,
 and missing destinations fail closed in the publisher UI; request and approval
 transactions re-lock and revalidate the same shared eligibility predicate.
 
+Stripe Connect Account Link return and refresh URLs use the request origin only
+when it is the exact canonical `publisher.<instance-domain>` host derived from
+`NEXT_PUBLIC_ALLOWED_APP_DOMAINS`; a validated `NEXT_PUBLIC_PUBLISHER_URL`
+remains the fallback. This preserves provider redirects across allow-listed VPS
+or custom-domain instances without accepting arbitrary origins.
+
 ## Completion and maker-checker
 
 Automated completion belongs to verified provider response, authenticated

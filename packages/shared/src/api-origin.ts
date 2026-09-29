@@ -180,6 +180,29 @@ export function resolveInstanceOrigin(
   return `http://localhost:${port}`
 }
 
+/**
+ * Accept a browser-provided origin only when it is the exact, allow-listed
+ * origin for the requested application surface.
+ */
+export function resolveRequestInstanceOrigin(
+  surface: InstanceSurface,
+  requestOrigin: string | undefined,
+  options: ResolveInstanceOriginOptions = {},
+): string | null {
+  if (!requestOrigin) return null
+  try {
+    const url = new URL(requestOrigin)
+    if (url.origin !== requestOrigin) return null
+    const resolved = resolveInstanceOrigin(surface, {
+      ...options,
+      browserLocation: { hostname: url.hostname, protocol: url.protocol },
+    })
+    return resolved === url.origin ? resolved : null
+  } catch {
+    return null
+  }
+}
+
 function parseConfiguredOrigin(value: string): string {
   let url: URL
   try {
