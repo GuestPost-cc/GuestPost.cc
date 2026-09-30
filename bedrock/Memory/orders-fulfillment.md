@@ -254,8 +254,10 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
   `customer refund + publisher compensation = captured order amount`; the
   compensation evidence and reconciliation distinguish its stable
   `force-cancel:<orderId>:<key>` refund reference from generic Finance refunds.
-  Stakeholder order timelines show the applicable compensation/decision reason,
-  and customers see the exact refund amount, including zero.
+  Force-cancel requires a bounded idempotency key. Stakeholder order timelines
+  show the publisher-compensation rationale and a structured emergency reason
+  code without exposing the free-form staff audit note; customers see the exact
+  refund amount, including zero.
 - `confirmDelivery`/settlement non-atomic fixed to single transaction
 
 ## Delivery and Settlement Operations (2026-07-12)

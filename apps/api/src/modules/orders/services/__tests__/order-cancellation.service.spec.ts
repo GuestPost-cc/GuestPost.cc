@@ -126,6 +126,7 @@ describe("OrderCancellationService", () => {
       service.forceCancel("order-1", "admin-1", {
         reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
         expectedVersion: 4,
+        idempotencyKey: "case-1",
         confirmationOrderId: "order-1",
         responsibility: CancellationResponsibility.SYSTEM,
         note: "Too short",
@@ -144,6 +145,7 @@ describe("OrderCancellationService", () => {
     await service.forceCancel("order-1", "admin-1", {
       reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
       expectedVersion: 4,
+      idempotencyKey: "case-1",
       confirmationOrderId: "order-1",
       responsibility: CancellationResponsibility.SYSTEM,
       note: "Verified legal emergency requiring an immediate cancellation.",
@@ -158,11 +160,25 @@ describe("OrderCancellationService", () => {
       order,
       expect.any(String),
       "admin-1",
-      "force-cancel:order-1:default",
+      "force-cancel:order-1:case-1",
       CancellationResponsibility.SYSTEM,
       { effectiveOrderStatus: order.status },
       true,
     )
+  })
+
+  it("requires an idempotency key before an emergency cancellation transaction", async () => {
+    await expect(
+      service.forceCancel("order-1", "admin-1", {
+        reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
+        expectedVersion: 4,
+        confirmationOrderId: "order-1",
+        responsibility: CancellationResponsibility.SYSTEM,
+        note: "Verified legal emergency requiring an immediate cancellation.",
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+
+    expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it("replays force-cancel compensation with its persisted effective status", async () => {
@@ -223,6 +239,7 @@ describe("OrderCancellationService", () => {
       service.forceCancel("order-1", "admin-1", {
         reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
         expectedVersion: 4,
+        idempotencyKey: "case-1",
         confirmationOrderId: "order-1",
         responsibility: CancellationResponsibility.SYSTEM,
         note: "Verified legal emergency requiring an immediate cancellation.",

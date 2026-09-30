@@ -31,7 +31,8 @@ const order = {
       eventType: "REFUND_ISSUED",
       metadata: {
         refundTransactionId: "refund-1",
-        reason: "Emergency cancellation: the publisher completed delivery.",
+        reason:
+          "Emergency cancellation: LEGAL_OR_SECURITY_EMERGENCY: private audit note.",
       },
     },
   ],
@@ -69,8 +70,9 @@ describe("order stakeholder timeline", () => {
       "Publisher completed verified publication work.",
     )
     expect(serialized).toContain(
-      "Emergency cancellation: the publisher completed delivery.",
+      "Emergency cancellation: legal or security emergency",
     )
+    expect(serialized).not.toContain("private audit note")
     expect(serialized).not.toContain('"publisherCompensation":"80.25"')
   })
 
@@ -99,7 +101,8 @@ describe("order stakeholder timeline", () => {
     expect(
       timeline.find((entry) => entry.kind === "PUBLISHER_COMPENSATION_DECIDED")
         ?.decisionReason,
-    ).toBe("Emergency cancellation: the publisher completed delivery.")
+    ).toBe("Emergency cancellation: legal or security emergency")
+    expect(serialized).not.toContain("private audit note")
   })
 
   it("shows a zero customer refund when compensation consumes the full order payment", () => {

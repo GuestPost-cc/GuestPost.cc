@@ -10,11 +10,16 @@ updated: 2026-09-30
 
 PR #145 (`fix/order-force-cancel-money-conservation`) corrects paid
 force-cancel allocation so customer refund plus publisher compensation cannot
-exceed captured order gross. CodeRabbit found partial-refund credit-note and
-replay edge cases; fixes and regression tests are pushed. The PR is rebased on
-current `main`; wait for CodeRabbit, Strix, and protected CI before merge. Render
-remains a manual deployment owner, and this additive database guard requires
-the documented migration/drain gates before promotion.
+exceed captured order gross. CodeRabbit's partial-credit-note and replay
+findings are fixed with regression coverage, force-cancel now requires an
+idempotency key, and external timelines show a structured reason code rather
+than the internal audit note. The PR is rebased on current `main`. Strix
+automatic review on push is disabled and must be explicitly rerun; CodeRabbit
+reported its hourly review limit. Render's GitHub App already publishes
+`in_progress` and `success` deployment statuses with dashboard links. Render
+remains manual (`autoDeployTrigger: off`); do not create a duplicate/fake GitHub
+deployment or promote this schema change before the documented migration/drain
+gates pass.
 
 ## Cross-portal visual loading polish
 

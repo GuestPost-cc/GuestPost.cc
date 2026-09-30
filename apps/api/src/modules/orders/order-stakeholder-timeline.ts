@@ -1,3 +1,5 @@
+import { CancellationReasonCode } from "@guestpost/database"
+
 export type OrderStakeholderTimelineViewer =
   | "CUSTOMER"
   | "PUBLISHER"
@@ -141,10 +143,18 @@ export function buildOrderStakeholderTimeline(
         )
       })
     : null
+  const reasonCode =
+    typeof refundEvent?.metadata?.reason === "string"
+      ? /^Emergency cancellation: ([A-Z_]+)/.exec(
+          refundEvent.metadata.reason,
+        )?.[1]
+      : undefined
   const decisionReason =
-    typeof refundEvent?.metadata?.reason === "string" &&
-    refundEvent.metadata.reason.trim().length <= 2_200
-      ? refundEvent.metadata.reason.trim()
+    reasonCode &&
+    Object.values(CancellationReasonCode).includes(
+      reasonCode as CancellationReasonCode,
+    )
+      ? `Emergency cancellation: ${reasonCode.toLowerCase().replaceAll("_", " ")}`
       : undefined
 
   for (const [flagIndex, flag] of (order.fraudFlags ?? []).entries()) {

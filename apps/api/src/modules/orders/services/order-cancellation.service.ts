@@ -1130,6 +1130,12 @@ export class OrderCancellationService {
         "confirmationOrderId must exactly match the order being cancelled",
       )
     }
+    const idempotencyKey = body.idempotencyKey?.trim()
+    if (!idempotencyKey || idempotencyKey.length > 200) {
+      throw new BadRequestException(
+        "An idempotency key is required for emergency cancellation",
+      )
+    }
     const finalResponsibility = this.assertFinalResponsibility(
       body.responsibility,
     )
@@ -1144,7 +1150,7 @@ export class OrderCancellationService {
           if (
             order.status === "REFUNDED" &&
             order.paymentStatus === "REFUNDED" &&
-            body.idempotencyKey
+            idempotencyKey
           ) {
             const persistedCompensation =
               await tx.publisherCompensation.findUnique({
@@ -1157,7 +1163,7 @@ export class OrderCancellationService {
                 order,
                 `Emergency cancellation: ${this.reasonText(body.reasonCode, auditNote)}`,
                 staffUserId,
-                `force-cancel:${orderId}:${body.idempotencyKey}`,
+                `force-cancel:${orderId}:${idempotencyKey}`,
                 finalResponsibility,
                 persistedCompensation
                   ? {
@@ -1191,7 +1197,7 @@ export class OrderCancellationService {
               order,
               `Emergency cancellation: ${this.reasonText(body.reasonCode, auditNote)}`,
               staffUserId,
-              `force-cancel:${orderId}:${body.idempotencyKey ?? "default"}`,
+              `force-cancel:${orderId}:${idempotencyKey}`,
               finalResponsibility,
               {
                 ...body.publisherCompensation,

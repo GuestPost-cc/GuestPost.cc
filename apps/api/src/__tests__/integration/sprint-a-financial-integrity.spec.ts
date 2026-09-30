@@ -53,6 +53,7 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
           reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
           note: "Verified system emergency requiring an immediate refund.",
           expectedVersion: orderBeforeRace.version,
+          idempotencyKey: `force-cancel-${ctx.order.id}`,
           confirmationOrderId: ctx.order.id,
           responsibility: CancellationResponsibility.SYSTEM,
           publisherCompensation: {
