@@ -84,7 +84,7 @@ END
 $function$;
 
 SELECT pg_temp.assert_true(
-  (SELECT count(*) = 99
+  (SELECT count(*) = 102
    FROM pg_class AS relation
    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
    WHERE namespace.nspname = 'public'
@@ -92,7 +92,7 @@ SELECT pg_temp.assert_true(
      AND relation.relname <> '_prisma_migrations'
      AND relation.relrowsecurity
      AND relation.relforcerowsecurity),
-  'all 99 application tables must have ENABLE + FORCE RLS'
+  'all 102 application tables must have ENABLE + FORCE RLS'
 );
 
 BEGIN;
@@ -167,6 +167,19 @@ INSERT INTO public."Order"
   ('rls_order_a', 'GUEST_POST', 10.00, 'rls_customer_owner', 'rls_org_a', 'rls_web_a', now()),
   ('rls_order_b', 'GUEST_POST', 20.00, 'rls_customer_b', 'rls_org_b', 'rls_web_b', now());
 
+INSERT INTO public."ReconciliationScan"
+  (id, "reportVersion", detector, "ranAt", report) VALUES
+  ('rls_reconciliation_scan', 1, 'rls-test', now(), '{"ok":false}'::jsonb);
+
+INSERT INTO public."ReconciliationCase"
+  (id, "aggregateType", "aggregateId", "orderId", "currentFingerprint", "updatedAt") VALUES
+  ('rls_reconciliation_case', 'Order', 'rls_order_a', 'rls_order_a', repeat('a', 64), now());
+
+INSERT INTO public."ReconciliationCaseSnapshot"
+  (id, "caseId", "scanId", "evidenceFingerprint", "findingCodes", findings) VALUES
+  ('rls_reconciliation_snapshot', 'rls_reconciliation_case', 'rls_reconciliation_scan',
+   repeat('b', 64), ARRAY['RLS_TEST'], '{"codes":["RLS_TEST"]}'::jsonb);
+
 INSERT INTO public."ApiKey"
   (id, "organizationId", name, "keyHash", "updatedAt") VALUES
   ('rls_key_a', 'rls_org_a', 'RLS Key A', repeat('a', 64), now()),
@@ -180,6 +193,7 @@ SET LOCAL ROLE guestpost_api_runtime;
 SELECT pg_temp.set_rls_context('API', 'CUSTOMER', 'rls_customer_owner', 'rls_org_a', 'OWNER');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."Organization"), 'customer owner sees exactly its organization');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."Order"), 'customer owner sees exactly its order');
+SELECT pg_temp.assert_true((SELECT count(*) = 0 FROM public."ReconciliationCase"), 'customer cannot read platform reconciliation evidence');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ApiKey"), 'customer owner sees exactly its API key');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."MarketplaceListing"), 'customer sees only reviewed marketplace listings');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ListingService"), 'customer sees only available catalog services');
@@ -308,6 +322,14 @@ BEGIN;
 SET LOCAL ROLE guestpost_api_runtime;
 SELECT pg_temp.set_rls_context('API', 'STAFF', 'rls_staff_finance', '', '', '', '', 'OPERATIONS');
 SELECT pg_temp.assert_true((SELECT count(*) = 2 FROM public."Order"), 'finance can inspect all orders');
+SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ReconciliationCase"), 'finance can inspect reconciliation cases');
+SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ReconciliationScan"), 'finance can inspect reconciliation scans');
+SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ReconciliationCaseSnapshot"), 'finance can inspect reconciliation snapshots');
+SELECT pg_temp.assert_affected_rows(
+  'UPDATE public."ReconciliationCase" SET version = version + 1, "lastDetectedAt" = now(), "updatedAt" = now() WHERE id = ''rls_reconciliation_case''',
+  0,
+  'finance cannot mutate reconciliation evidence'
+);
 SELECT pg_temp.assert_true((SELECT count(*) = 0 FROM public."MarketplaceListing"), 'finance cannot inspect marketplace listings');
 ROLLBACK;
 
@@ -316,6 +338,11 @@ SET LOCAL ROLE guestpost_api_runtime;
 SELECT pg_temp.set_rls_context('API', 'STAFF', 'rls_staff_admin', '', '', '', '', 'FINANCE');
 SELECT pg_temp.assert_true((SELECT count(*) = 4 FROM public."Organization"), 'super admin can inspect all organizations');
 SELECT pg_temp.assert_true((SELECT count(*) = 3 FROM public."MarketplaceListing"), 'super admin can inspect all listings');
+SELECT pg_temp.assert_affected_rows(
+  'UPDATE public."ReconciliationCase" SET version = version + 1, "lastDetectedAt" = now(), "updatedAt" = now() WHERE id = ''rls_reconciliation_case''',
+  1,
+  'super admin can mutate reconciliation evidence'
+);
 INSERT INTO public."AuditLog" (id, action, "entityType", "userId")
 VALUES ('rls_staff_audit_append_only', 'RLS_STAFF_TEST', 'User', 'rls_staff_admin');
 SELECT pg_temp.assert_affected_rows(
@@ -339,6 +366,11 @@ SET LOCAL ROLE guestpost_worker_runtime;
 SELECT pg_temp.assert_true((SELECT count(*) = 0 FROM public."Order"), 'worker without context sees no orders');
 SELECT pg_temp.set_rls_context('WORKER', '', '', '', '', '', '', '', '', 'reconciliation');
 SELECT pg_temp.assert_true((SELECT count(*) = 2 FROM public."Order"), 'reviewed worker identity can process platform orders');
+SELECT pg_temp.assert_affected_rows(
+  'UPDATE public."ReconciliationCase" SET version = version + 1, "lastDetectedAt" = now(), "updatedAt" = now() WHERE id = ''rls_reconciliation_case''',
+  1,
+  'reviewed worker identity can persist reconciliation evidence'
+);
 ROLLBACK;
 
 -- Revocation is live: an already-established context loses access immediately.

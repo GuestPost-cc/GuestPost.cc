@@ -25,6 +25,10 @@ const reconciliationMigration = fs.readFileSync(
   ),
   "utf8",
 )
+const rlsBoundaryAssertions = fs.readFileSync(
+  path.join(root, "scripts/test-full-rls-boundary.sql"),
+  "utf8",
+)
 
 function migrationModels(): string[] {
   const block = migration.match(
@@ -77,6 +81,10 @@ describe("full application RLS boundary migration", () => {
     expect(activation).toContain("covered_model_count <> 102")
     expect(activation).toContain("policy_count <> 408")
     expect(activation).toContain("total_policy_count <> 408")
+    expect(rlsBoundaryAssertions).toContain("count(*) = 102")
+    expect(rlsBoundaryAssertions).toContain(
+      "all 102 application tables must have ENABLE + FORCE RLS",
+    )
     expect(activation).toContain("ENABLE ROW LEVEL SECURITY")
     expect(activation).toContain("FORCE ROW LEVEL SECURITY")
     expect(activation).toMatch(/BEGIN;[\s\S]*COMMIT;/)
