@@ -25,16 +25,29 @@ const logger = createLogger("worker.reconciliation")
 // run the endpoint.
 async function handleReconciliationRun() {
   const report = await runReconciliation(prisma)
-  const ingestion = await persistReconciliationCases(prisma, report, {
-    detector: "worker",
-  })
+  let scanId: string | null = null
+
+  // The established audit and alerting path is the operational safety net.
+  // A new evidence-store outage must not suppress an otherwise complete drift
+  // report or make the scheduled job appear clean.
+  try {
+    scanId = (
+      await persistReconciliationCases(prisma, report, {
+        detector: "worker",
+      })
+    ).scanId
+  } catch (err) {
+    logger.error("failed to persist reconciliation case evidence", {
+      err: err instanceof Error ? err.message : String(err),
+    })
+  }
 
   if (report.ok) {
     logger.info("sweep clean", {
       ranAt: report.ranAt,
-      scanId: ingestion.scanId,
+      scanId,
     })
-    return { ok: true, ranAt: report.ranAt, scanId: ingestion.scanId }
+    return { ok: true, ranAt: report.ranAt, scanId }
   }
 
   const problems = {
@@ -138,7 +151,7 @@ async function handleReconciliationRun() {
   const total = getDedupHitsTotal()
   return {
     ok: false,
-    scanId: ingestion.scanId,
+    scanId,
     dedupHitsInSweep: total - dedupSnapshot,
     dedupHitsTotal: total,
     ...problems,
