@@ -10,6 +10,7 @@ import {
 } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { persistReconciliationCases } from "@guestpost/shared/dist/reconciliation-case-core"
 import { createObservableWorker } from "../lib/queue-observability"
 import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
@@ -24,10 +25,16 @@ const logger = createLogger("worker.reconciliation")
 // run the endpoint.
 async function handleReconciliationRun() {
   const report = await runReconciliation(prisma)
+  const ingestion = await persistReconciliationCases(prisma, report, {
+    detector: "worker",
+  })
 
   if (report.ok) {
-    logger.info("sweep clean", { ranAt: report.ranAt })
-    return { ok: true, ranAt: report.ranAt }
+    logger.info("sweep clean", {
+      ranAt: report.ranAt,
+      scanId: ingestion.scanId,
+    })
+    return { ok: true, ranAt: report.ranAt, scanId: ingestion.scanId }
   }
 
   const problems = {
@@ -131,6 +138,7 @@ async function handleReconciliationRun() {
   const total = getDedupHitsTotal()
   return {
     ok: false,
+    scanId: ingestion.scanId,
     dedupHitsInSweep: total - dedupSnapshot,
     dedupHitsTotal: total,
     ...problems,

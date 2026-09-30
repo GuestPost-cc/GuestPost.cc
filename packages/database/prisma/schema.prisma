@@ -1163,6 +1163,7 @@ model Order {
   review                 OrderReview?
   cancellationRequests   OrderCancellationRequest[]
   withdrawalAllocations  WithdrawalAllocation[]
+  reconciliationCases    ReconciliationCase[]
 
   // Scoped per organization — a globally unique key let one tenant replay
   // another tenant's key and read their order (cross-tenant leak).
@@ -2205,6 +2206,17 @@ enum TransactionType {
   CHARGEBACK
 }
 
+// The reconciliation work queue is separate from the immutable ledger. A
+// case describes detector evidence; it is never a generic balance adjustment.
+enum ReconciliationCaseStatus {
+  DETECTED
+  NEEDS_EVIDENCE
+  AWAITING_APPROVAL
+  APPLIED
+  VERIFIED
+  BLOCKED
+}
+
 model Transaction {
   id           String          @id @default(cuid())
   amount       Decimal
@@ -2255,6 +2267,66 @@ model Transaction {
   @@index([settlementId])
   @@index([providerRef])
   @@index([provider, providerRef])
+}
+
+// One case groups all currently detected financial findings for one
+// authoritative aggregate. The work queue can change state, but the immutable
+// scan snapshots below are the accounting evidence behind every transition.
+model ReconciliationCase {
+  id                 String                   @id @default(cuid())
+  aggregateType      String                   @db.VarChar(64)
+  aggregateId        String                   @db.VarChar(191)
+  orderId            String?
+  status             ReconciliationCaseStatus @default(DETECTED)
+  currentFingerprint String                   @db.Char(64)
+  detectedAt         DateTime                 @default(now())
+  lastDetectedAt     DateTime                 @default(now())
+  version            Int                      @default(0)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  order     Order?                       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  snapshots ReconciliationCaseSnapshot[]
+
+  @@unique([aggregateType, aggregateId])
+  @@index([status, lastDetectedAt])
+  @@index([orderId])
+}
+
+// Every scheduled or on-demand scan is retained. This lets staff distinguish
+// recurring evidence from a materially different detector result.
+model ReconciliationScan {
+  id            String   @id @default(cuid())
+  reportVersion Int
+  detector      String   @db.VarChar(64)
+  ranAt         DateTime
+  report        Json
+  initiatedById String?
+  createdAt     DateTime @default(now())
+
+  snapshots ReconciliationCaseSnapshot[]
+
+  @@index([ranAt])
+  @@index([detector, ranAt])
+}
+
+// JSON is a bounded, allowlisted detector snapshot; raw provider payloads and
+// internal staff notes are deliberately never copied into reconciliation data.
+model ReconciliationCaseSnapshot {
+  id                  String   @id @default(cuid())
+  caseId              String
+  scanId              String
+  evidenceFingerprint String   @db.Char(64)
+  findingCodes        String[]
+  findings            Json
+  createdAt           DateTime @default(now())
+
+  case ReconciliationCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  scan ReconciliationScan @relation(fields: [scanId], references: [id], onDelete: Restrict)
+
+  @@unique([caseId, scanId])
+  @@index([caseId, createdAt])
+  @@index([evidenceFingerprint])
 }
 
 // Provider-neutral customer funding record. The provider adapter may create or

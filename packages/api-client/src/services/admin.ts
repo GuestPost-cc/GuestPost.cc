@@ -1565,6 +1565,61 @@ export class AdminService {
     return this.client.get<ReconciliationReport>("/admin/reconciliation")
   }
 
+  getReconciliationCases(params?: {
+    take?: number
+    skip?: number
+    status?: string
+  }) {
+    const query = new URLSearchParams()
+    if (params?.take) query.set("take", String(params.take))
+    if (params?.skip) query.set("skip", String(params.skip))
+    if (params?.status) query.set("status", params.status)
+    const suffix = query.size ? `?${query}` : ""
+    return this.client.get<{
+      cases: Array<{
+        id: string
+        orderId: string | null
+        status: string
+        currentFingerprint: string
+        detectedAt: string
+        lastDetectedAt: string
+        version: number
+        snapshots: Array<{ findingCodes: string[]; createdAt: string }>
+      }>
+      total: number
+      take: number
+      skip: number
+    }>(`/admin/reconciliation/cases${suffix}`)
+  }
+
+  getReconciliationCase(caseId: string) {
+    return this.client.get<{
+      id: string
+      orderId: string | null
+      status: string
+      currentFingerprint: string
+      detectedAt: string
+      lastDetectedAt: string
+      version: number
+      order: {
+        id: string
+        amount: string | number | null
+        currency: string
+        status: string
+        paymentStatus: string
+        version: number
+      } | null
+      snapshots: Array<{
+        id: string
+        evidenceFingerprint: string
+        findingCodes: string[]
+        findings: unknown
+        createdAt: string
+        scan: { detector: string; ranAt: string; reportVersion: number }
+      }>
+    }>(`/admin/reconciliation/cases/${encodeURIComponent(caseId)}`)
+  }
+
   decryptPayoutMethod(payoutMethodId: string, reason: string) {
     return this.client.post<{
       details: Record<string, unknown>

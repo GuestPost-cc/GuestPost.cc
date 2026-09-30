@@ -25,9 +25,9 @@ no longer stall invisibly:
 
 Still open from the 2026-08-24 reconciliation plan:
 
-- [ ] Persist scheduled reconciliation runs (`ReconciliationRun` table +
-  findings history) instead of AuditLog-only history; alert on nonzero
-  findings.
+- [x] Persist scheduled and API reconciliation runs as immutable scan records
+  with deterministic, grouped per-order case snapshots; existing nonzero-drift
+  staff alerting remains in place. The initial workbench is detection-only.
 - [ ] Settlement aging surface for MANUAL-policy settlements past
   `reviewEndsAt` (staff notification), pairing with the documented
   `reviewEndsAt` enforcement gap below.

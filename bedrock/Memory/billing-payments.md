@@ -131,6 +131,18 @@ and signed Stripe staging evidence. Migration
 evidence mandatory for every failed attempt; all old writers must be drained
 before it lands.
 
+## Reconciliation workbench
+
+- Every API-triggered and scheduled reconciliation scan now persists an
+  immutable scan record and allowlisted, deterministic per-order evidence
+  snapshot. A single order case groups its related detector symptoms without
+  changing the ledger or wallet.
+- Only Finance and Super Admin can inspect case list/detail routes. The first
+  release is deliberately detection-only: it has no generic adjustment,
+  provider action, or balance-mutation endpoint. Any future correction must
+  satisfy the separately approved evidence, maker-checker, runtime-mode, and
+  idempotency contract in `docs/FINANCIAL_RECONCILIATION_REPAIR_PLAN.md`.
+
 ## Key files
 
 - `apps/api/src/modules/billing/`
