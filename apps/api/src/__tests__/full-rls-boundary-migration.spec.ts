@@ -84,16 +84,16 @@ describe("full application RLS boundary migration", () => {
       /^ALTER TABLE public\."?[A-Za-z][A-Za-z0-9_]*"? ENABLE ROW LEVEL SECURITY;/m,
     )
     expect(activation).toContain("activate=YES is required")
-    expect(activation).toContain("expected exactly 102 application tables")
+    expect(activation).toContain("expected exactly 105 application tables")
     expect(activation).toContain("covered_model_count <> 101")
-    expect(activation).toContain("total_policy_count <> 410")
+    expect(activation).toContain("total_policy_count <> 435")
     expect(activation).toContain("phase_one_api_key_policy_count <> 6")
-    expect(activation).toContain("covered_model_count <> 102")
-    expect(activation).toContain("policy_count <> 408")
-    expect(activation).toContain("total_policy_count <> 408")
-    expect(rlsBoundaryAssertions).toContain("count(*) = 102")
+    expect(activation).toContain("covered_model_count <> 105")
+    expect(activation).toContain("policy_count <> 433")
+    expect(activation).toContain("total_policy_count <> 433")
+    expect(rlsBoundaryAssertions).toContain("count(*) = 105")
     expect(rlsBoundaryAssertions).toContain(
-      "all 102 application tables must have ENABLE + FORCE RLS",
+      "all 105 application tables must have ENABLE + FORCE RLS",
     )
     expect(activation).toContain("ENABLE ROW LEVEL SECURITY")
     expect(activation).toContain("FORCE ROW LEVEL SECURITY")
