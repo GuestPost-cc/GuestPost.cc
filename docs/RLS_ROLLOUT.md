@@ -129,6 +129,10 @@ Every managed role is `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`,
 transitive membership edges and reconciles database/schema/relation/function
 ACLs in one transaction. It creates no password and leaves credential roles
 `NOLOGIN`; credential activation is a separate approved administrator change.
+The financial-repair migration additionally requires its dedicated `NOLOGIN`,
+`NOINHERIT`, `NOBYPASSRLS` owner role to exist before migrations run; create it
+with `scripts/provision-financial-repair-guard-role.sql`, then run the full role
+provisioner after migrations to reconcile exact grants and membership.
 
 ## Required migration grant checklist
 
