@@ -18,6 +18,13 @@ const emergencyDisable = fs.readFileSync(
   path.join(root, "scripts/emergency-disable-full-rls.sql"),
   "utf8",
 )
+const reconciliationMigration = fs.readFileSync(
+  path.join(
+    root,
+    "packages/database/prisma/migrations/20260930150000_reconciliation_case_workbench/migration.sql",
+  ),
+  "utf8",
+)
 
 function migrationModels(): string[] {
   const block = migration.match(
@@ -33,7 +40,16 @@ describe("full application RLS boundary migration", () => {
   it("stages four explicit policy commands without replacing live ApiKey policies", () => {
     const models = migrationModels()
     expect(new Set(models).size).toBe(99)
-    expect(models.sort()).toEqual([...RLS_MODEL_NAMES].sort())
+    expect(models.sort()).toEqual(
+      RLS_MODEL_NAMES.filter(
+        (model) =>
+          ![
+            "ReconciliationCase",
+            "ReconciliationScan",
+            "ReconciliationCaseSnapshot",
+          ].includes(model),
+      ).sort(),
+    )
     expect(migration).toContain("FOR SELECT USING")
     expect(migration).toContain("FOR INSERT WITH CHECK")
     expect(migration).toContain("FOR UPDATE USING")
@@ -54,16 +70,37 @@ describe("full application RLS boundary migration", () => {
       /^ALTER TABLE public\."?[A-Za-z][A-Za-z0-9_]*"? ENABLE ROW LEVEL SECURITY;/m,
     )
     expect(activation).toContain("activate=YES is required")
-    expect(activation).toContain("expected exactly 99 application tables")
-    expect(activation).toContain("covered_model_count <> 98")
-    expect(activation).toContain("total_policy_count <> 398")
+    expect(activation).toContain("expected exactly 102 application tables")
+    expect(activation).toContain("covered_model_count <> 101")
+    expect(activation).toContain("total_policy_count <> 410")
     expect(activation).toContain("phase_one_api_key_policy_count <> 6")
-    expect(activation).toContain("covered_model_count <> 99")
-    expect(activation).toContain("policy_count <> 396")
-    expect(activation).toContain("total_policy_count <> 396")
+    expect(activation).toContain("covered_model_count <> 102")
+    expect(activation).toContain("policy_count <> 408")
+    expect(activation).toContain("total_policy_count <> 408")
     expect(activation).toContain("ENABLE ROW LEVEL SECURITY")
     expect(activation).toContain("FORCE ROW LEVEL SECURITY")
     expect(activation).toMatch(/BEGIN;[\s\S]*COMMIT;/)
+  })
+
+  it("keeps reconciliation evidence behind Finance/Super Admin and worker-only policies", () => {
+    for (const model of [
+      "ReconciliationCase",
+      "ReconciliationScan",
+      "ReconciliationCaseSnapshot",
+    ]) {
+      expect(RLS_MODEL_NAMES).toContain(model)
+      expect(reconciliationMigration).toContain(
+        `ALTER TABLE "${model}" ENABLE ROW LEVEL SECURITY;`,
+      )
+      expect(reconciliationMigration).toContain(
+        `ALTER TABLE "${model}" FORCE ROW LEVEL SECURITY;`,
+      )
+    }
+    expect(reconciliationMigration).toContain("_full_boundary_select")
+    expect(reconciliationMigration).toContain("guestpost_worker_group")
+    expect(reconciliationMigration).toContain("'FINANCE'")
+    expect(reconciliationMigration).toContain("'SUPER_ADMIN'")
+    expect(reconciliationMigration).not.toContain("BYPASSRLS")
   })
 
   it("uses live authority rows and never grants a staff or worker bypass role", () => {

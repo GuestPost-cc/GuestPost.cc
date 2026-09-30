@@ -133,3 +133,90 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER "ReconciliationCaseSnapshot_guard"
 BEFORE INSERT ON "ReconciliationCaseSnapshot"
 FOR EACH ROW EXECUTE FUNCTION "guard_reconciliation_case_snapshot"();
+
+-- Reconciliation evidence is platform-only. A worker with an explicitly
+-- scoped worker context may persist detector output; Finance and Super Admin
+-- can read it, while only Super Admin has a direct write path. The policies
+-- deliberately do not expose rows to customer, publisher, public, webhook,
+-- reporting, or auth workloads.
+DO $reconciliation_grants$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_api_group') THEN
+    GRANT SELECT ON "ReconciliationCase", "ReconciliationScan", "ReconciliationCaseSnapshot"
+      TO guestpost_api_group;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_worker_group') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE
+      ON "ReconciliationCase", "ReconciliationScan", "ReconciliationCaseSnapshot"
+      TO guestpost_worker_group;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_rls_authorizer') THEN
+    GRANT SELECT ON "ReconciliationCase", "ReconciliationScan", "ReconciliationCaseSnapshot"
+      TO guestpost_rls_authorizer;
+  END IF;
+END
+$reconciliation_grants$;
+
+-- Before the staged full-boundary activation, leave every table inert. Once
+-- it is active, force these late-added tables immediately so a deployment
+-- cannot create an unprotected gap between migrations and the next rollout.
+DO $reconciliation_activation$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'Order'
+      AND relation.relrowsecurity
+      AND relation.relforcerowsecurity
+  ) THEN
+    ALTER TABLE "ReconciliationCase" ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE "ReconciliationCase" FORCE ROW LEVEL SECURITY;
+    ALTER TABLE "ReconciliationScan" ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE "ReconciliationScan" FORCE ROW LEVEL SECURITY;
+    ALTER TABLE "ReconciliationCaseSnapshot" ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE "ReconciliationCaseSnapshot" FORCE ROW LEVEL SECURITY;
+  END IF;
+END
+$reconciliation_activation$;
+
+DO $reconciliation_policies$
+DECLARE
+  model_name text;
+  worker_access text :=
+    '(guestpost_rls.role_member(current_user, ''guestpost_worker_group'') ' ||
+    'AND current_setting(''guestpost.rls_workload'', true) = ''WORKER'' ' ||
+    'AND NULLIF(current_setting(''guestpost.rls_worker'', true), '''') IS NOT NULL)';
+  super_admin_access text :=
+    'guestpost_rls.staff_role_in(ARRAY[''SUPER_ADMIN''])';
+BEGIN
+  FOREACH model_name IN ARRAY ARRAY[
+    'ReconciliationCase', 'ReconciliationScan', 'ReconciliationCaseSnapshot'
+  ] LOOP
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR SELECT USING (' ||
+      'current_user = ''guestpost_rls_authorizer'' OR %s OR %s OR ' ||
+      'guestpost_rls.staff_role_in(ARRAY[''FINANCE'']))',
+      model_name || '_full_boundary_select', model_name,
+      worker_access, super_admin_access
+    );
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR INSERT WITH CHECK (%s OR %s)',
+      model_name || '_full_boundary_insert', model_name,
+      worker_access, super_admin_access
+    );
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR UPDATE USING (%s OR %s) ' ||
+      'WITH CHECK (%s OR %s)',
+      model_name || '_full_boundary_update', model_name,
+      worker_access, super_admin_access, worker_access, super_admin_access
+    );
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR DELETE USING (%s OR %s)',
+      model_name || '_full_boundary_delete', model_name,
+      worker_access, super_admin_access
+    );
+  END LOOP;
+END
+$reconciliation_policies$;

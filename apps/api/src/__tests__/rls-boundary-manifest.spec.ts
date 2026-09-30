@@ -17,7 +17,7 @@ function schemaModels(): string[] {
 describe("full RLS boundary manifest", () => {
   it("classifies every Prisma model exactly once", () => {
     const models = schemaModels()
-    expect(models).toHaveLength(99)
+    expect(models).toHaveLength(102)
     expect(new Set(RLS_MODEL_NAMES).size).toBe(RLS_MODEL_NAMES.length)
     expect([...RLS_MODEL_NAMES].sort()).toEqual(models.sort())
   })
@@ -37,6 +37,16 @@ describe("full RLS boundary manifest", () => {
         "Membership",
         "PublisherMembership",
         "StaffMembership",
+      ]),
+    )
+  })
+
+  it("keeps reconciliation evidence platform-scoped", () => {
+    expect(RLS_BOUNDARY_MODELS.platform).toEqual(
+      expect.arrayContaining([
+        "ReconciliationCase",
+        "ReconciliationScan",
+        "ReconciliationCaseSnapshot",
       ]),
     )
   })
