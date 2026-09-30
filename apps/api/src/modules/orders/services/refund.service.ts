@@ -544,6 +544,7 @@ export class RefundService {
 
     if (
       input.offsetPublisherCompensation &&
+      input.responsibility !== "PUBLISHER" &&
       (!supplied ||
         supplied.amount == null ||
         supplied.reason == null ||

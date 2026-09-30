@@ -1114,6 +1114,61 @@ describe("RefundService", () => {
     expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
   })
 
+  it("replays a publisher-attributed force-cancel with its persisted NONE decision", async () => {
+    const existingRefund = {
+      id: "refund-tx-existing",
+      orderId: "order-1",
+      type: "REFUND",
+      amount: new Decimal(100),
+      currency: "USD",
+      walletId: "wallet-1",
+      reference: "force-cancel:order-1:case-1",
+      description: "Refund for order order-1",
+    }
+    prismaMock.transaction.findFirst.mockResolvedValue(existingRefund)
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+      ...baseOrder,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "PUBLISHER",
+    })
+    prismaMock.publisherCompensation.findUnique.mockResolvedValue({
+      id: "compensation-1",
+      orderId: "order-1",
+      refundTransactionId: existingRefund.id,
+      publisherId: "pub-1",
+      disposition: "NONE",
+      amount: new Decimal(0),
+      currency: "USD",
+      responsibility: "PUBLISHER",
+      reason:
+        "Publisher-attributed refund; publisher compensation is not payable.",
+      effectiveOrderStatus: "PUBLISHED",
+    })
+    prismaMock.orderEvent.findFirst.mockResolvedValue({
+      actorId: "admin-1",
+      metadata: {
+        reason: "Emergency cancellation: publisher-attributed failure.",
+        responsibility: "PUBLISHER",
+        refundTransactionId: existingRefund.id,
+      },
+    })
+
+    await service.refundOrderInTransaction(
+      prismaMock,
+      { ...baseOrder, status: "REFUNDED", paymentStatus: "REFUNDED" },
+      "Emergency cancellation: publisher-attributed failure.",
+      "admin-1",
+      existingRefund.reference,
+      "PUBLISHER",
+      { effectiveOrderStatus: "PUBLISHED" },
+      true,
+    )
+
+    expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
+  })
+
   it("rejects a replay that changes the publisher compensation disposition", async () => {
     const existingRefund = {
       id: "refund-tx-existing",
