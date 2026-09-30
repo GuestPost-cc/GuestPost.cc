@@ -71,6 +71,7 @@
     {
       "package": "brace-expansion",
       "minimumVersionsByMajor": {
+        "1": "1.1.20",
         "5": "5.0.12"
       },
       "reason": "GHSA-qhr7-859c-m2p7 and GHSA-6j4f-fj2g-mc7p require patched floors for every affected major line."
