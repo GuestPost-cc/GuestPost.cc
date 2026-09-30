@@ -67,6 +67,12 @@ describe("communication contracts", () => {
       isRequiredCommunicationChannel("PUBLISHER_COMPENSATION_DECIDED", "EMAIL"),
     ).toBe(true)
     expect(
+      isRequiredCommunicationChannel("ORDER_REFUND_CREDIT_REVERSED", "EMAIL"),
+    ).toBe(true)
+    expect(
+      isRequiredCommunicationChannel("ORDER_REFUND_CREDIT_REVERSED", "IN_APP"),
+    ).toBe(true)
+    expect(
       COMMUNICATION_EVENT_POLICIES.PUBLISHER_COMPENSATION_DECIDED
         .actorRecipientPolicy,
     ).toBe("INCLUDE_IF_LISTED")

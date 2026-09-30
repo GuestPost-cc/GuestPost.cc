@@ -128,6 +128,9 @@ export const RLS_BOUNDARY_MODELS = {
     "ReconciliationCase",
     "ReconciliationScan",
     "ReconciliationCaseSnapshot",
+    "ReconciliationRepairProposal",
+    "ReconciliationRepairApproval",
+    "ReconciliationRepairExecution",
   ],
 } as const
 

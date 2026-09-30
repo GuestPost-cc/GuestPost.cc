@@ -132,6 +132,30 @@ export class ReconciliationService {
             },
           },
         },
+        repairProposals: {
+          orderBy: { createdAt: "desc" },
+          take: 10,
+          select: {
+            id: true,
+            proposalDigest: true,
+            amount: true,
+            currency: true,
+            incidentReference: true,
+            reason: true,
+            initiatedByUserId: true,
+            expiresAt: true,
+            createdAt: true,
+            approval: { select: { approvedByUserId: true, createdAt: true } },
+            execution: {
+              select: {
+                id: true,
+                reversalTransactionId: true,
+                executedByUserId: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
       },
     })
     if (!caseRow) throw new NotFoundException("Reconciliation case not found")

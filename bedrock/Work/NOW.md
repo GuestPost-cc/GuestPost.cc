@@ -6,6 +6,18 @@ updated: 2026-09-30
 
 # Current focus
 
+## Financial reconciliation repair Phase 2
+
+Branch `feat/financial-reconciliation-repair-phase2` implements a narrowly
+scoped, maker-checker reversal for erroneous internal force-cancel refund
+credits, with Finance/Super Admin RBAC, fail-closed recovery-mode gates,
+immutable ledger/audit evidence, customer notification, and an admin workflow.
+Local monorepo typecheck, focused shared tests, and formatting checks pass.
+Remaining gates are API-focused tests, PostgreSQL migration rehearsal (Docker
+is unavailable locally), GitHub CI, CodeRabbit, and Strix review. Keep the new
+repair feature flag off outside an approved recovery window; this branch has
+not been merged or deployed.
+
 ## Force-cancel money conservation
 
 PR #145 (`fix/order-force-cancel-money-conservation`) corrects paid

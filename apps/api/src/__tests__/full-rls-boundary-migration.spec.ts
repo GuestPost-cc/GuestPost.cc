@@ -25,6 +25,13 @@ const reconciliationMigration = fs.readFileSync(
   ),
   "utf8",
 )
+const repairMigration = fs.readFileSync(
+  path.join(
+    root,
+    "packages/database/prisma/migrations/20261001100000_financial_reconciliation_repairs/migration.sql",
+  ),
+  "utf8",
+)
 const rlsBoundaryAssertions = fs.readFileSync(
   path.join(root, "scripts/test-full-rls-boundary.sql"),
   "utf8",
@@ -51,6 +58,9 @@ describe("full application RLS boundary migration", () => {
             "ReconciliationCase",
             "ReconciliationScan",
             "ReconciliationCaseSnapshot",
+            "ReconciliationRepairProposal",
+            "ReconciliationRepairApproval",
+            "ReconciliationRepairExecution",
           ].includes(model),
       ).sort(),
     )
@@ -109,6 +119,29 @@ describe("full application RLS boundary migration", () => {
     expect(reconciliationMigration).toContain("'FINANCE'")
     expect(reconciliationMigration).toContain("'SUPER_ADMIN'")
     expect(reconciliationMigration).not.toContain("BYPASSRLS")
+  })
+
+  it("places repair records behind immutable Finance/Super Admin RLS policies", () => {
+    for (const model of [
+      "ReconciliationRepairProposal",
+      "ReconciliationRepairApproval",
+      "ReconciliationRepairExecution",
+    ]) {
+      expect(RLS_MODEL_NAMES).toContain(model)
+      expect(repairMigration).toContain(
+        `ALTER TABLE public."${model}" ENABLE ROW LEVEL SECURITY;`,
+      )
+      expect(repairMigration).toContain(
+        `ALTER TABLE public."${model}" FORCE ROW LEVEL SECURITY;`,
+      )
+    }
+    expect(repairMigration).toContain("_finance_select")
+    expect(repairMigration).toContain("_finance_insert")
+    expect(repairMigration).toContain(
+      "financial reconciliation repair evidence is append-only",
+    )
+    expect(repairMigration).toContain("REFUND_REVERSAL")
+    expect(repairMigration).toContain("guestpost_rls.actor_id()")
   })
 
   it("uses live authority rows and never grants a staff or worker bypass role", () => {

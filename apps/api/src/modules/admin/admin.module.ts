@@ -12,6 +12,7 @@ import { RevenueService } from "./finance/revenue.service"
 import { FinanceWorkbenchService } from "./finance-workbench.service"
 import { OperationsWorkbenchService } from "./operations-workbench.service"
 import { ReconciliationService } from "./reconciliation.service"
+import { ReconciliationRepairService } from "./reconciliation-repair.service"
 import { AdminVerificationQueueService } from "./verification-queue.service"
 import { WebsiteImportService } from "./website-import/website-import.service"
 import { WebsiteVerificationService } from "./website-verification.service"
@@ -32,6 +33,7 @@ import { WebsiteVerificationService } from "./website-verification.service"
     OperationsWorkbenchService,
     AdminVerificationQueueService,
     ReconciliationService,
+    ReconciliationRepairService,
     RevenueService,
     WebsiteVerificationService,
     WebsiteImportService,

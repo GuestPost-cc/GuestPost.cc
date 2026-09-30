@@ -132,6 +132,7 @@ export type TransactionType =
   | "DEPOSIT"
   | "PURCHASE"
   | "REFUND"
+  | "REFUND_REVERSAL"
   | "WITHDRAWAL"
   | "COMMISSION"
   | "ADJUSTMENT"

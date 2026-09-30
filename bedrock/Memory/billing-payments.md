@@ -145,6 +145,20 @@ before it lands.
   satisfy the separately approved evidence, maker-checker, runtime-mode, and
   idempotency contract in `docs/FINANCIAL_RECONCILIATION_REPAIR_PLAN.md`.
 
+Phase 2 supports one narrowly-scoped repair: reverse an erroneous internal
+force-cancel refund credit only when the exact publisher-compensation evidence
+is valid. The original refund and decision stay immutable; a typed
+`REFUND_REVERSAL` ledger row, wallet debit, execution record, case transition,
+audit entry, and required customer outbox notice commit atomically. The API
+requires an explicit feature flag plus `FINANCE_RUNTIME_MODE=recovery_only`;
+Finance and Super Admin routes use distinct proposal/approval/execution steps,
+with a different approver, evidence/version revalidation, serializable order
+and wallet locks, and case-scoped execution idempotency. Database constraints
+and RLS enforce the same source/evidence relationship and append-only records.
+The admin case detail UI exposes preview/blockers and the maker-checker flow;
+unsupported or stale evidence remains detection-only. Local PostgreSQL
+migration rehearsal and production rollout are separate release gates.
+
 ## Key files
 
 - `apps/api/src/modules/billing/`

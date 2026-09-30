@@ -60,6 +60,7 @@ export const COMMUNICATION_EVENT_TYPES = [
   "ORDER_COMPLETED",
   "ORDER_CANCELLED",
   "ORDER_REFUNDED",
+  "ORDER_REFUND_CREDIT_REVERSED",
   "ORDER_CANCELLATION_REQUESTED",
   "ORDER_CANCELLATION_RESPONDED",
   "ORDER_CANCELLATION_RESOLVED",
@@ -269,6 +270,12 @@ export const COMMUNICATION_EVENT_POLICIES: Record<
     defaultChannels: both,
     requiredChannels: both,
     actorRecipientPolicy: "INCLUDE_IF_LISTED",
+  },
+  ORDER_REFUND_CREDIT_REVERSED: {
+    category: "BILLING",
+    severity: "WARNING",
+    defaultChannels: both,
+    requiredChannels: both,
   },
   ORDER_CANCELLATION_REQUESTED: {
     category: "ORDERS",

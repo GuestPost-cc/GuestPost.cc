@@ -247,6 +247,11 @@ API and worker, permissions are tested, and case history is immutable.
   and durable notification.
 - Add reconciliation support for the new compensating transaction.
 
+For the Phase 2 implementation, mutation endpoints additionally require
+`FINANCIAL_RECONCILIATION_REPAIRS_ENABLED=true`; the default is disabled. Read-
+only previews remain available to Finance/Super Admin. Enabling the flag does
+not bypass the required exact `FINANCE_RUNTIME_MODE=recovery_only` check.
+
 **Exit:** unsafe cases fail closed; parallel/replayed commands yield exactly
 one compensation; a source refund cannot be reversed more than once or across
 orders/wallets/currencies.

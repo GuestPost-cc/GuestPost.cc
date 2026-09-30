@@ -1302,6 +1302,125 @@ describe("runReconciliation with mock prisma", () => {
     expect(noTxIssues[0].severity).toBe("critical")
   })
 
+  it("nets a valid exact-source refund-credit reversal from refund and compensation reconciliation", async () => {
+    const prisma = mockPrisma()
+    const orderId = "order-reversed-refund"
+    prisma.order.findMany.mockImplementation(async (args: any) =>
+      args?.where?.status === "REFUNDED"
+        ? [
+            {
+              id: orderId,
+              amount: "100.00",
+              status: "REFUNDED",
+              fulfillmentChannel: "PUBLISHER",
+              website: {
+                ownershipType: "PUBLISHER",
+                publisherId: "publisher-1",
+              },
+              dispute: { previousStatus: "DELIVERED" },
+              settlements: [],
+              publisherCompensation: {
+                id: "compensation-1",
+                publisherId: "publisher-1",
+                refundTransactionId: "refund-1",
+                compensationTransactionId: "compensation-credit-1",
+                debtRepaymentTransactionId: null,
+                disposition: "EXACT_AMOUNT",
+                amount: "100.00",
+                currency: "USD",
+                responsibility: "PLATFORM",
+                reason:
+                  "The platform owns the full verified publication compensation.",
+                effectiveOrderStatus: "DELIVERED",
+                refundTransaction: {
+                  id: "refund-1",
+                  reference: `force-cancel:${orderId}:case-1`,
+                  amount: "100.00",
+                },
+                compensationTransaction: {
+                  id: "compensation-credit-1",
+                  type: "PUBLISHER_COMPENSATION",
+                  orderId,
+                  publisherId: "publisher-1",
+                  amount: "100.00",
+                  currency: "USD",
+                },
+                debtRepaymentTransaction: null,
+              },
+            },
+          ]
+        : [],
+    )
+    prisma.transaction.findMany.mockImplementation(async (args: any) => {
+      if (args?.where?.type === "REFUND")
+        return [
+          {
+            id: "refund-1",
+            amount: "100.00",
+            orderId,
+            reference: `force-cancel:${orderId}:case-1`,
+            walletId: "wallet-1",
+            currency: "USD",
+            provider: null,
+            providerRef: null,
+          },
+        ]
+      if (args?.where?.type === "REFUND_REVERSAL")
+        return [
+          {
+            id: "reversal-1",
+            amount: "-100.00",
+            orderId,
+            walletId: "wallet-1",
+            currency: "USD",
+            reversalOfTransactionId: "refund-1",
+          },
+        ]
+      return []
+    })
+
+    const report = await runReconciliation(prisma as any)
+    expect(report.refundRecon).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: ReconciliationCode.REFUND_PARTIAL }),
+        expect.objectContaining({
+          code: ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_INVALID,
+        }),
+        expect.objectContaining({
+          code: ReconciliationCode.REFUND_REVERSAL_INVALID,
+        }),
+      ]),
+    )
+  })
+
+  it("reports a refund reversal that is not an exact internal source match", async () => {
+    const prisma = mockPrisma()
+    prisma.transaction.findMany.mockImplementation(async (args: any) =>
+      args?.where?.type === "REFUND_REVERSAL"
+        ? [
+            {
+              id: "bad-reversal",
+              amount: "-4.99",
+              orderId: "order-1",
+              walletId: "wallet-1",
+              currency: "USD",
+              reversalOfTransactionId: "missing-source",
+            },
+          ]
+        : [],
+    )
+
+    const report = await runReconciliation(prisma as any)
+    expect(report.refundRecon).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: ReconciliationCode.REFUND_REVERSAL_INVALID,
+          entityId: "bad-reversal",
+        }),
+      ]),
+    )
+  })
+
   it("requires an explicit disposition for a post-publication publisher refund", async () => {
     const prisma = mockPrisma()
     prisma.order.findMany.mockImplementation(async (args: any) =>
