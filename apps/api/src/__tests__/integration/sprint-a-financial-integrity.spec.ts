@@ -108,7 +108,8 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
       expect(Number(balance.withdrawableBalance)).toBe(80)
       expect(Number(balance.debtBalance)).toBe(0)
       expect(Number(balance.lifetimeEarnings)).toBe(80)
-      expect(Number(wallet.availableBalance)).toBe(100)
+      // The $80 publisher compensation is allocated from the $100 payment.
+      expect(Number(wallet.availableBalance)).toBe(20)
     } finally {
       await cleanup()
     }
