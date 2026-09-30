@@ -51,6 +51,7 @@ import { AdminPage, AdminPageHeader } from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
+import { ReconciliationCases } from "./_reconciliation-cases"
 import { RevenuePanel } from "./_revenue-panel"
 
 const TABS = [
@@ -1536,13 +1537,16 @@ function FinancePageInner() {
       )}
 
       {activeTab === "reconciliation" && (
-        <ReconciliationDashboard
-          recon={recon}
-          isLoading={reconciliationQ.isLoading}
-          isFetching={reconciliationQ.isFetching}
-          error={reconciliationQ.error}
-          onRefresh={() => reconciliationQ.refetch()}
-        />
+        <div className="space-y-6">
+          <ReconciliationCases enabled={activeTab === "reconciliation"} />
+          <ReconciliationDashboard
+            recon={recon}
+            isLoading={reconciliationQ.isLoading}
+            isFetching={reconciliationQ.isFetching}
+            error={reconciliationQ.error}
+            onRefresh={() => reconciliationQ.refetch()}
+          />
+        </div>
       )}
 
       {activeTab === "revenue" && <RevenuePanel />}

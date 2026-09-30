@@ -122,7 +122,13 @@ export const RLS_BOUNDARY_MODELS = {
     "WebsiteIntegration",
     "IntegrationSync",
   ],
-  platform: ["DeliveryUrlClaimFence", "PlatformSettings"],
+  platform: [
+    "DeliveryUrlClaimFence",
+    "PlatformSettings",
+    "ReconciliationCase",
+    "ReconciliationScan",
+    "ReconciliationCaseSnapshot",
+  ],
 } as const
 
 export type RlsBoundaryRoot = keyof typeof RLS_BOUNDARY_MODELS

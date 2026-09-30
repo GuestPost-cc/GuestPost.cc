@@ -1,4 +1,4 @@
--- Atomically activate the preinstalled 99-model RLS boundary.
+-- Atomically activate the preinstalled 102-model RLS boundary.
 --
 -- This is intentionally not a Prisma migration: deployment installs policies
 -- first, rolls out context-aware code and separate NOLOGIN identities, runs
@@ -58,8 +58,8 @@ BEGIN
     AND relation.relkind = 'r'
     AND relation.relname <> '_prisma_migrations';
 
-  IF model_count <> 99 THEN
-    RAISE EXCEPTION 'expected exactly 99 application tables, found %', model_count;
+  IF model_count <> 102 THEN
+    RAISE EXCEPTION 'expected exactly 102 application tables, found %', model_count;
   END IF;
 
   SELECT count(DISTINCT tablename), count(*)
@@ -68,7 +68,7 @@ BEGIN
   WHERE schemaname = 'public'
     AND policyname LIKE '%\_full\_boundary\_%' ESCAPE '\';
 
-  IF covered_model_count <> 98 OR policy_count <> 392 THEN
+  IF covered_model_count <> 101 OR policy_count <> 404 THEN
     RAISE EXCEPTION
       'full-boundary policy coverage is incomplete: models %, policies %',
       covered_model_count, policy_count;
@@ -91,9 +91,9 @@ BEGIN
   FROM pg_policies
   WHERE schemaname = 'public';
 
-  IF total_policy_count <> 398 OR phase_one_api_key_policy_count <> 6 THEN
+  IF total_policy_count <> 410 OR phase_one_api_key_policy_count <> 6 THEN
     RAISE EXCEPTION
-      'expected exactly 392 staged and 6 Phase 1 policies before activation; total %, Phase 1 %',
+      'expected exactly 404 staged and 6 Phase 1 policies before activation; total %, Phase 1 %',
       total_policy_count, phase_one_api_key_policy_count;
   END IF;
 
@@ -278,7 +278,7 @@ BEGIN
   WHERE schemaname = 'public'
     AND policyname LIKE '%\_full\_boundary\_%' ESCAPE '\';
 
-  IF covered_model_count <> 99 OR policy_count <> 396 THEN
+  IF covered_model_count <> 102 OR policy_count <> 408 THEN
     RAISE EXCEPTION
       'activated policy coverage is incomplete: models %, policies %',
       covered_model_count, policy_count;
@@ -288,9 +288,9 @@ BEGIN
   FROM pg_policies
   WHERE schemaname = 'public';
 
-  IF total_policy_count <> 396 THEN
+  IF total_policy_count <> 408 THEN
     RAISE EXCEPTION
-      'unexpected public policy remains after activation: expected 396, found %',
+      'unexpected public policy remains after activation: expected 408, found %',
       total_policy_count;
   END IF;
 END

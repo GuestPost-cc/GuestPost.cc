@@ -242,7 +242,7 @@ REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
   guestpost_reporting_runtime,
   guestpost_rls_authorizer;
 
--- The API and worker need relation-level DML for the reviewed 99-model graph;
+-- The API and worker need relation-level DML for the reviewed 102-model graph;
 -- FORCE RLS and the command-aware policy matrix decide which rows each
 -- workload may actually read or change. These grants confer no DDL, role,
 -- replication, superuser, or RLS-bypass ability. Default privileges below

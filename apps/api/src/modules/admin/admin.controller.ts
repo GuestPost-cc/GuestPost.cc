@@ -290,6 +290,29 @@ export class AdminController {
     return this.reconciliation.run(user.id)
   }
 
+  // Reconciliation evidence is finance-only. The case workbench has no
+  // money-moving route until the separately approved recovery recipe lands.
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Get("reconciliation/cases")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  reconciliationCases(
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+    @Query("status") status?: string,
+  ) {
+    return this.reconciliation.listCases({
+      ...parsePagination(take, skip),
+      status,
+    })
+  }
+
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Get("reconciliation/cases/:id")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  reconciliationCase(@Param("id") id: string) {
+    return this.reconciliation.getCase(id)
+  }
+
   // Phase 7.1 — PlatformRevenue dashboard. Category B (Financial); matches the
   // `reconciliation` precedent. Revenue inspection is a Finance concern with
   // no operational use case for Operations.

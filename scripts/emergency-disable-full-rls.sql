@@ -1,6 +1,6 @@
 -- Incident-only rollback for a verified application lockout.
 --
--- This preserves the Phase 1 ApiKey boundary and disables the later 98-table
+-- This preserves the Phase 1 ApiKey boundary and disables the later 101-table
 -- activation atomically. It does not alter roles, credentials, grants,
 -- policies, or ownership, so the boundary can be re-enabled after repair.
 
