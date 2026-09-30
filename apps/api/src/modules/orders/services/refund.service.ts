@@ -426,8 +426,9 @@ export class RefundService {
       refund.reference !== expectedReference ||
       refund.currency !== order.currency ||
       (compensationOffset
-        ? !compensation ||
-          !refundAmount.plus(compensation.amount).equals(amount)
+        ? compensation
+          ? !refundAmount.plus(compensation.amount).equals(amount)
+          : !refundAmount.equals(amount)
         : !refundAmount.equals(amount)) ||
       !wallet ||
       refund.walletId !== wallet.id ||
@@ -541,6 +542,15 @@ export class RefundService {
       )
     }
 
+    if (
+      input.offsetPublisherCompensation &&
+      (!supplied ||
+        supplied.amount == null ||
+        supplied.reason == null ||
+        supplied.effectiveOrderStatus !== persisted.effectiveOrderStatus)
+    ) {
+      throw mismatch()
+    }
     if (input.responsibility !== "PUBLISHER" && !supplied) {
       throw mismatch()
     }

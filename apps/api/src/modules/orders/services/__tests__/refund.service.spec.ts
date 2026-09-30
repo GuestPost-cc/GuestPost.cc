@@ -1071,6 +1071,49 @@ describe("RefundService", () => {
     expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
   })
 
+  it("replays a force-cancel with no publisher-compensation evidence when the full gross was refunded", async () => {
+    const existingRefund = {
+      id: "refund-tx-existing",
+      orderId: "order-1",
+      type: "REFUND",
+      amount: new Decimal(100),
+      currency: "USD",
+      walletId: "wallet-1",
+      reference: "force-cancel:order-1:case-1",
+      description: "Refund for order order-1",
+    }
+    prismaMock.transaction.findFirst.mockResolvedValue(existingRefund)
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+      ...baseOrder,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "SYSTEM",
+    })
+    prismaMock.publisherCompensation.findUnique.mockResolvedValue(null)
+    prismaMock.orderEvent.findFirst.mockResolvedValue({
+      actorId: "admin-1",
+      metadata: {
+        reason: "Emergency cancellation: no compensation was due.",
+        responsibility: "SYSTEM",
+        refundTransactionId: existingRefund.id,
+      },
+    })
+
+    await service.refundOrderInTransaction(
+      prismaMock,
+      { ...baseOrder, status: "REFUNDED", paymentStatus: "REFUNDED" },
+      "Emergency cancellation: no compensation was due.",
+      "admin-1",
+      existingRefund.reference,
+      "SYSTEM",
+      undefined,
+      true,
+    )
+
+    expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
+  })
+
   it("rejects a replay that changes the publisher compensation disposition", async () => {
     const existingRefund = {
       id: "refund-tx-existing",

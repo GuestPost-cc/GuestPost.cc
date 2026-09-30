@@ -1146,6 +1146,11 @@ export class OrderCancellationService {
             order.paymentStatus === "REFUNDED" &&
             body.idempotencyKey
           ) {
+            const persistedCompensation =
+              await tx.publisherCompensation.findUnique({
+                where: { orderId },
+                select: { effectiveOrderStatus: true },
+              })
             return (
               await this.refund.refundOrderInTransaction(
                 tx,
@@ -1154,11 +1159,13 @@ export class OrderCancellationService {
                 staffUserId,
                 `force-cancel:${orderId}:${body.idempotencyKey}`,
                 finalResponsibility,
-                {
-                  ...body.publisherCompensation,
-                  effectiveOrderStatus:
-                    order.dispute?.previousStatus ?? order.status,
-                },
+                persistedCompensation
+                  ? {
+                      ...body.publisherCompensation,
+                      effectiveOrderStatus:
+                        persistedCompensation.effectiveOrderStatus,
+                    }
+                  : body.publisherCompensation,
                 true,
               )
             ).order
