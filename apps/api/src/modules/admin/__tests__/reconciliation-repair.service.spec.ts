@@ -38,7 +38,13 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     )
 
     await expect(
-      service.propose("case-1", "finance-user-1", {}),
+      service.propose("case-1", "finance-user-1", {
+        providerRefundConfirmedAbsent: true,
+        evidenceDigest: "a".repeat(64),
+        expectedCaseVersion: 1,
+        incidentReference: "provider-case-1",
+        reason: "Confirmed internal wallet credit with no provider refund.",
+      }),
     ).rejects.toBeInstanceOf(ServiceUnavailableException)
     expect(prisma.reconciliationRepairProposal.create).not.toHaveBeenCalled()
   })
