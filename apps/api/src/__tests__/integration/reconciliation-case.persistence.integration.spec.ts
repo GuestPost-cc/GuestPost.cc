@@ -1,5 +1,5 @@
 import { persistReconciliationCases } from "@guestpost/shared/dist/reconciliation-case-core"
-import { makeOrder, makeOrganization, makeUser } from "./factories"
+import { makeOrder, makeOrganization, makeUser, makeWebsite } from "./factories"
 import { createTestDatabase, type TestDatabase } from "./helpers/test-db"
 
 describe("[INTEGRATION] Reconciliation case evidence persistence", () => {
@@ -32,9 +32,11 @@ describe("[INTEGRATION] Reconciliation case evidence persistence", () => {
   it("retains one immutable evidence revision across repeated scans", async () => {
     const customer = await makeUser(prisma)
     const organization = await makeOrganization(prisma)
+    const website = await makeWebsite(prisma, { ownershipType: "PLATFORM" })
     const order = await makeOrder(prisma, {
       customerId: customer.id,
       organizationId: organization.id,
+      websiteId: website.id,
       type: "GUEST_POST",
     })
     const firstRunAt = new Date("2026-09-30T12:00:00.000Z")
