@@ -971,6 +971,204 @@ describe("RefundService", () => {
     })
   })
 
+  it("allocates force-cancel gross between publisher compensation and the customer refund", async () => {
+    prismaMock.transaction.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({
+        id:
+          data.type === "REFUND"
+            ? "refund-tx-1"
+            : data.type === "PUBLISHER_COMPENSATION"
+              ? "compensation-tx-1"
+              : "debt-tx-1",
+      }),
+    )
+
+    await service.refundOrderInTransaction(
+      prismaMock,
+      { ...baseOrder, status: "PUBLISHED" },
+      "Emergency cancellation: verified publisher work is retained.",
+      "admin-1",
+      "force-cancel:order-1:case-1",
+      "PLATFORM",
+      {
+        amount: "100.00",
+        reason: "Publisher completed the full paid order before cancellation.",
+        effectiveOrderStatus: "PUBLISHED",
+      },
+      true,
+    )
+
+    const refund = prismaMock.transaction.create.mock.calls.find(
+      ([{ data }]: any[]) => data.type === "REFUND",
+    )
+    expect(refund[0].data.amount.equals(new Decimal(0))).toBe(true)
+    expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.publisherCompensation.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        amount: new Decimal(100),
+        disposition: "EXACT_AMOUNT",
+        refundTransactionId: "refund-tx-1",
+      }),
+    })
+  })
+
+  it("replays only a force-cancel refund whose refund and compensation still equal the captured gross", async () => {
+    const existingRefund = {
+      id: "refund-tx-existing",
+      orderId: "order-1",
+      type: "REFUND",
+      amount: new Decimal(20),
+      currency: "USD",
+      walletId: "wallet-1",
+      reference: "force-cancel:order-1:case-1",
+      description: "Refund for order order-1",
+    }
+    const compensation = {
+      id: "compensation-1",
+      orderId: "order-1",
+      refundTransactionId: existingRefund.id,
+      publisherId: "pub-1",
+      disposition: "EXACT_AMOUNT",
+      amount: new Decimal(80),
+      currency: "USD",
+      responsibility: "PLATFORM",
+      reason: "Publisher completed the full paid order before cancellation.",
+      effectiveOrderStatus: "PUBLISHED",
+    }
+    prismaMock.transaction.findFirst.mockResolvedValue(existingRefund)
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+      ...baseOrder,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "PLATFORM",
+    })
+    prismaMock.publisherCompensation.findUnique.mockResolvedValue(compensation)
+    prismaMock.orderEvent.findFirst.mockResolvedValue({
+      actorId: "admin-1",
+      metadata: {
+        reason: "Emergency cancellation: verified publisher work is retained.",
+        responsibility: "PLATFORM",
+        refundTransactionId: existingRefund.id,
+      },
+    })
+
+    await service.refundOrderInTransaction(
+      prismaMock,
+      { ...baseOrder, status: "REFUNDED", paymentStatus: "REFUNDED" },
+      "Emergency cancellation: verified publisher work is retained.",
+      "admin-1",
+      existingRefund.reference,
+      "PLATFORM",
+      {
+        amount: "80.00",
+        reason: compensation.reason,
+        effectiveOrderStatus: "PUBLISHED",
+      },
+      true,
+    )
+
+    expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("replays a force-cancel with no publisher-compensation evidence when the full gross was refunded", async () => {
+    const existingRefund = {
+      id: "refund-tx-existing",
+      orderId: "order-1",
+      type: "REFUND",
+      amount: new Decimal(100),
+      currency: "USD",
+      walletId: "wallet-1",
+      reference: "force-cancel:order-1:case-1",
+      description: "Refund for order order-1",
+    }
+    prismaMock.transaction.findFirst.mockResolvedValue(existingRefund)
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+      ...baseOrder,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "SYSTEM",
+    })
+    prismaMock.publisherCompensation.findUnique.mockResolvedValue(null)
+    prismaMock.orderEvent.findFirst.mockResolvedValue({
+      actorId: "admin-1",
+      metadata: {
+        reason: "Emergency cancellation: no compensation was due.",
+        responsibility: "SYSTEM",
+        refundTransactionId: existingRefund.id,
+      },
+    })
+
+    await service.refundOrderInTransaction(
+      prismaMock,
+      { ...baseOrder, status: "REFUNDED", paymentStatus: "REFUNDED" },
+      "Emergency cancellation: no compensation was due.",
+      "admin-1",
+      existingRefund.reference,
+      "SYSTEM",
+      undefined,
+      true,
+    )
+
+    expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("replays a publisher-attributed force-cancel with its persisted NONE decision", async () => {
+    const existingRefund = {
+      id: "refund-tx-existing",
+      orderId: "order-1",
+      type: "REFUND",
+      amount: new Decimal(100),
+      currency: "USD",
+      walletId: "wallet-1",
+      reference: "force-cancel:order-1:case-1",
+      description: "Refund for order order-1",
+    }
+    prismaMock.transaction.findFirst.mockResolvedValue(existingRefund)
+    prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+      ...baseOrder,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "PUBLISHER",
+    })
+    prismaMock.publisherCompensation.findUnique.mockResolvedValue({
+      id: "compensation-1",
+      orderId: "order-1",
+      refundTransactionId: existingRefund.id,
+      publisherId: "pub-1",
+      disposition: "NONE",
+      amount: new Decimal(0),
+      currency: "USD",
+      responsibility: "PUBLISHER",
+      reason:
+        "Publisher-attributed refund; publisher compensation is not payable.",
+      effectiveOrderStatus: "PUBLISHED",
+    })
+    prismaMock.orderEvent.findFirst.mockResolvedValue({
+      actorId: "admin-1",
+      metadata: {
+        reason: "Emergency cancellation: publisher-attributed failure.",
+        responsibility: "PUBLISHER",
+        refundTransactionId: existingRefund.id,
+      },
+    })
+
+    await service.refundOrderInTransaction(
+      prismaMock,
+      { ...baseOrder, status: "REFUNDED", paymentStatus: "REFUNDED" },
+      "Emergency cancellation: publisher-attributed failure.",
+      "admin-1",
+      existingRefund.reference,
+      "PUBLISHER",
+      { effectiveOrderStatus: "PUBLISHED" },
+      true,
+    )
+
+    expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
+  })
+
   it("rejects a replay that changes the publisher compensation disposition", async () => {
     const existingRefund = {
       id: "refund-tx-existing",

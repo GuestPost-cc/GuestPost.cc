@@ -1130,6 +1130,12 @@ export class OrderCancellationService {
         "confirmationOrderId must exactly match the order being cancelled",
       )
     }
+    const idempotencyKey = body.idempotencyKey?.trim()
+    if (!idempotencyKey || idempotencyKey.length > 200) {
+      throw new BadRequestException(
+        "An idempotency key is required for emergency cancellation",
+      )
+    }
     const finalResponsibility = this.assertFinalResponsibility(
       body.responsibility,
     )
@@ -1138,12 +1144,41 @@ export class OrderCancellationService {
       orderId,
       async (tx: any) => {
         const order = await this.loadOrder(tx, orderId)
-        this.assertExpectedVersion(order.version, body.expectedVersion)
         if (
           (TERMINAL_ORDER_STATUSES as readonly string[]).includes(order.status)
         ) {
+          if (
+            order.status === "REFUNDED" &&
+            order.paymentStatus === "REFUNDED" &&
+            idempotencyKey
+          ) {
+            const persistedCompensation =
+              await tx.publisherCompensation.findUnique({
+                where: { orderId },
+                select: { effectiveOrderStatus: true },
+              })
+            return (
+              await this.refund.refundOrderInTransaction(
+                tx,
+                order,
+                `Emergency cancellation: ${this.reasonText(body.reasonCode, auditNote)}`,
+                staffUserId,
+                `force-cancel:${orderId}:${idempotencyKey}`,
+                finalResponsibility,
+                persistedCompensation
+                  ? {
+                      ...body.publisherCompensation,
+                      effectiveOrderStatus:
+                        persistedCompensation.effectiveOrderStatus,
+                    }
+                  : body.publisherCompensation,
+                true,
+              )
+            ).order
+          }
           return order
         }
+        this.assertExpectedVersion(order.version, body.expectedVersion)
         const confirmedFraudFinding = await tx.deliveryFraudFinding.findFirst({
           where: { orderId },
           select: { cancellationRequestId: true },
@@ -1162,13 +1197,14 @@ export class OrderCancellationService {
               order,
               `Emergency cancellation: ${this.reasonText(body.reasonCode, auditNote)}`,
               staffUserId,
-              `force-cancel:${orderId}:${body.idempotencyKey ?? order.version}`,
+              `force-cancel:${orderId}:${idempotencyKey}`,
               finalResponsibility,
               {
                 ...body.publisherCompensation,
                 effectiveOrderStatus:
                   order.dispute?.previousStatus ?? order.status,
               },
+              true,
             )
           ).order
         }

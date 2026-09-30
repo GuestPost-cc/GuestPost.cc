@@ -2299,6 +2299,9 @@ async function checkRefundReconciliation(
             responsibility: true,
             reason: true,
             effectiveOrderStatus: true,
+            refundTransaction: {
+              select: { id: true, reference: true, amount: true },
+            },
             compensationTransaction: {
               select: {
                 id: true,
@@ -2325,7 +2328,7 @@ async function checkRefundReconciliation(
     }),
     prisma.transaction.findMany({
       where: { type: "REFUND" as any },
-      select: { id: true, amount: true, orderId: true },
+      select: { id: true, amount: true, orderId: true, reference: true },
     }),
   ])
   stats.checkedOrders += refundedOrders.length
@@ -2441,6 +2444,13 @@ async function checkRefundReconciliation(
       !compensation.debtRepaymentTransactionId &&
       !credit &&
       !debt
+    const linkedRefund = compensation.refundTransaction
+    const forceCancelOffset = linkedRefund?.reference?.startsWith(
+      `force-cancel:${o.id}:`,
+    )
+    const validFunding = forceCancelOffset
+      ? toScaled(linkedRefund.amount) + amount === toScaled(o.amount)
+      : toScaled(linkedRefund?.amount ?? 0) === toScaled(o.amount)
     if (
       compensation.currency !== "USD" ||
       !refundEntry?.ids.has(compensation.refundTransactionId) ||
@@ -2452,7 +2462,8 @@ async function checkRefundReconciliation(
       compensation.responsibility === "UNDETERMINED" ||
       (compensation.responsibility === "PUBLISHER" && !validNone) ||
       (!validNone && !validCredit) ||
-      !validDebt
+      !validDebt ||
+      !validFunding
     ) {
       drift.push(
         makeRow({
@@ -2527,8 +2538,18 @@ async function checkRefundReconciliation(
       )
     }
     const o = refundedOrders.find((o: any) => o.id === orderId)
-    if (o && entry.sum !== toScaled(o.amount ?? 0)) {
-      const isWarning = entry.sum < toScaled(o.amount ?? 0)
+    if (o) {
+      const forceCancelCompensation = o.publisherCompensation
+      const refundReference = refundTxs.find(
+        (tx: any) => tx.orderId === orderId,
+      )?.reference
+      const expectedRefund =
+        forceCancelCompensation &&
+        refundReference?.startsWith(`force-cancel:${o.id}:`)
+          ? toScaled(o.amount ?? 0) - toScaled(forceCancelCompensation.amount)
+          : toScaled(o.amount ?? 0)
+      if (entry.sum === expectedRefund) continue
+      const isWarning = entry.sum < expectedRefund
       drift.push(
         makeRow({
           severity: isWarning ? "warning" : "critical",
@@ -2538,10 +2559,10 @@ async function checkRefundReconciliation(
             : ReconciliationCode.REFUND_PARTIAL,
           entityId: orderId,
           entityType: "Order",
-          amount: fromScaled(toScaled(o.amount ?? 0) - entry.sum),
-          message: `Order ${orderId.slice(0, 8)} refund sum (${fromScaled(entry.sum)}) ${isWarning ? "is less than" : "exceeds"} order amount (${fromScaled(toScaled(o.amount ?? 0))})`,
+          amount: fromScaled(expectedRefund - entry.sum),
+          message: `Order ${orderId.slice(0, 8)} refund sum (${fromScaled(entry.sum)}) ${isWarning ? "is less than" : "exceeds"} the supported refund amount (${fromScaled(expectedRefund)})`,
           metadata: {
-            expectedAmount: fromScaled(toScaled(o.amount ?? 0)),
+            expectedAmount: fromScaled(expectedRefund),
             actualAmount: fromScaled(entry.sum),
             orderId,
           },

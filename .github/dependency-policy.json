@@ -33,8 +33,8 @@
     },
     {
       "package": "fast-uri",
-      "minimumVersion": "3.1.4",
-      "reason": "GHSA-v2hh-gcrm-f6hx is fixed in the 3.x line at 3.1.4."
+      "minimumVersion": "3.1.8",
+      "reason": "GHSA-hrr3-gc8f-f4qj is fixed in the 3.x line at 3.1.8."
     },
     {
       "package": "sharp",
@@ -71,9 +71,17 @@
     {
       "package": "brace-expansion",
       "minimumVersionsByMajor": {
-        "5": "5.0.8"
+        "1": "1.1.20",
+        "5": "5.0.12"
       },
-      "reason": "GHSA-3jxr-9vmj-r5cp and GHSA-mh99-v99m-4gvg require patched floors for every affected major line."
+      "reason": "GHSA-qhr7-859c-m2p7 and GHSA-6j4f-fj2g-mc7p require patched floors for every affected major line."
+    },
+    {
+      "package": "ip-address",
+      "minimumVersionsByMajor": {
+        "10": "10.7.1"
+      },
+      "reason": "GHSA-j6r3-76f7-8jcv and GHSA-h3mg-xc3c-68pw require ip-address 10.7.1 or newer."
     },
     {
       "package": "js-yaml",

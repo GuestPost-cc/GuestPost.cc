@@ -53,6 +53,7 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
           reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
           note: "Verified system emergency requiring an immediate refund.",
           expectedVersion: orderBeforeRace.version,
+          idempotencyKey: `force-cancel-${ctx.order.id}`,
           confirmationOrderId: ctx.order.id,
           responsibility: CancellationResponsibility.SYSTEM,
           publisherCompensation: {
@@ -107,7 +108,8 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
       expect(Number(balance.withdrawableBalance)).toBe(80)
       expect(Number(balance.debtBalance)).toBe(0)
       expect(Number(balance.lifetimeEarnings)).toBe(80)
-      expect(Number(wallet.availableBalance)).toBe(100)
+      // The $80 publisher compensation is allocated from the $100 payment.
+      expect(Number(wallet.availableBalance)).toBe(20)
     } finally {
       await cleanup()
     }

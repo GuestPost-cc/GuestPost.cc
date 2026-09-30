@@ -357,6 +357,16 @@ export class RefundService {
   ): Promise<FinalRefundResponsibility> {
     const responsibility = order.refundResponsibility
     const amount = new Decimal(order.amount ?? 0)
+    const refundAmount = new Decimal(refund.amount ?? 0)
+    const compensationOffset = refund.reference?.startsWith(
+      `force-cancel:${order.id}:`,
+    )
+    const compensation = compensationOffset
+      ? await tx.publisherCompensation.findUnique({
+          where: { refundTransactionId: refund.id },
+          select: { amount: true },
+        })
+      : null
     const wallet = await tx.wallet.findUnique({
       where: { organizationId: order.organizationId },
     })
@@ -415,7 +425,11 @@ export class RefundService {
       refund.orderId !== order.id ||
       refund.reference !== expectedReference ||
       refund.currency !== order.currency ||
-      !new Decimal(refund.amount ?? 0).equals(amount) ||
+      (compensationOffset
+        ? compensation
+          ? !refundAmount.plus(compensation.amount).equals(amount)
+          : !refundAmount.equals(amount)
+        : !refundAmount.equals(amount)) ||
       !wallet ||
       refund.walletId !== wallet.id ||
       wallet.currency !== order.currency ||
@@ -445,6 +459,7 @@ export class RefundService {
       reason: string
       responsibility: FinalRefundResponsibility
       publisherCompensation?: PublisherCompensationDecision
+      offsetPublisherCompensation: boolean
     },
   ): Promise<void> {
     const mismatch = () =>
@@ -503,7 +518,9 @@ export class RefundService {
         input.publisherCompensation?.amount != null ||
         input.publisherCompensation?.reason != null ||
         (input.publisherCompensation?.effectiveOrderStatus != null &&
-          input.responsibility !== "PUBLISHER")
+          input.responsibility !== "PUBLISHER") ||
+        (input.offsetPublisherCompensation &&
+          !new Decimal(refund.amount ?? 0).equals(order.amount ?? 0))
       ) {
         throw mismatch()
       }
@@ -525,6 +542,16 @@ export class RefundService {
       )
     }
 
+    if (
+      input.offsetPublisherCompensation &&
+      input.responsibility !== "PUBLISHER" &&
+      (!supplied ||
+        supplied.amount == null ||
+        supplied.reason == null ||
+        supplied.effectiveOrderStatus !== persisted.effectiveOrderStatus)
+    ) {
+      throw mismatch()
+    }
     if (input.responsibility !== "PUBLISHER" && !supplied) {
       throw mismatch()
     }
@@ -543,6 +570,16 @@ export class RefundService {
     if (
       supplied?.effectiveOrderStatus != null &&
       supplied.effectiveOrderStatus !== persisted.effectiveOrderStatus
+    ) {
+      throw mismatch()
+    }
+    const expectedRefundAmount = input.offsetPublisherCompensation
+      ? new Decimal(order.amount ?? 0).minus(amount)
+      : new Decimal(order.amount ?? 0)
+    if (
+      input.offsetPublisherCompensation !==
+        refund.reference?.startsWith(`force-cancel:${order.id}:`) ||
+      !new Decimal(refund.amount ?? 0).equals(expectedRefundAmount)
     ) {
       throw mismatch()
     }
@@ -838,6 +875,7 @@ export class RefundService {
                 reason,
                 responsibility: options.responsibility,
                 publisherCompensation: options.publisherCompensation,
+                offsetPublisherCompensation: false,
               },
             )
             await this.recordRefundCommunications(tx, {
@@ -845,6 +883,7 @@ export class RefundService {
               actorUserId: userId,
               responsibility,
               refundTransactionId: lockedRefund.id,
+              refundAmount: new Decimal(lockedRefund.amount ?? 0),
             })
             return refundedOrder
           },
@@ -979,6 +1018,7 @@ export class RefundService {
     idempotencyKey: string | undefined,
     responsibility: FinalRefundResponsibility,
     publisherCompensation?: PublisherCompensationDecision,
+    offsetPublisherCompensation = false,
   ): Promise<RefundTransactionResult> {
     this.assertCanonicalUsd(order.currency, "order")
     // Duplicate guard
@@ -1010,12 +1050,14 @@ export class RefundService {
           reason,
           responsibility,
           publisherCompensation,
+          offsetPublisherCompensation,
         })
         await this.recordRefundCommunications(tx, {
           order: refundedOrder,
           actorUserId: userId,
           responsibility: persistedResponsibility,
           refundTransactionId: existing.id,
+          refundAmount: new Decimal(existing.amount ?? 0),
         })
         return {
           order: refundedOrder,
@@ -1065,6 +1107,7 @@ export class RefundService {
           actorUserId: userId,
           responsibility,
           refundTransactionId: result.refundTransactionId,
+          refundAmount: new Decimal(order.amount ?? 0),
         })
         return result
       } catch (error) {
@@ -1243,7 +1286,15 @@ export class RefundService {
     const wallet = await tx.wallet.findUnique({
       where: { organizationId: order.organizationId },
     })
-    const amount = order.amount ? new Decimal(order.amount) : new Decimal(0)
+    const gross = order.amount ? new Decimal(order.amount) : new Decimal(0)
+    const amount = offsetPublisherCompensation
+      ? gross.minus(publisherCompensationPlan?.amount ?? 0)
+      : gross
+    if (amount.isNegative()) {
+      throw new ConflictException(
+        "Publisher compensation exceeds the captured order amount",
+      )
+    }
     if (!wallet && amount.greaterThan(0)) {
       throw new ConflictException(
         "Paid order has no organization wallet; refund requires reconciliation",
@@ -1320,6 +1371,10 @@ export class RefundService {
           settlementCancelled: cancelledSettlementId,
           refundTransactionId: refundTransaction.id,
           publisherCompensationId: publisherCompensationRecord?.id ?? null,
+          customerRefundAmount: amount.toFixed(2),
+          publisherCompensationAmount:
+            publisherCompensationPlan?.amount.toFixed(2) ?? "0.00",
+          compensationOffset: offsetPublisherCompensation,
         },
       },
     })
@@ -1351,6 +1406,7 @@ export class RefundService {
       actorUserId: userId,
       responsibility,
       refundTransactionId: refundTransaction.id,
+      refundAmount: amount,
     })
 
     return {
@@ -1420,43 +1476,44 @@ export class RefundService {
       actorUserId: string
       responsibility: FinalRefundResponsibility
       refundTransactionId: string
+      refundAmount: Decimal
     },
   ): Promise<void> {
     if (!this.communications) return
-    const amount = new Decimal(input.order.amount ?? 0)
+    const amount = input.refundAmount
     const recipients = await this.communications.customerOrderRecipients(
       input.order.id,
       tx,
     )
-    const repairedLegacy = await this.repairValidatedLegacyRefundCommunication(
-      tx,
-      {
-        ...input,
-        recipientUserIds: recipients,
-      },
-    )
-    if (!repairedLegacy) {
-      await this.communications.record(
-        {
-          type: "ORDER_REFUNDED",
-          aggregateType: "Order",
-          aggregateId: input.order.id,
-          organizationId: input.order.organizationId,
-          title: "Order refund completed",
-          message: `${amount.toFixed(2)} ${input.order.currency} was returned to your wallet for order ${input.order.id}.`,
-          actionPath: `/dashboard/orders/${input.order.id}`,
-          payload: {
-            amount: amount.toString(),
-            currency: input.order.currency,
-            responsibility: input.responsibility,
-            refundTransactionId: input.refundTransactionId,
-          },
-          dedupKey: `order:${input.order.id}:refunded`,
+    if (amount.greaterThan(0)) {
+      const repairedLegacy =
+        await this.repairValidatedLegacyRefundCommunication(tx, {
+          ...input,
           recipientUserIds: recipients,
-          actorUserId: input.actorUserId,
-        },
-        tx,
-      )
+        })
+      if (!repairedLegacy) {
+        await this.communications.record(
+          {
+            type: "ORDER_REFUNDED",
+            aggregateType: "Order",
+            aggregateId: input.order.id,
+            organizationId: input.order.organizationId,
+            title: "Order refund completed",
+            message: `${amount.toFixed(2)} ${input.order.currency} was returned to your wallet for order ${input.order.id}.`,
+            actionPath: `/dashboard/orders/${input.order.id}`,
+            payload: {
+              amount: amount.toString(),
+              currency: input.order.currency,
+              responsibility: input.responsibility,
+              refundTransactionId: input.refundTransactionId,
+            },
+            dedupKey: `order:${input.order.id}:refunded`,
+            recipientUserIds: recipients,
+            actorUserId: input.actorUserId,
+          },
+          tx,
+        )
+      }
     }
     await this.recordPublisherCompensationCommunication(tx, input.order.id)
     const confirmedFindings = await tx.deliveryFraudFinding.findMany({

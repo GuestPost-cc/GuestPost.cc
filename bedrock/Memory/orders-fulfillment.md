@@ -249,6 +249,15 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 - One website per order (enforced in createOrder/addOrderItem)
 - Critical statuses (PAID, ACCEPTED, VERIFIED, COMPLETED, REFUNDED) are system-only
 - `forceCancel` delegates refund to `RefundService`
+- A paid force-cancel allocates the captured order gross between the customer
+  refund and any publisher compensation in one transaction. For this path,
+  `customer refund + publisher compensation = captured order amount`; the
+  compensation evidence and reconciliation distinguish its stable
+  `force-cancel:<orderId>:<key>` refund reference from generic Finance refunds.
+  Force-cancel requires a bounded idempotency key. Stakeholder order timelines
+  show the publisher-compensation rationale and a structured emergency reason
+  code without exposing the free-form staff audit note; customers see the exact
+  refund amount, including zero.
 - `confirmDelivery`/settlement non-atomic fixed to single transaction
 
 ## Delivery and Settlement Operations (2026-07-12)

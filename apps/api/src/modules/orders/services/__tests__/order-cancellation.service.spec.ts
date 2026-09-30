@@ -86,6 +86,9 @@ describe("OrderCancellationService", () => {
       deliveryFraudFinding: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      publisherCompensation: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       orderDispute: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: "dispute-1" }),
@@ -123,6 +126,7 @@ describe("OrderCancellationService", () => {
       service.forceCancel("order-1", "admin-1", {
         reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
         expectedVersion: 4,
+        idempotencyKey: "case-1",
         confirmationOrderId: "order-1",
         responsibility: CancellationResponsibility.SYSTEM,
         note: "Too short",
@@ -141,6 +145,7 @@ describe("OrderCancellationService", () => {
     await service.forceCancel("order-1", "admin-1", {
       reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
       expectedVersion: 4,
+      idempotencyKey: "case-1",
       confirmationOrderId: "order-1",
       responsibility: CancellationResponsibility.SYSTEM,
       note: "Verified legal emergency requiring an immediate cancellation.",
@@ -149,6 +154,79 @@ describe("OrderCancellationService", () => {
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1)
     expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       refund.refundOrderInTransaction.mock.invocationCallOrder[0],
+    )
+    expect(refund.refundOrderInTransaction).toHaveBeenCalledWith(
+      prisma,
+      order,
+      expect.any(String),
+      "admin-1",
+      "force-cancel:order-1:case-1",
+      CancellationResponsibility.SYSTEM,
+      { effectiveOrderStatus: order.status },
+      true,
+    )
+  })
+
+  it("requires an idempotency key before an emergency cancellation transaction", async () => {
+    await expect(
+      service.forceCancel("order-1", "admin-1", {
+        reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
+        expectedVersion: 4,
+        confirmationOrderId: "order-1",
+        responsibility: CancellationResponsibility.SYSTEM,
+        note: "Verified legal emergency requiring an immediate cancellation.",
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it("replays force-cancel compensation with its persisted effective status", async () => {
+    const refundedOrder = {
+      ...order,
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      refundResponsibility: "PLATFORM",
+    }
+    prisma.order.findUnique.mockResolvedValue(refundedOrder)
+    prisma.publisherCompensation.findUnique.mockResolvedValue({
+      effectiveOrderStatus: "PUBLISHED",
+    })
+    refund.refundOrderInTransaction.mockResolvedValue({
+      order: refundedOrder,
+      refundTransactionId: "refund-1",
+    })
+
+    await service.forceCancel("order-1", "admin-1", {
+      reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
+      expectedVersion: 4,
+      confirmationOrderId: "order-1",
+      responsibility: CancellationResponsibility.PLATFORM,
+      note: "Verified legal emergency requiring an immediate cancellation.",
+      idempotencyKey: "case-1",
+      publisherCompensation: {
+        amount: "80.00",
+        reason: "Publisher completed the verified publication work.",
+      },
+    })
+
+    expect(prisma.publisherCompensation.findUnique).toHaveBeenCalledWith({
+      where: { orderId: "order-1" },
+      select: { effectiveOrderStatus: true },
+    })
+    expect(refund.refundOrderInTransaction).toHaveBeenCalledWith(
+      prisma,
+      refundedOrder,
+      expect.any(String),
+      "admin-1",
+      "force-cancel:order-1:case-1",
+      CancellationResponsibility.PLATFORM,
+      {
+        amount: "80.00",
+        reason: "Publisher completed the verified publication work.",
+        effectiveOrderStatus: "PUBLISHED",
+      },
+      true,
     )
   })
 
@@ -161,6 +239,7 @@ describe("OrderCancellationService", () => {
       service.forceCancel("order-1", "admin-1", {
         reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
         expectedVersion: 4,
+        idempotencyKey: "case-1",
         confirmationOrderId: "order-1",
         responsibility: CancellationResponsibility.SYSTEM,
         note: "Verified legal emergency requiring an immediate cancellation.",

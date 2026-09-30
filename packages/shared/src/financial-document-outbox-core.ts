@@ -240,16 +240,6 @@ export async function issueFinancialDocumentForCommunication(
       .map((part: string) => part[0]?.toUpperCase() + part.slice(1))
       .join(" ")
     const refunded = input.type === "ORDER_REFUNDED"
-    lineItems = [
-      {
-        description: refunded
-          ? `Refund - ${serviceName} service`
-          : `${serviceName} service`,
-        quantity: 1,
-        unitAmount: subtotal,
-        lineTotal: subtotal,
-      },
-    ]
     payment = {
       status: refunded ? "REFUNDED" : "PAID",
       method: "GuestPost.cc wallet",
@@ -296,21 +286,29 @@ export async function issueFinancialDocumentForCommunication(
         },
         select: { id: true },
       })
+      const refundAmount =
+        typeof payload?.amount === "string"
+          ? normalizeFinancialMoney(payload.amount)
+          : null
       if (
         refund?.type !== "REFUND" ||
         refund.orderId !== order.id ||
-        normalizeFinancialMoney(refund.amount) !== subtotal ||
+        !refundAmount ||
+        refundAmount === "0.00" ||
+        BigInt(refundAmount.replace(".", "")) >
+          BigInt(subtotal.replace(".", "")) ||
+        normalizeFinancialMoney(refund.amount) !== refundAmount ||
         refund.currency.toUpperCase() !== currency ||
-        refund.wallet.organizationId !== canonicalOrganizationId ||
-        refund.wallet.currency.toUpperCase() !== currency ||
+        refund.wallet?.organizationId !== canonicalOrganizationId ||
+        refund.wallet?.currency.toUpperCase() !== currency ||
         !refundEvent ||
-        normalizeFinancialMoney(payload?.amount) !== subtotal ||
         String(payload?.currency ?? "").toUpperCase() !== currency
       ) {
         throw new Error(
           "Credit note refund ledger evidence does not match order",
         )
       }
+      subtotal = refundAmount
       payment.reference = `Refund ${refund.id}`
       const original = await db.financialDocument.findFirst({
         where: {
@@ -331,6 +329,16 @@ export async function issueFinancialDocumentForCommunication(
         relatedDocumentNumber = formatFinancialDocumentNumber(original)
       }
     }
+    lineItems = [
+      {
+        description: refunded
+          ? `Refund - ${serviceName} service`
+          : `${serviceName} service`,
+        quantity: 1,
+        unitAmount: subtotal,
+        lineTotal: subtotal,
+      },
+    ]
   }
 
   if ((input.organizationId ?? null) !== canonicalOrganizationId) {

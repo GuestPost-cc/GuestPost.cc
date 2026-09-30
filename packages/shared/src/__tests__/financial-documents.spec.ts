@@ -342,6 +342,44 @@ describe("financial documents", () => {
     )
   })
 
+  it("issues a net-value credit note for a partially refunded force-cancel", async () => {
+    const { db, getWinner } = financialDocumentDb()
+    db.transaction.findUnique.mockResolvedValue({
+      id: "refund-transaction-1",
+      type: "REFUND",
+      orderId: "order-1",
+      amount: "40.00",
+      currency: "USD",
+      wallet: { organizationId: "org-1", currency: "USD" },
+    })
+
+    await issueFinancialDocumentForCommunication(db, {
+      ...paidOrderEvent,
+      type: "ORDER_REFUNDED",
+      dedupKey: "order:order-1:refunded",
+      payload: {
+        amount: "40.00",
+        currency: "USD",
+        refundTransactionId: "refund-transaction-1",
+      },
+    })
+
+    expect(getWinner()).toEqual(
+      expect.objectContaining({
+        subtotal: "40.00",
+        total: "40.00",
+        snapshot: expect.objectContaining({
+          lineItems: [
+            expect.objectContaining({
+              unitAmount: "40.00",
+              lineTotal: "40.00",
+            }),
+          ],
+        }),
+      }),
+    )
+  })
+
   it.each([
     ["amount", { amount: "99.00" }],
     ["currency", { currency: "EUR" }],

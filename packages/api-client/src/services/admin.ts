@@ -1365,6 +1365,7 @@ export class AdminService {
   forceCancelOrder(
     id: string,
     data: CancellationMutationData & {
+      idempotencyKey: string
       confirmationOrderId: string
       responsibility: string
       publisherCompensation?: PublisherCompensationDecisionInput
