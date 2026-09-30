@@ -78,13 +78,13 @@ describe("persistReconciliationCases", () => {
             create: async () => ({ id: `scan-${++scanNumber}` }),
           },
           reconciliationCase: {
-            upsert: async ({ create }: any) => {
+            upsert: async ({ create, update }: any) => {
               currentFingerprint ??= create.currentFingerprint
+              if (update) {
+                expect(update.currentFingerprint).toBe(currentFingerprint)
+                expect(update.version).toEqual({ increment: 1 })
+              }
               return { id: "case-1" }
-            },
-            updateMany: async ({ where }: any) => {
-              expect(where.currentFingerprint.not).toBe(currentFingerprint)
-              return { count: 0 }
             },
           },
           reconciliationCaseSnapshot: {

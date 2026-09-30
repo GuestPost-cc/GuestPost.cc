@@ -104,8 +104,11 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => casesQ.refetch()}
-          disabled={casesQ.isFetching}
+          onClick={() => {
+            void casesQ.refetch()
+            if (selectedId) void caseQ.refetch()
+          }}
+          disabled={casesQ.isFetching || caseQ.isFetching}
         >
           <RefreshCw className="mr-2 h-3 w-3" /> Refresh
         </Button>
@@ -206,11 +209,33 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                     <span>Payment: {caseQ.data.order.paymentStatus}</span>
                   </div>
                 )}
-                <SafeFindingList findings={caseQ.data.snapshots[0]?.findings} />
+                {caseQ.data.snapshots.length === 0 ? (
+                  <SafeFindingList findings={undefined} />
+                ) : (
+                  <div className="space-y-3">
+                    {caseQ.data.snapshots.map((snapshot) => (
+                      <section
+                        key={snapshot.id}
+                        className="space-y-2 rounded-md border p-3"
+                      >
+                        <p className="text-xs text-muted-foreground">
+                          {timestamp(snapshot.scan.ranAt)} ·{" "}
+                          {snapshot.scan.detector} · v
+                          {snapshot.scan.reportVersion}
+                        </p>
+                        <SafeFindingList findings={snapshot.findings} />
+                        <p className="font-mono text-xs text-muted-foreground">
+                          Fingerprint{" "}
+                          {snapshot.evidenceFingerprint.slice(0, 16)}…
+                        </p>
+                      </section>
+                    ))}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Evidence fingerprint{" "}
-                  {caseQ.data.currentFingerprint.slice(0, 16)}… · Showing the
-                  latest {caseQ.data.snapshots.length} distinct evidence
+                  Current fingerprint{" "}
+                  {caseQ.data.currentFingerprint.slice(0, 16)}… · Showing{" "}
+                  {caseQ.data.snapshots.length} most recent distinct evidence
                   revision{caseQ.data.snapshots.length === 1 ? "" : "s"} (up to
                   20).
                 </p>

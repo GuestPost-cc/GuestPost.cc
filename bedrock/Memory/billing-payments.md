@@ -133,10 +133,12 @@ before it lands.
 
 ## Reconciliation workbench
 
-- Every API-triggered and scheduled reconciliation scan now persists an
+- API-triggered and scheduled reconciliation scans attempt to persist an
   immutable scan record and allowlisted, deterministic per-order evidence
-  snapshot. A single order case groups its related detector symptoms without
-  changing the ledger or wallet.
+  snapshot. A scheduled run continues drift logging and staff notifications if
+  evidence persistence fails, so that run may not have stored evidence. A
+  single order case groups its related detector symptoms without changing the
+  ledger or wallet.
 - Only Finance and Super Admin can inspect case list/detail routes. The first
   release is deliberately detection-only: it has no generic adjustment,
   provider action, or balance-mutation endpoint. Any future correction must

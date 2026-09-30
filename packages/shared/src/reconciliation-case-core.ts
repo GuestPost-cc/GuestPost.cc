@@ -159,19 +159,11 @@ export async function persistReconciliationCases(
           lastDetectedAt: ranAt,
         },
         update: {
-          lastDetectedAt: ranAt,
-        },
-        select: { id: true },
-      })
-      await tx.reconciliationCase.updateMany({
-        where: {
-          id: caseRow.id,
-          currentFingerprint: { not: evidenceFingerprint },
-        },
-        data: {
           currentFingerprint: evidenceFingerprint,
+          lastDetectedAt: ranAt,
           version: { increment: 1 },
         },
+        select: { id: true },
       })
       await tx.reconciliationCaseSnapshot.createMany({
         data: [
