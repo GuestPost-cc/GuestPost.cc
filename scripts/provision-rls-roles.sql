@@ -97,7 +97,7 @@ ALTER ROLE guestpost_reporting_runtime SET search_path = pg_catalog, public;
 
 -- This recipe owns the complete membership topology for its managed roles.
 -- Remove both direct and transitive surprises left by an earlier/manual setup,
--- then recreate only the five reviewed edges below. This is safe to rerun.
+-- then recreate only the six reviewed edges below. This is safe to rerun.
 DO $memberships$
 DECLARE
   membership_row record;
