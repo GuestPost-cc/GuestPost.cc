@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+@keyframes global-loading-bar-progress {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(400%);
+  }
+}
+
+.global-loading-bar__segment {
+  animation: global-loading-bar-progress 1.2s ease-in-out infinite;
+  width: 20%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .global-loading-bar__segment {
+    animation: none;
+    width: 100%;
+  }
+}
+
 @source "../src";
 @source "../../../apps/portal/src";
 @source "../../../apps/publisher/src";

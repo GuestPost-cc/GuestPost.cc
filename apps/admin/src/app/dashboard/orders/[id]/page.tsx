@@ -1517,7 +1517,7 @@ export default function OrderDetailPage() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
           <DialogHeader>
             <DialogTitle>Force-cancel order</DialogTitle>
             <DialogDescription>

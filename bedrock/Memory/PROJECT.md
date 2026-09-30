@@ -167,6 +167,11 @@ historical audit batches.
   block-level loading skeletons), so `AdminMetricCard` renders its value region
   with a non-phrasing container rather than a paragraph to preserve valid HTML
   and hydration integrity.
+- Admin, customer, and publisher QueryClient providers mount the shared
+  `GlobalLoadingBar` for initial TanStack query loads and active mutations.
+  Cached background refetches are quiet by default; queries may opt in through
+  `meta.globalLoadingBar`. It waits briefly before appearing and respects
+  reduced-motion preferences.
 - Publisher website CSV import treats the website URL and global domain
   uniqueness as row-blocking identity boundaries. Unsupported optional cells
   are normalized to blank with row warnings; category values are skipped

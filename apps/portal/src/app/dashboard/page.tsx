@@ -371,26 +371,37 @@ export default function DashboardPage() {
                 Organization funds used for marketplace orders.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent
+              className="space-y-4"
+              aria-busy={workbenchQuery.isLoading}
+            >
               <div className="rounded-xl border bg-muted/30 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Available now
                 </p>
-                <p className="mt-1 text-2xl font-bold tabular-nums">
-                  {formatCustomerMoney(
-                    wallet?.availableBalance,
-                    wallet?.currency ?? "USD",
-                  )}
-                </p>
+                {workbenchQuery.isLoading ? (
+                  <Skeleton aria-hidden="true" className="mt-2 h-8 w-36" />
+                ) : (
+                  <p className="mt-1 text-2xl font-bold tabular-nums">
+                    {formatCustomerMoney(
+                      wallet?.availableBalance,
+                      wallet?.currency ?? "USD",
+                    )}
+                  </p>
+                )}
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Reserved</span>
-                <span className="font-semibold tabular-nums">
-                  {formatCustomerMoney(
-                    wallet?.reservedBalance,
-                    wallet?.currency ?? "USD",
-                  )}
-                </span>
+                {workbenchQuery.isLoading ? (
+                  <Skeleton aria-hidden="true" className="h-5 w-20" />
+                ) : (
+                  <span className="font-semibold tabular-nums">
+                    {formatCustomerMoney(
+                      wallet?.reservedBalance,
+                      wallet?.currency ?? "USD",
+                    )}
+                  </span>
+                )}
               </div>
               {customer.customerRole === "OWNER" ? (
                 <Button className="w-full" variant="outline" asChild>

@@ -6,6 +6,19 @@ updated: 2026-09-30
 
 # Current focus
 
+## Cross-portal visual loading polish
+
+Branch `fix/visual-loading-polish` is based on `origin/main` after PR #143. It
+adds a shared, reduced-motion-aware top loading bar to the admin, customer, and
+publisher portals for initial TanStack query loads and mutations. Cached
+background refetches stay quiet unless a query opts in with
+`meta.globalLoadingBar`. The customer dashboard's wallet snapshot skeletons
+balances before its first response, and the admin force-cancel dialog is
+viewport-bounded and scrollable. The loading-bar anti-flicker behavior has
+focused UI tests. Local UI tests, TypeScript checks for all three portals, and
+webpack production builds for the three apps pass using the existing installed
+dependencies; review and CI remain the release gates.
+
 ## Billing cancel-return resilience
 
 PR #143 (`fix/billing-cancel-return`) contains the follow-up to current `main`
