@@ -159,6 +159,12 @@ jobs:
           psql -h localhost -U guestpost -d postgres -v ON_ERROR_STOP=1 \
             -c "CREATE DATABASE guestpost_rls_boundary_test"
 
+          # The financial repair migration transfers SECURITY DEFINER trigger
+          # ownership to this provisioned NOLOGIN role under FORCE RLS.
+          psql -h localhost -U guestpost -d guestpost_rls_boundary_test \
+            -v ON_ERROR_STOP=1 -v database_name=guestpost_rls_boundary_test \
+            -f scripts/provision-rls-roles.sql
+
           DATABASE_URL=postgresql://guestpost:guestpost@localhost:5432/guestpost_rls_boundary_test \
             pnpm --filter @guestpost/database exec prisma migrate deploy
 

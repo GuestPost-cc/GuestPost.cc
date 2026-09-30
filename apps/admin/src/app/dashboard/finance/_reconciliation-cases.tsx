@@ -79,11 +79,16 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [skip, setSkip] = useState(0)
-  const [preview, setPreview] = useState<Awaited<
-    ReturnType<typeof api.admin.previewRefundCreditRepair>
-  > | null>(null)
+  const [previewState, setPreviewState] = useState<{
+    caseId: string
+    data: Awaited<ReturnType<typeof api.admin.previewRefundCreditRepair>>
+  } | null>(null)
+  const preview = previewState?.caseId === selectedId ? previewState.data : null
+  const setPreview = (value: null) => setPreviewState(value)
   const [incidentReference, setIncidentReference] = useState("")
   const [reason, setReason] = useState("")
+  const [providerRefundConfirmedAbsent, setProviderRefundConfirmedAbsent] =
+    useState(false)
   const pageSize = 20
   const refreshCase = async () => {
     await Promise.all([
@@ -96,7 +101,7 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
   }
   const previewMutation = useMutation({
     mutationFn: (caseId: string) => api.admin.previewRefundCreditRepair(caseId),
-    onSuccess: setPreview,
+    onSuccess: (data, caseId) => setPreviewState({ caseId, data }),
   })
   const proposeMutation = useMutation({
     mutationFn: () => {
@@ -106,6 +111,7 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
         evidenceDigest: preview.evidenceDigest,
         expectedCaseVersion: preview.expectedCaseVersion,
         incidentReference: incidentReference.trim(),
+        providerRefundConfirmedAbsent,
         reason: reason.trim(),
       })
     },
@@ -219,7 +225,13 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedId(caseRow.id)}
+                      onClick={() => {
+                        setPreviewState(null)
+                        setIncidentReference("")
+                        setReason("")
+                        setProviderRefundConfirmedAbsent(false)
+                        setSelectedId(caseRow.id)
+                      }}
                     >
                       Open <ChevronRight className="ml-1 h-3 w-3" />
                     </Button>
@@ -332,10 +344,10 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                     </div>
                   )}
                   {preview?.eligible && preview.featureEnabled && (
-                    <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+                    <div className="grid gap-2">
                       <input
                         className="h-9 rounded-md border bg-background px-3 text-sm"
-                        placeholder="Incident / case reference"
+                        placeholder="Provider evidence / incident reference"
                         value={incidentReference}
                         onChange={(event) =>
                           setIncidentReference(event.target.value)
@@ -349,11 +361,27 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                         onChange={(event) => setReason(event.target.value)}
                         maxLength={1000}
                       />
+                      <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={providerRefundConfirmedAbsent}
+                          onChange={(event) =>
+                            setProviderRefundConfirmedAbsent(
+                              event.target.checked,
+                            )
+                          }
+                          className="mt-0.5"
+                        />
+                        I reviewed the referenced provider records and confirm
+                        no card or bank refund was issued; this repair is only
+                        for the internal GuestPost wallet credit.
+                      </label>
                       <Button
                         size="sm"
                         onClick={() => proposeMutation.mutate()}
                         disabled={
                           proposeMutation.isPending ||
+                          !providerRefundConfirmedAbsent ||
                           incidentReference.trim().length < 3 ||
                           reason.trim().length < 20
                         }
@@ -402,6 +430,12 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                           <p className="text-xs text-muted-foreground">
                             {proposal.reason}
                           </p>
+                          <p className="text-xs text-muted-foreground">
+                            External refund absence confirmed:{" "}
+                            {proposal.providerRefundConfirmedAbsent
+                              ? "yes"
+                              : "no"}
+                          </p>
                         </div>
                         {!proposal.approval &&
                           proposal.initiatedByUserId !== user?.id && (
@@ -414,23 +448,33 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                               Approve exact proposal
                             </Button>
                           )}
-                        {proposal.approval && !proposal.execution && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  `Execute the approved USD ${proposal.amount} internal wallet-credit reversal? This cannot be undone.`,
+                        {proposal.approval &&
+                          !proposal.execution &&
+                          proposal.approval.approvedByUserId !== user?.id && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Execute the approved USD ${proposal.amount} internal wallet-credit reversal? This cannot be undone.`,
+                                  )
                                 )
-                              )
-                                executeMutation.mutate(proposal)
-                            }}
-                            disabled={executeMutation.isPending}
-                          >
-                            Execute approved repair
-                          </Button>
-                        )}
+                                  executeMutation.mutate(proposal)
+                              }}
+                              disabled={executeMutation.isPending}
+                            >
+                              Execute approved repair
+                            </Button>
+                          )}
+                        {proposal.approval &&
+                          !proposal.execution &&
+                          proposal.approval.approvedByUserId === user?.id && (
+                            <p className="text-xs text-muted-foreground">
+                              An authorized Finance or Super Admin user other
+                              than the approver must execute this repair.
+                            </p>
+                          )}
                       </div>
                     ))}
                   </div>

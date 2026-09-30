@@ -20,6 +20,7 @@ CREATE TABLE public."ReconciliationRepairProposal" (
   "caseId" TEXT NOT NULL,
   "orderId" TEXT NOT NULL,
   "sourceRefundTransactionId" TEXT NOT NULL,
+  "providerRefundConfirmedAbsent" BOOLEAN NOT NULL,
   "walletId" TEXT NOT NULL,
   "evidenceFingerprint" CHAR(64) NOT NULL,
   "evidenceDigest" CHAR(64) NOT NULL,
@@ -39,6 +40,8 @@ CREATE TABLE public."ReconciliationRepairProposal" (
     "amount" > 0 AND "amount" * 100 = TRUNC("amount" * 100)
   ),
   CONSTRAINT "ReconciliationRepairProposal_currency_check" CHECK ("currency" = 'USD'),
+  CONSTRAINT "ReconciliationRepairProposal_provider_refund_confirmation_check"
+    CHECK ("providerRefundConfirmedAbsent"),
   CONSTRAINT "ReconciliationRepairProposal_digest_check" CHECK (
     "evidenceFingerprint" ~ '^[0-9a-f]{64}$'
     AND "evidenceDigest" ~ '^[0-9a-f]{64}$'
@@ -248,7 +251,8 @@ BEGIN
   SELECT COUNT(*) INTO refund_count FROM public."Transaction"
     WHERE "orderId" = NEW."orderId" AND "type" = 'REFUND';
 
-  IF repair_case."id" IS NULL OR repair_case."orderId" <> NEW."orderId"
+  IF NOT NEW."providerRefundConfirmedAbsent"
+     OR repair_case."id" IS NULL OR repair_case."orderId" <> NEW."orderId"
      OR repair_case."currentFingerprint" <> NEW."evidenceFingerprint"
      OR repair_case."version" <> NEW."expectedCaseVersion"
      OR target_order."id" IS NULL OR target_order."version" <> NEW."expectedOrderVersion"
@@ -626,13 +630,15 @@ DROP POLICY IF EXISTS "ReconciliationCase_full_boundary_update"
 CREATE POLICY "ReconciliationCase_full_boundary_update"
 ON public."ReconciliationCase" FOR UPDATE
 USING (
-  (guestpost_rls.role_member(current_user, 'guestpost_worker_group')
+  current_user = 'guestpost_financial_repair_guard'
+  OR (guestpost_rls.role_member(current_user, 'guestpost_worker_group')
    AND current_setting('guestpost.rls_workload', true) = 'WORKER'
    AND NULLIF(current_setting('guestpost.rls_worker', true), '') IS NOT NULL)
   OR guestpost_rls.staff_role_in(ARRAY['SUPER_ADMIN', 'FINANCE'])
 )
 WITH CHECK (
-  (guestpost_rls.role_member(current_user, 'guestpost_worker_group')
+  current_user = 'guestpost_financial_repair_guard'
+  OR (guestpost_rls.role_member(current_user, 'guestpost_worker_group')
    AND current_setting('guestpost.rls_workload', true) = 'WORKER'
    AND NULLIF(current_setting('guestpost.rls_worker', true), '') IS NOT NULL)
   OR guestpost_rls.staff_role_in(ARRAY['SUPER_ADMIN', 'FINANCE'])
@@ -663,7 +669,7 @@ BEGIN
   ] LOOP
     EXECUTE format(
       'CREATE POLICY %I ON public.%I FOR SELECT USING (' ||
-      'current_user = ''guestpost_rls_authorizer'' OR ' ||
+      'current_user IN (''guestpost_rls_authorizer'', ''guestpost_financial_repair_guard'') OR ' ||
       'guestpost_rls.staff_role_in(ARRAY[''SUPER_ADMIN'', ''FINANCE'']))',
       model_name || '_finance_select', model_name
     );
@@ -690,5 +696,104 @@ BEGIN
   END IF;
 END
 $repair_grants$;
+
+-- Trigger row locks run as a dedicated NOLOGIN, NO-BYPASSRLS owner. Runtime
+-- identities cannot SET ROLE to it. Reads are limited to evidence inspected by
+-- the guards; column-scoped UPDATE ACLs exist only because PostgreSQL requires
+-- UPDATE privilege and an UPDATE policy for SELECT ... FOR SHARE under FORCE
+-- ROW LEVEL SECURITY.
+DO $repair_guard$
+DECLARE
+  model_name TEXT;
+  tables CONSTANT TEXT[] := ARRAY[
+    'ReconciliationCase', 'Order', 'Transaction', 'Wallet',
+    'PublisherCompensation', 'Website', 'Settlement', 'OrderEvent',
+    'PaymentDispute', 'OrderDispute', 'DeliveryFraudFinding',
+    'ReconciliationCaseSnapshot', 'ReconciliationRepairProposal',
+    'ReconciliationRepairApproval', 'ReconciliationRepairExecution'
+  ];
+  locked_tables CONSTANT TEXT[] := ARRAY[
+    'ReconciliationCase', 'Order', 'Transaction', 'Wallet',
+    'PublisherCompensation', 'ReconciliationRepairProposal',
+    'ReconciliationRepairApproval', 'ReconciliationRepairExecution'
+  ];
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_class relation
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public' AND relation.relname = 'ReconciliationCase'
+      AND relation.relrowsecurity AND relation.relforcerowsecurity
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_financial_repair_guard'
+      AND rolcanlogin = false AND rolbypassrls = false
+  ) THEN
+    RAISE EXCEPTION 'forced-RLS repair requires the provisioned non-login repair guard role';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_financial_repair_guard') THEN
+    GRANT USAGE ON SCHEMA public, guestpost_rls TO guestpost_financial_repair_guard;
+    GRANT SELECT ON public."ReconciliationCase", public."Order",
+      public."Transaction", public."Wallet", public."PublisherCompensation",
+      public."Website", public."Settlement", public."OrderEvent",
+      public."PaymentDispute", public."OrderDispute",
+      public."DeliveryFraudFinding", public."ReconciliationCaseSnapshot",
+      public."ReconciliationRepairProposal", public."ReconciliationRepairApproval",
+      public."ReconciliationRepairExecution"
+      TO guestpost_financial_repair_guard;
+    GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA guestpost_rls
+      TO guestpost_financial_repair_guard;
+
+    GRANT UPDATE ("version") ON public."ReconciliationCase",
+      public."Order", public."Wallet" TO guestpost_financial_repair_guard;
+    GRANT UPDATE ("description") ON public."Transaction"
+      TO guestpost_financial_repair_guard;
+    GRANT UPDATE ("createdAt") ON public."PublisherCompensation",
+      public."ReconciliationRepairProposal", public."ReconciliationRepairApproval",
+      public."ReconciliationRepairExecution" TO guestpost_financial_repair_guard;
+
+    FOREACH model_name IN ARRAY tables LOOP
+      IF model_name NOT IN (
+        'ReconciliationRepairProposal', 'ReconciliationRepairApproval',
+        'ReconciliationRepairExecution'
+      ) THEN
+        EXECUTE format(
+          'CREATE POLICY %I ON public.%I FOR SELECT USING ' ||
+          '(current_user = ''guestpost_financial_repair_guard'')',
+          model_name || '_repair_guard_select', model_name
+        );
+      END IF;
+    END LOOP;
+
+    FOREACH model_name IN ARRAY locked_tables LOOP
+      IF model_name <> 'ReconciliationCase' THEN
+        EXECUTE format(
+          'CREATE POLICY %I ON public.%I FOR UPDATE USING ' ||
+          '(current_user = ''guestpost_financial_repair_guard'') WITH CHECK ' ||
+          '(current_user = ''guestpost_financial_repair_guard'')',
+          model_name || '_repair_guard_lock', model_name
+        );
+      END IF;
+    END LOOP;
+
+    -- PostgreSQL requires the new function owner to have CREATE on the
+    -- function schema at ownership-transfer time. Grant it only inside this
+    -- migration transaction, then revoke it before commit.
+    GRANT CREATE ON SCHEMA public TO guestpost_financial_repair_guard;
+    ALTER FUNCTION public.guard_reconciliation_repair_proposal() SECURITY DEFINER;
+    ALTER FUNCTION public.guard_reconciliation_repair_proposal()
+      OWNER TO guestpost_financial_repair_guard;
+    ALTER FUNCTION public.guard_reconciliation_repair_approval() SECURITY DEFINER;
+    ALTER FUNCTION public.guard_reconciliation_repair_approval()
+      OWNER TO guestpost_financial_repair_guard;
+    ALTER FUNCTION public.guard_refund_credit_reversal() SECURITY DEFINER;
+    ALTER FUNCTION public.guard_refund_credit_reversal()
+      OWNER TO guestpost_financial_repair_guard;
+    ALTER FUNCTION public.guard_reconciliation_repair_execution() SECURITY DEFINER;
+    ALTER FUNCTION public.guard_reconciliation_repair_execution()
+      OWNER TO guestpost_financial_repair_guard;
+    REVOKE CREATE ON SCHEMA public FROM guestpost_financial_repair_guard;
+  END IF;
+END
+$repair_guard$;
 
 COMMIT;

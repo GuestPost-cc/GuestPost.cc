@@ -133,17 +133,16 @@ before it lands.
 
 ## Reconciliation workbench
 
-- API-triggered and scheduled reconciliation scans attempt to persist an
-  immutable scan record and allowlisted, deterministic per-order evidence
-  snapshot. A scheduled run continues drift logging and staff notifications if
-  evidence persistence fails, so that run may not have stored evidence. A
-  single order case groups its related detector symptoms without changing the
-  ledger or wallet.
+- Scheduled worker reconciliation is the sole writer of immutable scan records
+  and allowlisted, deterministic per-order evidence snapshots; on-demand API
+  scans are read-only reports. A scheduled run continues drift logging and
+  staff notifications if evidence persistence fails, so that run may not have
+  stored evidence. A single order case groups related detector symptoms
+  without changing the ledger or wallet.
 - Only Finance and Super Admin can inspect case list/detail routes. The first
-  release is deliberately detection-only: it has no generic adjustment,
-  provider action, or balance-mutation endpoint. Any future correction must
-  satisfy the separately approved evidence, maker-checker, runtime-mode, and
-  idempotency contract in `docs/FINANCIAL_RECONCILIATION_REPAIR_PLAN.md`.
+  release was detection-only. Phase 2 adds exactly one narrowly scoped,
+  feature-gated repair recipe below; it does not expose generic adjustments
+  or provider-money actions.
 
 Phase 2 supports one narrowly-scoped repair: reverse an erroneous internal
 force-cancel refund credit only when the exact publisher-compensation evidence

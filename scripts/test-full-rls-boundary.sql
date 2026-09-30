@@ -84,7 +84,7 @@ END
 $function$;
 
 SELECT pg_temp.assert_true(
-  (SELECT count(*) = 102
+  (SELECT count(*) = 105
    FROM pg_class AS relation
    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
    WHERE namespace.nspname = 'public'
@@ -92,7 +92,40 @@ SELECT pg_temp.assert_true(
      AND relation.relname <> '_prisma_migrations'
      AND relation.relrowsecurity
      AND relation.relforcerowsecurity),
-  'all 102 application tables must have ENABLE + FORCE RLS'
+  'all 105 application tables must have ENABLE + FORCE RLS'
+);
+
+SELECT pg_temp.assert_true(
+  NOT pg_has_role('guestpost_api_runtime', 'guestpost_financial_repair_guard', 'MEMBER')
+  AND NOT pg_has_role('guestpost_auth_runtime', 'guestpost_financial_repair_guard', 'MEMBER')
+  AND NOT pg_has_role('guestpost_worker_runtime', 'guestpost_financial_repair_guard', 'MEMBER')
+  AND NOT pg_has_role('guestpost_reporting_runtime', 'guestpost_financial_repair_guard', 'MEMBER'),
+  'no runtime identity may assume the financial repair guard role'
+);
+
+SELECT pg_temp.assert_true(
+  (SELECT count(*) = 4
+   FROM pg_proc procedure
+   JOIN pg_namespace namespace ON namespace.oid = procedure.pronamespace
+   JOIN pg_roles owner_role ON owner_role.oid = procedure.proowner
+   WHERE namespace.nspname = 'public'
+     AND procedure.proname IN (
+       'guard_reconciliation_repair_proposal',
+       'guard_reconciliation_repair_approval',
+       'guard_refund_credit_reversal',
+       'guard_reconciliation_repair_execution'
+     )
+     AND procedure.prosecdef
+     AND owner_role.rolname = 'guestpost_financial_repair_guard'),
+  'financial row-lock triggers must use the dedicated SECURITY DEFINER owner'
+);
+
+SELECT pg_temp.assert_true(
+  has_column_privilege('guestpost_financial_repair_guard', 'public."Order"', 'version', 'UPDATE')
+  AND NOT has_column_privilege('guestpost_financial_repair_guard', 'public."Order"', 'status', 'UPDATE')
+  AND NOT has_column_privilege('guestpost_financial_repair_guard', 'public."Wallet"', 'availableBalance', 'UPDATE')
+  AND NOT has_schema_privilege('guestpost_financial_repair_guard', 'public', 'CREATE'),
+  'repair guard update rights must remain column-scoped to lock-only columns'
 );
 
 BEGIN;

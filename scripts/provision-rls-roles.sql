@@ -65,6 +65,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_rls_authorizer') THEN
     CREATE ROLE guestpost_rls_authorizer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_financial_repair_guard') THEN
+    CREATE ROLE guestpost_financial_repair_guard NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+  END IF;
 END
 $roles$;
 
@@ -84,6 +87,7 @@ ALTER ROLE guestpost_auth_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NORE
 ALTER ROLE guestpost_worker_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 ALTER ROLE guestpost_reporting_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 ALTER ROLE guestpost_rls_authorizer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+ALTER ROLE guestpost_financial_repair_guard NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 
 ALTER ROLE guestpost_migrator SET search_path = pg_catalog, public;
 ALTER ROLE guestpost_api_runtime SET search_path = pg_catalog, public;
@@ -116,7 +120,8 @@ BEGIN
       'guestpost_worker_runtime',
       'guestpost_reporting_group',
       'guestpost_reporting_runtime',
-      'guestpost_rls_authorizer'
+      'guestpost_rls_authorizer',
+      'guestpost_financial_repair_guard'
     )
     OR member_role.rolname IN (
       'guestpost_schema_owner',
@@ -129,7 +134,8 @@ BEGIN
       'guestpost_worker_runtime',
       'guestpost_reporting_group',
       'guestpost_reporting_runtime',
-      'guestpost_rls_authorizer'
+      'guestpost_rls_authorizer',
+      'guestpost_financial_repair_guard'
     )
   LOOP
     EXECUTE format(
@@ -161,6 +167,11 @@ GRANT guestpost_api_group TO guestpost_api_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_auth_group TO guestpost_auth_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_worker_group TO guestpost_worker_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_reporting_group TO guestpost_reporting_runtime WITH INHERIT TRUE, SET FALSE;
+-- Only the trusted schema owner may SET ROLE to this NOLOGIN, NO-BYPASSRLS
+-- owner used by tightly scoped financial-repair row-lock trigger functions.
+-- No API, worker, auth, reporting, or credential runtime role is a member.
+GRANT guestpost_financial_repair_guard TO guestpost_schema_owner
+  WITH INHERIT FALSE, SET TRUE;
 
 ALTER ROLE guestpost_migrator IN DATABASE :"database_name"
   SET role TO 'guestpost_schema_owner';
@@ -180,7 +191,8 @@ REVOKE ALL ON DATABASE :"database_name" FROM
   guestpost_auth_runtime,
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
-  guestpost_rls_authorizer;
+  guestpost_rls_authorizer,
+  guestpost_financial_repair_guard;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_migrator;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_api_runtime;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_auth_runtime;
@@ -198,7 +210,8 @@ REVOKE ALL ON SCHEMA public FROM
   guestpost_auth_runtime,
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
-  guestpost_rls_authorizer;
+  guestpost_rls_authorizer,
+  guestpost_financial_repair_guard;
 GRANT USAGE, CREATE ON SCHEMA public TO guestpost_schema_owner;
 GRANT USAGE ON SCHEMA public TO guestpost_api_group;
 GRANT USAGE ON SCHEMA public TO guestpost_auth_group;
@@ -218,7 +231,8 @@ REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM
   guestpost_auth_runtime,
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
-  guestpost_rls_authorizer;
+  guestpost_rls_authorizer,
+  guestpost_financial_repair_guard;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
   guestpost_api_group,
   guestpost_auth_group,
@@ -229,7 +243,8 @@ REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
   guestpost_auth_runtime,
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
-  guestpost_rls_authorizer;
+  guestpost_rls_authorizer,
+  guestpost_financial_repair_guard;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
   guestpost_api_group,
   guestpost_auth_group,
@@ -240,9 +255,10 @@ REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
   guestpost_auth_runtime,
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
-  guestpost_rls_authorizer;
+  guestpost_rls_authorizer,
+  guestpost_financial_repair_guard;
 
--- The API and worker need relation-level DML for the reviewed 102-model graph;
+-- The API and worker need relation-level DML for the reviewed 105-model graph;
 -- FORCE RLS and the command-aware policy matrix decide which rows each
 -- workload may actually read or change. These grants confer no DDL, role,
 -- replication, superuser, or RLS-bypass ability. Default privileges below
@@ -258,6 +274,37 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_worker_group;
 -- memberships, and receives no mutation privilege.
 GRANT USAGE ON SCHEMA public TO guestpost_rls_authorizer;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO guestpost_rls_authorizer;
+
+-- Preserve the repair guard's object-specific ACLs on a post-migration rerun.
+-- Initial provisioning runs before the repair tables exist, so this block is
+-- intentionally conditional and never grants broad table access.
+DO $financial_repair_guard_grants$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_financial_repair_guard'
+  ) AND to_regclass('public."ReconciliationRepairProposal"') IS NOT NULL THEN
+    GRANT USAGE ON SCHEMA public, guestpost_rls
+      TO guestpost_financial_repair_guard;
+    GRANT SELECT ON public."ReconciliationCase", public."Order",
+      public."Transaction", public."Wallet", public."PublisherCompensation",
+      public."Website", public."Settlement", public."OrderEvent",
+      public."PaymentDispute", public."OrderDispute",
+      public."DeliveryFraudFinding", public."ReconciliationCaseSnapshot",
+      public."ReconciliationRepairProposal", public."ReconciliationRepairApproval",
+      public."ReconciliationRepairExecution"
+      TO guestpost_financial_repair_guard;
+    GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA guestpost_rls
+      TO guestpost_financial_repair_guard;
+    GRANT UPDATE ("version") ON public."ReconciliationCase",
+      public."Order", public."Wallet" TO guestpost_financial_repair_guard;
+    GRANT UPDATE ("description") ON public."Transaction"
+      TO guestpost_financial_repair_guard;
+    GRANT UPDATE ("createdAt") ON public."PublisherCompensation",
+      public."ReconciliationRepairProposal", public."ReconciliationRepairApproval",
+      public."ReconciliationRepairExecution" TO guestpost_financial_repair_guard;
+  END IF;
+END
+$financial_repair_guard_grants$;
 
 -- Better Auth is isolated from the API runtime. It owns session/account flows
 -- and the atomic birth-time provisioning transaction, but no marketplace,
@@ -281,8 +328,14 @@ TO guestpost_auth_group;
 -- The delivery verification worker and API delivery flows call this
 -- SECURITY INVOKER fence directly. Functions were revoked from PUBLIC above,
 -- so retain only this audited runtime surface for the two callers.
-GRANT EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)
-  TO guestpost_api_group, guestpost_worker_group;
+DO $delivery_fence_grant$
+BEGIN
+  IF to_regprocedure('public.acquire_delivery_url_claim_fence(text)') IS NOT NULL THEN
+    GRANT EXECUTE ON FUNCTION public."acquire_delivery_url_claim_fence"(text)
+      TO guestpost_api_group, guestpost_worker_group;
+  END IF;
+END
+$delivery_fence_grant$;
 
 -- Reporting starts fail-closed: connect + schema usage but no table, sequence,
 -- or function privileges. Add an approved view/query grant per report.
@@ -303,7 +356,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE
   guestpost_auth_runtime,
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
-  guestpost_rls_authorizer;
+  guestpost_rls_authorizer,
+  guestpost_financial_repair_guard;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON SEQUENCES FROM
   guestpost_api_group,
   guestpost_auth_group,
@@ -314,7 +368,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE
   guestpost_auth_runtime,
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
-  guestpost_rls_authorizer;
+  guestpost_rls_authorizer,
+  guestpost_financial_repair_guard;
 ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM
   guestpost_api_group,
   guestpost_auth_group,
@@ -325,7 +380,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE
   guestpost_auth_runtime,
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
-  guestpost_rls_authorizer;
+  guestpost_rls_authorizer,
+  guestpost_financial_repair_guard;
 
 COMMIT;
 

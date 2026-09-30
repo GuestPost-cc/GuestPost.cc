@@ -99,6 +99,9 @@ USD 5.00 customer wallet credit, but only after confirming all of the following:
   refund;
 - a locked, fresh read shows enough *available* customer wallet liability to
   reverse the credit; reserved funds are not spendable for this purpose;
+- the maker cites provider evidence and explicitly attests that no separate
+  card/bank refund was issued; this provider-evidence confirmation is frozen
+  into the immutable proposal for the checker to review;
 - there is no concurrent order/wallet mutation, unresolved payment dispute, or
   other state that makes the proposed correction ambiguous.
 
@@ -247,10 +250,21 @@ API and worker, permissions are tested, and case history is immutable.
   and durable notification.
 - Add reconciliation support for the new compensating transaction.
 
-For the Phase 2 implementation, mutation endpoints additionally require
-`FINANCIAL_RECONCILIATION_REPAIRS_ENABLED=true`; the default is disabled. Read-
-only previews remain available to Finance/Super Admin. Enabling the flag does
-not bypass the required exact `FINANCE_RUNTIME_MODE=recovery_only` check.
+For the Phase 2 staging implementation, mutation endpoints additionally
+require `FINANCIAL_RECONCILIATION_REPAIRS_ENABLED=true`,
+`FINANCE_RUNTIME_MODE=recovery_only`,
+`DEPLOYMENT_ENVIRONMENT=staging`, and the explicit
+`FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS=true` exception. This
+temporary MFA bypass is permitted only with maker-checker and is not valid for
+production. Production mutations remain disabled until verified staff
+step-up/MFA is implemented and enforced.
+
+When execution reverses an eligible internal wallet credit, notify the
+customer with: “A credit of $5.00 applied to your account on [Date] due to an
+order cancellation error has been reversed. Your order cancellation remains
+in effect, and the publisher has been compensated. If you have questions,
+please contact support with reference case #[CaseID].” The amount, date, and
+case ID are populated from the approved repair evidence.
 
 **Exit:** unsafe cases fail closed; parallel/replayed commands yield exactly
 one compensation; a source refund cannot be reversed more than once or across
@@ -263,6 +277,9 @@ orders/wallets/currencies.
   leaking internal notes.
 - Run migration and end-to-end test in isolated Coolify staging with test-only
   DB/payment credentials and `recovery_only` behavior.
+- Provision the non-login financial-repair guard role before applying the
+  migration; verify its trigger ownership, RLS policies, and runtime role
+  separation after deployment.
 - Exercise the $5 force-cancel case plus failure/concurrency matrix below.
 
 **Exit:** staging canary proves `purchase = compensation + supported refund`
@@ -300,7 +317,8 @@ variance.
   blocked case.
 - No publisher compensation, partial compensation, invalid reason, wrong
   publisher, wrong order, multiple refund rows, missing purchase, refund already
-  externally sent, and unresolved dispute: no unsupported recipe executes.
+  externally sent, unconfirmed provider evidence, and unresolved dispute: no
+  unsupported recipe executes.
 - Wrong role, self-approval, stale approval digest, changed order version,
   missing/invalid mode, `locked`, and `recovery_only`: rejected as policy
   requires.
@@ -329,14 +347,16 @@ never quiet an alert by resolving/dismissing a case without matching evidence.
 1. Finance must confirm the example incident's provider and wallet evidence and
    disposition; screenshot findings alone do not prove whether the customer
    used the wallet credit.
-2. Product/Finance must decide what to do if an erroneous refund credit has
-   already been spent. This plan defaults to blocked/manual review and does not
-   create customer debt or a negative wallet.
-3. Security owners must define the available staff step-up authentication
-   mechanism and production eligibility, since universal staff step-up/MFA is
-   not currently recorded as implemented.
-4. Finance must approve the customer-facing wording and notification timing
-   when a prior wallet credit is reversed.
+2. **Resolved:** if an erroneous refund credit has already been spent or
+   reserved, block the repair for manual Finance review; never create a
+   negative wallet or customer debt.
+3. **Staging-only decision:** temporarily bypass step-up/MFA for staging tests
+   with strict two-person maker-checker. Production eligibility still requires
+   verified staff step-up/MFA.
+4. **Approved wording:** use the customer notification copy above for a
+   completed wallet-credit reversal.
 
-Until those decisions and staging exit criteria are met, reconciliation remains
-detection-only for financial corrections.
+The specific $5 incident remains investigation-only until its provider and
+wallet evidence confirms that the erroneous refund was strictly an internal
+GuestPost wallet credit and no separate card/bank refund occurred. The case
+summary and finding codes alone do not establish that fact.

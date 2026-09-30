@@ -122,6 +122,7 @@ is a separate administrator action after connection-level verification.
 | `guestpost_worker_group`, `guestpost_worker_runtime` | Platform job tables only, subject to forced policies. |
 | `guestpost_reporting_group`, `guestpost_reporting_runtime` | Starts with no table access. |
 | `guestpost_rls_authorizer` | `NOLOGIN`, `NOINHERIT`, no membership and no bypass; owns boolean-only `SECURITY DEFINER` policy helpers after activation. |
+| `guestpost_financial_repair_guard` | `NOLOGIN`, `NOINHERIT`, no bypass; only `guestpost_schema_owner` may `SET ROLE` to it. Owns repair row-lock triggers and has narrow evidence reads plus column-scoped lock privileges under dedicated RLS policies. Runtime identities are not members. |
 
 Every managed role is `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`,
 `NOREPLICATION`, and `NOBYPASSRLS`. Provisioning removes unexpected direct or
@@ -137,6 +138,9 @@ Default privileges grant no application access. Every migration that creates a t
 - the Prisma model manifest and full-boundary migration/next policy migration;
 - the exact API, auth, worker, or reporting relation grants, plus read-only
   `guestpost_rls_authorizer` access for every new policy root;
+- if a trigger uses row-locking selects under forced RLS, a separately
+  provisioned NOLOGIN guard owner, exact `SELECT`/column-level `UPDATE` grants,
+  matching RLS policies, and an ownership/runtime-membership test;
 - the activation catalog count and the destructive boundary test;
 - command-specific policy tests, including a non-owner and no-context case.
 

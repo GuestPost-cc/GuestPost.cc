@@ -12,11 +12,14 @@ Branch `feat/financial-reconciliation-repair-phase2` implements a narrowly
 scoped, maker-checker reversal for erroneous internal force-cancel refund
 credits, with Finance/Super Admin RBAC, fail-closed recovery-mode gates,
 immutable ledger/audit evidence, customer notification, and an admin workflow.
-Local monorepo typecheck, focused shared tests, and formatting checks pass.
-Remaining gates are API-focused tests, PostgreSQL migration rehearsal (Docker
-is unavailable locally), GitHub CI, CodeRabbit, and Strix review. Keep the new
-repair feature flag off outside an approved recovery window; this branch has
-not been merged or deployed.
+Local monorepo typecheck, Prisma validation, focused API/shared tests, and
+formatting checks pass. Durable reconciliation evidence is worker-written;
+on-demand staff scans remain report-only under the API role's least-privilege
+RLS grants. The specific $5 incident still needs provider-side evidence before
+it can be proposed for repair. Remaining gates are PostgreSQL migration
+rehearsal (Docker is unavailable locally), GitHub CI, CodeRabbit, and Strix
+review. Keep the repair feature flag off outside an approved recovery window;
+this branch has not been merged or deployed.
 
 ## Force-cancel money conservation
 

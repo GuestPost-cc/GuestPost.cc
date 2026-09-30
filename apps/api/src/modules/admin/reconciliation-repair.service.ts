@@ -56,7 +56,26 @@ export class ReconciliationRepairService {
           "This repair is available only during an approved recovery window.",
       })
     }
+    if (
+      process.env.DEPLOYMENT_ENVIRONMENT !== "staging" ||
+      process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS !== "true"
+    ) {
+      throw new ServiceUnavailableException({
+        code: "RECONCILIATION_REPAIR_STEP_UP_REQUIRED",
+        message:
+          "Repairs are staging-only until verified staff step-up authentication is available.",
+      })
+    }
     assertApiFinanceOperationAllowed("recovery")
+  }
+
+  private mutationsEnabled() {
+    return (
+      process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED === "true" &&
+      process.env.FINANCE_RUNTIME_MODE === "recovery_only" &&
+      process.env.DEPLOYMENT_ENVIRONMENT === "staging" &&
+      process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS === "true"
+    )
   }
 
   private async load(
@@ -99,6 +118,8 @@ export class ReconciliationRepairService {
         (item: any) => item.type === "REFUND_REVERSAL",
       ) ?? []
     const source = refunds.length === 1 ? refunds[0] : null
+    const purchases =
+      order?.transactions.filter((item: any) => item.type === "PURCHASE") ?? []
     const wallet = source?.walletId
       ? await tx.wallet.findUnique({ where: { id: source.walletId } })
       : null
@@ -129,6 +150,16 @@ export class ReconciliationRepairService {
       blockers.push("NOT_A_PUBLISHER_ORDER")
     if (refunds.length !== 1 || !source || reversals.length > 0)
       blockers.push("REFUND_SOURCE_NOT_UNIQUE_OR_ALREADY_REVERSED")
+    if (
+      purchases.length !== 1 ||
+      !order ||
+      purchases[0]?.amount?.toString() !== `-${order.amount?.toString()}` ||
+      purchases[0]?.currency !== "USD" ||
+      purchases[0]?.walletId !== source?.walletId ||
+      purchases[0]?.provider ||
+      purchases[0]?.providerRef
+    )
+      blockers.push("PURCHASE_EVIDENCE_INVALID")
     if (
       source &&
       (source.amount?.toString() !== order.amount?.toString() ||
@@ -250,6 +281,14 @@ export class ReconciliationRepairService {
         walletId: source.walletId,
         createdAt: source.createdAt.toISOString(),
       },
+      purchase: purchases.length === 1 && {
+        id: purchases[0].id,
+        amount: String(purchases[0].amount),
+        currency: purchases[0].currency,
+        walletId: purchases[0].walletId,
+        provider: purchases[0].provider,
+        providerRef: purchases[0].providerRef,
+      },
       compensation: compensation && {
         id: compensation.id,
         amount: String(compensation.amount),
@@ -322,9 +361,7 @@ export class ReconciliationRepairService {
           : null,
       immutableEvidence:
         "The original refund and decision records remain unchanged.",
-      featureEnabled:
-        process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED === "true" &&
-        process.env.FINANCE_RUNTIME_MODE === "recovery_only",
+      featureEnabled: this.mutationsEnabled(),
     }
   }
 
@@ -334,6 +371,13 @@ export class ReconciliationRepairService {
     input: ProposeRefundCreditRepairDto,
   ) {
     this.assertEnabled()
+    if (!input.providerRefundConfirmedAbsent) {
+      throw new ConflictException({
+        code: "PROVIDER_REFUND_EVIDENCE_UNCONFIRMED",
+        message:
+          "A provider-free internal wallet credit must be confirmed from independent payment-provider evidence before proposing a repair.",
+      })
+    }
     const context = await this.load(caseId)
     if (
       context.blockers.length ||
@@ -351,6 +395,7 @@ export class ReconciliationRepairService {
       amount: String(context.source.amount),
       source: context.source.id,
       incidentReference: input.incidentReference,
+      providerRefundConfirmedAbsent: input.providerRefundConfirmedAbsent,
       reason: input.reason.trim(),
       caseVersion: context.caseRow.version,
       orderVersion: context.order.version,
@@ -370,11 +415,20 @@ export class ReconciliationRepairService {
           throw new ConflictException(
             "Repair evidence changed; create a fresh preview",
           )
+        const activeProposal = await tx.reconciliationRepairProposal.findFirst({
+          where: { caseId, expiresAt: { gt: new Date() } },
+          select: { id: true },
+        })
+        if (activeProposal)
+          throw new ConflictException(
+            "An unexpired repair proposal already exists for this case",
+          )
         const proposal = await tx.reconciliationRepairProposal.create({
           data: {
             caseId,
             orderId: current.order.id,
             sourceRefundTransactionId: current.source.id,
+            providerRefundConfirmedAbsent: input.providerRefundConfirmedAbsent,
             walletId: current.wallet.id,
             evidenceFingerprint: current.caseRow.currentFingerprint,
             evidenceDigest: current.evidenceDigest,
@@ -409,6 +463,8 @@ export class ReconciliationRepairService {
               amount: current.source.amount.toString(),
               currency: "USD",
               incidentReference: input.incidentReference,
+              providerRefundConfirmedAbsent:
+                input.providerRefundConfirmedAbsent,
             },
           },
           tx,
@@ -645,7 +701,7 @@ export class ReconciliationRepairService {
             aggregateId: current.order.id,
             organizationId: current.order.organizationId,
             title: "Wallet refund credit corrected",
-            message: `An internal GuestPost wallet refund credit of USD ${freshProposal.amount.toString()} was corrected for order ${current.order.id}. This notice concerns your GuestPost wallet only; it does not indicate a bank or card refund. Contact support with case reference ${freshProposal.incidentReference} if you have questions.`,
+            message: `A credit of $${money(freshProposal.amount).toFixed(2)} applied to your account on ${current.source.createdAt.toISOString().slice(0, 10)} due to an order cancellation error has been reversed. Your order cancellation remains in effect, and the publisher has been compensated. If you have questions, please contact support with reference case #${caseId}.`,
             actionPath: `/dashboard/orders/${current.order.id}`,
             dedupKey: `reconciliation-repair:${proposalId}:customer-notice`,
             recipientUserIds: recipients,

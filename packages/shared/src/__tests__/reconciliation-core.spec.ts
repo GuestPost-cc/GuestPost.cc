@@ -1380,17 +1380,12 @@ describe("runReconciliation with mock prisma", () => {
     })
 
     const report = await runReconciliation(prisma as any)
-    expect(report.refundRecon).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: ReconciliationCode.REFUND_PARTIAL }),
-        expect.objectContaining({
-          code: ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_INVALID,
-        }),
-        expect.objectContaining({
-          code: ReconciliationCode.REFUND_REVERSAL_INVALID,
-        }),
-      ]),
+    const codes = report.refundRecon.map((row: any) => row.code)
+    expect(codes).not.toContain(ReconciliationCode.REFUND_PARTIAL)
+    expect(codes).not.toContain(
+      ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_INVALID,
     )
+    expect(codes).not.toContain(ReconciliationCode.REFUND_REVERSAL_INVALID)
   })
 
   it("reports a refund reversal that is not an exact internal source match", async () => {

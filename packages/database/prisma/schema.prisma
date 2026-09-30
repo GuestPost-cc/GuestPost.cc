@@ -565,6 +565,7 @@ model User {
   completedPayoutExecutions      PayoutExecution[]               @relation("PayoutCompletionActor")
   initiatedReconciliationRepairs ReconciliationRepairProposal[]  @relation("ReconciliationRepairInitiator")
   approvedReconciliationRepairs  ReconciliationRepairApproval[]  @relation("ReconciliationRepairApprover")
+  approvedReconciliationRepairExecutions ReconciliationRepairExecution[] @relation("ReconciliationRepairExecutionApprover")
   executedReconciliationRepairs  ReconciliationRepairExecution[] @relation("ReconciliationRepairExecutor")
   cancelledPayoutExecutions      PayoutExecution[]               @relation("PayoutCancellationActor")
   adminVerifiedDeliveryVersions  OrderDeliveryVersion[]          @relation("AdminVerifiedVersion")
@@ -2316,6 +2317,7 @@ model ReconciliationRepairProposal {
   caseId                    String
   orderId                   String
   sourceRefundTransactionId String
+  providerRefundConfirmedAbsent Boolean
   walletId                  String
   evidenceFingerprint       String   @db.Char(64)
   evidenceDigest            String   @db.Char(64)
@@ -2331,16 +2333,16 @@ model ReconciliationRepairProposal {
   expiresAt                 DateTime
   createdAt                 DateTime @default(now())
 
-  case         ReconciliationCase             @relation(fields: [caseId], references: [id], onDelete: Restrict)
-  order        Order                          @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  sourceRefund Transaction                    @relation("RepairProposalSourceRefund", fields: [sourceRefundTransactionId], references: [id], onDelete: Restrict)
-  wallet       Wallet                         @relation(fields: [walletId], references: [id], onDelete: Restrict)
-  initiatedBy  User                           @relation("ReconciliationRepairInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  case         ReconciliationCase             @relation(fields: [caseId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_case_fkey")
+  order        Order                          @relation(fields: [orderId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_order_fkey")
+  sourceRefund Transaction                    @relation("RepairProposalSourceRefund", fields: [sourceRefundTransactionId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_source_fkey")
+  wallet       Wallet                         @relation(fields: [walletId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_wallet_fkey")
+  initiatedBy  User                           @relation("ReconciliationRepairInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_initiator_fkey")
   approval     ReconciliationRepairApproval?
   execution    ReconciliationRepairExecution?
 
   @@index([caseId, createdAt])
-  @@index([sourceRefundTransactionId, expiresAt])
+  @@index([sourceRefundTransactionId, expiresAt], map: "ReconciliationRepairProposal_source_expires_idx")
 }
 
 model ReconciliationRepairApproval {
@@ -2350,8 +2352,8 @@ model ReconciliationRepairApproval {
   approvedByUserId String
   createdAt        DateTime @default(now())
 
-  proposal   ReconciliationRepairProposal @relation(fields: [proposalId], references: [id], onDelete: Restrict)
-  approvedBy User                         @relation("ReconciliationRepairApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  proposal   ReconciliationRepairProposal @relation(fields: [proposalId], references: [id], onDelete: Restrict, map: "ReconciliationRepairApproval_proposal_fkey")
+  approvedBy User                         @relation("ReconciliationRepairApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict, map: "ReconciliationRepairApproval_approver_fkey")
 }
 
 model ReconciliationRepairExecution {
@@ -2374,13 +2376,14 @@ model ReconciliationRepairExecution {
   requestFingerprint        String   @db.Char(64)
   createdAt                 DateTime @default(now())
 
-  proposal     ReconciliationRepairProposal @relation(fields: [proposalId], references: [id], onDelete: Restrict)
-  case         ReconciliationCase           @relation(fields: [caseId], references: [id], onDelete: Restrict)
-  order        Order                        @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  sourceRefund Transaction                  @relation("ReconciliationRepairSource", fields: [sourceRefundTransactionId], references: [id], onDelete: Restrict)
-  reversal     Transaction                  @relation("ReconciliationRepairReversal", fields: [reversalTransactionId], references: [id], onDelete: Restrict)
-  wallet       Wallet                       @relation(fields: [walletId], references: [id], onDelete: Restrict)
-  executedBy   User                         @relation("ReconciliationRepairExecutor", fields: [executedByUserId], references: [id], onDelete: Restrict)
+  proposal     ReconciliationRepairProposal @relation(fields: [proposalId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_proposal_fkey")
+  case         ReconciliationCase           @relation(fields: [caseId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_case_fkey")
+  order        Order                        @relation(fields: [orderId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_order_fkey")
+  sourceRefund Transaction                  @relation("ReconciliationRepairSource", fields: [sourceRefundTransactionId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_source_fkey")
+  reversal     Transaction                  @relation("ReconciliationRepairReversal", fields: [reversalTransactionId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_reversal_fkey")
+  wallet       Wallet                       @relation(fields: [walletId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_wallet_fkey")
+  executedBy   User                         @relation("ReconciliationRepairExecutor", fields: [executedByUserId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_executor_fkey")
+  approvedBy   User                         @relation("ReconciliationRepairExecutionApprover", fields: [approverUserId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_approver_fkey")
 
   @@unique([caseId, idempotencyKey])
   @@index([caseId, createdAt])

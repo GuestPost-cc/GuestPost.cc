@@ -1,5 +1,4 @@
 import { runReconciliation } from "@guestpost/shared"
-import { persistReconciliationCases } from "@guestpost/shared/dist/reconciliation-case-core"
 import {
   BadRequestException,
   Injectable,
@@ -22,10 +21,6 @@ export class ReconciliationService {
 
   async run(userId?: string) {
     const report = await runReconciliation(this.prisma)
-    const ingestion = await persistReconciliationCases(this.prisma, report, {
-      detector: "admin",
-      initiatedById: userId ?? null,
-    })
     const moduleKeys = [
       "walletDrift",
       "publisherDrift",
@@ -49,13 +44,14 @@ export class ReconciliationService {
         scanDurationMs: report.scanDurationMs,
         summary: report.summary,
         issueCodes,
-        reconciliationScanId: ingestion.scanId,
-        casesRecorded: ingestion.cases.length,
+        // On-demand API scans are read-only. The scheduled worker is the
+        // only writer of immutable scan/case evidence under the RLS boundary.
+        persistedAsEvidence: false,
       },
       userId: userId ?? null,
       organizationId: null,
     })
-    return { ...report, reconciliationScanId: ingestion.scanId }
+    return report
   }
 
   async listCases(input: { take: number; skip: number; status?: string }) {
@@ -141,6 +137,7 @@ export class ReconciliationService {
             amount: true,
             currency: true,
             incidentReference: true,
+            providerRefundConfirmedAbsent: true,
             reason: true,
             initiatedByUserId: true,
             expiresAt: true,

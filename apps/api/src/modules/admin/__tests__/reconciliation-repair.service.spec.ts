@@ -5,6 +5,9 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
   const originalFeatureFlag =
     process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED
   const originalFinanceMode = process.env.FINANCE_RUNTIME_MODE
+  const originalDeploymentEnvironment = process.env.DEPLOYMENT_ENVIRONMENT
+  const originalMfaBypass =
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS
 
   afterEach(() => {
     if (originalFeatureFlag === undefined)
@@ -14,6 +17,14 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     if (originalFinanceMode === undefined)
       delete process.env.FINANCE_RUNTIME_MODE
     else process.env.FINANCE_RUNTIME_MODE = originalFinanceMode
+    if (originalDeploymentEnvironment === undefined)
+      delete process.env.DEPLOYMENT_ENVIRONMENT
+    else process.env.DEPLOYMENT_ENVIRONMENT = originalDeploymentEnvironment
+    if (originalMfaBypass === undefined)
+      delete process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS
+    else
+      process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS =
+        originalMfaBypass
   })
 
   it("does not create a proposal unless the feature is explicitly enabled", async () => {
@@ -35,7 +46,7 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
   it("does not allow repair mutations outside recovery-only runtime mode", async () => {
     process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED = "true"
     process.env.FINANCE_RUNTIME_MODE = "normal"
-    const prisma = { reconciliationRepairApproval: { findFirst: jest.fn() } }
+    const prisma = { $transaction: jest.fn() }
     const service = new ReconciliationRepairService(
       prisma as any,
       {} as any,
@@ -45,6 +56,24 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     await expect(
       service.approve("case-1", "proposal-1", "finance-user-2", "a".repeat(64)),
     ).rejects.toBeInstanceOf(ServiceUnavailableException)
-    expect(prisma.reconciliationRepairApproval.findFirst).not.toHaveBeenCalled()
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it("keeps the temporary MFA bypass unavailable outside staging", async () => {
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED = "true"
+    process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+    process.env.DEPLOYMENT_ENVIRONMENT = "production"
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS = "true"
+    const prisma = { $transaction: jest.fn() }
+    const service = new ReconciliationRepairService(
+      prisma as any,
+      {} as any,
+      {} as any,
+    )
+
+    await expect(
+      service.approve("case-1", "proposal-1", "finance-user-2", "a".repeat(64)),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 })

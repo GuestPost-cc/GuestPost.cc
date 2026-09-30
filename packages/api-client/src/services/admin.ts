@@ -1623,6 +1623,7 @@ export class AdminService {
         amount: string | number
         currency: string
         incidentReference: string
+        providerRefundConfirmedAbsent: boolean
         reason: string
         initiatedByUserId: string
         expiresAt: string
@@ -1671,6 +1672,7 @@ export class AdminService {
       evidenceDigest: string
       expectedCaseVersion: number
       incidentReference: string
+      providerRefundConfirmedAbsent: boolean
       reason: string
     },
   ) {
