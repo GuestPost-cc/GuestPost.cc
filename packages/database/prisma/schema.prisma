@@ -2293,8 +2293,8 @@ model ReconciliationCase {
   @@index([orderId])
 }
 
-// Every scheduled or on-demand scan is retained. This lets staff distinguish
-// recurring evidence from a materially different detector result.
+// Every scheduled or on-demand scan report is retained. Case snapshots below
+// retain only distinct evidence revisions, not duplicate scan occurrences.
 model ReconciliationScan {
   id            String   @id @default(cuid())
   reportVersion Int
@@ -2324,7 +2324,7 @@ model ReconciliationCaseSnapshot {
   case ReconciliationCase @relation(fields: [caseId], references: [id], onDelete: Restrict)
   scan ReconciliationScan @relation(fields: [scanId], references: [id], onDelete: Restrict)
 
-  @@unique([caseId, scanId])
+  @@unique([caseId, evidenceFingerprint])
   @@index([caseId, createdAt])
   @@index([evidenceFingerprint])
 }

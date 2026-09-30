@@ -159,22 +159,33 @@ export async function persistReconciliationCases(
           lastDetectedAt: ranAt,
         },
         update: {
-          currentFingerprint: evidenceFingerprint,
           lastDetectedAt: ranAt,
-          version: { increment: 1 },
         },
         select: { id: true },
       })
-      await tx.reconciliationCaseSnapshot.create({
-        data: {
-          caseId: caseRow.id,
-          scanId: scan.id,
-          evidenceFingerprint,
-          findingCodes: [
-            ...new Set(findings.map((finding) => finding.code)),
-          ].sort(),
-          findings,
+      await tx.reconciliationCase.updateMany({
+        where: {
+          id: caseRow.id,
+          currentFingerprint: { not: evidenceFingerprint },
         },
+        data: {
+          currentFingerprint: evidenceFingerprint,
+          version: { increment: 1 },
+        },
+      })
+      await tx.reconciliationCaseSnapshot.createMany({
+        data: [
+          {
+            caseId: caseRow.id,
+            scanId: scan.id,
+            evidenceFingerprint,
+            findingCodes: [
+              ...new Set(findings.map((finding) => finding.code)),
+            ].sort(),
+            findings,
+          },
+        ],
+        skipDuplicates: true,
       })
       cases.push({ id: caseRow.id, orderId, fingerprint: evidenceFingerprint })
     }

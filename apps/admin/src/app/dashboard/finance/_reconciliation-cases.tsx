@@ -210,8 +210,9 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                 <p className="text-xs text-muted-foreground">
                   Evidence fingerprint{" "}
                   {caseQ.data.currentFingerprint.slice(0, 16)}… · Showing the
-                  latest {caseQ.data.snapshots.length} scan snapshot
-                  {caseQ.data.snapshots.length === 1 ? "" : "s"} (up to 20).
+                  latest {caseQ.data.snapshots.length} distinct evidence
+                  revision{caseQ.data.snapshots.length === 1 ? "" : "s"} (up to
+                  20).
                 </p>
               </div>
             )}

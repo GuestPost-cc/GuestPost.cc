@@ -61,8 +61,8 @@ CREATE INDEX "ReconciliationCase_orderId_idx" ON "ReconciliationCase"("orderId")
 CREATE INDEX "ReconciliationScan_ranAt_idx" ON "ReconciliationScan"("ranAt");
 CREATE INDEX "ReconciliationScan_detector_ranAt_idx"
   ON "ReconciliationScan"("detector", "ranAt");
-CREATE UNIQUE INDEX "ReconciliationCaseSnapshot_caseId_scanId_key"
-  ON "ReconciliationCaseSnapshot"("caseId", "scanId");
+CREATE UNIQUE INDEX "ReconciliationCaseSnapshot_caseId_evidenceFingerprint_key"
+  ON "ReconciliationCaseSnapshot"("caseId", "evidenceFingerprint");
 CREATE INDEX "ReconciliationCaseSnapshot_caseId_createdAt_idx"
   ON "ReconciliationCaseSnapshot"("caseId", "createdAt");
 CREATE INDEX "ReconciliationCaseSnapshot_evidenceFingerprint_idx"
