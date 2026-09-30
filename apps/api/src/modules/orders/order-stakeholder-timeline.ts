@@ -18,6 +18,8 @@ export type OrderStakeholderTimelineEntry = {
   severity: "INFO" | "WARNING" | "CRITICAL" | "SUCCESS"
   title: string
   summary: string
+  reason?: string
+  decisionReason?: string
   financialImpact?: {
     currency: string
     customerRefund?: string
@@ -126,6 +128,24 @@ export function buildOrderStakeholderTimeline(
   const reviewStillBlocked = (order.fraudFlags ?? []).some(
     (flag: any) => flag.hold != null,
   )
+  const compensation = order.publisherCompensation
+  const refundEvent = compensation
+    ? (order.events ?? []).find((event: any) => {
+        const metadata = event.metadata
+        return (
+          event.eventType === "REFUND_ISSUED" &&
+          metadata &&
+          typeof metadata === "object" &&
+          !Array.isArray(metadata) &&
+          metadata.refundTransactionId === compensation.refundTransactionId
+        )
+      })
+    : null
+  const decisionReason =
+    typeof refundEvent?.metadata?.reason === "string" &&
+    refundEvent.metadata.reason.trim().length <= 2_200
+      ? refundEvent.metadata.reason.trim()
+      : undefined
 
   for (const [flagIndex, flag] of (order.fraudFlags ?? []).entries()) {
     entries.push({
@@ -192,6 +212,12 @@ export function buildOrderStakeholderTimeline(
   for (const [refundIndex, refund] of (order.transactions ?? [])
     .filter((transaction: any) => transaction.type === "REFUND")
     .entries()) {
+    const refundAmount = decimalString(refund.amount)
+    const compensationOffsetsRefund =
+      compensation?.refundTransactionId === refund.id &&
+      compensation.refundTransaction?.reference?.startsWith(
+        `force-cancel:${order.id}:`,
+      )
     const showAmount =
       viewer === "CUSTOMER" || viewer === "FINANCE" || viewer === "SUPER_ADMIN"
     entries.push({
@@ -200,24 +226,28 @@ export function buildOrderStakeholderTimeline(
       occurredAt: refund.createdAt,
       status: "COMPLETED",
       severity: "SUCCESS",
-      title: "Customer refund completed",
+      title:
+        compensationOffsetsRefund && !isPositiveDecimal(refundAmount)
+          ? "No customer refund was issued"
+          : "Customer refund completed",
       summary:
         viewer === "CUSTOMER"
-          ? "The refund was returned to your platform wallet."
+          ? compensationOffsetsRefund && !isPositiveDecimal(refundAmount)
+            ? "No money was returned to your wallet; the paid order amount was allocated to publisher compensation."
+            : "The refund was returned to your platform wallet."
           : viewer === "PUBLISHER"
             ? "The customer refund is complete. Your publisher financial outcome is shown separately when applicable."
             : "The authoritative customer refund ledger entry is complete.",
       ...(showAmount && {
         financialImpact: {
           currency: refund.currency,
-          customerRefund: decimalString(refund.amount),
+          customerRefund: refundAmount,
         },
       }),
     })
   }
 
-  const compensation = order.publisherCompensation
-  if (compensation && viewer !== "CUSTOMER") {
+  if (compensation) {
     const debtApplied = compensation.debtRepaymentTransaction
       ? decimalString(compensation.debtRepaymentTransaction.amount).replace(
           /^-/,
@@ -235,13 +265,28 @@ export function buildOrderStakeholderTimeline(
       severity: isPositiveDecimal(amount) ? "SUCCESS" : "INFO",
       title: "Publisher financial outcome recorded",
       summary:
-        viewer === "PUBLISHER"
+        viewer === "CUSTOMER"
           ? compensation.disposition === "NONE"
-            ? "The reviewed refund does not include publisher compensation."
-            : "Publisher compensation was recorded. Any existing debt was netted before funds became withdrawable."
-          : viewer === "OPERATIONS"
-            ? "Finance recorded the publisher outcome for this refunded order."
-            : `The authoritative publisher compensation decision is ${compensation.disposition}.`,
+            ? "No publisher compensation was recorded for this cancellation decision."
+            : "Publisher compensation was applied from the order payment. The customer refund amount is shown separately."
+          : viewer === "PUBLISHER"
+            ? compensation.disposition === "NONE"
+              ? "The reviewed refund does not include publisher compensation."
+              : "Publisher compensation was recorded. Any existing debt was netted before funds became withdrawable."
+            : viewer === "OPERATIONS"
+              ? "Finance recorded the publisher outcome for this refunded order."
+              : `The authoritative publisher compensation decision is ${compensation.disposition}.`,
+      reason:
+        viewer === "CUSTOMER" || viewer === "PUBLISHER"
+          ? compensation.reason
+          : undefined,
+      decisionReason:
+        (viewer === "CUSTOMER" || viewer === "PUBLISHER") &&
+        compensation.refundTransaction?.reference?.startsWith(
+          `force-cancel:${order.id}:`,
+        )
+          ? decisionReason
+          : undefined,
       ...(showAmount && {
         financialImpact: {
           currency: compensation.currency,

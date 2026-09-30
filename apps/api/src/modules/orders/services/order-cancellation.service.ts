@@ -1138,12 +1138,34 @@ export class OrderCancellationService {
       orderId,
       async (tx: any) => {
         const order = await this.loadOrder(tx, orderId)
-        this.assertExpectedVersion(order.version, body.expectedVersion)
         if (
           (TERMINAL_ORDER_STATUSES as readonly string[]).includes(order.status)
         ) {
+          if (
+            order.status === "REFUNDED" &&
+            order.paymentStatus === "REFUNDED" &&
+            body.idempotencyKey
+          ) {
+            return (
+              await this.refund.refundOrderInTransaction(
+                tx,
+                order,
+                `Emergency cancellation: ${this.reasonText(body.reasonCode, auditNote)}`,
+                staffUserId,
+                `force-cancel:${orderId}:${body.idempotencyKey}`,
+                finalResponsibility,
+                {
+                  ...body.publisherCompensation,
+                  effectiveOrderStatus:
+                    order.dispute?.previousStatus ?? order.status,
+                },
+                true,
+              )
+            ).order
+          }
           return order
         }
+        this.assertExpectedVersion(order.version, body.expectedVersion)
         const confirmedFraudFinding = await tx.deliveryFraudFinding.findFirst({
           where: { orderId },
           select: { cancellationRequestId: true },
@@ -1162,13 +1184,14 @@ export class OrderCancellationService {
               order,
               `Emergency cancellation: ${this.reasonText(body.reasonCode, auditNote)}`,
               staffUserId,
-              `force-cancel:${orderId}:${body.idempotencyKey ?? order.version}`,
+              `force-cancel:${orderId}:${body.idempotencyKey ?? "default"}`,
               finalResponsibility,
               {
                 ...body.publisherCompensation,
                 effectiveOrderStatus:
                   order.dispute?.previousStatus ?? order.status,
               },
+              true,
             )
           ).order
         }

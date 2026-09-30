@@ -6,6 +6,16 @@ updated: 2026-09-30
 
 # Current focus
 
+## Force-cancel money conservation
+
+PR #145 (`fix/order-force-cancel-money-conservation`) corrects paid
+force-cancel allocation so customer refund plus publisher compensation cannot
+exceed captured order gross. CodeRabbit found partial-refund credit-note and
+replay edge cases; fixes and regression tests are pushed. The PR is rebased on
+current `main`; wait for CodeRabbit, Strix, and protected CI before merge. Render
+remains a manual deployment owner, and this additive database guard requires
+the documented migration/drain gates before promotion.
+
 ## Cross-portal visual loading polish
 
 Branch `fix/visual-loading-polish` is based on `origin/main` after PR #143. It

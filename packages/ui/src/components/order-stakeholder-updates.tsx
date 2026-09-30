@@ -49,6 +49,8 @@ export interface OrderStakeholderUpdate {
   severity: OrderStakeholderUpdateSeverity
   title: string
   summary: string
+  reason?: string
+  decisionReason?: string
   financialImpact?: OrderStakeholderFinancialImpact
 }
 
@@ -210,6 +212,28 @@ export function OrderStakeholderUpdates({
                       >
                         {update.summary}
                       </p>
+                      {update.reason ? (
+                        <p
+                          className="mt-2 whitespace-pre-wrap break-words rounded-md border bg-background/70 p-3 text-sm leading-6"
+                          dir="auto"
+                        >
+                          <span className="font-medium">
+                            Compensation reason:{" "}
+                          </span>
+                          {update.reason}
+                        </p>
+                      ) : null}
+                      {update.decisionReason ? (
+                        <p
+                          className="mt-2 whitespace-pre-wrap break-words rounded-md border bg-background/70 p-3 text-sm leading-6"
+                          dir="auto"
+                        >
+                          <span className="font-medium">
+                            Cancellation decision:{" "}
+                          </span>
+                          {update.decisionReason}
+                        </p>
+                      ) : null}
                       {update.financialImpact ? (
                         <FinancialImpact impact={update.financialImpact} />
                       ) : null}

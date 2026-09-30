@@ -26,11 +26,25 @@ const order = {
       createdAt: new Date("2026-08-15T02:00:00Z"),
     },
   ],
+  events: [
+    {
+      eventType: "REFUND_ISSUED",
+      metadata: {
+        refundTransactionId: "refund-1",
+        reason: "Emergency cancellation: the publisher completed delivery.",
+      },
+    },
+  ],
   publisherCompensation: {
     id: "compensation-1",
+    refundTransactionId: "refund-1",
     disposition: "EXACT_AMOUNT",
     amount: "80.25",
     currency: "USD",
+    reason: "Publisher completed verified publication work.",
+    refundTransaction: {
+      reference: "force-cancel:order-1:case-1",
+    },
     createdAt: new Date("2026-08-15T02:00:01Z"),
     debtRepaymentTransaction: { amount: "-20.10" },
   },
@@ -51,6 +65,13 @@ describe("order stakeholder timeline", () => {
       timeline.find((entry) => entry.kind === "CUSTOMER_REFUND_COMPLETED")
         ?.financialImpact,
     ).toEqual({ currency: "USD", customerRefund: "125.40" })
+    expect(serialized).toContain(
+      "Publisher completed verified publication work.",
+    )
+    expect(serialized).toContain(
+      "Emergency cancellation: the publisher completed delivery.",
+    )
+    expect(serialized).not.toContain('"publisherCompensation":"80.25"')
   })
 
   it("shows the publisher only its exact compensation and net credit", () => {
@@ -71,6 +92,31 @@ describe("order stakeholder timeline", () => {
       debtApplied: "20.10",
       netPublisherCredit: "60.15",
     })
+    expect(
+      timeline.find((entry) => entry.kind === "PUBLISHER_COMPENSATION_DECIDED")
+        ?.reason,
+    ).toBe("Publisher completed verified publication work.")
+    expect(
+      timeline.find((entry) => entry.kind === "PUBLISHER_COMPENSATION_DECIDED")
+        ?.decisionReason,
+    ).toBe("Emergency cancellation: the publisher completed delivery.")
+  })
+
+  it("shows a zero customer refund when compensation consumes the full order payment", () => {
+    const timeline = buildOrderStakeholderTimeline(
+      {
+        ...order,
+        transactions: [{ ...order.transactions[0], amount: "0.00" }],
+      },
+      "CUSTOMER",
+    )
+    const refund = timeline.find(
+      (entry) => entry.kind === "CUSTOMER_REFUND_COMPLETED",
+    )
+
+    expect(refund?.title).toBe("No customer refund was issued")
+    expect(refund?.summary).toContain("No money was returned to your wallet")
+    expect(refund?.financialImpact?.customerRefund).toBe("0.00")
   })
 
   it("keeps Operations free of customer and publisher amounts", () => {

@@ -1347,6 +1347,7 @@ describe("runReconciliation with mock prisma", () => {
 
   it("accepts exact publisher-compensation aggregate and ledger evidence", async () => {
     const prisma = mockPrisma()
+    let refundAmount = "40.00"
     prisma.order.findMany.mockImplementation(async (args: any) =>
       args?.where?.status === "REFUNDED"
         ? [
@@ -1381,6 +1382,12 @@ describe("runReconciliation with mock prisma", () => {
                 reason:
                   "Publisher completed verified publication work before the platform failure.",
                 effectiveOrderStatus: "DELIVERED",
+                refundTransaction: {
+                  id: "refund-1",
+                  reference:
+                    "force-cancel:order-refund-exact-compensation:case-1",
+                  amount: refundAmount,
+                },
                 compensationTransaction: {
                   id: "compensation-credit-1",
                   type: "PUBLISHER_COMPENSATION",
@@ -1400,8 +1407,9 @@ describe("runReconciliation with mock prisma", () => {
         ? [
             {
               id: "refund-1",
-              amount: "100.00",
+              amount: refundAmount,
               orderId: "order-refund-exact-compensation",
+              reference: "force-cancel:order-refund-exact-compensation:case-1",
             },
           ]
         : [],
@@ -1417,6 +1425,15 @@ describe("runReconciliation with mock prisma", () => {
         ].includes(row.code),
       ),
     ).toEqual([])
+
+    refundAmount = "100.00"
+    const overpaidReport = await runReconciliation(prisma as any)
+    expect(
+      overpaidReport.refundRecon.some(
+        (row) =>
+          row.code === ReconciliationCode.REFUND_PUBLISHER_COMPENSATION_INVALID,
+      ),
+    ).toBe(true)
   })
 
   it("flags completed payouts with missing canonical evidence", async () => {

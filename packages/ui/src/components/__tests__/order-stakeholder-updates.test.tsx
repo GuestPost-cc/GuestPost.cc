@@ -62,6 +62,8 @@ describe("OrderStakeholderUpdates", () => {
         updates={[
           update({
             kind: "PUBLISHER_COMPENSATION_DECIDED",
+            reason: "Publisher completed verified publication work.",
+            decisionReason: "Emergency cancellation: verified order evidence.",
             financialImpact: {
               currency: "USD",
               publisherCompensation: "125.40",
@@ -76,6 +78,20 @@ describe("OrderStakeholderUpdates", () => {
     expect(screen.getByText("125.40")).toBeInTheDocument()
     expect(screen.getByText("25.00")).toBeInTheDocument()
     expect(screen.getByText("100.40")).toBeInTheDocument()
+    expect(
+      screen
+        .getByText("Publisher completed verified publication work.")
+        .closest("p"),
+    ).toHaveTextContent(
+      "Compensation reason: Publisher completed verified publication work.",
+    )
+    expect(
+      screen
+        .getByText(/Emergency cancellation: verified order evidence\./)
+        .closest("p"),
+    ).toHaveTextContent(
+      "Cancellation decision: Emergency cancellation: verified order evidence.",
+    )
     expect(screen.queryByText("Customer refund")).not.toBeInTheDocument()
   })
 

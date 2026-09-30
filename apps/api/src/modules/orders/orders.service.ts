@@ -1180,6 +1180,9 @@ export class OrdersService {
         },
         publisherCompensation: {
           include: {
+            refundTransaction: {
+              select: { reference: true },
+            },
             debtRepaymentTransaction: {
               select: { id: true, amount: true, currency: true },
             },

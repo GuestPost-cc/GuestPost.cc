@@ -206,6 +206,8 @@ export interface StakeholderTimelineEntry {
   severity: StakeholderTimelineEntrySeverity
   title: string
   summary: string
+  reason?: string
+  decisionReason?: string
   financialImpact?: StakeholderFinancialImpact
 }
 

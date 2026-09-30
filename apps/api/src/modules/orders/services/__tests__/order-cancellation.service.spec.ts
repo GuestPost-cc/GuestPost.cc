@@ -150,6 +150,16 @@ describe("OrderCancellationService", () => {
     expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       refund.refundOrderInTransaction.mock.invocationCallOrder[0],
     )
+    expect(refund.refundOrderInTransaction).toHaveBeenCalledWith(
+      prisma,
+      order,
+      expect.any(String),
+      "admin-1",
+      "force-cancel:order-1:default",
+      CancellationResponsibility.SYSTEM,
+      { effectiveOrderStatus: order.status },
+      true,
+    )
   })
 
   it("cannot bypass a confirmed-fraud Finance case through emergency force-cancel", async () => {
