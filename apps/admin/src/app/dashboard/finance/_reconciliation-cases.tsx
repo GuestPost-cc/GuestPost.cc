@@ -77,9 +77,11 @@ function SafeFindingList({ findings }: { findings: unknown }) {
  * until its separately approved maker-checker recovery implementation exists. */
 export function ReconciliationCases({ enabled }: { enabled: boolean }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [skip, setSkip] = useState(0)
+  const pageSize = 20
   const casesQ = useQuery({
-    queryKey: ["reconciliation-cases"],
-    queryFn: () => api.admin.getReconciliationCases({ take: 20 }),
+    queryKey: ["reconciliation-cases", skip],
+    queryFn: () => api.admin.getReconciliationCases({ take: pageSize, skip }),
     enabled,
   })
   const caseQ = useQuery({
@@ -207,12 +209,42 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                 <SafeFindingList findings={caseQ.data.snapshots[0]?.findings} />
                 <p className="text-xs text-muted-foreground">
                   Evidence fingerprint{" "}
-                  {caseQ.data.currentFingerprint.slice(0, 16)}… ·{" "}
-                  {caseQ.data.snapshots.length} retained scan snapshot
-                  {caseQ.data.snapshots.length === 1 ? "" : "s"}
+                  {caseQ.data.currentFingerprint.slice(0, 16)}… · Showing the
+                  latest {caseQ.data.snapshots.length} scan snapshot
+                  {caseQ.data.snapshots.length === 1 ? "" : "s"} (up to 20).
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {casesQ.data && casesQ.data.total > pageSize && (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Showing {skip + 1}–
+              {Math.min(skip + casesQ.data.cases.length, casesQ.data.total)} of{" "}
+              {casesQ.data.total} cases
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSkip(Math.max(0, skip - pageSize))}
+                disabled={skip === 0 || casesQ.isFetching}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSkip(skip + pageSize)}
+                disabled={
+                  skip + pageSize >= casesQ.data.total || casesQ.isFetching
+                }
+              >
+                Next
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
