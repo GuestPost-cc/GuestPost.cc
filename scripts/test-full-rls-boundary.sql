@@ -358,9 +358,8 @@ SELECT pg_temp.assert_true((SELECT count(*) = 2 FROM public."Order"), 'finance c
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ReconciliationCase"), 'finance can inspect reconciliation cases');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ReconciliationScan"), 'finance can inspect reconciliation scans');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ReconciliationCaseSnapshot"), 'finance can inspect reconciliation snapshots');
-SELECT pg_temp.assert_affected_rows(
+SELECT pg_temp.assert_rejected(
   'UPDATE public."ReconciliationCase" SET version = version + 1, "lastDetectedAt" = now(), "updatedAt" = now() WHERE id = ''rls_reconciliation_case''',
-  0,
   'finance cannot mutate reconciliation evidence'
 );
 SELECT pg_temp.assert_true((SELECT count(*) = 0 FROM public."MarketplaceListing"), 'finance cannot inspect marketplace listings');
@@ -371,10 +370,9 @@ SET LOCAL ROLE guestpost_api_runtime;
 SELECT pg_temp.set_rls_context('API', 'STAFF', 'rls_staff_admin', '', '', '', '', 'FINANCE');
 SELECT pg_temp.assert_true((SELECT count(*) = 4 FROM public."Organization"), 'super admin can inspect all organizations');
 SELECT pg_temp.assert_true((SELECT count(*) = 3 FROM public."MarketplaceListing"), 'super admin can inspect all listings');
-SELECT pg_temp.assert_affected_rows(
+SELECT pg_temp.assert_rejected(
   'UPDATE public."ReconciliationCase" SET version = version + 1, "lastDetectedAt" = now(), "updatedAt" = now() WHERE id = ''rls_reconciliation_case''',
-  1,
-  'super admin can mutate reconciliation evidence'
+  'super admin cannot mutate reconciliation evidence directly'
 );
 INSERT INTO public."AuditLog" (id, action, "entityType", "userId")
 VALUES ('rls_staff_audit_append_only', 'RLS_STAFF_TEST', 'User', 'rls_staff_admin');

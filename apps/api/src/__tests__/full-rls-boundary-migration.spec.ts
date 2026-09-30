@@ -95,6 +95,12 @@ describe("full application RLS boundary migration", () => {
     expect(rlsBoundaryAssertions).toContain(
       "all 105 application tables must have ENABLE + FORCE RLS",
     )
+    expect(rlsBoundaryAssertions).toContain(
+      "finance cannot mutate reconciliation evidence",
+    )
+    expect(rlsBoundaryAssertions).toContain(
+      "super admin cannot mutate reconciliation evidence directly",
+    )
     expect(activation).toContain("ENABLE ROW LEVEL SECURITY")
     expect(activation).toContain("FORCE ROW LEVEL SECURITY")
     expect(activation).toMatch(/BEGIN;[\s\S]*COMMIT;/)
