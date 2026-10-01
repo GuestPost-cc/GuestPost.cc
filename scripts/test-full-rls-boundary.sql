@@ -135,18 +135,20 @@ SELECT format(
   'ALTER ROLE guestpost_api_runtime IN DATABASE %I SET guestpost.financial_repair_single_actor = %L',
   current_database(), 'on'
 ) \gexec
-SELECT pg_temp.assert_true(
-  NOT EXISTS (
-    SELECT 1
-    FROM pg_catalog.pg_db_role_setting AS setting
-    JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
-    WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
-      AND configured_role.rolname = 'guestpost_financial_repair_staging'
-      AND pg_catalog.pg_has_role(session_user, configured_role.oid, 'MEMBER')
-      AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
-  ),
-  'the genuine API session cannot activate the capability by setting its own defaults'
-);
+SELECT NOT EXISTS (
+  SELECT 1
+  FROM pg_catalog.pg_db_role_setting AS setting
+  JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
+  WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
+    AND configured_role.rolname = 'guestpost_financial_repair_staging'
+    AND pg_catalog.pg_has_role(session_user, configured_role.oid, 'MEMBER')
+    AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
+) AS api_cannot_enable_repair \gset
+\if :api_cannot_enable_repair
+\else
+  \echo 'RLS assertion failed: API self-role defaults activated staging capability'
+  \quit 3
+\endif
 RESET SESSION AUTHORIZATION;
 ROLLBACK;
 
