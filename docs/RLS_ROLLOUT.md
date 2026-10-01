@@ -108,7 +108,7 @@ inert for pre-rollout and local compatibility.
 
 ## Role topology
 
-`scripts/provision-rls-roles.sql` owns 11 roles and exactly five membership
+`scripts/provision-rls-roles.sql` owns 12 roles and exactly six membership
 edges:
 
 The reconciliation leaves all credential roles `NOLOGIN`; enabling credentials
@@ -122,12 +122,19 @@ is a separate administrator action after connection-level verification.
 | `guestpost_worker_group`, `guestpost_worker_runtime` | Platform job tables only, subject to forced policies. |
 | `guestpost_reporting_group`, `guestpost_reporting_runtime` | Starts with no table access. |
 | `guestpost_rls_authorizer` | `NOLOGIN`, `NOINHERIT`, no membership and no bypass; owns boolean-only `SECURITY DEFINER` policy helpers after activation. |
+| `guestpost_financial_repair_guard` | `NOLOGIN`, `NOINHERIT`, no bypass; only `guestpost_schema_owner` may `SET ROLE` to it. Owns repair row-lock triggers and has narrow evidence reads plus column-scoped lock privileges under dedicated RLS policies. Runtime identities are not members. |
 
 Every managed role is `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`,
 `NOREPLICATION`, and `NOBYPASSRLS`. Provisioning removes unexpected direct or
 transitive membership edges and reconciles database/schema/relation/function
 ACLs in one transaction. It creates no password and leaves credential roles
 `NOLOGIN`; credential activation is a separate approved administrator change.
+The financial-repair migration additionally requires its dedicated `NOLOGIN`,
+`NOINHERIT`, `NOBYPASSRLS` owner role to exist before migrations run; create it
+with `scripts/provision-financial-repair-guard-role.sql`. When
+`guestpost_schema_owner` exists, that script grants it the required `SET ROLE`
+membership before ownership transfer. Run the full role provisioner after
+migrations to reconcile the exact six-edge topology and object-specific ACLs.
 
 ## Required migration grant checklist
 
@@ -137,6 +144,9 @@ Default privileges grant no application access. Every migration that creates a t
 - the Prisma model manifest and full-boundary migration/next policy migration;
 - the exact API, auth, worker, or reporting relation grants, plus read-only
   `guestpost_rls_authorizer` access for every new policy root;
+- if a trigger uses row-locking selects under forced RLS, a separately
+  provisioned NOLOGIN guard owner, exact `SELECT`/column-level `UPDATE` grants,
+  matching RLS policies, and an ownership/runtime-membership test;
 - the activation catalog count and the destructive boundary test;
 - command-specific policy tests, including a non-owner and no-context case.
 
@@ -148,16 +158,17 @@ object-specific grants for every newly created relation.
 Never combine these stages into one production command. Rehearse every step on
 a current, disposable clone first.
 
-1. **Prove the clone.** Apply all migrations, provision roles, transfer the
-   reviewed public table/sequence ownership inventory to
-   `guestpost_schema_owner`, activate the clone, and run
+1. **Prove the clone.** Precreate the financial-repair guard role, apply all
+   migrations, provision roles, transfer the reviewed public table/sequence
+   ownership inventory to `guestpost_schema_owner`, activate the clone, and run
    `scripts/test-full-rls-boundary.sql` as a cluster administrator. The test is
    destructive and uses fixed fixtures, so it is for a fresh ephemeral
    database only. GitHub CI performs this entire sequence in a dedicated
    `guestpost_rls_boundary_test` database.
-2. **Install inert policies.** Deploy the Prisma migration normally. Verify 98
-   covered models and 392 full-boundary policies, plus the six Phase 1
-   `ApiKey` policies. Do not activate the generalized boundary yet.
+2. **Install inert policies.** Precreate the financial-repair guard role, then
+   deploy the Prisma migration normally. Verify 101 staged models with 404
+   full-boundary policies and six Phase 1 `ApiKey` policies before activation.
+   Do not activate the generalized boundary yet.
 3. **Provision disabled identities.** Run the role recipe through a protected
    administrator connection with the exact target database name. Transfer
    ownership from an explicit inventory. Create independent TLS/password or
@@ -273,8 +284,9 @@ WHERE rolname LIKE 'guestpost_%'
 ORDER BY rolname;
 ```
 
-Before activation, expected full-boundary values are 98 covered tables and 392
-command policies, alongside six Phase 1 `ApiKey` policies. After activation,
-expected values are 99 forced tables, 99 covered tables, 396 command policies,
-and `false` for every privileged role attribute. Treat any mismatch as a
-failed deployment gate.
+Before activation, expected full-boundary values are 101 covered models and
+404 full-boundary policies; the database has 105 application tables and 435
+policies total, including the six Phase 1 `ApiKey` policies and the
+reconciliation workbench/repair policies. After activation, expected values are
+105 forced tables, 105 covered tables, and 433 total policies, with `false` for every
+privileged role attribute. Treat any mismatch as a failed deployment gate.

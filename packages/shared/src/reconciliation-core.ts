@@ -79,6 +79,7 @@ export enum ReconciliationCode {
   REFUND_NO_TRANSACTION = "REFUND_NO_TRANSACTION",
   REFUND_ORPHAN_TX = "REFUND_ORPHAN_TX",
   REFUND_DUPLICATE = "REFUND_DUPLICATE",
+  REFUND_REVERSAL_INVALID = "REFUND_REVERSAL_INVALID",
   REFUND_PARTIAL = "REFUND_PARTIAL",
   REFUND_SETTLEMENT_NOT_REVERSED = "REFUND_SETTLEMENT_NOT_REVERSED",
   REFUND_PUBLISHER_COMPENSATION_MISSING = "REFUND_PUBLISHER_COMPENSATION_MISSING",
@@ -2268,7 +2269,7 @@ async function checkRefundReconciliation(
 ): Promise<DriftRow[]> {
   const drift: DriftRow[] = []
 
-  const [refundedOrders, refundTxs] = await Promise.all([
+  const [refundedOrders, refundTxs, refundReversals] = await Promise.all([
     prisma.order.findMany({
       where: { status: "REFUNDED" },
       select: {
@@ -2328,11 +2329,31 @@ async function checkRefundReconciliation(
     }),
     prisma.transaction.findMany({
       where: { type: "REFUND" as any },
-      select: { id: true, amount: true, orderId: true, reference: true },
+      select: {
+        id: true,
+        amount: true,
+        orderId: true,
+        reference: true,
+        walletId: true,
+        currency: true,
+        provider: true,
+        providerRef: true,
+      },
+    }),
+    prisma.transaction.findMany({
+      where: { type: "REFUND_REVERSAL" as any },
+      select: {
+        id: true,
+        amount: true,
+        orderId: true,
+        walletId: true,
+        currency: true,
+        reversalOfTransactionId: true,
+      },
     }),
   ])
   stats.checkedOrders += refundedOrders.length
-  stats.checkedTransactions += refundTxs.length
+  stats.checkedTransactions += refundTxs.length + refundReversals.length
 
   const refundedOrderIds = new Set(refundedOrders.map((o: any) => o.id))
   const refundTxsByOrder = new Map<
@@ -2355,6 +2376,48 @@ async function checkRefundReconciliation(
     entry.sum += toScaled(tx.amount)
     entry.ids.add(tx.id)
     refundTxsByOrder.set(tx.orderId, entry)
+  }
+
+  const refundById = new Map(refundTxs.map((tx: any) => [tx.id, tx]))
+  const refundReversalSumByOrder = new Map<string, bigint>()
+  for (const reversal of refundReversals) {
+    const source: any = refundById.get(reversal.reversalOfTransactionId)
+    const valid =
+      source &&
+      reversal.amount != null &&
+      toScaled(reversal.amount) === -toScaled(source.amount) &&
+      reversal.orderId === source.orderId &&
+      reversal.walletId === source.walletId &&
+      reversal.currency === source.currency &&
+      source.orderId &&
+      source.provider == null &&
+      source.providerRef == null
+    if (!valid) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.REFUND,
+          code: ReconciliationCode.REFUND_REVERSAL_INVALID,
+          entityId: reversal.id,
+          entityType: "Transaction",
+          message: `Refund reversal ${reversal.id.slice(0, 8)} does not exactly link to its source refund`,
+          metadata: {
+            transactionId: reversal.id,
+            orderId: reversal.orderId ?? undefined,
+          },
+        }),
+      )
+      continue
+    }
+    refundReversalSumByOrder.set(
+      reversal.orderId,
+      (refundReversalSumByOrder.get(reversal.orderId) ?? 0n) +
+        toScaled(reversal.amount),
+    )
+  }
+  for (const [orderId, reversalSum] of refundReversalSumByOrder) {
+    const entry = refundTxsByOrder.get(orderId)
+    if (entry) entry.sum += reversalSum
   }
 
   // Order REFUNDED but no REFUND transaction
@@ -2448,9 +2511,10 @@ async function checkRefundReconciliation(
     const forceCancelOffset = linkedRefund?.reference?.startsWith(
       `force-cancel:${o.id}:`,
     )
+    const effectiveRefund = refundEntry?.sum ?? 0n
     const validFunding = forceCancelOffset
-      ? toScaled(linkedRefund.amount) + amount === toScaled(o.amount)
-      : toScaled(linkedRefund?.amount ?? 0) === toScaled(o.amount)
+      ? effectiveRefund + amount === toScaled(o.amount)
+      : effectiveRefund === toScaled(o.amount)
     if (
       compensation.currency !== "USD" ||
       !refundEntry?.ids.has(compensation.refundTransactionId) ||

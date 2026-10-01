@@ -84,7 +84,7 @@ END
 $function$;
 
 SELECT pg_temp.assert_true(
-  (SELECT count(*) = 102
+  (SELECT count(*) = 105
    FROM pg_class AS relation
    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
    WHERE namespace.nspname = 'public'
@@ -92,7 +92,40 @@ SELECT pg_temp.assert_true(
      AND relation.relname <> '_prisma_migrations'
      AND relation.relrowsecurity
      AND relation.relforcerowsecurity),
-  'all 102 application tables must have ENABLE + FORCE RLS'
+  'all 105 application tables must have ENABLE + FORCE RLS'
+);
+
+SELECT pg_temp.assert_true(
+  NOT pg_has_role('guestpost_api_runtime', 'guestpost_financial_repair_guard', 'MEMBER')
+  AND NOT pg_has_role('guestpost_auth_runtime', 'guestpost_financial_repair_guard', 'MEMBER')
+  AND NOT pg_has_role('guestpost_worker_runtime', 'guestpost_financial_repair_guard', 'MEMBER')
+  AND NOT pg_has_role('guestpost_reporting_runtime', 'guestpost_financial_repair_guard', 'MEMBER'),
+  'no runtime identity may assume the financial repair guard role'
+);
+
+SELECT pg_temp.assert_true(
+  (SELECT count(*) = 4
+   FROM pg_proc procedure
+   JOIN pg_namespace namespace ON namespace.oid = procedure.pronamespace
+   JOIN pg_roles owner_role ON owner_role.oid = procedure.proowner
+   WHERE namespace.nspname = 'public'
+     AND procedure.proname IN (
+       'guard_reconciliation_repair_proposal',
+       'guard_reconciliation_repair_approval',
+       'guard_refund_credit_reversal',
+       'guard_reconciliation_repair_execution'
+     )
+     AND procedure.prosecdef
+     AND owner_role.rolname = 'guestpost_financial_repair_guard'),
+  'financial row-lock triggers must use the dedicated SECURITY DEFINER owner'
+);
+
+SELECT pg_temp.assert_true(
+  has_column_privilege('guestpost_financial_repair_guard', 'public."Order"', 'version', 'UPDATE')
+  AND NOT has_column_privilege('guestpost_financial_repair_guard', 'public."Order"', 'status', 'UPDATE')
+  AND NOT has_column_privilege('guestpost_financial_repair_guard', 'public."Wallet"', 'availableBalance', 'UPDATE')
+  AND NOT has_schema_privilege('guestpost_financial_repair_guard', 'public', 'CREATE'),
+  'repair guard update rights must remain column-scoped to lock-only columns'
 );
 
 BEGIN;
@@ -325,9 +358,8 @@ SELECT pg_temp.assert_true((SELECT count(*) = 2 FROM public."Order"), 'finance c
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ReconciliationCase"), 'finance can inspect reconciliation cases');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ReconciliationScan"), 'finance can inspect reconciliation scans');
 SELECT pg_temp.assert_true((SELECT count(*) = 1 FROM public."ReconciliationCaseSnapshot"), 'finance can inspect reconciliation snapshots');
-SELECT pg_temp.assert_affected_rows(
+SELECT pg_temp.assert_rejected(
   'UPDATE public."ReconciliationCase" SET version = version + 1, "lastDetectedAt" = now(), "updatedAt" = now() WHERE id = ''rls_reconciliation_case''',
-  0,
   'finance cannot mutate reconciliation evidence'
 );
 SELECT pg_temp.assert_true((SELECT count(*) = 0 FROM public."MarketplaceListing"), 'finance cannot inspect marketplace listings');
@@ -338,10 +370,9 @@ SET LOCAL ROLE guestpost_api_runtime;
 SELECT pg_temp.set_rls_context('API', 'STAFF', 'rls_staff_admin', '', '', '', '', 'FINANCE');
 SELECT pg_temp.assert_true((SELECT count(*) = 4 FROM public."Organization"), 'super admin can inspect all organizations');
 SELECT pg_temp.assert_true((SELECT count(*) = 3 FROM public."MarketplaceListing"), 'super admin can inspect all listings');
-SELECT pg_temp.assert_affected_rows(
+SELECT pg_temp.assert_rejected(
   'UPDATE public."ReconciliationCase" SET version = version + 1, "lastDetectedAt" = now(), "updatedAt" = now() WHERE id = ''rls_reconciliation_case''',
-  1,
-  'super admin can mutate reconciliation evidence'
+  'super admin cannot mutate reconciliation evidence directly'
 );
 INSERT INTO public."AuditLog" (id, action, "entityType", "userId")
 VALUES ('rls_staff_audit_append_only', 'RLS_STAFF_TEST', 'User', 'rls_staff_admin');

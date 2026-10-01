@@ -25,6 +25,13 @@ const reconciliationMigration = fs.readFileSync(
   ),
   "utf8",
 )
+const repairMigration = fs.readFileSync(
+  path.join(
+    root,
+    "packages/database/prisma/migrations/20261001100000_financial_reconciliation_repairs/migration.sql",
+  ),
+  "utf8",
+)
 const rlsBoundaryAssertions = fs.readFileSync(
   path.join(root, "scripts/test-full-rls-boundary.sql"),
   "utf8",
@@ -51,6 +58,9 @@ describe("full application RLS boundary migration", () => {
             "ReconciliationCase",
             "ReconciliationScan",
             "ReconciliationCaseSnapshot",
+            "ReconciliationRepairProposal",
+            "ReconciliationRepairApproval",
+            "ReconciliationRepairExecution",
           ].includes(model),
       ).sort(),
     )
@@ -74,16 +84,22 @@ describe("full application RLS boundary migration", () => {
       /^ALTER TABLE public\."?[A-Za-z][A-Za-z0-9_]*"? ENABLE ROW LEVEL SECURITY;/m,
     )
     expect(activation).toContain("activate=YES is required")
-    expect(activation).toContain("expected exactly 102 application tables")
+    expect(activation).toContain("expected exactly 105 application tables")
     expect(activation).toContain("covered_model_count <> 101")
-    expect(activation).toContain("total_policy_count <> 410")
+    expect(activation).toContain("total_policy_count <> 435")
     expect(activation).toContain("phase_one_api_key_policy_count <> 6")
-    expect(activation).toContain("covered_model_count <> 102")
-    expect(activation).toContain("policy_count <> 408")
-    expect(activation).toContain("total_policy_count <> 408")
-    expect(rlsBoundaryAssertions).toContain("count(*) = 102")
+    expect(activation).toContain("covered_model_count <> 105")
+    expect(activation).toContain("policy_count <> 433")
+    expect(activation).toContain("total_policy_count <> 433")
+    expect(rlsBoundaryAssertions).toContain("count(*) = 105")
     expect(rlsBoundaryAssertions).toContain(
-      "all 102 application tables must have ENABLE + FORCE RLS",
+      "all 105 application tables must have ENABLE + FORCE RLS",
+    )
+    expect(rlsBoundaryAssertions).toContain(
+      "finance cannot mutate reconciliation evidence",
+    )
+    expect(rlsBoundaryAssertions).toContain(
+      "super admin cannot mutate reconciliation evidence directly",
     )
     expect(activation).toContain("ENABLE ROW LEVEL SECURITY")
     expect(activation).toContain("FORCE ROW LEVEL SECURITY")
@@ -109,6 +125,29 @@ describe("full application RLS boundary migration", () => {
     expect(reconciliationMigration).toContain("'FINANCE'")
     expect(reconciliationMigration).toContain("'SUPER_ADMIN'")
     expect(reconciliationMigration).not.toContain("BYPASSRLS")
+  })
+
+  it("places repair records behind immutable Finance/Super Admin RLS policies", () => {
+    for (const model of [
+      "ReconciliationRepairProposal",
+      "ReconciliationRepairApproval",
+      "ReconciliationRepairExecution",
+    ]) {
+      expect(RLS_MODEL_NAMES).toContain(model)
+      expect(repairMigration).toContain(
+        `ALTER TABLE public."${model}" ENABLE ROW LEVEL SECURITY;`,
+      )
+      expect(repairMigration).toContain(
+        `ALTER TABLE public."${model}" FORCE ROW LEVEL SECURITY;`,
+      )
+    }
+    expect(repairMigration).toContain("_finance_select")
+    expect(repairMigration).toContain("_finance_insert")
+    expect(repairMigration).toContain(
+      "financial reconciliation repair evidence is append-only",
+    )
+    expect(repairMigration).toContain("REFUND_REVERSAL")
+    expect(repairMigration).toContain("guestpost_rls.actor_id()")
   })
 
   it("uses live authority rows and never grants a staff or worker bypass role", () => {

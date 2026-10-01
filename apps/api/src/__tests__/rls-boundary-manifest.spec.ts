@@ -17,7 +17,7 @@ function schemaModels(): string[] {
 describe("full RLS boundary manifest", () => {
   it("classifies every Prisma model exactly once", () => {
     const models = schemaModels()
-    expect(models).toHaveLength(102)
+    expect(models).toHaveLength(105)
     expect(new Set(RLS_MODEL_NAMES).size).toBe(RLS_MODEL_NAMES.length)
     expect([...RLS_MODEL_NAMES].sort()).toEqual(models.sort())
   })
@@ -47,6 +47,9 @@ describe("full RLS boundary manifest", () => {
         "ReconciliationCase",
         "ReconciliationScan",
         "ReconciliationCaseSnapshot",
+        "ReconciliationRepairProposal",
+        "ReconciliationRepairApproval",
+        "ReconciliationRepairExecution",
       ]),
     )
   })

@@ -98,11 +98,17 @@ import {
   UpdatePlatformWebsiteDto,
 } from "./dto/create-platform-website.dto"
 import { GetRevenueQueryDto } from "./dto/get-revenue-query.dto"
+import {
+  ApproveRefundCreditRepairDto,
+  ExecuteRefundCreditRepairDto,
+  ProposeRefundCreditRepairDto,
+} from "./dto/reconciliation-repair.dto"
 import { buildRevenueCsvFilename, streamRevenueCsv } from "./finance/csv-stream"
 import { RevenueService } from "./finance/revenue.service"
 import { FinanceWorkbenchService } from "./finance-workbench.service"
 import { OperationsWorkbenchService } from "./operations-workbench.service"
 import { ReconciliationService } from "./reconciliation.service"
+import { ReconciliationRepairService } from "./reconciliation-repair.service"
 import { AdminVerificationQueueService } from "./verification-queue.service"
 import { websiteImportTemplateCsv } from "./website-import/csv-parser"
 import { WebsiteImportService } from "./website-import/website-import.service"
@@ -184,6 +190,7 @@ export class AdminController {
     private readonly cancellation: OrderCancellationService,
     private readonly ops: OrderOperationsService,
     private readonly reconciliation: ReconciliationService,
+    private readonly reconciliationRepair: ReconciliationRepairService,
     private readonly payoutExecution: PayoutExecutionService,
     private readonly marketplace: MarketplaceService,
     private readonly websiteVerification: WebsiteVerificationService,
@@ -290,8 +297,8 @@ export class AdminController {
     return this.reconciliation.run(user.id)
   }
 
-  // Reconciliation evidence is finance-only. The case workbench has no
-  // money-moving route until the separately approved recovery recipe lands.
+  // Reconciliation repair is one typed recipe and every mutation rechecks
+  // evidence in the service and the database; Finance and Super Admin only.
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   @Get("reconciliation/cases")
   @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
@@ -311,6 +318,59 @@ export class AdminController {
   @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
   reconciliationCase(@Param("id") id: string) {
     return this.reconciliation.getCase(id)
+  }
+
+  @Post("reconciliation/cases/:id/repair-preview")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  previewRefundCreditRepair(@Param("id") id: string) {
+    return this.reconciliationRepair.preview(id)
+  }
+
+  @Post("reconciliation/cases/:id/repair-proposals")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  proposeRefundCreditRepair(
+    @Param("id") id: string,
+    @Body() body: ProposeRefundCreditRepairDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.reconciliationRepair.propose(id, user.id, body)
+  }
+
+  @Post("reconciliation/cases/:id/repair-proposals/:proposalId/approve")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  approveRefundCreditRepair(
+    @Param("id") id: string,
+    @Param("proposalId") proposalId: string,
+    @Body() body: ApproveRefundCreditRepairDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.reconciliationRepair.approve(
+      id,
+      proposalId,
+      user.id,
+      body.proposalDigest,
+    )
+  }
+
+  @Post("reconciliation/cases/:id/repair-proposals/:proposalId/execute")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  executeRefundCreditRepair(
+    @Param("id") id: string,
+    @Param("proposalId") proposalId: string,
+    @Body() body: ExecuteRefundCreditRepairDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.reconciliationRepair.execute(
+      id,
+      proposalId,
+      user.id,
+      body.proposalDigest,
+      body.idempotencyKey,
+    )
   }
 
   // Phase 7.1 — PlatformRevenue dashboard. Category B (Financial); matches the

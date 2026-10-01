@@ -1,4 +1,4 @@
--- Atomically activate the preinstalled 102-model RLS boundary.
+-- Atomically activate the preinstalled 105-model RLS boundary.
 --
 -- This is intentionally not a Prisma migration: deployment installs policies
 -- first, rolls out context-aware code and separate NOLOGIN identities, runs
@@ -58,8 +58,8 @@ BEGIN
     AND relation.relkind = 'r'
     AND relation.relname <> '_prisma_migrations';
 
-  IF model_count <> 102 THEN
-    RAISE EXCEPTION 'expected exactly 102 application tables, found %', model_count;
+  IF model_count <> 105 THEN
+    RAISE EXCEPTION 'expected exactly 105 application tables, found %', model_count;
   END IF;
 
   SELECT count(DISTINCT tablename), count(*)
@@ -91,9 +91,9 @@ BEGIN
   FROM pg_policies
   WHERE schemaname = 'public';
 
-  IF total_policy_count <> 410 OR phase_one_api_key_policy_count <> 6 THEN
+  IF total_policy_count <> 435 OR phase_one_api_key_policy_count <> 6 THEN
     RAISE EXCEPTION
-      'expected exactly 404 staged and 6 Phase 1 policies before activation; total %, Phase 1 %',
+      'expected exactly 429 staged and 6 Phase 1 policies before activation; total %, Phase 1 %',
       total_policy_count, phase_one_api_key_policy_count;
   END IF;
 
@@ -105,12 +105,28 @@ BEGIN
     'guestpost_auth_group', 'guestpost_auth_runtime',
     'guestpost_worker_group', 'guestpost_worker_runtime',
     'guestpost_reporting_group', 'guestpost_reporting_runtime',
-    'guestpost_rls_authorizer'
+    'guestpost_rls_authorizer', 'guestpost_financial_repair_guard'
   )
   AND (rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls);
 
   IF bad_role_count <> 0 THEN
     RAISE EXCEPTION 'managed role has a forbidden privileged attribute';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_auth_members membership
+    JOIN pg_roles granted ON granted.oid = membership.roleid
+    JOIN pg_roles member ON member.oid = membership.member
+    WHERE granted.rolname = 'guestpost_financial_repair_guard'
+      AND member.rolname <> 'guestpost_schema_owner'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_auth_members membership
+    JOIN pg_roles granted ON granted.oid = membership.roleid
+    JOIN pg_roles member ON member.oid = membership.member
+    WHERE granted.rolname = 'guestpost_financial_repair_guard'
+      AND member.rolname = 'guestpost_schema_owner'
+  ) THEN
+    RAISE EXCEPTION 'repair guard must be SET ROLE-accessible only to guestpost_schema_owner';
   END IF;
 
   IF (SELECT count(*) FROM pg_roles WHERE rolname LIKE 'guestpost_%') < 11 THEN
@@ -276,9 +292,15 @@ BEGIN
     INTO covered_model_count, policy_count
   FROM pg_policies
   WHERE schemaname = 'public'
-    AND policyname LIKE '%\_full\_boundary\_%' ESCAPE '\';
+    AND (
+      policyname LIKE '%\_full\_boundary\_%' ESCAPE '\'
+      OR policyname LIKE '%\_finance\_select' ESCAPE '\'
+      OR policyname LIKE '%\_finance\_insert' ESCAPE '\'
+      OR policyname LIKE '%\_repair\_guard\_select' ESCAPE '\'
+      OR policyname LIKE '%\_repair\_guard\_lock' ESCAPE '\'
+    );
 
-  IF covered_model_count <> 102 OR policy_count <> 408 THEN
+  IF covered_model_count <> 105 OR policy_count <> 433 THEN
     RAISE EXCEPTION
       'activated policy coverage is incomplete: models %, policies %',
       covered_model_count, policy_count;
@@ -288,9 +310,9 @@ BEGIN
   FROM pg_policies
   WHERE schemaname = 'public';
 
-  IF total_policy_count <> 408 THEN
+  IF total_policy_count <> 433 THEN
     RAISE EXCEPTION
-      'unexpected public policy remains after activation: expected 408, found %',
+      'unexpected public policy remains after activation: expected 433, found %',
       total_policy_count;
   END IF;
 END

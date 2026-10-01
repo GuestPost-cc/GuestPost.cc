@@ -1617,7 +1617,102 @@ export class AdminService {
         createdAt: string
         scan: { detector: string; ranAt: string; reportVersion: number }
       }>
+      repairProposals: Array<{
+        id: string
+        proposalDigest: string
+        amount: string | number
+        currency: string
+        incidentReference: string
+        providerRefundConfirmedAbsent: boolean
+        reason: string
+        initiatedByUserId: string
+        expiresAt: string
+        createdAt: string
+        approval: { approvedByUserId: string; createdAt: string } | null
+        execution: {
+          id: string
+          reversalTransactionId: string
+          executedByUserId: string
+          createdAt: string
+        } | null
+      }>
     }>(`/admin/reconciliation/cases/${encodeURIComponent(caseId)}`)
+  }
+
+  previewRefundCreditRepair(caseId: string) {
+    return this.client.post<{
+      eligible: boolean
+      blockers: string[]
+      evidenceDigest: string
+      expectedCaseVersion: number
+      expectedOrderVersion: number | null
+      expectedWalletVersion: number | null
+      entry: {
+        type: string
+        amount: string
+        currency: string
+        reversesTransactionId: string
+      } | null
+      balance: {
+        availableBefore: string
+        availableAfter: string
+        reservedUnchanged: string
+      } | null
+      immutableEvidence: string
+      featureEnabled: boolean
+    }>(
+      `/admin/reconciliation/cases/${encodeURIComponent(caseId)}/repair-preview`,
+      { json: {} },
+    )
+  }
+
+  proposeRefundCreditRepair(
+    caseId: string,
+    input: {
+      evidenceDigest: string
+      expectedCaseVersion: number
+      incidentReference: string
+      providerRefundConfirmedAbsent: boolean
+      reason: string
+    },
+  ) {
+    return this.client.post<{
+      id: string
+      proposalDigest: string
+      expiresAt: string
+      status: string
+    }>(
+      `/admin/reconciliation/cases/${encodeURIComponent(caseId)}/repair-proposals`,
+      { json: input },
+    )
+  }
+
+  approveRefundCreditRepair(
+    caseId: string,
+    proposalId: string,
+    proposalDigest: string,
+  ) {
+    return this.client.post<{ id: string; proposalId: string; status: string }>(
+      `/admin/reconciliation/cases/${encodeURIComponent(caseId)}/repair-proposals/${encodeURIComponent(proposalId)}/approve`,
+      { json: { proposalDigest } },
+    )
+  }
+
+  executeRefundCreditRepair(
+    caseId: string,
+    proposalId: string,
+    proposalDigest: string,
+    idempotencyKey: string,
+  ) {
+    return this.client.post<{
+      id: string
+      reversalTransactionId: string
+      status: string
+      replayed: boolean
+    }>(
+      `/admin/reconciliation/cases/${encodeURIComponent(caseId)}/repair-proposals/${encodeURIComponent(proposalId)}/execute`,
+      { json: { proposalDigest, idempotencyKey } },
+    )
   }
 
   decryptPayoutMethod(payoutMethodId: string, reason: string) {

@@ -549,45 +549,49 @@ model User {
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 
-  memberships                   Membership[]
-  publisherMemberships          PublisherMembership[]
-  staffMemberships              StaffMembership[]
-  ownedOrders                   Order[]                       @relation("OrderCustomer")
-  assignedOrders                Order[]                       @relation("OrderAssignee")
-  orderEvents                   OrderEvent[]
-  publications                  Publication[]                 @relation("PublicationVerifier")
-  requestedWithdrawals          Withdrawal[]                  @relation("WithdrawalRequester")
-  approvedWithdrawals           Withdrawal[]                  @relation("WithdrawalApprover")
-  rejectedWithdrawals           Withdrawal[]                  @relation("WithdrawalRejector")
-  reversedWithdrawals           Withdrawal[]                  @relation("WithdrawalReverser")
-  initiatedPayoutExecutions     PayoutExecution[]             @relation("PayoutExecutionInitiator")
-  payoutExecutionClaims         PayoutExecutionClaim[]        @relation("PayoutExecutionClaimActor")
-  completedPayoutExecutions     PayoutExecution[]             @relation("PayoutCompletionActor")
-  cancelledPayoutExecutions     PayoutExecution[]             @relation("PayoutCancellationActor")
-  adminVerifiedDeliveryVersions OrderDeliveryVersion[]        @relation("AdminVerifiedVersion")
-  resolvedDeliveryFraudFlags    DeliveryFraudFlagResolution[] @relation("DeliveryFraudResolver")
-  decidedDeliveryFraudFindings  DeliveryFraudFinding[]        @relation("DeliveryFraudFindingDecider")
-  tickets                       Ticket[]
-  messages                      TicketMessage[]
-  notifications                 Notification[]
-  notificationPreferences       NotificationPreference[]
-  communicationDeliveries       CommunicationDelivery[]
-  emailSuppressions             EmailSuppression[]
-  auditLogs                     AuditLog[]
-  sessions                      Session[]
-  accounts                      Account[]
-  marketplaceReviews            MarketplaceReview[]
-  marketplaceFavorites          MarketplaceFavorite[]
-  activeContext                 ActiveContext?
-  managedWebsites               Website[]                     @relation("WebsiteManager")
-  assignedTickets               Ticket[]                      @relation("TicketAssignee")
-  legalAcceptances              LegalAcceptance[]
-  suspendedBy                   User?                         @relation("UserSuspensionsIssued", fields: [suspendedByUserId], references: [id], onDelete: SetNull)
-  suspensionsIssued             User[]                        @relation("UserSuspensionsIssued")
-  websiteImportBatches          WebsiteImportBatch[]
-  publisherCompensationsDecided PublisherCompensation[]       @relation("PublisherCompensationDecider")
-  moderationEvents              ModerationEvent[]             @relation("ModerationEventActor")
-  createdApiKeys                ApiKey[]                      @relation("ApiKeyCreator")
+  memberships                    Membership[]
+  publisherMemberships           PublisherMembership[]
+  staffMemberships               StaffMembership[]
+  ownedOrders                    Order[]                         @relation("OrderCustomer")
+  assignedOrders                 Order[]                         @relation("OrderAssignee")
+  orderEvents                    OrderEvent[]
+  publications                   Publication[]                   @relation("PublicationVerifier")
+  requestedWithdrawals           Withdrawal[]                    @relation("WithdrawalRequester")
+  approvedWithdrawals            Withdrawal[]                    @relation("WithdrawalApprover")
+  rejectedWithdrawals            Withdrawal[]                    @relation("WithdrawalRejector")
+  reversedWithdrawals            Withdrawal[]                    @relation("WithdrawalReverser")
+  initiatedPayoutExecutions      PayoutExecution[]               @relation("PayoutExecutionInitiator")
+  payoutExecutionClaims          PayoutExecutionClaim[]          @relation("PayoutExecutionClaimActor")
+  completedPayoutExecutions      PayoutExecution[]               @relation("PayoutCompletionActor")
+  initiatedReconciliationRepairs ReconciliationRepairProposal[]  @relation("ReconciliationRepairInitiator")
+  approvedReconciliationRepairs  ReconciliationRepairApproval[]  @relation("ReconciliationRepairApprover")
+  approvedReconciliationRepairExecutions ReconciliationRepairExecution[] @relation("ReconciliationRepairExecutionApprover")
+  executedReconciliationRepairs  ReconciliationRepairExecution[] @relation("ReconciliationRepairExecutor")
+  cancelledPayoutExecutions      PayoutExecution[]               @relation("PayoutCancellationActor")
+  adminVerifiedDeliveryVersions  OrderDeliveryVersion[]          @relation("AdminVerifiedVersion")
+  resolvedDeliveryFraudFlags     DeliveryFraudFlagResolution[]   @relation("DeliveryFraudResolver")
+  decidedDeliveryFraudFindings   DeliveryFraudFinding[]          @relation("DeliveryFraudFindingDecider")
+  tickets                        Ticket[]
+  messages                       TicketMessage[]
+  notifications                  Notification[]
+  notificationPreferences        NotificationPreference[]
+  communicationDeliveries        CommunicationDelivery[]
+  emailSuppressions              EmailSuppression[]
+  auditLogs                      AuditLog[]
+  sessions                       Session[]
+  accounts                       Account[]
+  marketplaceReviews             MarketplaceReview[]
+  marketplaceFavorites           MarketplaceFavorite[]
+  activeContext                  ActiveContext?
+  managedWebsites                Website[]                       @relation("WebsiteManager")
+  assignedTickets                Ticket[]                        @relation("TicketAssignee")
+  legalAcceptances               LegalAcceptance[]
+  suspendedBy                    User?                           @relation("UserSuspensionsIssued", fields: [suspendedByUserId], references: [id], onDelete: SetNull)
+  suspensionsIssued              User[]                          @relation("UserSuspensionsIssued")
+  websiteImportBatches           WebsiteImportBatch[]
+  publisherCompensationsDecided  PublisherCompensation[]         @relation("PublisherCompensationDecider")
+  moderationEvents               ModerationEvent[]               @relation("ModerationEventActor")
+  createdApiKeys                 ApiKey[]                        @relation("ApiKeyCreator")
 
   @@index([userType, banned])
   @@index([suspendedByUserId])
@@ -1134,36 +1138,38 @@ model Order {
   createdAt               DateTime                    @default(now())
   updatedAt               DateTime                    @updatedAt
 
-  customer               User                          @relation("OrderCustomer", fields: [customerId], references: [id])
-  assignee               User?                         @relation("OrderAssignee", fields: [assigneeId], references: [id])
-  website                Website?                      @relation(fields: [websiteId], references: [id])
-  activeDeliveryVersion  OrderDeliveryVersion?         @relation("ActiveOrderDeliveryVersion", fields: [activeDeliveryVersionId], references: [id])
-  organization           Organization                  @relation(fields: [organizationId], references: [id])
-  campaign               Campaign?                     @relation(fields: [campaignId], references: [id])
-  listing                MarketplaceListing?           @relation(fields: [listingId], references: [id])
-  listingService         ListingService?               @relation(fields: [listingServiceId], references: [id])
-  contentOrder           ContentOrder?
-  articleVersions        OrderArticleVersion[]
-  revisions              Revision[]
-  reports                Report[]
-  transactions           Transaction[]
-  items                  OrderItem[]
-  events                 OrderEvent[]
-  settlements            Settlement[]
-  dispute                OrderDispute?
-  platformRevenue        PlatformRevenue?
-  deliveryVersions       OrderDeliveryVersion[]        @relation("OrderDeliveryVersions")
-  fulfillmentAssignments FulfillmentAssignment[]
-  fraudFlags             DeliveryFraudFlag[]
-  publisherCompensation  PublisherCompensation?
-  fraudHolds             DeliveryFraudHold[]
-  fraudFlagResolutions   DeliveryFraudFlagResolution[]
-  fraudFindings          DeliveryFraudFinding[]
-  tickets                Ticket[]
-  review                 OrderReview?
-  cancellationRequests   OrderCancellationRequest[]
-  withdrawalAllocations  WithdrawalAllocation[]
-  reconciliationCases    ReconciliationCase[]
+  customer                       User                            @relation("OrderCustomer", fields: [customerId], references: [id])
+  assignee                       User?                           @relation("OrderAssignee", fields: [assigneeId], references: [id])
+  website                        Website?                        @relation(fields: [websiteId], references: [id])
+  activeDeliveryVersion          OrderDeliveryVersion?           @relation("ActiveOrderDeliveryVersion", fields: [activeDeliveryVersionId], references: [id])
+  organization                   Organization                    @relation(fields: [organizationId], references: [id])
+  campaign                       Campaign?                       @relation(fields: [campaignId], references: [id])
+  listing                        MarketplaceListing?             @relation(fields: [listingId], references: [id])
+  listingService                 ListingService?                 @relation(fields: [listingServiceId], references: [id])
+  contentOrder                   ContentOrder?
+  articleVersions                OrderArticleVersion[]
+  revisions                      Revision[]
+  reports                        Report[]
+  transactions                   Transaction[]
+  items                          OrderItem[]
+  events                         OrderEvent[]
+  reconciliationRepairProposals  ReconciliationRepairProposal[]
+  reconciliationRepairExecutions ReconciliationRepairExecution[]
+  settlements                    Settlement[]
+  dispute                        OrderDispute?
+  platformRevenue                PlatformRevenue?
+  deliveryVersions               OrderDeliveryVersion[]          @relation("OrderDeliveryVersions")
+  fulfillmentAssignments         FulfillmentAssignment[]
+  fraudFlags                     DeliveryFraudFlag[]
+  publisherCompensation          PublisherCompensation?
+  fraudHolds                     DeliveryFraudHold[]
+  fraudFlagResolutions           DeliveryFraudFlagResolution[]
+  fraudFindings                  DeliveryFraudFinding[]
+  tickets                        Ticket[]
+  review                         OrderReview?
+  cancellationRequests           OrderCancellationRequest[]
+  withdrawalAllocations          WithdrawalAllocation[]
+  reconciliationCases            ReconciliationCase[]
 
   // Scoped per organization — a globally unique key let one tenant replay
   // another tenant's key and read their order (cross-tenant leak).
@@ -2177,10 +2183,12 @@ model Wallet {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  organization    Organization?    @relation(fields: [organizationId], references: [id])
-  transactions    Transaction[]
-  depositAttempts DepositAttempt[]
-  paymentDisputes PaymentDispute[]
+  organization                   Organization?                   @relation(fields: [organizationId], references: [id])
+  transactions                   Transaction[]
+  depositAttempts                DepositAttempt[]
+  paymentDisputes                PaymentDispute[]
+  reconciliationRepairProposals  ReconciliationRepairProposal[]
+  reconciliationRepairExecutions ReconciliationRepairExecution[]
   // Partial unique index for legacy personal wallets only. A global userId
   // unique would break users who create wallets for multiple organizations.
   // See migration 20260719120000_wallet_personal_user_unique.
@@ -2193,6 +2201,7 @@ enum TransactionType {
   DEPOSIT
   PURCHASE
   REFUND
+  REFUND_REVERSAL
   WITHDRAWAL
   WITHDRAWAL_REVERSAL
   SETTLEMENT_RELEASE
@@ -2218,14 +2227,14 @@ enum ReconciliationCaseStatus {
 }
 
 model Transaction {
-  id           String          @id @default(cuid())
-  amount       Decimal
-  currency     String          @default("USD")
-  type         TransactionType
-  reference    String?
+  id                      String          @id @default(cuid())
+  amount                  Decimal
+  currency                String          @default("USD")
+  type                    TransactionType
+  reference               String?
   // External provider linkage (e.g. Stripe payment_intent for deposits) —
   // lets chargeback webhooks find the originating deposit + wallet.
-  providerRef  String?
+  providerRef             String?
   // FIN-02: paired with `providerRef` to form a provider-aware uniqueness
   // key for external deposits (Stripe, Wise, manual, etc.). Composite key
   // `[provider, providerRef]` is realised at the DB level via a partial
@@ -2236,27 +2245,33 @@ model Transaction {
   // used by `MarketplaceFavorite_userId_listingId_serviceType_key` and
   // `MarketplaceListing_websiteId_active_key`. Prisma's `@@unique` syntax
   // doesn't express partial predicates, so the constraint lives in raw SQL.
-  provider     String?
-  description  String?
-  walletId     String?
-  orderId      String?
-  publisherId  String?
-  settlementId String?
-  createdAt    DateTime        @default(now())
+  provider                String?
+  description             String?
+  walletId                String?
+  orderId                 String?
+  publisherId             String?
+  settlementId            String?
+  reversalOfTransactionId String?         @unique
+  createdAt               DateTime        @default(now())
 
-  wallet                      Wallet?                    @relation(fields: [walletId], references: [id])
-  order                       Order?                     @relation(fields: [orderId], references: [id])
-  publisher                   Publisher?                 @relation(fields: [publisherId], references: [id])
-  settlement                  Settlement?                @relation(fields: [settlementId], references: [id])
+  wallet                      Wallet?                        @relation(fields: [walletId], references: [id])
+  order                       Order?                         @relation(fields: [orderId], references: [id])
+  publisher                   Publisher?                     @relation(fields: [publisherId], references: [id])
+  settlement                  Settlement?                    @relation(fields: [settlementId], references: [id])
   depositAttempt              DepositAttempt?
   withdrawalAllocations       WithdrawalAllocation[]
-  originatingPaymentDisputes  PaymentDispute[]           @relation("PaymentDisputeDepositTransaction")
-  paymentDisputeHold          PaymentDispute?            @relation("PaymentDisputeHoldTransaction")
-  paymentDisputeResolution    PaymentDispute?            @relation("PaymentDisputeResolutionTransaction")
-  publisherCompensationRefund PublisherCompensation?     @relation("PublisherCompensationRefund")
-  publisherCompensationCredit PublisherCompensation?     @relation("PublisherCompensationCredit")
-  publisherCompensationDebt   PublisherCompensation?     @relation("PublisherCompensationDebt")
-  cancellationRefundRequests  OrderCancellationRequest[] @relation("OrderCancellationRefund")
+  originatingPaymentDisputes  PaymentDispute[]               @relation("PaymentDisputeDepositTransaction")
+  paymentDisputeHold          PaymentDispute?                @relation("PaymentDisputeHoldTransaction")
+  paymentDisputeResolution    PaymentDispute?                @relation("PaymentDisputeResolutionTransaction")
+  publisherCompensationRefund PublisherCompensation?         @relation("PublisherCompensationRefund")
+  publisherCompensationCredit PublisherCompensation?         @relation("PublisherCompensationCredit")
+  publisherCompensationDebt   PublisherCompensation?         @relation("PublisherCompensationDebt")
+  cancellationRefundRequests  OrderCancellationRequest[]     @relation("OrderCancellationRefund")
+  reversalOf                  Transaction?                   @relation("RefundCreditReversal", fields: [reversalOfTransactionId], references: [id], onDelete: Restrict)
+  reversals                   Transaction[]                  @relation("RefundCreditReversal")
+  repairSource                ReconciliationRepairExecution? @relation("ReconciliationRepairSource")
+  repairReversal              ReconciliationRepairExecution? @relation("ReconciliationRepairReversal")
+  refundReversalProposals     ReconciliationRepairProposal[] @relation("RepairProposalSourceRefund")
 
   @@unique([reference])
   @@index([walletId])
@@ -2285,12 +2300,94 @@ model ReconciliationCase {
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
 
-  order     Order?                       @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  snapshots ReconciliationCaseSnapshot[]
+  order            Order?                          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  snapshots        ReconciliationCaseSnapshot[]
+  repairProposals  ReconciliationRepairProposal[]
+  repairExecutions ReconciliationRepairExecution[]
 
   @@unique([aggregateType, aggregateId])
   @@index([status, lastDetectedAt])
   @@index([orderId])
+}
+
+// A proposal freezes the exact evidence digest and reason reviewed by the
+// maker. Approval and execution are separate append-only records.
+model ReconciliationRepairProposal {
+  id                        String   @id @default(cuid())
+  caseId                    String
+  orderId                   String
+  sourceRefundTransactionId String
+  providerRefundConfirmedAbsent Boolean
+  walletId                  String
+  evidenceFingerprint       String   @db.Char(64)
+  evidenceDigest            String   @db.Char(64)
+  proposalDigest            String   @unique @db.Char(64)
+  amount                    Decimal  @db.Decimal(18, 2)
+  currency                  String   @default("USD") @db.VarChar(3)
+  incidentReference         String   @db.VarChar(191)
+  reason                    String   @db.VarChar(1000)
+  expectedCaseVersion       Int
+  expectedOrderVersion      Int
+  expectedWalletVersion     Int
+  initiatedByUserId         String
+  expiresAt                 DateTime
+  createdAt                 DateTime @default(now())
+
+  case         ReconciliationCase             @relation(fields: [caseId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_case_fkey")
+  order        Order                          @relation(fields: [orderId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_order_fkey")
+  sourceRefund Transaction                    @relation("RepairProposalSourceRefund", fields: [sourceRefundTransactionId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_source_fkey")
+  wallet       Wallet                         @relation(fields: [walletId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_wallet_fkey")
+  initiatedBy  User                           @relation("ReconciliationRepairInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict, map: "ReconciliationRepairProposal_initiator_fkey")
+  approval     ReconciliationRepairApproval?
+  execution    ReconciliationRepairExecution?
+
+  @@index([caseId, createdAt])
+  @@index([sourceRefundTransactionId, expiresAt], map: "ReconciliationRepairProposal_source_expires_idx")
+}
+
+model ReconciliationRepairApproval {
+  id               String   @id @default(cuid())
+  proposalId       String   @unique
+  proposalDigest   String   @db.Char(64)
+  approvedByUserId String
+  createdAt        DateTime @default(now())
+
+  proposal   ReconciliationRepairProposal @relation(fields: [proposalId], references: [id], onDelete: Restrict, map: "ReconciliationRepairApproval_proposal_fkey")
+  approvedBy User                         @relation("ReconciliationRepairApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict, map: "ReconciliationRepairApproval_approver_fkey")
+}
+
+model ReconciliationRepairExecution {
+  id                        String   @id @default(cuid())
+  proposalId                String   @unique
+  caseId                    String
+  orderId                   String
+  sourceRefundTransactionId String   @unique
+  reversalTransactionId     String   @unique
+  walletId                  String
+  amount                    Decimal  @db.Decimal(18, 2)
+  currency                  String   @default("USD") @db.VarChar(3)
+  beforeAvailableBalance    Decimal  @db.Decimal(18, 2)
+  afterAvailableBalance     Decimal  @db.Decimal(18, 2)
+  beforeWalletVersion       Int
+  afterWalletVersion        Int
+  executedByUserId          String
+  approverUserId            String
+  idempotencyKey            String   @db.VarChar(191)
+  requestFingerprint        String   @db.Char(64)
+  createdAt                 DateTime @default(now())
+
+  proposal     ReconciliationRepairProposal @relation(fields: [proposalId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_proposal_fkey")
+  case         ReconciliationCase           @relation(fields: [caseId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_case_fkey")
+  order        Order                        @relation(fields: [orderId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_order_fkey")
+  sourceRefund Transaction                  @relation("ReconciliationRepairSource", fields: [sourceRefundTransactionId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_source_fkey")
+  reversal     Transaction                  @relation("ReconciliationRepairReversal", fields: [reversalTransactionId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_reversal_fkey")
+  wallet       Wallet                       @relation(fields: [walletId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_wallet_fkey")
+  executedBy   User                         @relation("ReconciliationRepairExecutor", fields: [executedByUserId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_executor_fkey")
+  approvedBy   User                         @relation("ReconciliationRepairExecutionApprover", fields: [approverUserId], references: [id], onDelete: Restrict, map: "ReconciliationRepairExecution_approver_fkey")
+
+  @@unique([caseId, idempotencyKey])
+  @@index([caseId, createdAt])
+  @@index([orderId, createdAt])
 }
 
 // Every scheduled or on-demand scan report is retained. Case snapshots below
