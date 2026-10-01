@@ -48,8 +48,13 @@
     },
     {
       "package": "dompurify",
-      "minimumVersion": "3.4.12",
-      "reason": "GHSA-c2j3-45gr-mqc4 is fixed in DOMPurify 3.4.12."
+      "minimumVersion": "3.4.16",
+      "reason": "GHSA-c2j3-45gr-mqc4 is fixed in DOMPurify 3.4.12 and GHSA-p98j-92pf-mc4p is fixed in 3.4.16."
+    },
+    {
+      "package": "hono",
+      "minimumVersion": "4.13.7",
+      "reason": "GHSA-hxh3-vqpv-xpqv is fixed in Hono 4.13.7."
     },
     {
       "package": "shell-quote",
