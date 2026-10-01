@@ -1601,6 +1601,7 @@ export class AdminService {
       detectedAt: string
       lastDetectedAt: string
       version: number
+      makerCheckerRequired: boolean
       order: {
         id: string
         amount: string | number | null

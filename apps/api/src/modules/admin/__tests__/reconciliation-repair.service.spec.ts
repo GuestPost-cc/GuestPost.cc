@@ -8,6 +8,8 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
   const originalDeploymentEnvironment = process.env.DEPLOYMENT_ENVIRONMENT
   const originalMfaBypass =
     process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS
+  const originalMakerCheckerBypass =
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS
 
   afterEach(() => {
     if (originalFeatureFlag === undefined)
@@ -25,6 +27,12 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     else
       process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS =
         originalMfaBypass
+    if (originalMakerCheckerBypass === undefined)
+      delete process.env
+        .FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS
+    else
+      process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS =
+        originalMakerCheckerBypass
   })
 
   it("does not create a proposal unless the feature is explicitly enabled", async () => {

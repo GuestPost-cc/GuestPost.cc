@@ -13,10 +13,18 @@ BEGIN
     CREATE ROLE guestpost_financial_repair_guard
       NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_financial_repair_staging'
+  ) THEN
+    CREATE ROLE guestpost_financial_repair_staging
+      NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+  END IF;
 END
 $financial_repair_guard_role$;
 
 ALTER ROLE guestpost_financial_repair_guard
+  NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+ALTER ROLE guestpost_financial_repair_staging
   NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 
 -- A production migrator runs as guestpost_schema_owner, which must be a

@@ -292,6 +292,11 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                         explicitly enabled and finance runtime is in
                         recovery-only mode.
                       </p>
+                      <p className="text-xs text-muted-foreground">
+                        {caseQ.data.makerCheckerRequired
+                          ? "A different Finance or Super Admin user must approve and execute this proposal."
+                          : "Staging test mode: this staff account may approve and execute its own proposal. Production requires independent staff accounts."}
+                      </p>
                     </div>
                     <Button
                       variant="outline"
@@ -438,7 +443,8 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                           </p>
                         </div>
                         {!proposal.approval &&
-                          proposal.initiatedByUserId !== user?.id && (
+                          (!caseQ.data.makerCheckerRequired ||
+                            proposal.initiatedByUserId !== user?.id) && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -450,7 +456,9 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                           )}
                         {proposal.approval &&
                           !proposal.execution &&
-                          proposal.approval.approvedByUserId !== user?.id && (
+                          (!caseQ.data.makerCheckerRequired ||
+                            proposal.approval.approvedByUserId !==
+                              user?.id) && (
                             <Button
                               variant="destructive"
                               size="sm"
@@ -469,6 +477,7 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                           )}
                         {proposal.approval &&
                           !proposal.execution &&
+                          caseQ.data.makerCheckerRequired &&
                           proposal.approval.approvedByUserId === user?.id && (
                             <p className="text-xs text-muted-foreground">
                               An authorized Finance or Super Admin user other

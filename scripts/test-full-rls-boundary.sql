@@ -104,6 +104,14 @@ SELECT pg_temp.assert_true(
 );
 
 SELECT pg_temp.assert_true(
+  NOT pg_has_role('guestpost_api_runtime', 'guestpost_financial_repair_staging', 'MEMBER')
+  AND NOT pg_has_role('guestpost_auth_runtime', 'guestpost_financial_repair_staging', 'MEMBER')
+  AND NOT pg_has_role('guestpost_worker_runtime', 'guestpost_financial_repair_staging', 'MEMBER')
+  AND NOT pg_has_role('guestpost_reporting_runtime', 'guestpost_financial_repair_staging', 'MEMBER'),
+  'no runtime identity may assume the staging-only single-actor capability in the default role topology'
+);
+
+SELECT pg_temp.assert_true(
   (SELECT count(*) = 4
    FROM pg_proc procedure
    JOIN pg_namespace namespace ON namespace.oid = procedure.pronamespace

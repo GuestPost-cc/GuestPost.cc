@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { isStagingSingleActorRepairEnabled } from "./reconciliation-repair.gates"
 
 /**
  * Financial drift detector. The check logic lives in
@@ -156,7 +157,26 @@ export class ReconciliationService {
       },
     })
     if (!caseRow) throw new NotFoundException("Reconciliation case not found")
-    return caseRow
+    const stagingBypassConfigured = isStagingSingleActorRepairEnabled()
+    const stagingRoleMembership = stagingBypassConfigured
+      ? await this.prisma.$queryRaw<Array<{ enabled: boolean }>>`
+          SELECT EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_roles AS role
+            WHERE role.rolname = 'guestpost_financial_repair_staging'
+              AND pg_catalog.pg_has_role(
+                session_user,
+                role.oid,
+                'MEMBER'
+              )
+          ) AS enabled
+        `
+      : []
+    return {
+      ...caseRow,
+      makerCheckerRequired:
+        !stagingBypassConfigured || stagingRoleMembership[0]?.enabled !== true,
+    }
   }
 
   history(take = 20) {
