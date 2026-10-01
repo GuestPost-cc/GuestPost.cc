@@ -12,7 +12,6 @@ export function isStagingSingleActorRepairEnabled() {
   )
 }
 
-
 export async function isStagingSingleActorRepairDatabaseEnabled(
   prisma: Pick<PrismaService, "$queryRaw">,
 ) {
