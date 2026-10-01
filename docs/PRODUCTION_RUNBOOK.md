@@ -33,7 +33,7 @@ evidence while refusing money mutations.
 | `FINANCE_RUNTIME_MODE` | required in production: `normal`, `recovery_only`, or `locked`; missing/invalid values fail closed to `locked` |
 | `FINANCIAL_RECONCILIATION_REPAIRS_ENABLED` | financial repair endpoint gate; keep false outside an approved staging recovery test |
 | `FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS` | staging-only step-up bypass; never set in production |
-| `FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS` | staging-only single-account test gate; requires the staging capability DB role and recovery-only mode; production must leave false/unset |
+| `FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS` | staging-only single-account test gate; requires recovery-only mode and the administrator-set `guestpost.financial_repair_single_actor=on` role setting scoped to the staging database; production must leave false/unset |
 | `STRIPE_LIVE_MODE_ENABLED` | must remain false for test keys/staging; live-key boot gate |
 | `NEXT_PUBLIC_PORTAL_URL`, `NEXT_PUBLIC_PUBLISHER_URL` | exact HTTPS fallback return origins; required when the corresponding Stripe flow is enabled in production |
 | `NEXT_PUBLIC_ALLOWED_APP_DOMAINS` | comma-separated deployment instance domains (for example, `stage.example.com`); set on the API runtime and frontend builds. The API derives exact HTTPS origins for the configured website, `app`, `publisher`, and `admin` surfaces for CORS/CSRF/auth, while approved `app.<domain>`/`api.<domain>` routing and Stripe returns avoid build-time hostnames |
