@@ -8,18 +8,22 @@ updated: 2026-09-30
 
 ## Financial reconciliation repair Phase 2
 
-Branch `feat/financial-reconciliation-repair-phase2` implements a narrowly
-scoped, maker-checker reversal for erroneous internal force-cancel refund
-credits, with Finance/Super Admin RBAC, fail-closed recovery-mode gates,
-immutable ledger/audit evidence, customer notification, and an admin workflow.
-Local monorepo typecheck, Prisma validation, focused API/shared tests, and
-formatting checks pass. Durable reconciliation evidence is worker-written;
-on-demand staff scans remain report-only under the API role's least-privilege
-RLS grants. The specific $5 incident still needs provider-side evidence before
-it can be proposed for repair. Remaining gates are PostgreSQL migration
-rehearsal (Docker is unavailable locally), GitHub CI, CodeRabbit, and Strix
-review. Keep the repair feature flag off outside an approved recovery window;
-this branch has not been merged or deployed.
+PR #149 (`fix/staging-reconciliation-single-actor`) adds an explicit
+staging-only same-account test path while keeping two-person approval as the
+default and production requirement. It requires the existing staging recovery
+gates, a new explicit bypass flag, and an API-runtime membership granted only
+on a dedicated staging PostgreSQL cluster. The Admin UI only exposes the
+single-account approve/execute controls when the API confirms both its config
+and database capability gates. The user's evidence confirms case
+`cmun9e6g9001` was an internal wallet credit, not a Stripe refund; no repair has
+been executed. Local formatter, diff check, and isolated gate test pass. Full
+local API/Admin validation was blocked by absent workspace build artifacts and
+unavailable npm DNS. GitHub CI is running; CodeRabbit has not posted a review,
+and Strix's PR app reported its included review quota exhausted. Do not merge or
+deploy before CI and an available review; do not execute the case. After merge,
+deploy the Admin build as well as API, apply the migration, set the explicit
+staging bypass and capability membership on the dedicated staging cluster, and
+let the operator perform Maker-Checker/test actions manually.
 
 ## Force-cancel money conservation
 

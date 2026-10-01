@@ -154,6 +154,15 @@ Finance and Super Admin routes use distinct proposal/approval/execution steps,
 with a different approver, evidence/version revalidation, serializable order
 and wallet locks, and case-scoped execution idempotency. Database constraints
 and RLS enforce the same source/evidence relationship and append-only records.
+Two-person approval remains the default and production requirement. Disposable
+staging can enable a single-account test path only with all explicit staging
+recovery flags plus membership of `guestpost_api_runtime` in the no-privilege
+`guestpost_financial_repair_staging` database capability role. Role membership
+is cluster-wide, so grant it only on a dedicated staging cluster; provisioners
+and CI deliberately leave it ungranted. The API reports the effective gate to
+the Admin workbench, which only exposes same-account controls when both API and
+database gates are active. This exception does not bypass evidence, available-
+balance, RLS, audit, or idempotency checks.
 The admin case detail UI exposes preview/blockers and the maker-checker flow;
 unsupported or stale evidence remains detection-only. Local PostgreSQL
 migration rehearsal and production rollout are separate release gates.
