@@ -131,10 +131,13 @@ ROLLBACK;
 
 BEGIN;
 SET SESSION AUTHORIZATION guestpost_api_runtime;
-SELECT format(
-  'ALTER ROLE guestpost_api_runtime IN DATABASE %I SET guestpost.financial_repair_single_actor = %L',
-  current_database(), 'on'
-) \gexec
+SELECT pg_temp.assert_rejected(
+  format(
+    'ALTER ROLE guestpost_api_runtime IN DATABASE %I SET guestpost.financial_repair_single_actor = %L',
+    current_database(), 'on'
+  ),
+  'the API runtime cannot set the custom repair capability on its own role'
+);
 SELECT NOT EXISTS (
   SELECT 1
   FROM pg_catalog.pg_db_role_setting AS setting
