@@ -18,9 +18,13 @@ and database capability gates. The user's evidence confirms case
 `cmun9e6g9001` was an internal wallet credit, not a Stripe refund; no repair has
 been executed. Local formatter, diff check, and isolated gate test pass. Full
 local API/Admin validation was blocked by absent workspace build artifacts and
-unavailable npm DNS. GitHub CI is running; CodeRabbit has not posted a review,
-and Strix's PR app reported its included review quota exhausted. Do not merge or
-deploy before CI and an available review; do not execute the case. After merge,
+unavailable npm DNS. CodeRabbit flagged that the additive migration must
+preserve `SECURITY DEFINER`; both trigger-function replacements now declare it.
+Initial GitHub CI stopped at the production dependency audit because `hono` is
+below patched 4.13.7; PR #148 already carries that focused dependency-floor
+fix. Strix's PR app reported its included review quota exhausted. Do not merge
+or deploy before latest CI and review are complete; do not execute the case.
+After merge,
 deploy the Admin build as well as API, apply the migration, set the explicit
 staging bypass and capability membership on the dedicated staging cluster, and
 let the operator perform Maker-Checker/test actions manually.
