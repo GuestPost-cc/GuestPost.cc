@@ -126,6 +126,26 @@ SELECT pg_temp.assert_rejected(
 );
 ROLLBACK;
 
+SELECT format(
+  'ALTER ROLE guestpost_api_runtime IN DATABASE %I SET guestpost.financial_repair_single_actor = %L',
+  current_database(), 'on'
+) \gexec
+SELECT pg_temp.assert_true(
+  EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_db_role_setting AS setting
+    JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
+    WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
+      AND configured_role.rolname = 'guestpost_api_runtime'
+      AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
+  ),
+  'the administrator can enable the single-actor capability for the current database only'
+);
+SELECT format(
+  'ALTER ROLE guestpost_api_runtime IN DATABASE %I RESET guestpost.financial_repair_single_actor',
+  current_database()
+) \gexec
+
 SELECT pg_temp.assert_true(
   (SELECT count(*) = 4
    FROM pg_proc procedure
