@@ -104,11 +104,18 @@ SELECT pg_temp.assert_true(
 );
 
 SELECT pg_temp.assert_true(
-  NOT pg_has_role('guestpost_api_runtime', 'guestpost_financial_repair_staging', 'MEMBER')
-  AND NOT pg_has_role('guestpost_auth_runtime', 'guestpost_financial_repair_staging', 'MEMBER')
-  AND NOT pg_has_role('guestpost_worker_runtime', 'guestpost_financial_repair_staging', 'MEMBER')
-  AND NOT pg_has_role('guestpost_reporting_runtime', 'guestpost_financial_repair_staging', 'MEMBER'),
-  'no runtime identity may assume the staging-only single-actor capability in the default role topology'
+  NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_db_role_setting AS setting
+    JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
+    WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
+      AND configured_role.rolname IN (
+        'guestpost_api_runtime', 'guestpost_auth_runtime',
+        'guestpost_worker_runtime', 'guestpost_reporting_runtime'
+      )
+      AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
+  ),
+  'the database-local single-actor capability must be disabled by default'
 );
 
 SELECT pg_temp.assert_true(

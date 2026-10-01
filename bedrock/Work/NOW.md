@@ -11,8 +11,8 @@ updated: 2026-09-30
 PR #149 (`fix/staging-reconciliation-single-actor`) adds an explicit
 staging-only same-account test path while keeping two-person approval as the
 default and production requirement. It requires the existing staging recovery
-gates, a new explicit bypass flag, and an API-runtime membership granted only
-on a dedicated staging PostgreSQL cluster. The Admin UI only exposes the
+gates, a new explicit bypass flag, and an administrator-set database-local
+role setting for `guestpost_api_runtime`. The Admin UI only exposes the
 single-account approve/execute controls when the API confirms both its config
 and database capability gates. The user's evidence confirms case
 `cmun9e6g9001` was an internal wallet credit, not a Stripe refund; no repair has
@@ -26,7 +26,7 @@ fix. Strix's PR app reported its included review quota exhausted. Do not merge
 or deploy before latest CI and review are complete; do not execute the case.
 After merge,
 deploy the Admin build as well as API, apply the migration, set the explicit
-staging bypass and capability membership on the dedicated staging cluster, and
+staging bypass and database-local role setting for the staging database, and
 let the operator perform Maker-Checker/test actions manually.
 
 ## Force-cancel money conservation

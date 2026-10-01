@@ -1,6 +1,6 @@
--- Staging-only single-actor testing is an explicit database capability.
--- The capability role is created by the role provisioner but is not granted
--- to any runtime by migrations. On production, these guards remain two-person.
+-- Staging-only single-actor testing is an explicit database-local capability.
+-- It is enabled by an administrator-set per-database role setting, never by
+-- cluster-wide role membership or a caller-controlled session GUC.
 
 CREATE OR REPLACE FUNCTION public.guard_reconciliation_repair_approval()
 RETURNS TRIGGER
@@ -13,9 +13,16 @@ DECLARE
   staging_single_actor_enabled boolean := false;
 BEGIN
   SELECT EXISTS (
-    SELECT 1 FROM pg_catalog.pg_roles capability_role
-    WHERE capability_role.rolname = 'guestpost_financial_repair_staging'
-      AND pg_catalog.pg_has_role(session_user, capability_role.oid, 'MEMBER')
+    SELECT 1
+    FROM pg_catalog.pg_db_role_setting AS setting
+    JOIN pg_catalog.pg_roles AS configured_role
+      ON configured_role.oid = setting.setrole
+    WHERE setting.setdatabase = (
+        SELECT database.oid FROM pg_catalog.pg_database AS database
+        WHERE database.datname = current_database()
+      )
+      AND pg_catalog.pg_has_role(session_user, configured_role.oid, 'MEMBER')
+      AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
   ) INTO staging_single_actor_enabled;
 
   SELECT * INTO proposal FROM public."ReconciliationRepairProposal"
@@ -50,9 +57,16 @@ DECLARE
   staging_single_actor_enabled boolean := false;
 BEGIN
   SELECT EXISTS (
-    SELECT 1 FROM pg_catalog.pg_roles capability_role
-    WHERE capability_role.rolname = 'guestpost_financial_repair_staging'
-      AND pg_catalog.pg_has_role(session_user, capability_role.oid, 'MEMBER')
+    SELECT 1
+    FROM pg_catalog.pg_db_role_setting AS setting
+    JOIN pg_catalog.pg_roles AS configured_role
+      ON configured_role.oid = setting.setrole
+    WHERE setting.setdatabase = (
+        SELECT database.oid FROM pg_catalog.pg_database AS database
+        WHERE database.datname = current_database()
+      )
+      AND pg_catalog.pg_has_role(session_user, configured_role.oid, 'MEMBER')
+      AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
   ) INTO staging_single_actor_enabled;
 
   SELECT * INTO proposal FROM public."ReconciliationRepairProposal"

@@ -257,13 +257,15 @@ require `FINANCIAL_RECONCILIATION_REPAIRS_ENABLED=true`,
 `FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS=true` exception. For
 disposable staging tests only, single-account maker-checker bypass additionally
 requires `FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS=true`
-and explicit membership of `guestpost_api_runtime` in the no-privilege
-`guestpost_financial_repair_staging` capability role. Provision this role only
-on a dedicated staging database cluster: PostgreSQL role memberships are
-cluster-wide. The Admin case response reports whether the full API and database
+and the explicit database-local `guestpost.financial_repair_single_actor=on`
+role setting for `guestpost_api_runtime`. Apply it only through the trusted
+administrator script against the named staging database. PostgreSQL scopes
+this setting per database, so it cannot enable the capability in another
+database on a shared cluster; the runtime role cannot write the catalog or
+elevate its own role settings. The Admin case response reports whether both
 gates are active, and only then exposes same-account approve/execute controls.
 Without both gates, two-person maker-checker remains enforced. Production must
-never receive the bypass environment variable or capability-role membership;
+never receive the bypass environment variable or database-local setting;
 production repairs require independent staff and verified step-up/MFA before
 they are enabled.
 

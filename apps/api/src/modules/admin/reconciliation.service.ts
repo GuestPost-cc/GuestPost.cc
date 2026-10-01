@@ -162,13 +162,19 @@ export class ReconciliationService {
       ? await this.prisma.$queryRaw<Array<{ enabled: boolean }>>`
           SELECT EXISTS (
             SELECT 1
-            FROM pg_catalog.pg_roles AS role
-            WHERE role.rolname = 'guestpost_financial_repair_staging'
+            FROM pg_catalog.pg_db_role_setting AS setting
+            JOIN pg_catalog.pg_roles AS configured_role
+              ON configured_role.oid = setting.setrole
+            WHERE setting.setdatabase = (
+                SELECT database.oid FROM pg_catalog.pg_database AS database
+                WHERE database.datname = current_database()
+              )
               AND pg_catalog.pg_has_role(
                 session_user,
-                role.oid,
+                configured_role.oid,
                 'MEMBER'
               )
+              AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
           ) AS enabled
         `
       : []

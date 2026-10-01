@@ -167,6 +167,10 @@ ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name" RESET role;
 ALTER ROLE guestpost_auth_runtime IN DATABASE :"database_name" RESET role;
 ALTER ROLE guestpost_worker_runtime IN DATABASE :"database_name" RESET role;
 ALTER ROLE guestpost_reporting_runtime IN DATABASE :"database_name" RESET role;
+-- Reconciliation's single-actor staging exception is explicitly database-
+-- scoped and is disabled whenever the role topology is reprovisioned.
+ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name"
+  RESET guestpost.financial_repair_single_actor;
 
 GRANT guestpost_schema_owner TO guestpost_migrator WITH INHERIT FALSE, SET TRUE;
 GRANT guestpost_api_group TO guestpost_api_runtime WITH INHERIT TRUE, SET FALSE;
