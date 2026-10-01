@@ -169,6 +169,7 @@ export class ReconciliationService {
                 SELECT database.oid FROM pg_catalog.pg_database AS database
                 WHERE database.datname = current_database()
               )
+              AND configured_role.rolname = 'guestpost_financial_repair_staging'
               AND pg_catalog.pg_has_role(
                 session_user,
                 configured_role.oid,

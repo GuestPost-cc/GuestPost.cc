@@ -1,4 +1,4 @@
-import { ServiceUnavailableException } from "@nestjs/common"
+import { ConflictException, ServiceUnavailableException } from "@nestjs/common"
 import { ReconciliationRepairService } from "../reconciliation-repair.service"
 
 describe("ReconciliationRepairService fail-closed rollout gate", () => {
@@ -70,6 +70,46 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     await expect(
       service.approve("case-1", "proposal-1", "finance-user-2", "a".repeat(64)),
     ).rejects.toBeInstanceOf(ServiceUnavailableException)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it("requires the database capability when the approver also executes", async () => {
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED = "true"
+    process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+    process.env.DEPLOYMENT_ENVIRONMENT = "staging"
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS = "true"
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS =
+      "true"
+    const userId = "finance-user-2"
+    const proposalDigest = "a".repeat(64)
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ enabled: false }]),
+      reconciliationRepairExecution: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      reconciliationRepairProposal: {
+        findFirst: jest.fn().mockResolvedValue({
+          proposalDigest,
+          expiresAt: new Date(Date.now() + 60_000),
+        }),
+      },
+      reconciliationRepairApproval: {
+        findUnique: jest.fn().mockResolvedValue({
+          approvedByUserId: userId,
+          proposalDigest,
+        }),
+      },
+      $transaction: jest.fn(),
+    }
+    const service = new ReconciliationRepairService(
+      prisma as any,
+      {} as any,
+      {} as any,
+    )
+
+    await expect(
+      service.execute("case-1", "proposal-1", userId, proposalDigest, "key-1"),
+    ).rejects.toBeInstanceOf(ConflictException)
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 

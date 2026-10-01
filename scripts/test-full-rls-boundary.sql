@@ -109,25 +109,28 @@ SELECT pg_temp.assert_true(
     FROM pg_catalog.pg_db_role_setting AS setting
     JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
     WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
-      AND configured_role.rolname IN (
-        'guestpost_api_runtime', 'guestpost_auth_runtime',
-        'guestpost_worker_runtime', 'guestpost_reporting_runtime'
-      )
+      AND configured_role.rolname = 'guestpost_financial_repair_staging'
       AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
   ),
   'the database-local single-actor capability must be disabled by default'
+);
+SELECT pg_temp.assert_true(
+  pg_catalog.pg_has_role(
+    'guestpost_api_runtime', 'guestpost_financial_repair_staging', 'MEMBER'
+  ),
+  'the API runtime may inspect but cannot activate the trusted staging capability'
 );
 
 BEGIN;
 SET LOCAL ROLE guestpost_api_runtime;
 SELECT pg_temp.assert_rejected(
-  'ALTER ROLE guestpost_api_runtime SET guestpost.financial_repair_single_actor = ''on''',
-  'the API runtime cannot elevate its own database-local single-actor capability'
+  'ALTER ROLE guestpost_financial_repair_staging SET guestpost.financial_repair_single_actor = ''on''',
+  'the API runtime cannot elevate the trusted database-local single-actor capability'
 );
 ROLLBACK;
 
 SELECT format(
-  'ALTER ROLE guestpost_api_runtime IN DATABASE %I SET guestpost.financial_repair_single_actor = %L',
+  'ALTER ROLE guestpost_financial_repair_staging IN DATABASE %I SET guestpost.financial_repair_single_actor = %L',
   current_database(), 'on'
 ) \gexec
 SELECT pg_temp.assert_true(
@@ -136,13 +139,13 @@ SELECT pg_temp.assert_true(
     FROM pg_catalog.pg_db_role_setting AS setting
     JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
     WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
-      AND configured_role.rolname = 'guestpost_api_runtime'
+      AND configured_role.rolname = 'guestpost_financial_repair_staging'
       AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
   ),
   'the administrator can enable the single-actor capability for the current database only'
 );
 SELECT format(
-  'ALTER ROLE guestpost_api_runtime IN DATABASE %I RESET guestpost.financial_repair_single_actor',
+  'ALTER ROLE guestpost_financial_repair_staging IN DATABASE %I RESET guestpost.financial_repair_single_actor',
   current_database()
 ) \gexec
 

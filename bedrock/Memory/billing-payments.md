@@ -157,7 +157,7 @@ and RLS enforce the same source/evidence relationship and append-only records.
 Two-person approval remains the default and production requirement. Disposable
 staging can enable a single-account test path only with all explicit staging
 recovery flags plus an administrator-set database-local role setting for
-`guestpost_api_runtime`. This setting cannot enable the capability in other
+`guestpost_financial_repair_staging`, which is granted to the API runtime without SET ROLE. This setting cannot enable the capability in other
 databases on a shared cluster and cannot be written by the runtime role. The
 API reports the effective gate to the Admin workbench, which only exposes
 same-account controls when both API and database gates are active. This

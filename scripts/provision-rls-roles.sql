@@ -171,12 +171,18 @@ ALTER ROLE guestpost_reporting_runtime IN DATABASE :"database_name" RESET role;
 -- scoped and is disabled whenever the role topology is reprovisioned.
 ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name"
   RESET guestpost.financial_repair_single_actor;
+ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name"
+  RESET guestpost.financial_repair_single_actor;
+ALTER ROLE guestpost_financial_repair_staging IN DATABASE :"database_name"
+  RESET guestpost.financial_repair_single_actor;
 
 GRANT guestpost_schema_owner TO guestpost_migrator WITH INHERIT FALSE, SET TRUE;
 GRANT guestpost_api_group TO guestpost_api_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_auth_group TO guestpost_auth_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_worker_group TO guestpost_worker_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_reporting_group TO guestpost_reporting_runtime WITH INHERIT TRUE, SET FALSE;
+GRANT guestpost_financial_repair_staging TO guestpost_api_runtime
+  WITH INHERIT FALSE, SET FALSE;
 -- Only the trusted schema owner may SET ROLE to this NOLOGIN, NO-BYPASSRLS
 -- owner used by tightly scoped financial-repair row-lock trigger functions.
 -- No API, worker, auth, reporting, or credential runtime role is a member.

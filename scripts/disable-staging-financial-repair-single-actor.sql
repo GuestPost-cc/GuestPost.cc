@@ -37,13 +37,15 @@ SELECT current_database() !~* '(prod|production)' AS database_not_production \gs
 
 ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name"
   RESET guestpost.financial_repair_single_actor;
+ALTER ROLE guestpost_financial_repair_staging IN DATABASE :"database_name"
+  RESET guestpost.financial_repair_single_actor;
 
 SELECT NOT EXISTS (
     SELECT 1
     FROM pg_catalog.pg_db_role_setting AS setting
     JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
     WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
-      AND configured_role.rolname = 'guestpost_api_runtime'
+      AND configured_role.rolname IN ('guestpost_api_runtime', 'guestpost_financial_repair_staging')
       AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
   ) AS staging_single_actor_disabled \gset
 \if :staging_single_actor_disabled

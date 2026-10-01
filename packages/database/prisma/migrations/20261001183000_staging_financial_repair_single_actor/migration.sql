@@ -21,6 +21,7 @@ BEGIN
         SELECT database.oid FROM pg_catalog.pg_database AS database
         WHERE database.datname = current_database()
       )
+      AND configured_role.rolname = 'guestpost_financial_repair_staging'
       AND pg_catalog.pg_has_role(session_user, configured_role.oid, 'MEMBER')
       AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
   ) INTO staging_single_actor_enabled;
@@ -65,6 +66,7 @@ BEGIN
         SELECT database.oid FROM pg_catalog.pg_database AS database
         WHERE database.datname = current_database()
       )
+      AND configured_role.rolname = 'guestpost_financial_repair_staging'
       AND pg_catalog.pg_has_role(session_user, configured_role.oid, 'MEMBER')
       AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
   ) INTO staging_single_actor_enabled;
@@ -89,6 +91,7 @@ BEGIN
      OR approval."proposalDigest" <> proposal."proposalDigest"
      OR NEW."approverUserId" <> approval."approvedByUserId"
      OR (NEW."approverUserId" = proposal."initiatedByUserId" AND NOT staging_single_actor_enabled)
+     OR (NEW."approverUserId" = NEW."executedByUserId" AND NOT staging_single_actor_enabled)
      OR NEW."caseId" <> proposal."caseId"
      OR NEW."orderId" <> proposal."orderId"
      OR NEW."sourceRefundTransactionId" <> proposal."sourceRefundTransactionId"

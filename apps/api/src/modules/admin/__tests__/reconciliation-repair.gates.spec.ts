@@ -1,4 +1,7 @@
-import { isStagingSingleActorRepairEnabled } from "../reconciliation-repair.gates"
+import {
+  isStagingSingleActorRepairDatabaseEnabled,
+  isStagingSingleActorRepairEnabled,
+} from "../reconciliation-repair.gates"
 
 describe("staging single-actor repair gate", () => {
   const names = [
@@ -36,5 +39,27 @@ describe("staging single-actor repair gate", () => {
     delete process.env
       .FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS
     expect(isStagingSingleActorRepairEnabled()).toBe(false)
+  })
+
+  it("requires the administrator-set database capability too", async () => {
+    process.env.DEPLOYMENT_ENVIRONMENT = "staging"
+    process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED = "true"
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS = "true"
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS =
+      "true"
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ enabled: false }]),
+    }
+
+    await expect(
+      isStagingSingleActorRepairDatabaseEnabled(prisma as any),
+    ).resolves.toBe(false)
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1)
+
+    prisma.$queryRaw.mockResolvedValue([{ enabled: true }])
+    await expect(
+      isStagingSingleActorRepairDatabaseEnabled(prisma as any),
+    ).resolves.toBe(true)
   })
 })

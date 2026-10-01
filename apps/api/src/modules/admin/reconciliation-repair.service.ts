@@ -14,7 +14,7 @@ import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { CommunicationsService } from "../communications/communications.service"
 import { ProposeRefundCreditRepairDto } from "./dto/reconciliation-repair.dto"
-import { isStagingSingleActorRepairEnabled } from "./reconciliation-repair.gates"
+import { isStagingSingleActorRepairDatabaseEnabled } from "./reconciliation-repair.gates"
 
 const SUPPORTED_FINDINGS = [
   "REFUND_PARTIAL",
@@ -501,7 +501,7 @@ export class ReconciliationRepairService {
           throw new ConflictException("Repair proposal is stale")
         if (
           proposal.initiatedByUserId === userId &&
-          !isStagingSingleActorRepairEnabled()
+          !(await isStagingSingleActorRepairDatabaseEnabled(tx))
         )
           throw new ForbiddenException(
             "A different Finance user must approve this proposal",
@@ -596,7 +596,7 @@ export class ReconciliationRepairService {
       approval.proposalDigest !== proposalDigest ||
       proposal.proposalDigest !== proposalDigest ||
       (approval.approvedByUserId === userId &&
-        !isStagingSingleActorRepairEnabled()) ||
+        !(await isStagingSingleActorRepairDatabaseEnabled(this.prisma))) ||
       proposal.expiresAt <= new Date()
     )
       throw new ConflictException("A current independent approval is required")
@@ -616,6 +616,8 @@ export class ReconciliationRepairService {
         if (
           !freshApproval ||
           freshApproval.proposalDigest !== proposalDigest ||
+          (freshApproval.approvedByUserId === userId &&
+            !(await isStagingSingleActorRepairDatabaseEnabled(tx))) ||
           freshProposal.proposalDigest !== proposalDigest ||
           freshProposal.expiresAt <= new Date() ||
           current.blockers.length ||

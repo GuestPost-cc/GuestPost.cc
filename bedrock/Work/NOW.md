@@ -12,7 +12,7 @@ PR #149 (`fix/staging-reconciliation-single-actor`) adds an explicit
 staging-only same-account test path while keeping two-person approval as the
 default and production requirement. It requires the existing staging recovery
 gates, a new explicit bypass flag, and an administrator-set database-local
-role setting for `guestpost_api_runtime`. The Admin UI only exposes the
+role setting for the NOLOGIN `guestpost_financial_repair_staging` capability role, granted to API runtime without SET ROLE. The Admin UI only exposes the
 single-account approve/execute controls when the API confirms both its config
 and database capability gates. The user's evidence confirms case
 `cmun9e6g9001` was an internal wallet credit, not a Stripe refund; no repair has

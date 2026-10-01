@@ -44,13 +44,20 @@ SELECT current_database() !~* '(prod|production)' AS database_not_production \gs
 
 DO $enable_staging_repair$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'guestpost_api_runtime') THEN
-    RAISE EXCEPTION 'required API runtime role is missing';
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'guestpost_financial_repair_staging' AND rolcanlogin = false) THEN
+    RAISE EXCEPTION 'required non-login staging capability role is missing';
+  END IF;
+  IF NOT pg_catalog.pg_has_role(
+    'guestpost_api_runtime', 'guestpost_financial_repair_staging', 'MEMBER'
+  ) THEN
+    RAISE EXCEPTION 'API runtime is not a member of the staging capability role';
   END IF;
 END
 $enable_staging_repair$;
 
 ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name"
+  RESET guestpost.financial_repair_single_actor;
+ALTER ROLE guestpost_financial_repair_staging IN DATABASE :"database_name"
   SET guestpost.financial_repair_single_actor = 'on';
 
 SELECT EXISTS (
@@ -58,7 +65,7 @@ SELECT EXISTS (
     FROM pg_catalog.pg_db_role_setting AS setting
     JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
     WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
-      AND configured_role.rolname = 'guestpost_api_runtime'
+      AND configured_role.rolname = 'guestpost_financial_repair_staging'
       AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
   ) AS staging_single_actor_enabled \gset
 \if :staging_single_actor_enabled

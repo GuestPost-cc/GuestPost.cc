@@ -258,7 +258,7 @@ require `FINANCIAL_RECONCILIATION_REPAIRS_ENABLED=true`,
 disposable staging tests only, single-account maker-checker bypass additionally
 requires `FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS=true`
 and the explicit database-local `guestpost.financial_repair_single_actor=on`
-role setting for `guestpost_api_runtime`. Apply it only through the trusted
+role setting for `guestpost_financial_repair_staging`, to which only the API runtime is a non-SET member. Apply it only through the trusted
 administrator script against the named staging database. PostgreSQL scopes
 this setting per database, so it cannot enable the capability in another
 database on a shared cluster; the runtime role cannot write the catalog or
