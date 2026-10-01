@@ -5,6 +5,7 @@
 CREATE OR REPLACE FUNCTION public.guard_reconciliation_repair_approval()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $function$
 DECLARE
@@ -35,6 +36,7 @@ $function$;
 CREATE OR REPLACE FUNCTION public.guard_reconciliation_repair_execution()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $function$
 DECLARE
