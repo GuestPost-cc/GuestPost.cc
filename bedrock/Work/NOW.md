@@ -16,14 +16,14 @@ role setting for `guestpost_api_runtime`. The Admin UI only exposes the
 single-account approve/execute controls when the API confirms both its config
 and database capability gates. The user's evidence confirms case
 `cmun9e6g9001` was an internal wallet credit, not a Stripe refund; no repair has
-been executed. Local formatter, diff check, and isolated gate test pass. Full
-local API/Admin validation was blocked by absent workspace build artifacts and
-unavailable npm DNS. CodeRabbit flagged that the additive migration must
-preserve `SECURITY DEFINER`; both trigger-function replacements now declare it.
-Initial GitHub CI stopped at the production dependency audit because `hono` is
-below patched 4.13.7; PR #148 already carries that focused dependency-floor
-fix. Strix's PR app reported its included review quota exhausted. Do not merge
-or deploy before latest CI and review are complete; do not execute the case.
+been executed. The staging single-actor exception now uses an administrator-
+set PostgreSQL role setting scoped to one database; runtime self-elevation is
+covered by the RLS boundary test. CI run #685 passed all checks, including
+migrations, API integration, full RLS, build, and browser E2E. CodeRabbit's
+refresh is rate-limited until its included window resets, and Strix PR reviews
+remain blocked by the workspace trial limit. The earlier SECURITY DEFINER
+review thread is resolved; no financial action has run. Keep PR #149 open
+until the pending review decision is settled, and do not execute the case.
 After merge,
 deploy the Admin build as well as API, apply the migration, set the explicit
 staging bypass and database-local role setting for the staging database, and
