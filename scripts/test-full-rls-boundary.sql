@@ -118,6 +118,14 @@ SELECT pg_temp.assert_true(
   'the database-local single-actor capability must be disabled by default'
 );
 
+BEGIN;
+SET LOCAL ROLE guestpost_api_runtime;
+SELECT pg_temp.assert_rejected(
+  'ALTER ROLE guestpost_api_runtime SET guestpost.financial_repair_single_actor = ''on''',
+  'the API runtime cannot elevate its own database-local single-actor capability'
+);
+ROLLBACK;
+
 SELECT pg_temp.assert_true(
   (SELECT count(*) = 4
    FROM pg_proc procedure
