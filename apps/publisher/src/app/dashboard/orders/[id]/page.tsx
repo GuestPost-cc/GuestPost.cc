@@ -388,6 +388,18 @@ export default function OrderDetailPage() {
       ["PUBLISHED", "VERIFIED", "DELIVERED", "COMPLETED", "DISPUTED"].includes(
         order.status,
       ),
+    refetchInterval: (query) => {
+      if (order?.status !== "PUBLISHED") return false
+      const currentProof = query.state.data
+      if (!currentProof) {
+        return query.state.status === "error" ? false : 10_000
+      }
+      return currentProof.hasDelivery &&
+        ["PENDING", "RETRYING"].includes(currentProof.verificationStatus)
+        ? 10_000
+        : false
+    },
+    refetchOnWindowFocus: true,
   })
 
   const { data: events = [] } = useQuery({

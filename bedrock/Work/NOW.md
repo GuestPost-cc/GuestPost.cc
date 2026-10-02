@@ -1,10 +1,25 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-09-30
+updated: 2026-10-02
 ---
 
 # Current focus
+
+## Reconciliation eligibility and delivery-verification recovery
+
+Branch `fix/reconciliation-wallet-availability-and-delivery-verification`
+targets current `origin/main`. It allows the typed refund-credit reversal
+when current unreserved wallet balance covers the exact amount; historical
+debits alone do not block, while insufficient available funds, disputes, and
+ambiguous evidence remain fail-closed. The Admin preview explains the balance
+requirement. Customer and publisher order pages refresh while verification is
+pending, and the worker recovery sweep now recovers `RETRYING` rows as well as
+`PENDING`. No schema migration or staging money mutation is part of this fix.
+Focused API/worker tests, API/Admin/Portal/Publisher typechecks, worker build,
+lint, and Biome checks pass. Next: review/CI, CodeRabbit and Strix, then deploy
+API/worker/Admin/Portal and verify the canary without bypassing insufficient
+balance or evidence gates.
 
 ## Financial reconciliation repair Phase 2
 

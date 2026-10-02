@@ -19,7 +19,7 @@ function candidate(id: string, overrides: Record<string, unknown> = {}) {
   }
 }
 
-test("dispatches only active, non-superseded PENDING delivery versions", async () => {
+test("dispatches active PENDING and RETRYING delivery versions", async () => {
   let query: any
   const prisma = {
     orderDeliveryVersion: {
@@ -27,6 +27,7 @@ test("dispatches only active, non-superseded PENDING delivery versions", async (
         query = args
         return [
           candidate("active"),
+          candidate("retrying", { verificationStatus: "RETRYING" }),
           candidate("superseded", { supersededByVersion: 2 }),
           candidate("inactive", { activeOrder: null }),
           candidate("verified", { verificationStatus: "VERIFIED" }),
@@ -58,22 +59,23 @@ test("dispatches only active, non-superseded PENDING delivery versions", async (
   )
 
   assert.deepEqual(query.where, {
-    verificationStatus: "PENDING",
+    verificationStatus: { in: ["PENDING", "RETRYING"] },
     supersededByVersion: null,
     activeOrder: { isNot: null },
   })
   assert.deepEqual(query.orderBy, [{ createdAt: "asc" }, { id: "asc" }])
   assert.equal(query.take, 25)
   assert.deepEqual(result, {
-    scanned: 4,
-    eligible: 1,
-    dispatched: 1,
+    scanned: 5,
+    eligible: 2,
+    dispatched: 2,
     confirmedExisting: 0,
     rearmedTerminal: 0,
   })
-  assert.equal(added.length, 1)
+  assert.equal(added.length, 2)
   assert.equal(added[0].name, "delivery-verify")
   assert.equal(added[0].options.jobId, "delivery-verify-active-v0")
+  assert.equal(added[1].options.jobId, "delivery-verify-retrying-v0")
   assert.equal(verifyJobPayload(added[0].data), true)
 })
 
@@ -113,10 +115,15 @@ test("treats an accepted response lost behind a deterministic ID as success", as
   assert.equal(result.dispatched, 0)
 })
 
-test("re-arms a terminal queue record when Postgres remains PENDING", async () => {
+test("re-arms a terminal retry when Postgres remains RETRYING", async () => {
   const prisma = {
     orderDeliveryVersion: {
-      findMany: async () => [candidate("terminal", { verificationVersion: 2 })],
+      findMany: async () => [
+        candidate("terminal", {
+          verificationVersion: 2,
+          verificationStatus: "RETRYING",
+        }),
+      ],
       findFirst: async () => null,
     },
   }

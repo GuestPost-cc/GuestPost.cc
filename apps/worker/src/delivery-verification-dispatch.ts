@@ -74,7 +74,7 @@ export async function dispatchPendingDeliveryVerifications(
   const batchSize = deliveryVerificationDispatchBatchSize(requestedBatchSize)
   const candidates = (await prisma.orderDeliveryVersion.findMany({
     where: {
-      verificationStatus: "PENDING",
+      verificationStatus: { in: ["PENDING", "RETRYING"] },
       supersededByVersion: null,
       activeOrder: { isNot: null },
     },
@@ -91,7 +91,7 @@ export async function dispatchPendingDeliveryVerifications(
 
   const eligible = candidates.filter(
     (candidate) =>
-      candidate.verificationStatus === "PENDING" &&
+      ["PENDING", "RETRYING"].includes(candidate.verificationStatus) &&
       candidate.supersededByVersion == null &&
       candidate.activeOrder != null &&
       Number.isSafeInteger(candidate.verificationVersion) &&
