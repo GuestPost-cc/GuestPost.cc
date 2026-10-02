@@ -11,6 +11,7 @@ process.env.QUEUE_SIGNING_SECRET ??= "worker-dispatch-test-secret-32-bytes"
 function candidate(id: string, overrides: Record<string, unknown> = {}) {
   return {
     id,
+    createdAt: new Date("2026-10-01T00:00:00.000Z"),
     verificationVersion: 0,
     verificationStatus: "PENDING",
     supersededByVersion: null,
@@ -71,12 +72,74 @@ test("dispatches active PENDING and RETRYING delivery versions", async () => {
     dispatched: 2,
     confirmedExisting: 0,
     rearmedTerminal: 0,
+    nextCursor: null,
+    failures: [],
   })
   assert.equal(added.length, 2)
   assert.equal(added[0].name, "delivery-verify")
   assert.equal(added[0].options.jobId, "delivery-verify-active-v0")
   assert.equal(added[1].options.jobId, "delivery-verify-retrying-v0")
   assert.equal(verifyJobPayload(added[0].data), true)
+})
+
+test("advances past live retries so newer pending versions are reached", async () => {
+  const olderRetry = candidate("older-retry", {
+    verificationStatus: "RETRYING",
+    createdAt: new Date("2026-09-30T00:00:00.000Z"),
+  })
+  const newerPending = candidate("newer-pending", {
+    createdAt: new Date("2026-10-01T00:00:00.000Z"),
+  })
+  let query: any
+  const prisma = {
+    orderDeliveryVersion: {
+      findMany: async (args: any) => {
+        query = args
+        return query.where.OR ? [newerPending] : [olderRetry]
+      },
+      findFirst: async () => null,
+    },
+  }
+  const added: string[] = []
+  const queue = {
+    add: async (_name: string, data: any) => {
+      added.push(data.deliveryVersionId)
+    },
+    getJob: async (jobId: string) =>
+      jobId === "delivery-verify-older-retry-v0"
+        ? { getState: async () => "delayed", remove: async () => {} }
+        : null,
+  }
+
+  const first = await dispatchPendingDeliveryVerifications(
+    prisma as any,
+    queue,
+    1,
+  )
+  assert.deepEqual(first.nextCursor, {
+    createdAt: "2026-09-30T00:00:00.000Z",
+    id: "older-retry",
+  })
+
+  const second = await dispatchPendingDeliveryVerifications(
+    prisma as any,
+    queue,
+    1,
+    first.nextCursor ?? undefined,
+  )
+  assert.deepEqual(query.where.OR, [
+    { createdAt: { gt: new Date("2026-09-30T00:00:00.000Z") } },
+    {
+      createdAt: new Date("2026-09-30T00:00:00.000Z"),
+      id: { gt: "older-retry" },
+    },
+  ])
+  assert.deepEqual(added, ["newer-pending"])
+  assert.equal(second.dispatched, 1)
+  assert.deepEqual(second.nextCursor, {
+    createdAt: "2026-10-01T00:00:00.000Z",
+    id: "newer-pending",
+  })
 })
 
 test("treats an accepted response lost behind a deterministic ID as success", async () => {
@@ -113,6 +176,7 @@ test("treats an accepted response lost behind a deterministic ID as success", as
   assert.equal(lookedUpId, "delivery-verify-accepted-v3")
   assert.equal(result.confirmedExisting, 1)
   assert.equal(result.dispatched, 0)
+  assert.deepEqual(result.failures, [])
 })
 
 test("re-arms a terminal retry when Postgres remains RETRYING", async () => {
@@ -151,6 +215,7 @@ test("re-arms a terminal retry when Postgres remains RETRYING", async () => {
   assert.equal(added, 1)
   assert.equal(result.rearmedTerminal, 1)
   assert.equal(result.dispatched, 1)
+  assert.deepEqual(result.failures, [])
 })
 
 test("a later sweep recovers a real enqueue outage with the same dedupe key", async () => {
@@ -168,10 +233,12 @@ test("a later sweep recovers a real enqueue outage with the same dedupe key", as
     },
     getJob: async () => null,
   }
-  await assert.rejects(
-    dispatchPendingDeliveryVerifications(prisma as any, unavailableQueue, 100),
-    /Failed to dispatch 1 of 1/,
+  const failed = await dispatchPendingDeliveryVerifications(
+    prisma as any,
+    unavailableQueue,
+    100,
   )
+  assert.equal(failed.failures.length, 1)
 
   const recoveredQueue = {
     add: async (_name: string, _data: unknown, options: any) => {

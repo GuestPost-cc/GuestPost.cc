@@ -10,6 +10,7 @@ const MAX_BATCH_SIZE = 1_000
 
 interface DispatchCandidate {
   id: string
+  createdAt: Date
   verificationVersion: number
   verificationStatus: string
   supersededByVersion: number | null
@@ -48,6 +49,13 @@ export interface DeliveryVerificationDispatchResult {
   dispatched: number
   confirmedExisting: number
   rearmedTerminal: number
+  nextCursor: DeliveryVerificationDispatchCursor | null
+  failures: Error[]
+}
+
+export interface DeliveryVerificationDispatchCursor {
+  createdAt: string
+  id: string
 }
 
 const TERMINAL_JOB_STATES = new Set(["completed", "failed"])
@@ -70,6 +78,7 @@ export async function dispatchPendingDeliveryVerifications(
   prisma: DispatchPrisma,
   queue: DispatchQueue,
   requestedBatchSize: unknown,
+  startAfter?: DeliveryVerificationDispatchCursor,
 ): Promise<DeliveryVerificationDispatchResult> {
   const batchSize = deliveryVerificationDispatchBatchSize(requestedBatchSize)
   const candidates = (await prisma.orderDeliveryVersion.findMany({
@@ -77,9 +86,21 @@ export async function dispatchPendingDeliveryVerifications(
       verificationStatus: { in: ["PENDING", "RETRYING"] },
       supersededByVersion: null,
       activeOrder: { isNot: null },
+      ...(startAfter
+        ? {
+            OR: [
+              { createdAt: { gt: new Date(startAfter.createdAt) } },
+              {
+                createdAt: new Date(startAfter.createdAt),
+                id: { gt: startAfter.id },
+              },
+            ],
+          }
+        : {}),
     },
     select: {
       id: true,
+      createdAt: true,
       verificationVersion: true,
       verificationStatus: true,
       supersededByVersion: true,
@@ -101,6 +122,14 @@ export async function dispatchPendingDeliveryVerifications(
   let confirmedExisting = 0
   let rearmedTerminal = 0
   const failures: Error[] = []
+  const lastCandidate = candidates[candidates.length - 1]
+  const nextCursor =
+    candidates.length === batchSize && lastCandidate
+      ? {
+          createdAt: lastCandidate.createdAt.toISOString(),
+          id: lastCandidate.id,
+        }
+      : null
 
   for (const candidate of eligible) {
     const jobId = deliveryVerificationJobId(
@@ -148,19 +177,14 @@ export async function dispatchPendingDeliveryVerifications(
     }
   }
 
-  if (failures.length > 0) {
-    throw new AggregateError(
-      failures,
-      `Failed to dispatch ${failures.length} of ${eligible.length} pending delivery verifications`,
-    )
-  }
-
   return {
     scanned: candidates.length,
     eligible: eligible.length,
     dispatched,
     confirmedExisting,
     rearmedTerminal,
+    nextCursor,
+    failures,
   }
 }
 
