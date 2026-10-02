@@ -254,10 +254,20 @@ For the Phase 2 staging implementation, mutation endpoints additionally
 require `FINANCIAL_RECONCILIATION_REPAIRS_ENABLED=true`,
 `FINANCE_RUNTIME_MODE=recovery_only`,
 `DEPLOYMENT_ENVIRONMENT=staging`, and the explicit
-`FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS=true` exception. This
-temporary MFA bypass is permitted only with maker-checker and is not valid for
-production. Production mutations remain disabled until verified staff
-step-up/MFA is implemented and enforced.
+`FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS=true` exception. For
+disposable staging tests only, single-account maker-checker bypass additionally
+requires `FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS=true`
+and the explicit database-local `guestpost.financial_repair_single_actor=on`
+role setting for `guestpost_financial_repair_staging`, to which only the API runtime is a non-SET member. Apply it only through the trusted
+administrator script against the named staging database. PostgreSQL scopes
+this setting per database, so it cannot enable the capability in another
+database on a shared cluster; the runtime role cannot write the catalog or
+elevate its own role settings. The Admin case response reports whether both
+gates are active, and only then exposes same-account approve/execute controls.
+Without both gates, two-person maker-checker remains enforced. Production must
+never receive the bypass environment variable or database-local setting;
+production repairs require independent staff and verified step-up/MFA before
+they are enabled.
 
 When execution reverses an eligible internal wallet credit, notify the
 customer with: “A credit of $5.00 applied to your account on [Date] due to an

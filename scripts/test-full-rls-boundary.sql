@@ -104,6 +104,78 @@ SELECT pg_temp.assert_true(
 );
 
 SELECT pg_temp.assert_true(
+  NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_db_role_setting AS setting
+    JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
+    WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
+      AND configured_role.rolname = 'guestpost_financial_repair_staging'
+      AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
+  ),
+  'the database-local single-actor capability must be disabled by default'
+);
+SELECT pg_temp.assert_true(
+  pg_catalog.pg_has_role(
+    'guestpost_api_runtime', 'guestpost_financial_repair_staging', 'MEMBER'
+  ),
+  'the API runtime may inspect but cannot activate the trusted staging capability'
+);
+
+BEGIN;
+SET LOCAL ROLE guestpost_api_runtime;
+SELECT pg_temp.assert_rejected(
+  'ALTER ROLE guestpost_financial_repair_staging SET guestpost.financial_repair_single_actor = ''on''',
+  'the API runtime cannot elevate the trusted database-local single-actor capability'
+);
+ROLLBACK;
+
+BEGIN;
+SET SESSION AUTHORIZATION guestpost_api_runtime;
+SELECT pg_temp.assert_rejected(
+  format(
+    'ALTER ROLE guestpost_api_runtime IN DATABASE %I SET guestpost.financial_repair_single_actor = %L',
+    current_database(), 'on'
+  ),
+  'the API runtime cannot set the custom repair capability on its own role'
+);
+SELECT NOT EXISTS (
+  SELECT 1
+  FROM pg_catalog.pg_db_role_setting AS setting
+  JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
+  WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
+    AND configured_role.rolname = 'guestpost_financial_repair_staging'
+    AND pg_catalog.pg_has_role(session_user, configured_role.oid, 'MEMBER')
+    AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
+) AS api_cannot_enable_repair \gset
+\if :api_cannot_enable_repair
+\else
+  \echo 'RLS assertion failed: API self-role defaults activated staging capability'
+  \quit 3
+\endif
+RESET SESSION AUTHORIZATION;
+ROLLBACK;
+
+SELECT format(
+  'ALTER ROLE guestpost_financial_repair_staging IN DATABASE %I SET guestpost.financial_repair_single_actor = %L',
+  current_database(), 'on'
+) \gexec
+SELECT pg_temp.assert_true(
+  EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_db_role_setting AS setting
+    JOIN pg_catalog.pg_roles AS configured_role ON configured_role.oid = setting.setrole
+    WHERE setting.setdatabase = (SELECT oid FROM pg_catalog.pg_database WHERE datname = current_database())
+      AND configured_role.rolname = 'guestpost_financial_repair_staging'
+      AND 'guestpost.financial_repair_single_actor=on' = ANY(setting.setconfig)
+  ),
+  'the administrator can enable the single-actor capability for the current database only'
+);
+SELECT format(
+  'ALTER ROLE guestpost_financial_repair_staging IN DATABASE %I RESET guestpost.financial_repair_single_actor',
+  current_database()
+) \gexec
+
+SELECT pg_temp.assert_true(
   (SELECT count(*) = 4
    FROM pg_proc procedure
    JOIN pg_namespace namespace ON namespace.oid = procedure.pronamespace

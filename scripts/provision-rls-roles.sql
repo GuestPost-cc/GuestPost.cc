@@ -68,6 +68,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_financial_repair_guard') THEN
     CREATE ROLE guestpost_financial_repair_guard NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'guestpost_financial_repair_staging') THEN
+    CREATE ROLE guestpost_financial_repair_staging NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+  END IF;
 END
 $roles$;
 
@@ -88,6 +91,7 @@ ALTER ROLE guestpost_worker_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NO
 ALTER ROLE guestpost_reporting_group NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 ALTER ROLE guestpost_rls_authorizer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 ALTER ROLE guestpost_financial_repair_guard NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+ALTER ROLE guestpost_financial_repair_staging NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
 
 ALTER ROLE guestpost_migrator SET search_path = pg_catalog, public;
 ALTER ROLE guestpost_api_runtime SET search_path = pg_catalog, public;
@@ -121,7 +125,8 @@ BEGIN
       'guestpost_reporting_group',
       'guestpost_reporting_runtime',
       'guestpost_rls_authorizer',
-      'guestpost_financial_repair_guard'
+      'guestpost_financial_repair_guard',
+      'guestpost_financial_repair_staging'
     )
     OR member_role.rolname IN (
       'guestpost_schema_owner',
@@ -135,7 +140,8 @@ BEGIN
       'guestpost_reporting_group',
       'guestpost_reporting_runtime',
       'guestpost_rls_authorizer',
-      'guestpost_financial_repair_guard'
+      'guestpost_financial_repair_guard',
+      'guestpost_financial_repair_staging'
     )
   LOOP
     EXECUTE format(
@@ -161,12 +167,22 @@ ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name" RESET role;
 ALTER ROLE guestpost_auth_runtime IN DATABASE :"database_name" RESET role;
 ALTER ROLE guestpost_worker_runtime IN DATABASE :"database_name" RESET role;
 ALTER ROLE guestpost_reporting_runtime IN DATABASE :"database_name" RESET role;
+-- Reconciliation's single-actor staging exception is explicitly database-
+-- scoped and is disabled whenever the role topology is reprovisioned.
+ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name"
+  RESET guestpost.financial_repair_single_actor;
+ALTER ROLE guestpost_api_runtime IN DATABASE :"database_name"
+  RESET guestpost.financial_repair_single_actor;
+ALTER ROLE guestpost_financial_repair_staging IN DATABASE :"database_name"
+  RESET guestpost.financial_repair_single_actor;
 
 GRANT guestpost_schema_owner TO guestpost_migrator WITH INHERIT FALSE, SET TRUE;
 GRANT guestpost_api_group TO guestpost_api_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_auth_group TO guestpost_auth_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_worker_group TO guestpost_worker_runtime WITH INHERIT TRUE, SET FALSE;
 GRANT guestpost_reporting_group TO guestpost_reporting_runtime WITH INHERIT TRUE, SET FALSE;
+GRANT guestpost_financial_repair_staging TO guestpost_api_runtime
+  WITH INHERIT FALSE, SET FALSE;
 -- Only the trusted schema owner may SET ROLE to this NOLOGIN, NO-BYPASSRLS
 -- owner used by tightly scoped financial-repair row-lock trigger functions.
 -- No API, worker, auth, reporting, or credential runtime role is a member.
@@ -192,7 +208,8 @@ REVOKE ALL ON DATABASE :"database_name" FROM
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
   guestpost_rls_authorizer,
-  guestpost_financial_repair_guard;
+  guestpost_financial_repair_guard,
+  guestpost_financial_repair_staging;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_migrator;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_api_runtime;
 GRANT CONNECT ON DATABASE :"database_name" TO guestpost_auth_runtime;
@@ -211,7 +228,8 @@ REVOKE ALL ON SCHEMA public FROM
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
   guestpost_rls_authorizer,
-  guestpost_financial_repair_guard;
+  guestpost_financial_repair_guard,
+  guestpost_financial_repair_staging;
 GRANT USAGE, CREATE ON SCHEMA public TO guestpost_schema_owner;
 GRANT USAGE ON SCHEMA public TO guestpost_api_group;
 GRANT USAGE ON SCHEMA public TO guestpost_auth_group;
@@ -232,7 +250,8 @@ REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
   guestpost_rls_authorizer,
-  guestpost_financial_repair_guard;
+  guestpost_financial_repair_guard,
+  guestpost_financial_repair_staging;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
   guestpost_api_group,
   guestpost_auth_group,
@@ -244,7 +263,8 @@ REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
   guestpost_rls_authorizer,
-  guestpost_financial_repair_guard;
+  guestpost_financial_repair_guard,
+  guestpost_financial_repair_staging;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
   guestpost_api_group,
   guestpost_auth_group,
@@ -256,7 +276,8 @@ REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
   guestpost_worker_runtime,
   guestpost_reporting_runtime,
   guestpost_rls_authorizer,
-  guestpost_financial_repair_guard;
+  guestpost_financial_repair_guard,
+  guestpost_financial_repair_staging;
 
 -- The API and worker need relation-level DML for the reviewed 105-model graph;
 -- FORCE RLS and the command-aware policy matrix decide which rows each
