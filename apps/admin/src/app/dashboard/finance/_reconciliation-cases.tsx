@@ -40,6 +40,14 @@ function CaseStatus({ status }: { status: string }) {
   return <Badge variant={variant as any}>{status.replaceAll("_", " ")}</Badge>
 }
 
+/** Explain stable repair blocker codes while preserving the code in the UI. */
+function repairBlockerMessage(code: string) {
+  if (code === "INSUFFICIENT_AVAILABLE_FUNDS") {
+    return "Available wallet funds are below the exact reversal amount. Reserved funds cannot be used."
+  }
+  return code.replaceAll("_", " ")
+}
+
 function SafeFindingList({ findings }: { findings: unknown }) {
   if (!Array.isArray(findings) || findings.length === 0) {
     return (
@@ -74,6 +82,7 @@ function SafeFindingList({ findings }: { findings: unknown }) {
   )
 }
 
+/** Render case evidence, typed repair previews, and authorized repair actions. */
 export function ReconciliationCases({ enabled }: { enabled: boolean }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
@@ -333,10 +342,35 @@ export function ReconciliationCases({ enabled }: { enabled: boolean }) {
                           <p className="font-medium">
                             Blocked — no money will move.
                           </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {preview.blockers.join(", ") ||
-                              "Repair is not currently eligible."}
-                          </p>
+                          {preview.blockers.length > 0 ? (
+                            <ul className="mt-1 list-inside list-disc text-xs text-muted-foreground">
+                              {preview.blockers.map((blocker) => (
+                                <li key={blocker}>
+                                  {repairBlockerMessage(blocker)}{" "}
+                                  <span className="font-mono">({blocker})</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Repair is not currently eligible.
+                            </p>
+                          )}
+                          {preview.balance && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Available now: USD{" "}
+                              {preview.balance.availableBefore}
+                              {preview.entry && (
+                                <>
+                                  {" "}
+                                  · reversal requires {preview.entry.currency}{" "}
+                                  {preview.entry.amount.replace(/^-/, "")}
+                                </>
+                              )}{" "}
+                              · reserved balance remains USD{" "}
+                              {preview.balance.reservedUnchanged}
+                            </p>
+                          )}
                         </div>
                       )}
                       {preview.eligible && !preview.featureEnabled && (

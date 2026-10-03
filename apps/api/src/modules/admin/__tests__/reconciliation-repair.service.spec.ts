@@ -131,3 +131,144 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 })
+
+/** Build provider-free refund evidence with a controlled current wallet balance. */
+function repairPreviewFixture(availableBalance: string) {
+  const source = {
+    id: "refund-1",
+    type: "REFUND",
+    amount: "5",
+    currency: "USD",
+    walletId: "wallet-1",
+    provider: null,
+    providerRef: null,
+    reference: "force-cancel:order-1:incident-1",
+    createdAt: new Date("2026-09-30T00:00:00.000Z"),
+  }
+  const wallet = {
+    id: "wallet-1",
+    organizationId: "org-1",
+    currency: "USD",
+    availableBalance,
+    reservedBalance: "100",
+    version: 4,
+  }
+  const caseRow = {
+    id: "case-1",
+    aggregateType: "Order",
+    orderId: "order-1",
+    status: "DETECTED",
+    version: 2,
+    currentFingerprint: "fingerprint",
+    snapshots: [
+      {
+        findingCodes: [
+          "REFUND_PARTIAL",
+          "REFUND_PUBLISHER_COMPENSATION_INVALID",
+        ],
+      },
+    ],
+    order: {
+      id: "order-1",
+      organizationId: "org-1",
+      status: "REFUNDED",
+      paymentStatus: "REFUNDED",
+      amount: "5",
+      currency: "USD",
+      fulfillmentChannel: "PUBLISHER",
+      version: 3,
+      refundResponsibility: "PLATFORM",
+      transactions: [
+        {
+          id: "purchase-1",
+          type: "PURCHASE",
+          amount: "-5",
+          currency: "USD",
+          walletId: "wallet-1",
+          provider: null,
+          providerRef: null,
+        },
+        source,
+      ],
+      events: [
+        {
+          metadata: {
+            refundTransactionId: source.id,
+            responsibility: "PLATFORM",
+          },
+        },
+      ],
+      website: { publisherId: "publisher-1", ownershipType: "PUBLISHER" },
+      settlements: [{ publisherId: "publisher-1", publisherAmount: "5" }],
+      publisherCompensation: {
+        disposition: "EXACT_AMOUNT",
+        amount: "5",
+        currency: "USD",
+        refundTransactionId: source.id,
+        responsibility: "PLATFORM",
+        effectiveOrderStatus: "PUBLISHED",
+        reason: "Platform cancellation after publisher delivery.",
+        publisherId: "publisher-1",
+        compensationTransactionId: "compensation-1",
+        compensationTransaction: {
+          id: "compensation-1",
+          type: "PUBLISHER_COMPENSATION",
+          orderId: "order-1",
+          publisherId: "publisher-1",
+          currency: "USD",
+          amount: "5",
+        },
+        debtRepaymentTransactionId: null,
+        debtRepaymentTransaction: null,
+      },
+      dispute: null,
+      fraudFindings: [],
+    },
+  }
+  const prisma = {
+    reconciliationCase: {
+      findUnique: jest.fn().mockResolvedValue(caseRow),
+    },
+    wallet: { findUnique: jest.fn().mockResolvedValue(wallet) },
+    paymentDispute: { count: jest.fn().mockResolvedValue(0) },
+    // Models a later wallet debit; fungible, currently available funds decide
+    // whether the exact reversal is affordable.
+    transaction: { count: jest.fn().mockResolvedValue(1) },
+  }
+  return {
+    prisma,
+    service: new ReconciliationRepairService(
+      prisma as any,
+      {} as any,
+      {} as any,
+    ),
+  }
+}
+
+describe("ReconciliationRepairService wallet affordability", () => {
+  it("allows reversal with sufficient available funds despite later spending", async () => {
+    const { prisma, service } = repairPreviewFixture("5")
+
+    const preview = await service.preview("case-1")
+
+    expect(preview.eligible).toBe(true)
+    expect(preview.blockers).not.toContain(
+      "REFUND_CREDIT_MAY_BE_SPENT_OR_RESERVED",
+    )
+    expect(preview.balance).toMatchObject({
+      availableBefore: "5",
+      availableAfter: "0",
+      reservedUnchanged: "100",
+    })
+    expect(prisma.transaction.count).not.toHaveBeenCalled()
+  })
+
+  it("blocks when available funds are short even if reserved funds exist", async () => {
+    const { service } = repairPreviewFixture("4.99")
+
+    const preview = await service.preview("case-1")
+
+    expect(preview.eligible).toBe(false)
+    expect(preview.blockers).toContain("INSUFFICIENT_AVAILABLE_FUNDS")
+  })
+})
