@@ -345,6 +345,7 @@ function OrderArticleVersions({
   )
 }
 
+/** Render a publisher's order and keep active delivery verification current. */
 export default function OrderDetailPage() {
   const params = useParams()
   const orderId = params.id as string

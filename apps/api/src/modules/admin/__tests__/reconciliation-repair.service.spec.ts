@@ -132,6 +132,7 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
   })
 })
 
+/** Build provider-free refund evidence with a controlled current wallet balance. */
 function repairPreviewFixture(availableBalance: string) {
   const source = {
     id: "refund-1",

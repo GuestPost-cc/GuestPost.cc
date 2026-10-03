@@ -40,6 +40,7 @@ function CaseStatus({ status }: { status: string }) {
   return <Badge variant={variant as any}>{status.replaceAll("_", " ")}</Badge>
 }
 
+/** Explain stable repair blocker codes while preserving the code in the UI. */
 function repairBlockerMessage(code: string) {
   if (code === "INSUFFICIENT_AVAILABLE_FUNDS") {
     return "Available wallet funds are below the exact reversal amount. Reserved funds cannot be used."
@@ -81,6 +82,7 @@ function SafeFindingList({ findings }: { findings: unknown }) {
   )
 }
 
+/** Render case evidence, typed repair previews, and authorized repair actions. */
 export function ReconciliationCases({ enabled }: { enabled: boolean }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()

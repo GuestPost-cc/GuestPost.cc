@@ -79,6 +79,7 @@ export class ReconciliationRepairService {
     )
   }
 
+  /** Load allowlisted case evidence and derive fail-closed repair blockers. */
   private async load(
     caseId: string,
     tx: any = this.prisma,

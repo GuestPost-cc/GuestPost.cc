@@ -381,6 +381,7 @@ function OrderArticleVersions({
   )
 }
 
+/** Render a customer's order and keep active delivery verification current. */
 export default function OrderDetailPage({
   params,
 }: {
