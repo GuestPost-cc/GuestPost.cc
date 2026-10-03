@@ -236,9 +236,13 @@ test("a later sweep recovers a real enqueue outage with the same dedupe key", as
   const failed = await dispatchPendingDeliveryVerifications(
     prisma as any,
     unavailableQueue,
-    100,
+    1,
   )
   assert.equal(failed.failures.length, 1)
+  assert.deepEqual(failed.nextCursor, {
+    createdAt: "2026-10-01T00:00:00.000Z",
+    id: "recover",
+  })
 
   const recoveredQueue = {
     add: async (_name: string, _data: unknown, options: any) => {

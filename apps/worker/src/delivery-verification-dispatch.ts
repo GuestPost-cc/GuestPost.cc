@@ -130,6 +130,10 @@ export async function dispatchPendingDeliveryVerifications(
           id: lastCandidate.id,
         }
       : null
+  // ponytail: failed enqueues retry on cursor wrap; add a retry-ID lane if
+  // that delay exceeds the recovery SLO. Advancing prevents one bad row from
+  // pinning every newer verification, while a Redis outage also prevents this
+  // cursor from persisting and naturally retries the same page next sweep.
 
   for (const candidate of eligible) {
     const jobId = deliveryVerificationJobId(
