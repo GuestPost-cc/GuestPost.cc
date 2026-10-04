@@ -56,10 +56,10 @@ and available customer balance permit it.
 5. A wallet credit is internal GuestPost liability. Verify it against the
    original refund transaction and provider records; never infer an external
    card/bank refund from a GuestPost ledger row.
-6. If evidence conflicts, funds have been spent/reserved, currency is invalid,
-   or no approved repair recipe applies, make no mutation. Escalate for manual
-   Finance decision rather than creating a negative wallet or taking unrelated
-   funds.
+6. If evidence conflicts, the current available wallet balance is below the
+   exact reversal amount, currency is invalid, or no approved repair recipe
+   applies, make no mutation. Escalate for manual Finance decision rather than
+   creating a negative wallet or using reserved funds.
 7. Re-running the same command must not make another ledger entry. Retrying
    with changed inputs must conflict.
 
@@ -111,11 +111,14 @@ approval to a digest of the case evidence, exact amount/currency, and command
 version. Any relevant evidence change expires the preview and requires a new
 one.
 
-If the refund credit has been spent or reserved, or provider/order evidence is
-ambiguous, the supported result for the first release is **blocked / Finance
-review required**. Do not debit other customer deposits, permit an overdraft,
-or silently create a receivable. A customer recovery / receivable policy would
-be a separate, explicitly approved product/accounting decision.
+Wallet balances are fungible, so a historical debit after the erroneous credit
+does not by itself block correction. The supported result is **blocked / Finance
+review required** when current *available* balance is below the exact reversal
+amount or provider/order evidence is ambiguous. The reversal debits only the
+available balance, leaves reserved funds unchanged, and must never create an
+overdraft. If balance is insufficient, do not silently create a receivable; a
+customer recovery policy would require a separate, explicitly approved
+product/accounting decision.
 
 ### 3. Approve and apply
 

@@ -25,6 +25,13 @@ Order checkout locks the Order before the Wallet and validates its exact USD
 item contract before either reservation or capture. The paid transition,
 reservation, PURCHASE evidence, audit, and submission commit atomically; a
 concurrent checkout request cannot debit the same Order twice.
+
+An approved internal refund-credit reversal uses the customer's current
+available wallet balance as fungible liability: historical debits do not by
+themselves block it when available funds cover the exact reversal. Reserved
+funds are never used, insufficient available balance stays blocked for Finance
+review, and the locked execution must not create an overdraft. Provider money
+and original ledger evidence are never changed by this repair.
 The former customer wallet-withdrawal endpoint and API-client method are
 retired because they reduced an internal balance without an external return.
 A future return requires source allocation, destination policy, provider

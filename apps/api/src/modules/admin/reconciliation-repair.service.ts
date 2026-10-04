@@ -79,6 +79,7 @@ export class ReconciliationRepairService {
     )
   }
 
+  /** Load allowlisted case evidence and derive fail-closed repair blockers. */
   private async load(
     caseId: string,
     tx: any = this.prisma,
@@ -232,26 +233,11 @@ export class ReconciliationRepairService {
       }))
     )
       blockers.push("WALLET_PAYMENT_DISPUTE_OPEN")
-    if (
-      source &&
-      (await tx.transaction.count({
-        where: {
-          walletId: source.walletId,
-          createdAt: { gte: source.createdAt },
-          id: { not: source.id },
-          OR: [
-            {
-              type: {
-                in: ["PURCHASE", "WITHDRAWAL", "CHARGEBACK", "REFUND_REVERSAL"],
-              },
-              amount: { lt: 0 },
-            },
-            { type: "RESERVATION" },
-          ],
-        },
-      }))
-    )
-      blockers.push("REFUND_CREDIT_MAY_BE_SPENT_OR_RESERVED")
+    // Wallet funds are fungible: a historical debit does not make an exact
+    // reversal unsafe when the current spendable balance covers it. Reserved
+    // funds are excluded because only availableBalance can fund the debit.
+    // This condition is revalidated under the wallet/order locks at proposal
+    // and execution, so concurrent spending cannot create an overdraft.
     if (
       wallet &&
       source &&

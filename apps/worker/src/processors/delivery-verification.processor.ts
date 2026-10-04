@@ -19,6 +19,7 @@ import { createLogger } from "@guestpost/shared/dist/observability/structured-lo
 import * as Sentry from "@sentry/node"
 import { Queue } from "bullmq"
 import {
+  type DeliveryVerificationDispatchCursor,
   deliveryVerificationDispatchBatchSize,
   dispatchPendingDeliveryVerifications,
   isDeliveryVerificationJobEligible,
@@ -34,6 +35,60 @@ import { isRepeatableJob } from "../repeatable-job-registry"
 import { enqueueTrustRecompute } from "../trust-enqueue"
 
 const logger = createLogger("worker.delivery-verification")
+const DISPATCH_SWEEP_CURSOR_KEY =
+  "guestpost:worker:delivery-verification-dispatch-cursor:v1"
+const DISPATCH_SWEEP_CURSOR_TTL_SECONDS = 30 * 24 * 60 * 60
+
+/** Read a validated cursor so delayed jobs cannot pin the recovery sweep. */
+async function loadDispatchSweepCursor(): Promise<
+  DeliveryVerificationDispatchCursor | undefined
+> {
+  try {
+    const raw = await connection.get(DISPATCH_SWEEP_CURSOR_KEY)
+    if (!raw) return undefined
+    const parsed = JSON.parse(
+      raw,
+    ) as Partial<DeliveryVerificationDispatchCursor>
+    const createdAt = new Date(parsed.createdAt ?? "")
+    if (
+      typeof parsed.id !== "string" ||
+      parsed.id.length === 0 ||
+      parsed.id.length > 200 ||
+      !Number.isFinite(createdAt.getTime())
+    ) {
+      await connection.del(DISPATCH_SWEEP_CURSOR_KEY)
+      return undefined
+    }
+    return { id: parsed.id, createdAt: createdAt.toISOString() }
+  } catch (error) {
+    logger.warn("delivery verification dispatch cursor read failed", {
+      err: error instanceof Error ? error.message : String(error),
+    })
+    return undefined
+  }
+}
+
+/** Persist the next page, or clear the cursor after the final page. */
+async function saveDispatchSweepCursor(
+  cursor: DeliveryVerificationDispatchCursor | null,
+): Promise<void> {
+  try {
+    if (!cursor) {
+      await connection.del(DISPATCH_SWEEP_CURSOR_KEY)
+      return
+    }
+    await connection.set(
+      DISPATCH_SWEEP_CURSOR_KEY,
+      JSON.stringify(cursor),
+      "EX",
+      DISPATCH_SWEEP_CURSOR_TTL_SECONDS,
+    )
+  } catch (error) {
+    logger.warn("delivery verification dispatch cursor write failed", {
+      err: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
 
 // Delivery verification worker. Fetches the published page (SSRF-guarded,
 // redirect chain resolved manually), then delegates to the pure core which
@@ -95,11 +150,20 @@ export function createDeliveryVerificationWorker() {
             prisma,
             queue,
             deliveryVerificationDispatchBatchSize(job.data?.batchSize),
+            await loadDispatchSweepCursor(),
           )
+          await saveDispatchSweepCursor(res.nextCursor)
+          const { failures, nextCursor: _cursor, ...stats } = res
           logger.info("delivery verification dispatch sweep complete", {
-            result: res,
+            result: stats,
           })
-          return res
+          if (failures.length > 0) {
+            throw new AggregateError(
+              failures,
+              `Failed to dispatch ${failures.length} delivery verifications`,
+            )
+          }
+          return stats
         } finally {
           await queue.close()
         }
