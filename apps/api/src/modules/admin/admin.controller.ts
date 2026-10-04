@@ -333,9 +333,9 @@ export class AdminController {
   proposeRefundCreditRepair(
     @Param("id") id: string,
     @Body() body: ProposeRefundCreditRepairDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() actor: DurableCurrentAuthority,
   ) {
-    return this.reconciliationRepair.propose(id, user.id, body)
+    return this.reconciliationRepair.propose(id, actor, body)
   }
 
   @Post("reconciliation/cases/:id/repair-proposals/:proposalId/approve")
@@ -345,12 +345,12 @@ export class AdminController {
     @Param("id") id: string,
     @Param("proposalId") proposalId: string,
     @Body() body: ApproveRefundCreditRepairDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() actor: DurableCurrentAuthority,
   ) {
     return this.reconciliationRepair.approve(
       id,
       proposalId,
-      user.id,
+      actor,
       body.proposalDigest,
     )
   }
@@ -362,12 +362,12 @@ export class AdminController {
     @Param("id") id: string,
     @Param("proposalId") proposalId: string,
     @Body() body: ExecuteRefundCreditRepairDto,
-    @CurrentUser() user: any,
+    @CurrentAuthority() actor: DurableCurrentAuthority,
   ) {
     return this.reconciliationRepair.execute(
       id,
       proposalId,
-      user.id,
+      actor,
       body.proposalDigest,
       body.idempotencyKey,
     )

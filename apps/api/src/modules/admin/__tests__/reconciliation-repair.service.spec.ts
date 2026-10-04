@@ -1,5 +1,16 @@
+import { RLS_RAW_CLIENT } from "@guestpost/database"
 import { ConflictException, ServiceUnavailableException } from "@nestjs/common"
 import { ReconciliationRepairService } from "../reconciliation-repair.service"
+
+const staffActor = (
+  id: string,
+  staffRole: "SUPER_ADMIN" | "FINANCE" = "FINANCE",
+) => ({
+  id,
+  userType: "STAFF",
+  staffRole,
+  staffPermissions: [],
+})
 
 describe("ReconciliationRepairService fail-closed rollout gate", () => {
   const originalFeatureFlag =
@@ -46,7 +57,7 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     )
 
     await expect(
-      service.propose("case-1", "finance-user-1", {
+      service.propose("case-1", staffActor("finance-user-1"), {
         providerRefundConfirmedAbsent: true,
         evidenceDigest: "a".repeat(64),
         expectedCaseVersion: 1,
@@ -68,7 +79,12 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     )
 
     await expect(
-      service.approve("case-1", "proposal-1", "finance-user-2", "a".repeat(64)),
+      service.approve(
+        "case-1",
+        "proposal-1",
+        staffActor("finance-user-2"),
+        "a".repeat(64),
+      ),
     ).rejects.toBeInstanceOf(ServiceUnavailableException)
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
@@ -108,7 +124,13 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     )
 
     await expect(
-      service.execute("case-1", "proposal-1", userId, proposalDigest, "key-1"),
+      service.execute(
+        "case-1",
+        "proposal-1",
+        staffActor(userId),
+        proposalDigest,
+        "key-1",
+      ),
     ).rejects.toBeInstanceOf(ConflictException)
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
@@ -126,9 +148,122 @@ describe("ReconciliationRepairService fail-closed rollout gate", () => {
     )
 
     await expect(
-      service.approve("case-1", "proposal-1", "finance-user-2", "a".repeat(64)),
+      service.approve(
+        "case-1",
+        "proposal-1",
+        staffActor("finance-user-2"),
+        "a".repeat(64),
+      ),
     ).rejects.toBeInstanceOf(ServiceUnavailableException)
     expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe("ReconciliationRepairService actor-pinned RLS transactions", () => {
+  const originalFeatureFlag =
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED
+  const originalFinanceMode = process.env.FINANCE_RUNTIME_MODE
+  const originalDeploymentEnvironment = process.env.DEPLOYMENT_ENVIRONMENT
+  const originalMfaBypass =
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS
+
+  beforeEach(() => {
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED = "true"
+    process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+    process.env.DEPLOYMENT_ENVIRONMENT = "staging"
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS = "true"
+  })
+
+  afterEach(() => {
+    if (originalFeatureFlag === undefined)
+      delete process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED
+    else
+      process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED = originalFeatureFlag
+    if (originalFinanceMode === undefined)
+      delete process.env.FINANCE_RUNTIME_MODE
+    else process.env.FINANCE_RUNTIME_MODE = originalFinanceMode
+    if (originalDeploymentEnvironment === undefined)
+      delete process.env.DEPLOYMENT_ENVIRONMENT
+    else process.env.DEPLOYMENT_ENVIRONMENT = originalDeploymentEnvironment
+    if (originalMfaBypass === undefined)
+      delete process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS
+    else
+      process.env.FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS =
+        originalMfaBypass
+  })
+
+  it.each([
+    "SUPER_ADMIN",
+    "FINANCE",
+  ] as const)("installs the durable %s actor on the mutation transaction", async (role) => {
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED = "true"
+    process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      reconciliationRepairProposal: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    }
+    const rawPrisma = {
+      $transaction: jest.fn(async (operation: (client: typeof tx) => unknown) =>
+        operation(tx),
+      ),
+    }
+    const prisma = { [RLS_RAW_CLIENT]: rawPrisma }
+    const service = new ReconciliationRepairService(
+      prisma as any,
+      {} as any,
+      {} as any,
+    )
+
+    await expect(
+      service.approve(
+        "case-1",
+        "proposal-1",
+        staffActor("actor-1", role),
+        "a".repeat(64),
+      ),
+    ).rejects.toMatchObject({ status: 404 })
+
+    expect(rawPrisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+    })
+    const contextSql = tx.$executeRaw.mock.calls[0][0]
+    expect(contextSql.values).toEqual([
+      "API",
+      "STAFF",
+      "actor-1",
+      "",
+      "",
+      "",
+      "",
+      role,
+      "[]",
+      "",
+      "",
+      "",
+    ])
+  })
+
+  it("rejects non-finance actors before opening a repair transaction", async () => {
+    process.env.FINANCIAL_RECONCILIATION_REPAIRS_ENABLED = "true"
+    process.env.FINANCE_RUNTIME_MODE = "recovery_only"
+    const rawPrisma = { $transaction: jest.fn() }
+    const service = new ReconciliationRepairService(
+      { [RLS_RAW_CLIENT]: rawPrisma } as any,
+      {} as any,
+      {} as any,
+    )
+
+    await expect(
+      service.approve(
+        "case-1",
+        "proposal-1",
+        { ...staffActor("actor-1"), staffRole: "OPERATIONS" },
+        "a".repeat(64),
+      ),
+    ).rejects.toMatchObject({ status: 403 })
+    expect(rawPrisma.$transaction).not.toHaveBeenCalled()
   })
 })
 

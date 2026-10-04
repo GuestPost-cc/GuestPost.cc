@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto"
-import { runLockedOrderSerializableTransaction } from "@guestpost/shared"
+import {
+  RLS_RAW_CLIENT,
+  type StaffRlsContext,
+  setApplicationRlsContext,
+} from "@guestpost/database"
+import {
+  lockOrderAggregate,
+  runSerializableTransactionWithRetry,
+} from "@guestpost/shared"
 import { lockWalletForUpdate } from "@guestpost/shared/dist/payment-dispute-core"
 import {
   ConflictException,
@@ -35,6 +43,13 @@ type RepairContext = {
   evidenceDigest: string
 }
 
+type RepairStaffActor = {
+  id: string
+  userType: string
+  staffRole: string | null
+  staffPermissions: readonly string[]
+}
+
 @Injectable()
 export class ReconciliationRepairService {
   constructor(
@@ -68,6 +83,58 @@ export class ReconciliationRepairService {
       })
     }
     assertApiFinanceOperationAllowed("recovery")
+  }
+
+  /**
+   * Pin repair writes to the same durable staff authority used by route RBAC.
+   * These transactions intentionally use the raw Prisma client and install
+   * request-local RLS facts themselves: finance mutations must not depend on
+   * ambient AsyncLocalStorage state surviving nested/retried transactions.
+   */
+  private repairActorContext(actor: RepairStaffActor): StaffRlsContext {
+    if (
+      actor.userType !== "STAFF" ||
+      !["SUPER_ADMIN", "FINANCE"].includes(actor.staffRole ?? "")
+    ) {
+      throw new ForbiddenException("Finance staff authority is required")
+    }
+    return {
+      workload: "API",
+      actorId: actor.id,
+      actorKind: "STAFF",
+      staffRole: actor.staffRole as StaffRlsContext["staffRole"],
+      staffPermissions: actor.staffPermissions,
+    }
+  }
+
+  private rawPrisma() {
+    return (this.prisma as any)[RLS_RAW_CLIENT] ?? this.prisma
+  }
+
+  private runRepairTransaction<T>(
+    actor: RepairStaffActor,
+    operation: (tx: any) => Promise<T>,
+  ) {
+    const context = this.repairActorContext(actor)
+    return runSerializableTransactionWithRetry(this.rawPrisma(), async (tx) => {
+      await setApplicationRlsContext(tx, context)
+      return operation(tx)
+    })
+  }
+
+  private runRepairOrderTransaction<T>(
+    actor: RepairStaffActor,
+    orderId: string,
+    operation: (tx: any) => Promise<T>,
+  ) {
+    const context = this.repairActorContext(actor)
+    return runSerializableTransactionWithRetry(this.rawPrisma(), async (tx) => {
+      // Establish authorization before the aggregate lock; this is the first
+      // SQL statement in the transaction and keeps retries actor-pinned.
+      await setApplicationRlsContext(tx, context)
+      await lockOrderAggregate(tx, orderId)
+      return operation(tx)
+    })
   }
 
   private mutationsEnabled() {
@@ -354,10 +421,12 @@ export class ReconciliationRepairService {
 
   async propose(
     caseId: string,
-    userId: string,
+    actor: RepairStaffActor,
     input: ProposeRefundCreditRepairDto,
   ) {
     this.assertEnabled()
+    this.repairActorContext(actor)
+    const userId = actor.id
     if (!input.providerRefundConfirmedAbsent) {
       throw new ConflictException({
         code: "PROVIDER_REFUND_EVIDENCE_UNCONFIRMED",
@@ -388,8 +457,8 @@ export class ReconciliationRepairService {
       orderVersion: context.order.version,
       walletVersion: context.wallet.version,
     })
-    const created = await runLockedOrderSerializableTransaction(
-      this.prisma,
+    const created = await this.runRepairOrderTransaction(
+      actor,
       context.order.id,
       async (tx) => {
         await lockWalletForUpdate(tx, context.wallet.id)
@@ -470,83 +539,85 @@ export class ReconciliationRepairService {
   async approve(
     caseId: string,
     proposalId: string,
-    userId: string,
+    actor: RepairStaffActor,
     proposalDigest: string,
   ) {
     this.assertEnabled()
-    return this.prisma.$transaction(
-      async (tx: any) => {
-        const proposal = await tx.reconciliationRepairProposal.findFirst({
-          where: { id: proposalId, caseId },
-        })
-        if (!proposal) throw new NotFoundException("Repair proposal not found")
-        if (
-          proposal.proposalDigest !== proposalDigest ||
-          proposal.expiresAt <= new Date()
+    this.repairActorContext(actor)
+    const userId = actor.id
+    return this.runRepairTransaction(actor, async (tx: any) => {
+      const proposal = await tx.reconciliationRepairProposal.findFirst({
+        where: { id: proposalId, caseId },
+      })
+      if (!proposal) throw new NotFoundException("Repair proposal not found")
+      if (
+        proposal.proposalDigest !== proposalDigest ||
+        proposal.expiresAt <= new Date()
+      )
+        throw new ConflictException("Repair proposal is stale")
+      if (
+        proposal.initiatedByUserId === userId &&
+        !(await isStagingSingleActorRepairDatabaseEnabled(tx))
+      )
+        throw new ForbiddenException(
+          "A different Finance user must approve this proposal",
         )
+      const existingApproval = await tx.reconciliationRepairApproval.findUnique(
+        {
+          where: { proposalId },
+        },
+      )
+      if (existingApproval) {
+        if (existingApproval.proposalDigest !== proposalDigest)
           throw new ConflictException("Repair proposal is stale")
-        if (
-          proposal.initiatedByUserId === userId &&
-          !(await isStagingSingleActorRepairDatabaseEnabled(tx))
-        )
-          throw new ForbiddenException(
-            "A different Finance user must approve this proposal",
-          )
-        const existingApproval =
-          await tx.reconciliationRepairApproval.findUnique({
-            where: { proposalId },
-          })
-        if (existingApproval) {
-          if (existingApproval.proposalDigest !== proposalDigest)
-            throw new ConflictException("Repair proposal is stale")
-          return {
-            id: existingApproval.id,
-            proposalId,
-            status: "APPROVED",
-            replayed: true,
-          }
-        }
-        const current = await this.load(caseId, tx)
-        if (
-          current.blockers.length ||
-          current.caseRow.status !== "AWAITING_APPROVAL" ||
-          current.evidenceDigest !== proposal.evidenceDigest ||
-          current.order.version !== proposal.expectedOrderVersion ||
-          current.wallet.version !== proposal.expectedWalletVersion
-        )
-          throw new ConflictException("Repair proposal evidence is stale")
-        const approval = await tx.reconciliationRepairApproval.create({
-          data: { proposalId, proposalDigest, approvedByUserId: userId },
-        })
-        await this.audit.log(
-          {
-            action: "FINANCIAL_RECONCILIATION_REPAIR_APPROVED",
-            entityType: "ReconciliationRepairProposal",
-            entityId: proposalId,
-            userId,
-            organizationId: null,
-            metadata: { caseId, proposalDigest },
-          },
-          tx,
-        )
         return {
-          id: approval.id,
+          id: existingApproval.id,
           proposalId,
           status: "APPROVED",
-          replayed: false,
+          replayed: true,
         }
-      },
-      { isolationLevel: "Serializable" },
-    )
+      }
+      const current = await this.load(caseId, tx)
+      if (
+        current.blockers.length ||
+        current.caseRow.status !== "AWAITING_APPROVAL" ||
+        current.evidenceDigest !== proposal.evidenceDigest ||
+        current.order.version !== proposal.expectedOrderVersion ||
+        current.wallet.version !== proposal.expectedWalletVersion
+      )
+        throw new ConflictException("Repair proposal evidence is stale")
+      const approval = await tx.reconciliationRepairApproval.create({
+        data: { proposalId, proposalDigest, approvedByUserId: userId },
+      })
+      await this.audit.log(
+        {
+          action: "FINANCIAL_RECONCILIATION_REPAIR_APPROVED",
+          entityType: "ReconciliationRepairProposal",
+          entityId: proposalId,
+          userId,
+          organizationId: null,
+          metadata: { caseId, proposalDigest },
+        },
+        tx,
+      )
+      return {
+        id: approval.id,
+        proposalId,
+        status: "APPROVED",
+        replayed: false,
+      }
+    })
   }
 
   async execute(
     caseId: string,
     proposalId: string,
-    userId: string,
+    actor: RepairStaffActor,
     proposalDigest: string,
     idempotencyKey: string,
   ) {
+    this.repairActorContext(actor)
+    const userId = actor.id
     const prior = await (
       this.prisma as any
     ).reconciliationRepairExecution.findUnique({
@@ -587,8 +658,8 @@ export class ReconciliationRepairService {
     )
       throw new ConflictException("A current independent approval is required")
     const requestFingerprint = hash({ proposalDigest, idempotencyKey })
-    const result = await runLockedOrderSerializableTransaction(
-      this.prisma,
+    const result = await this.runRepairOrderTransaction(
+      actor,
       proposal.orderId,
       async (tx) => {
         await lockWalletForUpdate(tx, proposal.walletId)
