@@ -599,6 +599,8 @@ export class RefundService {
     const supplied = input.publisherCompensation
     const legacyNoFeeAllocation =
       input.offsetPublisherCompensation &&
+      (refund.reference?.startsWith(`force-cancel:${order.id}:`) === true ||
+        refund.reference?.startsWith("cancellation-request:") === true) &&
       metadata?.compensationOffset !== true &&
       persisted.platformFeePolicyVersion == null &&
       (new Decimal(refund.amount ?? 0).equals(order.amount ?? 0) ||
