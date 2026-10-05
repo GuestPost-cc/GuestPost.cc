@@ -28,6 +28,14 @@ Coolify Compose resource and domains/DNS, staging R2 readiness, reviewed
 invoice issuer identity, and restricted Stripe test access before scheduled
 worker jobs run.
 
+Coolify's Traefik proxy runs on `127.0.0.1:18080` behind the server's existing
+Caddy, which keeps public ports 80/443. The Compose manifest takes one required
+`APP_DOMAIN` and derives frontend URLs, API auth URLs, cookie scope, CORS, and
+trusted origins from it. Current staging uses `shohan.iam.bd`; future
+`guestpost.mvp.bd` use requires DNS and matching Caddy/Coolify host routing,
+then a redeploy with the new root domain because one auth cookie can cover only
+one root domain at a time. See `docs/COOLIFY_STAGING_RUNBOOK.md`.
+
 ## Hosting model (2026-06-14)
 
 Currently **laptop-only** for development. A 2GB VPS attempt at `103.42.5.163` (Ubuntu 24.04, BDIX-class provider) was provisioned + bootstrapped + populated with the full stack on 2026-06-14, then deleted same day — Next dev mode + nest --watch + tsx --watch + Docker (postgres/redis/mailpit) exceeded RAM and the first compiled request hung. The repo was scrubbed of VPS artifacts (`infrastructure/vps/`, `infrastructure/caddy/`, `infrastructure/docker/docker-compose.staging.yml`, per-app Dockerfiles, `scripts/vps-sync.sh`, `.env.vps.example`, README VPS section, plan-file Part 2 — all gone).

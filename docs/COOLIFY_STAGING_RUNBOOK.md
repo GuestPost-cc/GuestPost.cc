@@ -1,7 +1,7 @@
 # Coolify staging deployment
 
-This runbook deploys the current GitHub `main` application to the existing
-staging hosts in `render.yml`, using Coolify, a new empty Neon project, internal
+This runbook deploys the current GitHub `main` application to a domain selected
+through Coolify variables, using Coolify, a new empty Neon project, internal
 Redis, and the existing Cloudflare R2 integration. Do not treat a successful
 image build as a database or financial release.
 
@@ -16,14 +16,30 @@ Create a Docker Compose resource in the existing Coolify project:
 - Compose file: `infrastructure/coolify/compose.yaml`.
 - Set the required variables from the sections below in Coolify before the
   first build. Do not commit a `.env` file or paste secrets into build args.
-- Assign these domains to the corresponding Compose services in Coolify:
-  `api.guestpost.pro.bd` → `api:4000`, `guestpost.pro.bd` → `website:3000`,
-  `app.guestpost.pro.bd` → `portal:3000`,
-  `publisher.guestpost.pro.bd` → `publisher:3000`,
-  `admin.guestpost.pro.bd` → `admin:3000`.
-- Point DNS for all five names at the Coolify server and enable HTTPS before
-  allowing sign-in. These names are also used by Better Auth and frontend
-  builds; change the compose file and this allowlist together if staging moves.
+- The host already runs Caddy on public ports 80/443. Coolify's Traefik proxy
+  binds only to `127.0.0.1:18080`; host Caddy forwards each configured app
+  hostname there. Keep those host bindings; do not claim public ports 80/443
+  with Coolify or publish application ports publicly.
+- Set `APP_DOMAIN` to the selected root domain. Compose derives the API,
+  website, portal, publisher, and admin URLs, trusted origins, CORS origins,
+  and auth cookie domain from it. For current staging, set
+  `APP_DOMAIN=shohan.iam.bd`.
+- In the Coolify Compose resource, assign these **HTTP** hostnames derived
+  from `APP_DOMAIN` so Traefik routes on its private HTTP entry point:
+  `api.${APP_DOMAIN}` → `api:4000`, `${APP_DOMAIN}` → `website:3000`,
+  `app.${APP_DOMAIN}` → `portal:3000`,
+  `publisher.${APP_DOMAIN}` → `publisher:3000`, and
+  `admin.${APP_DOMAIN}` → `admin:3000`. Host Caddy terminates public HTTPS
+  and proxies each hostname to Traefik on loopback port 18080.
+- Point DNS for all five names at the Coolify server and configure matching
+  Caddy host blocks. Confirm HTTPS certificates are ready before allowing
+  sign-in. The app domain is not hardcoded in Compose; domain-specific DNS and
+  reverse-proxy host blocks remain infrastructure configuration.
+- The future domain is `guestpost.mvp.bd`. When its DNS is ready, add its five
+  Caddy host blocks, update the five Coolify hostnames, then change only
+  `APP_DOMAIN` to `guestpost.mvp.bd` and redeploy. Do not serve both unrelated
+  root domains as one authenticated deployment: the shared auth cookie is
+  scoped to one root domain at a time.
 
 The Compose stack includes Redis with persistence, four web apps, the API, one
 realtime worker, and an idle `worker-jobs` service for Coolify scheduled tasks.
@@ -65,6 +81,7 @@ the same names during Compose interpolation and build arguments.
 
 | Variable | Use |
 |---|---|
+| `APP_DOMAIN` | Root domain for all public app URLs and auth/CORS allowlists; current staging value: `shohan.iam.bd`; future cutover value: `guestpost.mvp.bd` |
 | `API_DATABASE_URL` | Neon API runtime identity |
 | `AUTH_DATABASE_URL` | Neon Better Auth identity |
 | `WORKER_DATABASE_URL` | Neon worker identity |

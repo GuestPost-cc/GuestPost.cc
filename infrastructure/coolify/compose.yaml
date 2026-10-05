@@ -49,19 +49,19 @@ services:
       INVOICE_ISSUER_POSTAL_CODE: ${INVOICE_ISSUER_POSTAL_CODE:?Set the staging invoice issuer postal code}
       INVOICE_ISSUER_COUNTRY_CODE: ${INVOICE_ISSUER_COUNTRY_CODE:?Set the staging invoice issuer country code}
       INVOICE_SUPPORT_EMAIL: ${INVOICE_SUPPORT_EMAIL:?Set the staging support email}
-      TRUSTED_ORIGINS: https://guestpost.pro.bd,https://app.guestpost.pro.bd,https://publisher.guestpost.pro.bd,https://admin.guestpost.pro.bd,https://api.guestpost.pro.bd
-      CORS_ORIGIN: https://guestpost.pro.bd,https://app.guestpost.pro.bd,https://publisher.guestpost.pro.bd,https://admin.guestpost.pro.bd
-      BETTER_AUTH_URL: https://api.guestpost.pro.bd
-      BETTER_AUTH_ALLOWED_HOSTS: api.guestpost.pro.bd
-      AUTH_COOKIE_DOMAIN: guestpost.pro.bd
+      TRUSTED_ORIGINS: https://${APP_DOMAIN:?Set the public app root domain},https://app.${APP_DOMAIN:?Set the public app root domain},https://publisher.${APP_DOMAIN:?Set the public app root domain},https://admin.${APP_DOMAIN:?Set the public app root domain}
+      CORS_ORIGIN: https://${APP_DOMAIN:?Set the public app root domain},https://app.${APP_DOMAIN:?Set the public app root domain},https://publisher.${APP_DOMAIN:?Set the public app root domain},https://admin.${APP_DOMAIN:?Set the public app root domain}
+      BETTER_AUTH_URL: https://api.${APP_DOMAIN:?Set the public app root domain}
+      BETTER_AUTH_ALLOWED_HOSTS: api.${APP_DOMAIN:?Set the public app root domain}
+      AUTH_COOKIE_DOMAIN: ${APP_DOMAIN:?Set the public app root domain}
       OAUTH_STATE_COOKIE_SAMESITE: lax
       OAUTH_STATE_COOKIE_SECURE: "true"
-      NEXT_PUBLIC_ALLOWED_APP_DOMAINS: guestpost.pro.bd
-      NEXT_PUBLIC_API_URL: https://api.guestpost.pro.bd
-      NEXT_PUBLIC_WEBSITE_URL: https://guestpost.pro.bd
-      NEXT_PUBLIC_PORTAL_URL: https://app.guestpost.pro.bd
-      NEXT_PUBLIC_PUBLISHER_URL: https://publisher.guestpost.pro.bd
-      NEXT_PUBLIC_ADMIN_URL: https://admin.guestpost.pro.bd
+      NEXT_PUBLIC_ALLOWED_APP_DOMAINS: ${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_API_URL: https://api.${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_WEBSITE_URL: https://${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_PORTAL_URL: https://app.${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_PUBLISHER_URL: https://publisher.${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_ADMIN_URL: https://admin.${APP_DOMAIN:?Set the public app root domain}
       OBJECT_STORAGE_PROVIDER: r2
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?Set the Cloudflare R2 account ID}
       R2_ENDPOINT: ${R2_ENDPOINT:?Set the canonical Cloudflare R2 endpoint}
@@ -84,11 +84,11 @@ services:
       dockerfile: infrastructure/coolify/Dockerfile.web
       args: &web-build-args
         APP_NAME: website
-        NEXT_PUBLIC_API_URL: https://api.guestpost.pro.bd
-        NEXT_PUBLIC_WEBSITE_URL: https://guestpost.pro.bd
-        NEXT_PUBLIC_PORTAL_URL: https://app.guestpost.pro.bd
-        NEXT_PUBLIC_PUBLISHER_URL: https://publisher.guestpost.pro.bd
-        NEXT_PUBLIC_ADMIN_URL: https://admin.guestpost.pro.bd
+        NEXT_PUBLIC_API_URL: https://api.${APP_DOMAIN:?Set the public app root domain}
+        NEXT_PUBLIC_WEBSITE_URL: https://${APP_DOMAIN:?Set the public app root domain}
+        NEXT_PUBLIC_PORTAL_URL: https://app.${APP_DOMAIN:?Set the public app root domain}
+        NEXT_PUBLIC_PUBLISHER_URL: https://publisher.${APP_DOMAIN:?Set the public app root domain}
+        NEXT_PUBLIC_ADMIN_URL: https://admin.${APP_DOMAIN:?Set the public app root domain}
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
     restart: unless-stopped
     depends_on:

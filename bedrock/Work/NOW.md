@@ -15,14 +15,18 @@ has a Coolify Compose definition, shared Next.js Dockerfile, and staging
 runbook in progress. A new empty Neon project `guestpost-staging` is created
 on the Free plan in Singapore with PostgreSQL 17 (`calm-waterfall-71932352`).
 The deployment config keeps finance locked and all payout/deposit/Connect/live
-Stripe and financial repair gates off.
+Stripe and financial repair gates off. The Compose file derives all public
+URLs and origin allowlists from the required `APP_DOMAIN`; current staging is
+`shohan.iam.bd`, with `guestpost.mvp.bd` reserved for a later DNS and proxy
+cutover. The Coolify Traefik proxy is healthy on loopback port 18080 behind
+host Caddy, which retains public ports 80/443.
 
 Next: complete review of Compose and runbook, commit the deployment files, then
 provision the dedicated database role topology/migrations, set Coolify secrets,
-configure staging R2 readiness and issuer identity, map the existing
-`guestpost.pro.bd` hosts, and enable worker schedules after the restricted
-Stripe test key is present. Do not activate full RLS until its role, canary,
-and atomic activation sequence in `docs/RLS_ROLLOUT.md` is complete.
+configure staging R2 readiness and issuer identity, map the five hosts derived
+from `APP_DOMAIN`, and enable worker schedules after the restricted Stripe
+test key is present. Do not activate full RLS until its role, canary, and
+atomic activation sequence in `docs/RLS_ROLLOUT.md` is complete.
 
 ## Reconciliation repair proposal guard follow-up
 

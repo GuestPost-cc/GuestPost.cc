@@ -1,7 +1,7 @@
 ---
 area: history
 project: GuestPost.cc
-updated: 2026-09-30
+updated: 2026-10-05
 ---
 
 # Project History
@@ -13,14 +13,17 @@ This is not a git replacement.
 
 ## Timeline Notes
 
+- [2026-10-05-backfill](timeline/2026-10-05-backfill.md)
+- [2026-10-01-backfill](timeline/2026-10-01-backfill.md)
 - [2026-09-19-backfill](timeline/2026-09-19-backfill.md)
 - [2026-08-09-backfill](timeline/2026-08-09-backfill.md)
 - [2026-08-02-backfill](timeline/2026-08-02-backfill.md)
-- [2026-07-16-catchup](timeline/2026-07-16-catchup.md)
-- [2026-07-16-backfill](timeline/2026-07-16-backfill.md)
 
 ## Recent Activity
 
+- **2026-10-05** `backfill` — History backfill: 453 commits, 0 releases, 2 integrations
+- **2026-10-05** `integration_claude` — claude integration detected
+- **2026-10-05** `integration_cursor` — cursor integration detected
 - **2026-09-19** `backfill` — History backfill: 434 commits, 0 releases, 1 integrations
 - **2026-09-19** `integration_claude` — claude integration detected
 - **2026-08-02** `backfill` — History backfill: 394 commits, 0 releases, 2 integrations
@@ -33,9 +36,6 @@ This is not a git replacement.
 - **2026-07-02** `integration_cursor` — cursor integration detected
 - **2026-06-15** `release` [pre-claude-trailer-strip-backup] — Release pre-claude-trailer-strip-backup
 - **2026-06-09** `backfill` — History backfill: 16 commits, 0 releases, 2 integrations
-- **2026-06-09** `integration_claude` — claude integration detected
-- **2026-06-09** `integration_cursor` — cursor integration detected
-- **2026-06-09** `project_start` — Project started (first commit: 2026-06-07, 16 total commits)
 
 ## Reference
 
