@@ -26,13 +26,23 @@ checks remain pending. The resource is stopped and has not been deployed. The
 Coolify Traefik proxy is healthy on loopback port 18080 behind host Caddy,
 which retains public ports 80/443.
 
-Next: provision and verify the dedicated database role topology, run checked-in
-migrations, configure the staging R2 bucket/readiness object and reviewed
-invoice issuer identity, and supply the Coolify runtime credentials. Confirm
-DNS and host Caddy routing before starting services. Enable worker schedules
-only after the restricted Stripe test key is present. Do not activate full RLS
+Database provisioning is complete. All 100 checked-in Prisma migrations are
+applied under `guestpost_schema_owner`; the temporary Neon migration login and
+its database CREATE grant were removed. The 13-role ACL topology is in place,
+and API/auth/worker/reporting effective-role and table-grant canaries passed
+through temporary `SET ROLE` sessions that were rolled back; no runtime login
+credentials were created. Neon retains 13 project-owner admin-only membership
+edges beside the seven reviewed application edges; they have `INHERIT FALSE`
+and `SET FALSE` and are not used by app connections. Full RLS remains
+unactivated because its activation
+preflight currently expects no provider-managed owner edges; review that guard
+before any activation. The Compose resource remains stopped. Next: configure
+the staging R2 bucket/readiness object and reviewed invoice issuer identity,
+then provision separately approved runtime credentials. Confirm DNS and host
+Caddy routing before starting services. Enable worker schedules only after
+the restricted Stripe test key is present. Keep full RLS activation separate
 until its role, canary, and atomic activation sequence in
-`docs/RLS_ROLLOUT.md` is complete.
+`docs/RLS_ROLLOUT.md` passes.
 
 ## Reconciliation repair proposal guard follow-up
 

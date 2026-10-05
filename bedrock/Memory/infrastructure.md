@@ -18,12 +18,22 @@ contract remain the prior deployment record until this Coolify stack is
 promoted. See `docs/COOLIFY_STAGING_RUNBOOK.md` for the new release sequence.
 
 The new Neon project `guestpost-staging` is on the Free plan in Singapore,
-PostgreSQL 17, with an empty `guestpost` database. Its project ID is
+PostgreSQL 17, with a fresh `guestpost` database. Its project ID is
 `calm-waterfall-71932352`. The app manifest intentionally keeps finance locked,
 disables payout/deposit/Connect/live Stripe and repair gates, and requires
 separate API, Better Auth, worker, and migration database identities. RLS must
 be provisioned and canaried by the documented staged process before runtime
-startup/activation. Coolify now has a `staging` environment and an undeployed
+startup/activation. Neon rejects `ALTER ROLE` and blocks `SET ROLE
+neon_superuser`, so the checked-in provisioners validate create-time role
+attributes on Neon. All 100 Prisma migrations are applied under
+`guestpost_schema_owner`; the one-use migrator login and temporary database
+CREATE grant were removed. The final role ACLs are installed, and pre-start
+API/auth/worker/reporting identity canaries pass. Neon retains 13 owner
+admin-only membership edges in addition to the seven application edges; the
+owner edges do not grant inherited or SET ROLE access and are never supplied to
+the app. Full RLS remains unactivated; its activation preflight needs a reviewed
+Neon-aware exception for those provider-managed edges. Coolify now has a
+`staging` environment and an undeployed
 `guestpost-staging` Compose resource sourced through the repository-restricted
 GitHub App. Its production and preview `APP_DOMAIN` values are set to
 `shohan.iam.bd`; the API, website, portal, publisher, and admin routes use

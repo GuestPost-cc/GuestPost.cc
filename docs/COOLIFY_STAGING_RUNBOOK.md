@@ -56,6 +56,24 @@ worker runtime, reporting runtime, RLS authorizer, and the financial repair
 guard. Runtime identities must be `NOBYPASSRLS`, non-owner, and have no DDL.
 Keep the migration URL outside all reusable runtime services.
 
+Neon does not provide a PostgreSQL superuser to the project owner and rejects
+`ALTER ROLE`. The checked-in provisioners therefore validate role attributes
+created with the reviewed values. Before migrations, run
+`scripts/provision-financial-repair-guard-role.sql`, then create the schema
+owner and a one-use migration login with
+`scripts/provision-neon-migration-login.sql`. Generate a random password only
+in the operator shell and pass it as the required `migrator_password` psql
+variable. Run Prisma Migrate through the direct endpoint as
+`guestpost_migrator_login`, adding the standard PostgreSQL startup option
+`options=-c role=guestpost_schema_owner`. Verify
+`session_user=guestpost_migrator_login` and
+`current_user=guestpost_schema_owner` before migrating. After migrations,
+confirm all application tables and sequences are owned by
+`guestpost_schema_owner`, remove the temporary login with
+`scripts/cleanup-neon-migration-login.sql`, then run
+`scripts/provision-rls-roles.sql` to install and verify the final ACL topology.
+Never store the temporary login or owner URL in Coolify.
+
 Use the staged sequence in `docs/RLS_ROLLOUT.md`:
 
 1. Precreate the financial repair guard role, apply all checked-in Prisma
@@ -115,12 +133,14 @@ values and monitor failed executions.
 
 ## First release and checks
 
-1. Confirm the new Neon database is empty, backups/PITR are enabled, and all
-   staged identities are separate.
+1. Confirm the new Neon database is empty, backups/PITR are enabled, and the
+   staged identities are separate. On Neon, use the one-use migration login
+   procedure above; its LOGIN is dropped after the migration canary.
 2. Confirm R2 readiness object exists and only the dedicated staging bucket is
    granted to the app.
-3. Run migrations as the isolated migration role; capture the applied migration
-   list and role verification evidence in the deployment record.
+3. Run migrations as the isolated one-use migration login with the effective
+   schema-owner identity; capture the applied migration list and role
+   verification evidence in the deployment record.
 4. Start API and realtime worker only after RLS roles and inert policies are
    ready; then start the frontends and validate each public host, health route,
    sign-in, signup, and cross-surface cookies.

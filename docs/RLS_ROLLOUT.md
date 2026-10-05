@@ -19,8 +19,10 @@ migration:
   boundary while preserving the independently proven Phase 1 `ApiKey`
   boundary.
 
-No repository script enables a login, creates a password, changes an
-environment, or targets a hosted database automatically.
+No repository script enables a reusable runtime login, creates a runtime
+password, changes an environment, or targets a hosted database automatically.
+For Neon only, staging uses one disposable, least-privilege migration login and
+drops it after ownership verification.
 
 ## Policy boundary
 
@@ -108,11 +110,28 @@ inert for pre-rollout and local compatibility.
 
 ## Role topology
 
-`scripts/provision-rls-roles.sql` owns 12 roles and exactly six membership
+`scripts/provision-rls-roles.sql` owns 13 roles and exactly seven membership
 edges:
 
 The reconciliation leaves all credential roles `NOLOGIN`; enabling credentials
 is a separate administrator action after connection-level verification.
+
+Neon does not expose PostgreSQL superuser privileges to a project owner and
+rejects `ALTER ROLE`. Its project owner can create roles with their final safe
+attributes and grant reviewed memberships. The provisioners validate those
+attributes and perform schema/table ACL work under `guestpost_schema_owner`.
+On Neon, use the disposable `guestpost_migrator_login` from
+`scripts/provision-neon-migration-login.sql` with startup option
+`options=-c role=guestpost_schema_owner`; drop it with
+`scripts/cleanup-neon-migration-login.sql` after confirming all objects are
+owned by the schema owner. This exception creates no reusable runtime login.
+Neon also retains one creator membership per SQL-created role for
+`guestpost_owner`, with `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`, even
+after the role recipe runs. The app roles still have only the seven reviewed
+application edges; the 13 creator edges are not inherited or settable by an
+app role. The current `activate-full-rls.sql` preflight rejects the creator
+edge to the repair guard, so full RLS activation on Neon needs a separately
+reviewed provider-aware preflight change before that stage is attempted.
 
 | Roles | Purpose |
 | --- | --- |
@@ -134,7 +153,7 @@ The financial-repair migration additionally requires its dedicated `NOLOGIN`,
 with `scripts/provision-financial-repair-guard-role.sql`. When
 `guestpost_schema_owner` exists, that script grants it the required `SET ROLE`
 membership before ownership transfer. Run the full role provisioner after
-migrations to reconcile the exact six-edge topology and object-specific ACLs.
+migrations to reconcile the exact seven-edge topology and object-specific ACLs.
 
 ## Required migration grant checklist
 
@@ -159,12 +178,13 @@ Never combine these stages into one production command. Rehearse every step on
 a current, disposable clone first.
 
 1. **Prove the clone.** Precreate the financial-repair guard role, apply all
-   migrations, provision roles, transfer the reviewed public table/sequence
-   ownership inventory to `guestpost_schema_owner`, activate the clone, and run
-   `scripts/test-full-rls-boundary.sql` as a cluster administrator. The test is
-   destructive and uses fixed fixtures, so it is for a fresh ephemeral
-   database only. GitHub CI performs this entire sequence in a dedicated
-   `guestpost_rls_boundary_test` database.
+   migrations under `guestpost_schema_owner`, provision roles, transfer the
+   reviewed public table/sequence ownership inventory to that role, activate
+   the clone, and run `scripts/test-full-rls-boundary.sql` as a cluster
+   administrator. On Neon, use and then drop the disposable migration login
+   described above. The test is destructive and uses fixed fixtures, so it is
+   for a fresh ephemeral database only. GitHub CI performs this entire
+   sequence in a dedicated `guestpost_rls_boundary_test` database.
 2. **Install inert policies.** Precreate the financial-repair guard role, then
    deploy the Prisma migration normally. Verify 101 staged models with 404
    full-boundary policies and six Phase 1 `ApiKey` policies before activation.
@@ -176,9 +196,11 @@ a current, disposable clone first.
    roles. Never give a runtime the migrator/owner secret.
 4. **Verify each connection.** Connect with each new URL and check
    `session_user`, `current_user`, membership edges, `rolbypassrls=false`, and
-   expected table grants/denials. The migrator must enter as
-   `guestpost_migrator` with `current_user=guestpost_schema_owner`; runtime
-   sessions must remain their runtime identity.
+   expected table grants/denials. On self-managed PostgreSQL, the migrator
+   enters as `guestpost_migrator` with `current_user=guestpost_schema_owner`.
+   On Neon, the disposable `guestpost_migrator_login` has that same effective
+   schema-owner identity and is removed after migration. Runtime sessions must
+   remain their runtime identity.
 5. **Deploy context-aware code while policies are inert.** Configure the API
    `DATABASE_URL` with the API runtime identity, `AUTH_DATABASE_URL` with the
    auth runtime identity, and worker `DATABASE_URL` with the worker runtime

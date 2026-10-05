@@ -5,6 +5,8 @@
 
 \set ON_ERROR_STOP on
 
+SELECT CASE WHEN rolsuper THEN 'true' ELSE 'false' END AS is_superuser FROM pg_roles WHERE rolname = current_user \gset
+
 DO $financial_repair_guard_role$
 BEGIN
   IF NOT EXISTS (
@@ -22,10 +24,28 @@ BEGIN
 END
 $financial_repair_guard_role$;
 
-ALTER ROLE guestpost_financial_repair_guard
-  NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
-ALTER ROLE guestpost_financial_repair_staging
-  NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+\if :is_superuser
+  ALTER ROLE guestpost_financial_repair_guard
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+  ALTER ROLE guestpost_financial_repair_staging
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
+\else
+  DO $verify_financial_repair_roles$
+  BEGIN
+    IF EXISTS (
+      SELECT 1 FROM pg_roles
+      WHERE rolname IN (
+        'guestpost_financial_repair_guard',
+        'guestpost_financial_repair_staging'
+      )
+        AND (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole
+          OR rolreplication OR rolbypassrls OR rolinherit)
+    ) THEN
+      RAISE EXCEPTION 'Neon repair roles must be created with their reviewed NOLOGIN, NOINHERIT, NOBYPASSRLS attributes';
+    END IF;
+  END
+  $verify_financial_repair_roles$;
+\endif
 
 -- A production migrator runs as guestpost_schema_owner, which must be a
 -- member of the new function owner to transfer trigger-function ownership.
