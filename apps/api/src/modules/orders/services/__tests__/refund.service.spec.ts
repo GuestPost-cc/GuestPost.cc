@@ -45,6 +45,11 @@ describe("RefundService", () => {
         findFirst: jest.fn().mockResolvedValue(null),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      platformSettings: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: "settings-1", version: 3, platformFeePct: new Decimal(10) },
+        ]),
+      },
       platformRevenue: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         delete: jest.fn(),
@@ -971,7 +976,7 @@ describe("RefundService", () => {
     })
   })
 
-  it("allocates force-cancel gross between publisher compensation and the customer refund", async () => {
+  it("retains the snapshotted platform fee from gross before publisher compensation and customer refund", async () => {
     prismaMock.transaction.create.mockImplementation(({ data }: any) =>
       Promise.resolve({
         id:
@@ -991,7 +996,7 @@ describe("RefundService", () => {
       "force-cancel:order-1:case-1",
       "PLATFORM",
       {
-        amount: "100.00",
+        amount: "90.00",
         reason: "Publisher completed the full paid order before cancellation.",
         effectiveOrderStatus: "PUBLISHED",
       },
@@ -1005,11 +1010,79 @@ describe("RefundService", () => {
     expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
     expect(prismaMock.publisherCompensation.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        amount: new Decimal(100),
+        amount: new Decimal(90),
+        platformFeeAmount: new Decimal(10),
+        platformFeeBps: 1000,
+        platformFeePolicyVersion: "platform-settings:settings-1:v3",
         disposition: "EXACT_AMOUNT",
         refundTransactionId: "refund-tx-1",
       }),
     })
+  })
+
+  it("refunds only the gross remainder after the publisher share and fee", async () => {
+    prismaMock.transaction.create.mockImplementation(({ data }: any) =>
+      Promise.resolve({
+        id:
+          data.type === "REFUND"
+            ? "refund-tx-1"
+            : data.type === "PUBLISHER_COMPENSATION"
+              ? "compensation-tx-1"
+              : "debt-tx-1",
+      }),
+    )
+
+    await service.refundOrderInTransaction(
+      prismaMock,
+      { ...baseOrder, status: "PUBLISHED" },
+      "Emergency cancellation: publisher work receives a partial award.",
+      "admin-1",
+      "force-cancel:order-1:case-2",
+      "PLATFORM",
+      {
+        amount: "60.00",
+        reason: "Publisher receives the reviewed partial payment for completed work.",
+        effectiveOrderStatus: "PUBLISHED",
+      },
+      true,
+    )
+
+    const refund = prismaMock.transaction.create.mock.calls.find(
+      ([{ data }]: any[]) => data.type === "REFUND",
+    )
+    expect(refund[0].data.amount.equals(new Decimal(30))).toBe(true)
+    expect(prismaMock.wallet.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          availableBalance: { increment: new Decimal(30) },
+        }),
+      }),
+    )
+  })
+
+  it("fails closed when no versioned fee policy can support positive compensation", async () => {
+    prismaMock.platformSettings.findMany.mockResolvedValue([])
+
+    await expect(
+      service.refundOrderInTransaction(
+        prismaMock,
+        { ...baseOrder, status: "PUBLISHED" },
+        "Emergency cancellation: fee settings are missing for review.",
+        "admin-1",
+        "force-cancel:order-1:case-3",
+        "PLATFORM",
+        {
+          amount: "1.00",
+          reason: "Publisher has completed one dollar of reviewed contract work.",
+          effectiveOrderStatus: "PUBLISHED",
+        },
+        true,
+      ),
+    ).rejects.toMatchObject({
+      response: { code: "PLATFORM_FEE_POLICY_UNAVAILABLE" },
+    })
+    expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prismaMock.transaction.create).not.toHaveBeenCalled()
   })
 
   it("replays only a force-cancel refund whose refund and compensation still equal the captured gross", async () => {

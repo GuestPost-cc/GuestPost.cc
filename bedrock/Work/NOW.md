@@ -1,10 +1,27 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-10-02
+updated: 2026-10-05
 ---
 
 # Current focus
+
+## Reconciliation repair proposal guard follow-up
+
+The API preview and locked repair service use current unreserved wallet
+availability, but the deployed proposal trigger still rejected any historical
+wallet debit after the source refund. A follow-up migration now aligns the
+database guard with the reviewed current-balance rule while keeping the exact
+available-balance check, actor/RLS gate, dispute/fraud checks, and version locks.
+The migration and contract regression test are drafted on
+`fix/reconciliation-repair-current-balance-guard`; local package tests are
+currently unavailable because dependencies are absent and registry DNS is
+unreachable. Finance-approved cancellation and force-cancel now allocate gross
+between the customer refund, publisher's net compensation, and the snapshotted
+platform fee. Active settlement snapshots are authoritative; otherwise the
+versioned policy is captured at approval. Database guards, replay validation,
+Finance UI, and regression tests enforce the same allocation. The user selected
+retaining the fee from gross.
 
 ## Reconciliation eligibility and delivery-verification recovery
 

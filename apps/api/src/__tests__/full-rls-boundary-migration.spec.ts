@@ -32,6 +32,20 @@ const repairMigration = fs.readFileSync(
   ),
   "utf8",
 )
+const repairBalanceMigration = fs.readFileSync(
+  path.join(
+    root,
+    "packages/database/prisma/migrations/20261005120000_reconciliation_repair_current_balance_guard/migration.sql",
+  ),
+  "utf8",
+)
+const compensationFeeMigration = fs.readFileSync(
+  path.join(
+    root,
+    "packages/database/prisma/migrations/20261005130000_publisher_compensation_platform_fee/migration.sql",
+  ),
+  "utf8",
+)
 const rlsBoundaryAssertions = fs.readFileSync(
   path.join(root, "scripts/test-full-rls-boundary.sql"),
   "utf8",
@@ -148,6 +162,41 @@ describe("full application RLS boundary migration", () => {
     )
     expect(repairMigration).toContain("REFUND_REVERSAL")
     expect(repairMigration).toContain("guestpost_rls.actor_id()")
+  })
+
+  it("uses current available balance instead of historical wallet debits for repair eligibility", () => {
+    const proposalGuard = repairBalanceMigration.match(
+      /CREATE OR REPLACE FUNCTION public\.guard_reconciliation_repair_proposal\(\)([\s\S]*?)\$function\$;/,
+    )?.[1]
+
+    expect(proposalGuard).toBeDefined()
+    expect(proposalGuard).toContain(
+      'target_wallet."availableBalance" < NEW."amount"',
+    )
+    expect(proposalGuard).not.toContain(
+      'later."createdAt" >= source_tx."createdAt"',
+    )
+    expect(proposalGuard).not.toContain("'RESERVATION'")
+    expect(repairBalanceMigration).toContain(
+      "SECURITY DEFINER is used only when forced RLS requires the dedicated guard",
+    )
+    expect(repairBalanceMigration).toContain(
+      "OWNER TO guestpost_financial_repair_guard",
+    )
+  })
+
+  it("conserves cancellation gross across refund, publisher compensation, and snapshotted platform fee", () => {
+    expect(compensationFeeMigration).toContain('"platformFeeAmount" DECIMAL')
+    expect(compensationFeeMigration).toContain('"platformFeeBps" INTEGER')
+    expect(compensationFeeMigration).toContain(
+      '"platformFeePolicyVersion" VARCHAR(128)',
+    )
+    expect(compensationFeeMigration).toContain(
+      'refund_row."amount" + NEW."amount" + NEW."platformFeeAmount"',
+    )
+    expect(compensationFeeMigration).toContain('settings."version"::TEXT')
+    expect(compensationFeeMigration).toContain("settlement_fee_policy_version")
+    expect(compensationFeeMigration).toContain("AND NOT EXISTS (")
   })
 
   it("uses live authority rows and never grants a staff or worker bypass role", () => {

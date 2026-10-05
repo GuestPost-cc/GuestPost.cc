@@ -1336,6 +1336,9 @@ model PublisherCompensation {
   debtRepaymentTransactionId String?                          @unique
   disposition                PublisherCompensationDisposition
   amount                     Decimal
+  platformFeeAmount          Decimal                          @default(0)
+  platformFeeBps             Int?
+  platformFeePolicyVersion   String?                          @db.VarChar(128)
   currency                   String                           @default("USD") @db.VarChar(3)
   responsibility             CancellationResponsibility
   reason                     String                           @db.VarChar(2000)

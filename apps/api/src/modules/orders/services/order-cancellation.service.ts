@@ -27,6 +27,10 @@ import {
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
+import {
+  resolvePlatformFeePolicy,
+  splitPlatformFee,
+} from "../../../common/platform-fee"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { CommunicationsService } from "../../communications/communications.service"
@@ -888,6 +892,7 @@ export class OrderCancellationService {
           `cancellation-request:${request.id}`,
           resolvedResponsibility,
           publisherCompensationIntent,
+          true,
         )
 
         if (request.status === "APPROVED") {
@@ -1293,7 +1298,11 @@ export class OrderCancellationService {
                   orderBy: { createdAt: "desc" },
                   take: 1,
                   select: {
+                    grossAmount: true,
                     publisherAmount: true,
+                    platformFee: true,
+                    platformFeeBps: true,
+                    feePolicyVersion: true,
                     currency: true,
                   },
                 },
@@ -1307,6 +1316,30 @@ export class OrderCancellationService {
         tx.orderCancellationRequest.count({ where }),
       ]),
     )
+    const needsCurrentFeePolicy =
+      canViewFinancials &&
+      items.some((request: any) => {
+        const activeSettlement = request.order.settlements?.[0]
+        return (
+          !activeSettlement &&
+          isPostPublicationPublisherOrder({
+            fulfillmentChannel: request.fulfillmentChannel,
+            websiteOwnershipType: request.order.website?.ownershipType,
+            effectiveOrderStatus: request.previousOrderStatus,
+            hasSettlement: false,
+          })
+        )
+      })
+    let currentFeePolicy: Awaited<ReturnType<typeof resolvePlatformFeePolicy>> | null =
+      null
+    if (needsCurrentFeePolicy) {
+      try {
+        currentFeePolicy = await resolvePlatformFeePolicy(this.prisma)
+      } catch {
+        // Keep the read-only queue available but fail closed for a positive
+        // publisher compensation until a versioned policy is available.
+      }
+    }
     return {
       items: items.map((request: any) => {
         const { fraudFindings, ...requestWithoutFraudFindings } = request
@@ -1318,6 +1351,39 @@ export class OrderCancellationService {
           hasSettlement: Boolean(activeSettlement),
         })
         const customer = request.order.customer
+        let platformFeeAmount: string | null = null
+        let maximumCompensation = "0"
+        let feePolicyAvailable = false
+        let platformFeeBps: number | null = null
+        let feePolicyVersion: string | null = null
+        if (required) {
+          if (activeSettlement) {
+            const gross = new Decimal(activeSettlement.grossAmount)
+            const fee = new Decimal(activeSettlement.platformFee)
+            const publisherAmount = new Decimal(activeSettlement.publisherAmount)
+            feePolicyAvailable =
+              gross.equals(request.order.amount ?? 0) &&
+              fee.plus(publisherAmount).equals(gross) &&
+              Number.isInteger(activeSettlement.platformFeeBps) &&
+              typeof activeSettlement.feePolicyVersion === "string"
+            if (feePolicyAvailable) {
+              platformFeeAmount = fee.toFixed(2)
+              maximumCompensation = publisherAmount.toFixed(2)
+              platformFeeBps = activeSettlement.platformFeeBps
+              feePolicyVersion = activeSettlement.feePolicyVersion
+            }
+          } else if (currentFeePolicy) {
+            const split = splitPlatformFee(
+              request.order.amount ?? 0,
+              currentFeePolicy.fraction,
+            )
+            platformFeeAmount = split.fee.toFixed(2)
+            maximumCompensation = split.net.toFixed(2)
+            feePolicyAvailable = true
+            platformFeeBps = currentFeePolicy.basisPoints
+            feePolicyVersion = currentFeePolicy.policyVersion
+          }
+        }
         const order = {
           // This is a role-scoped API contract. Never spread a Prisma Order
           // record here: new scalar fields are otherwise silently exposed to
@@ -1352,13 +1418,11 @@ export class OrderCancellationService {
           ...(canViewFinancials && {
             publisherCompensationPolicy: {
               required,
-              maximumAmount: String(
-                required
-                  ? (activeSettlement?.publisherAmount ??
-                      request.order.amount ??
-                      0)
-                  : 0,
-              ),
+              maximumAmount: maximumCompensation,
+              platformFeeAmount,
+              platformFeeBps,
+              feePolicyVersion,
+              feePolicyAvailable,
               currency: activeSettlement?.currency ?? request.order.currency,
               effectiveOrderStatus: request.previousOrderStatus,
             },

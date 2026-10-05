@@ -304,6 +304,7 @@ describe("OrderCancellationService", () => {
           "Platform-funded compensation for completed publisher delivery work.",
         effectiveOrderStatus: "PUBLISHED",
       },
+      true,
     )
   })
 

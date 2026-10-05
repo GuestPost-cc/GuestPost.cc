@@ -30,6 +30,14 @@ Both **customer** AND **admin** must approve before funds are released. Dispute 
 ### Platform Fee
 
 20% platform fee captured at settlement creation via fee-by-subtraction (`splitPlatformFee`).
+For Finance-approved publisher cancellation with compensation, captured gross
+is conserved across the customer refund, publisher's net share, and a retained
+platform fee. An active Settlement's fee/version snapshot is authoritative;
+without one, the versioned `PlatformSettings` policy is captured when Finance
+approves. Publisher debt is netted only from the publisher share, after this
+split. `PublisherCompensation` preserves the fee amount, basis points, and
+policy version as immutable evidence; missing fee evidence blocks positive
+compensation.
 
 ### Tier-Based Review Windows
 
