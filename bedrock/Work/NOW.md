@@ -11,22 +11,28 @@ updated: 2026-10-05
 The user chose a fresh staging redeploy on Coolify + Neon and confirmed the old
 Neon project was deleted, so do not restore or expect prior data. The current
 GitHub `main` base is `418550dc`; local branch `codex/coolify-staging-rebuild`
-has a Coolify Compose definition, shared Next.js Dockerfile, and staging
-runbook in progress. A new empty Neon project `guestpost-staging` is created
+has a committed Coolify Compose definition, shared Next.js Dockerfile, and
+staging runbook. A new empty Neon project `guestpost-staging` is created
 on the Free plan in Singapore with PostgreSQL 17 (`calm-waterfall-71932352`).
 The deployment config keeps finance locked and all payout/deposit/Connect/live
 Stripe and financial repair gates off. The Compose file derives all public
 URLs and origin allowlists from the required `APP_DOMAIN`; current staging is
 `shohan.iam.bd`, with `guestpost.mvp.bd` reserved for a later DNS and proxy
-cutover. The Coolify Traefik proxy is healthy on loopback port 18080 behind
-host Caddy, which retains public ports 80/443.
+cutover. The Coolify environment is named `staging`; the `guestpost-staging`
+Compose resource uses the repository-restricted GitHub App and branch
+`codex/coolify-staging-rebuild`. Production and preview APP_DOMAIN variables
+are set to `shohan.iam.bd`, and five HTTP service routes are configured. DNS
+checks remain pending. The resource is stopped and has not been deployed. The
+Coolify Traefik proxy is healthy on loopback port 18080 behind host Caddy,
+which retains public ports 80/443.
 
-Next: complete review of Compose and runbook, commit the deployment files, then
-provision the dedicated database role topology/migrations, set Coolify secrets,
-configure staging R2 readiness and issuer identity, map the five hosts derived
-from `APP_DOMAIN`, and enable worker schedules after the restricted Stripe
-test key is present. Do not activate full RLS until its role, canary, and
-atomic activation sequence in `docs/RLS_ROLLOUT.md` is complete.
+Next: provision and verify the dedicated database role topology, run checked-in
+migrations, configure the staging R2 bucket/readiness object and reviewed
+invoice issuer identity, and supply the Coolify runtime credentials. Confirm
+DNS and host Caddy routing before starting services. Enable worker schedules
+only after the restricted Stripe test key is present. Do not activate full RLS
+until its role, canary, and atomic activation sequence in
+`docs/RLS_ROLLOUT.md` is complete.
 
 ## Reconciliation repair proposal guard follow-up
 

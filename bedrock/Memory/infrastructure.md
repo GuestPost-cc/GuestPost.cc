@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-08-15
+updated: 2026-10-05
 ---
 
 # Infrastructure
@@ -23,10 +23,14 @@ PostgreSQL 17, with an empty `guestpost` database. Its project ID is
 disables payout/deposit/Connect/live Stripe and repair gates, and requires
 separate API, Better Auth, worker, and migration database identities. RLS must
 be provisioned and canaried by the documented staged process before runtime
-startup/activation. Remaining setup includes runtime role credentials,
-Coolify Compose resource and domains/DNS, staging R2 readiness, reviewed
-invoice issuer identity, and restricted Stripe test access before scheduled
-worker jobs run.
+startup/activation. Coolify now has a `staging` environment and an undeployed
+`guestpost-staging` Compose resource sourced through the repository-restricted
+GitHub App. Its production and preview `APP_DOMAIN` values are set to
+`shohan.iam.bd`; the API, website, portal, publisher, and admin routes use
+HTTP to the internal Traefik service ports. The hostnames have not passed DNS
+checks. Remaining setup includes runtime role credentials, staging R2
+readiness, reviewed invoice issuer identity, and restricted Stripe test access
+before scheduled worker jobs run.
 
 Coolify's Traefik proxy runs on `127.0.0.1:18080` behind the server's existing
 Caddy, which keeps public ports 80/443. The Compose manifest takes one required
