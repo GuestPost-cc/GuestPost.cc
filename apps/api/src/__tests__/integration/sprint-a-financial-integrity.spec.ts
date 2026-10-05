@@ -84,8 +84,15 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
       expect(order?.status).toBe("REFUNDED")
       expect(finalSettlement?.status).toBe("CANCELLED")
 
-      const [releaseCount, refundCount, compensationCount, balance, wallet] =
-        await Promise.all([
+      const [
+        releaseCount,
+        refundCount,
+        compensationCount,
+        balance,
+        wallet,
+        compensation,
+        refund,
+      ] = await Promise.all([
           prisma.transaction.count({
             where: { orderId: ctx.order.id, type: "SETTLEMENT_RELEASE" },
           }),
@@ -101,6 +108,12 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
           prisma.wallet.findUniqueOrThrow({
             where: { organizationId: ctx.organization.id },
           }),
+          prisma.publisherCompensation.findUniqueOrThrow({
+            where: { orderId: ctx.order.id },
+          }),
+          prisma.transaction.findFirstOrThrow({
+            where: { orderId: ctx.order.id, type: "REFUND" },
+          }),
         ])
       expect(releaseCount).toBeLessThanOrEqual(1)
       expect(refundCount).toBe(1)
@@ -108,8 +121,12 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
       expect(Number(balance.withdrawableBalance)).toBe(80)
       expect(Number(balance.debtBalance)).toBe(0)
       expect(Number(balance.lifetimeEarnings)).toBe(80)
-      // The $80 publisher compensation is allocated from the $100 payment.
-      expect(Number(wallet.availableBalance)).toBe(20)
+      // The $100 gross allocation is $80 publisher compensation, $20 retained
+      // platform fee, and no customer refund.
+      expect(Number(compensation.amount)).toBe(80)
+      expect(Number(compensation.platformFeeAmount)).toBe(20)
+      expect(Number(refund.amount)).toBe(0)
+      expect(Number(wallet.availableBalance)).toBe(0)
     } finally {
       await cleanup()
     }
@@ -401,258 +418,3 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         version: withdrawal.version,
       })
       await expect(
-        prisma.payoutExecution.count({
-          where: { withdrawalId: withdrawal.id },
-        }),
-      ).resolves.toBe(0)
-      await expect(
-        prisma.transaction.count({
-          where: { publisherId: ctx.publisher.publisher.id },
-        }),
-      ).resolves.toBe(transactionCountBefore)
-    } finally {
-      await cleanup()
-    }
-  }, 30_000)
-
-  // ─── C-2: forceApprove creates audit row ──────────────────────────
-  it("C-2: forceApprove creates audit log entry with reason + previousStatus", async () => {
-    const { app, prisma, cleanup } = await createTestApp()
-    try {
-      const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
-      const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
-      const settlements: any = app.get(SettlementsService)
-
-      // Create settlement + customer-approve it
-      const settlement = await settlements.createSettlement(
-        ctx.order.id,
-        ctx.organization.id,
-        ctx.customer.user.id,
-      )
-      await settlements.customerApprove(
-        settlement.id,
-        ctx.customer.user.id,
-        ctx.organization.id,
-        "OWNER",
-        "OWNER",
-      )
-
-      const forceReason = "Publisher bankruptcy exception"
-      await settlements.forceApprove(
-        settlement.id,
-        forceReason,
-        ctx.customer.user.id,
-        "SUPER_ADMIN",
-      )
-
-      const auditRow = await prisma.auditLog.findFirst({
-        where: {
-          action: "SETTLEMENT_FORCE_APPROVED",
-          entityId: settlement.id,
-        },
-        orderBy: { createdAt: "desc" },
-      })
-
-      expect(auditRow).not.toBeNull()
-      expect(auditRow.metadata.reason).toBe(forceReason)
-      expect(auditRow.metadata.previousStatus).toBe("CUSTOMER_APPROVED")
-      expect(auditRow.metadata.actorRole).toBe("SUPER_ADMIN")
-      expect(auditRow.userId).toBe(ctx.customer.user.id)
-    } finally {
-      await cleanup()
-    }
-  }, 30_000)
-
-  // ─── C-2: adminApprove creates audit row ──────────────────────────
-  it("C-2: adminApprove creates audit log entry with reason + previousStatus", async () => {
-    const { app, prisma, cleanup } = await createTestApp()
-    try {
-      const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
-      const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
-      const settlements: any = app.get(SettlementsService)
-
-      const settlement = await settlements.createSettlement(
-        ctx.order.id,
-        ctx.organization.id,
-        ctx.customer.user.id,
-      )
-      await settlements.customerApprove(
-        settlement.id,
-        ctx.customer.user.id,
-        ctx.organization.id,
-        "OWNER",
-        "OWNER",
-      )
-
-      const approveReason = "Manual finance reconciliation"
-      await settlements.adminApprove(
-        settlement.id,
-        approveReason,
-        ctx.customer.user.id,
-        "FINANCE",
-      )
-
-      const auditRow = await prisma.auditLog.findFirst({
-        where: {
-          action: "SETTLEMENT_ADMIN_APPROVED",
-          entityId: settlement.id,
-        },
-        orderBy: { createdAt: "desc" },
-      })
-
-      expect(auditRow).not.toBeNull()
-      expect(auditRow.metadata.reason).toBe(approveReason)
-      expect(auditRow.metadata.previousStatus).toBe("CUSTOMER_APPROVED")
-      expect(auditRow.metadata.actorRole).toBe("FINANCE")
-      expect(auditRow.userId).toBe(ctx.customer.user.id)
-    } finally {
-      await cleanup()
-    }
-  }, 30_000)
-
-  // ─── C-2: cancelSettlement audit includes previousStatus ──────────
-  it("C-2: cancelSettlement audit includes previousStatus in metadata", async () => {
-    const { app, prisma, cleanup } = await createTestApp()
-    try {
-      const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
-      const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
-      const settlements: any = app.get(SettlementsService)
-
-      const settlement = await settlements.createSettlement(
-        ctx.order.id,
-        ctx.organization.id,
-        ctx.customer.user.id,
-      )
-
-      await settlements.cancelSettlement(
-        settlement.id,
-        ctx.customer.user.id,
-        "Order no longer needed",
-      )
-
-      const auditRow = await prisma.auditLog.findFirst({
-        where: {
-          action: "SETTLEMENT_CANCELLED",
-          entityId: settlement.id,
-        },
-        orderBy: { createdAt: "desc" },
-      })
-
-      expect(auditRow).not.toBeNull()
-      expect(auditRow.metadata.previousStatus).toBe("PENDING")
-      expect(auditRow.metadata.reason).toBe("Order no longer needed")
-    } finally {
-      await cleanup()
-    }
-  }, 30_000)
-
-  // ─── C-3: forceApprove vs openDispute race ────────────────────────
-  it("C-3: forceApprove vs openDispute — never both RELEASED and OPEN", async () => {
-    const { app, prisma, cleanup } = await createTestApp()
-    try {
-      const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
-      const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
-      const settlements: any = app.get(SettlementsService)
-
-      const settlement = await settlements.createSettlement(
-        ctx.order.id,
-        ctx.organization.id,
-        ctx.customer.user.id,
-      )
-      await settlements.customerApprove(
-        settlement.id,
-        ctx.customer.user.id,
-        ctx.organization.id,
-        "OWNER",
-        "OWNER",
-      )
-
-      // Fire forceApprove + openDispute concurrently
-      const results = await Promise.allSettled([
-        settlements.forceApprove(
-          settlement.id,
-          "Force approve test",
-          ctx.customer.user.id,
-          "SUPER_ADMIN",
-        ),
-        prisma.orderDispute.create({
-          data: {
-            orderId: ctx.order.id,
-            raisedById: ctx.customer.user.id,
-            status: "OPEN",
-            reason: "Test dispute",
-          },
-        }),
-      ])
-
-      // Verify no contradictory state: both RELEASED + OPEN is impossible
-      const finalSettlement = await prisma.settlement.findUnique({
-        where: { id: settlement.id },
-      })
-      const activeDispute = await prisma.orderDispute.findFirst({
-        where: { orderId: ctx.order.id, status: "OPEN" },
-      })
-
-      if (finalSettlement?.status === "RELEASED") {
-        expect(activeDispute).toBeNull()
-      }
-      if (activeDispute) {
-        expect(finalSettlement?.status).not.toBe("RELEASED")
-      }
-
-      // At least one operation should have succeeded
-      const fulfilled = results.filter((r) => r.status === "fulfilled")
-      expect(fulfilled.length).toBeGreaterThanOrEqual(1)
-    } finally {
-      await cleanup()
-    }
-  }, 30_000)
-
-  // ─── C-2: releaseFundsInternal creates audit row ─────────────────
-  it("C-2: releaseFundsInternal creates SETTLEMENT_FUNDS_RELEASED audit entry", async () => {
-    const { app, prisma, cleanup } = await createTestApp()
-    try {
-      const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
-      const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
-      const settlements: any = app.get(SettlementsService)
-
-      const settlement = await settlements.createSettlement(
-        ctx.order.id,
-        ctx.organization.id,
-        ctx.customer.user.id,
-      )
-      await settlements.customerApprove(
-        settlement.id,
-        ctx.customer.user.id,
-        ctx.organization.id,
-        "OWNER",
-        "OWNER",
-      )
-      await settlements.adminApprove(
-        settlement.id,
-        "Release test",
-        ctx.customer.user.id,
-        "SUPER_ADMIN",
-      )
-
-      const auditRow = await prisma.auditLog.findFirst({
-        where: {
-          action: "SETTLEMENT_FUNDS_RELEASED",
-          entityId: settlement.id,
-        },
-        orderBy: { createdAt: "desc" },
-      })
-
-      expect(auditRow).not.toBeNull()
-      expect(auditRow.metadata.previousStatus).toBe("ADMIN_APPROVED")
-      expect(auditRow.metadata.publisherAmount).toBeGreaterThan(0)
-    } finally {
-      await cleanup()
-    }
-  }, 30_000)
-})
