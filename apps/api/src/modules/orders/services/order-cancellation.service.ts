@@ -27,7 +27,12 @@ import {
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { assertApiFinanceOperationAllowed } from "../../../common/finance-runtime-mode"
+import {
+  resolvePlatformFeePolicy,
+  splitPlatformFee,
+} from "../../../common/platform-fee"
 import { PrismaService } from "../../../common/prisma.service"
+import { resolvePublisherCompensationFee } from "../../../common/publisher-compensation-fee"
 import { AuditService } from "../../audit/audit.service"
 import { CommunicationsService } from "../../communications/communications.service"
 import { QueueService } from "../../queues/queue.service"
@@ -888,6 +893,7 @@ export class OrderCancellationService {
           `cancellation-request:${request.id}`,
           resolvedResponsibility,
           publisherCompensationIntent,
+          true,
         )
 
         if (request.status === "APPROVED") {
@@ -1293,7 +1299,11 @@ export class OrderCancellationService {
                   orderBy: { createdAt: "desc" },
                   take: 1,
                   select: {
+                    grossAmount: true,
                     publisherAmount: true,
+                    platformFee: true,
+                    platformFeeBps: true,
+                    feePolicyVersion: true,
                     currency: true,
                   },
                 },
@@ -1307,64 +1317,123 @@ export class OrderCancellationService {
         tx.orderCancellationRequest.count({ where }),
       ]),
     )
+    const needsCurrentFeePolicy =
+      canViewFinancials &&
+      items.some((request: any) => {
+        const activeSettlement = request.order.settlements?.[0]
+        return (
+          !activeSettlement &&
+          isPostPublicationPublisherOrder({
+            fulfillmentChannel: request.fulfillmentChannel,
+            websiteOwnershipType: request.order.website?.ownershipType,
+            effectiveOrderStatus: request.previousOrderStatus,
+            hasSettlement: false,
+          })
+        )
+      })
+    let currentFeePolicy: Awaited<
+      ReturnType<typeof resolvePlatformFeePolicy>
+    > | null = null
+    if (needsCurrentFeePolicy) {
+      try {
+        currentFeePolicy = await resolvePlatformFeePolicy(this.prisma)
+      } catch {
+        // Keep the read-only queue available but fail closed for a positive
+        // publisher compensation until a versioned policy is available.
+      }
+    }
     return {
-      items: items.map((request: any) => {
-        const { fraudFindings, ...requestWithoutFraudFindings } = request
-        const activeSettlement = request.order.settlements?.[0] ?? null
-        const required = isPostPublicationPublisherOrder({
-          fulfillmentChannel: request.fulfillmentChannel,
-          websiteOwnershipType: request.order.website?.ownershipType,
-          effectiveOrderStatus: request.previousOrderStatus,
-          hasSettlement: Boolean(activeSettlement),
-        })
-        const customer = request.order.customer
-        const order = {
-          // This is a role-scoped API contract. Never spread a Prisma Order
-          // record here: new scalar fields are otherwise silently exposed to
-          // Operations as the schema evolves.
-          id: request.order.id,
-          title: request.order.title,
-          status: request.order.status,
-          fulfillmentChannel: request.order.fulfillmentChannel,
-          website: request.order.website
-            ? {
-                id: request.order.website.id,
-                domain: request.order.website.domain,
-                publisherId: request.order.website.publisherId,
+      items: await Promise.all(
+        items.map(async (request: any) => {
+          const { fraudFindings, ...requestWithoutFraudFindings } = request
+          const activeSettlement = request.order.settlements?.[0] ?? null
+          const required = isPostPublicationPublisherOrder({
+            fulfillmentChannel: request.fulfillmentChannel,
+            websiteOwnershipType: request.order.website?.ownershipType,
+            effectiveOrderStatus: request.previousOrderStatus,
+            hasSettlement: Boolean(activeSettlement),
+          })
+          const customer = request.order.customer
+          let platformFeeAmount: string | null = null
+          let maximumCompensation = "0"
+          let feePolicyAvailable = false
+          let platformFeeBps: number | null = null
+          let feePolicyVersion: string | null = null
+          if (required) {
+            if (activeSettlement) {
+              try {
+                const allocation = await resolvePublisherCompensationFee(
+                  this.prisma,
+                  request.order.amount ?? 0,
+                  activeSettlement,
+                )
+                feePolicyAvailable = true
+                platformFeeAmount = allocation.amount.toFixed(2)
+                maximumCompensation = allocation.maximumCompensation.toFixed(2)
+                platformFeeBps = allocation.basisPoints
+                feePolicyVersion = allocation.policyVersion
+              } catch {
+                // Keep the read-only queue available, but do not expose an
+                // invalid settlement snapshot as an executable allocation.
               }
-            : null,
-          ...(canViewFinancials && {
-            amount: request.order.amount,
-            currency: request.order.currency,
-          }),
-          customer: customer
-            ? {
-                id: customer.id,
-                name: customer.name,
-                ...(canViewIdentity && { email: customer.email }),
-              }
-            : null,
-        }
-        return {
-          ...requestWithoutFraudFindings,
-          order,
-          requiresConfirmedFraudFullRefund: (fraudFindings?.length ?? 0) > 0,
-          ...(canViewFinancials && {
-            publisherCompensationPolicy: {
-              required,
-              maximumAmount: String(
-                required
-                  ? (activeSettlement?.publisherAmount ??
-                      request.order.amount ??
-                      0)
-                  : 0,
-              ),
-              currency: activeSettlement?.currency ?? request.order.currency,
-              effectiveOrderStatus: request.previousOrderStatus,
-            },
-          }),
-        }
-      }),
+            } else if (currentFeePolicy) {
+              const split = splitPlatformFee(
+                request.order.amount ?? 0,
+                currentFeePolicy.fraction,
+              )
+              platformFeeAmount = split.fee.toFixed(2)
+              maximumCompensation = split.net.toFixed(2)
+              feePolicyAvailable = true
+              platformFeeBps = currentFeePolicy.basisPoints
+              feePolicyVersion = currentFeePolicy.policyVersion
+            }
+          }
+          const order = {
+            // This is a role-scoped API contract. Never spread a Prisma Order
+            // record here: new scalar fields are otherwise silently exposed to
+            // Operations as the schema evolves.
+            id: request.order.id,
+            title: request.order.title,
+            status: request.order.status,
+            fulfillmentChannel: request.order.fulfillmentChannel,
+            website: request.order.website
+              ? {
+                  id: request.order.website.id,
+                  domain: request.order.website.domain,
+                  publisherId: request.order.website.publisherId,
+                }
+              : null,
+            ...(canViewFinancials && {
+              amount: request.order.amount,
+              currency: request.order.currency,
+            }),
+            customer: customer
+              ? {
+                  id: customer.id,
+                  name: customer.name,
+                  ...(canViewIdentity && { email: customer.email }),
+                }
+              : null,
+          }
+          return {
+            ...requestWithoutFraudFindings,
+            order,
+            requiresConfirmedFraudFullRefund: (fraudFindings?.length ?? 0) > 0,
+            ...(canViewFinancials && {
+              publisherCompensationPolicy: {
+                required,
+                maximumAmount: maximumCompensation,
+                platformFeeAmount,
+                platformFeeBps,
+                feePolicyVersion,
+                feePolicyAvailable,
+                currency: activeSettlement?.currency ?? request.order.currency,
+                effectiveOrderStatus: request.previousOrderStatus,
+              },
+            }),
+          }
+        }),
+      ),
       total,
       take,
       skip,

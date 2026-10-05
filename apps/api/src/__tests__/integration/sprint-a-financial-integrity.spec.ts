@@ -84,32 +84,49 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
       expect(order?.status).toBe("REFUNDED")
       expect(finalSettlement?.status).toBe("CANCELLED")
 
-      const [releaseCount, refundCount, compensationCount, balance, wallet] =
-        await Promise.all([
-          prisma.transaction.count({
-            where: { orderId: ctx.order.id, type: "SETTLEMENT_RELEASE" },
-          }),
-          prisma.transaction.count({
-            where: { orderId: ctx.order.id, type: "REFUND" },
-          }),
-          prisma.transaction.count({
-            where: { orderId: ctx.order.id, type: "PUBLISHER_COMPENSATION" },
-          }),
-          prisma.publisherBalance.findUniqueOrThrow({
-            where: { publisherId: ctx.publisher.publisher.id },
-          }),
-          prisma.wallet.findUniqueOrThrow({
-            where: { organizationId: ctx.organization.id },
-          }),
-        ])
+      const [
+        releaseCount,
+        refundCount,
+        compensationCount,
+        balance,
+        wallet,
+        compensation,
+        refund,
+      ] = await Promise.all([
+        prisma.transaction.count({
+          where: { orderId: ctx.order.id, type: "SETTLEMENT_RELEASE" },
+        }),
+        prisma.transaction.count({
+          where: { orderId: ctx.order.id, type: "REFUND" },
+        }),
+        prisma.transaction.count({
+          where: { orderId: ctx.order.id, type: "PUBLISHER_COMPENSATION" },
+        }),
+        prisma.publisherBalance.findUniqueOrThrow({
+          where: { publisherId: ctx.publisher.publisher.id },
+        }),
+        prisma.wallet.findUniqueOrThrow({
+          where: { organizationId: ctx.organization.id },
+        }),
+        prisma.publisherCompensation.findUniqueOrThrow({
+          where: { orderId: ctx.order.id },
+        }),
+        prisma.transaction.findFirstOrThrow({
+          where: { orderId: ctx.order.id, type: "REFUND" },
+        }),
+      ])
       expect(releaseCount).toBeLessThanOrEqual(1)
       expect(refundCount).toBe(1)
       expect(compensationCount).toBe(1)
       expect(Number(balance.withdrawableBalance)).toBe(80)
       expect(Number(balance.debtBalance)).toBe(0)
       expect(Number(balance.lifetimeEarnings)).toBe(80)
-      // The $80 publisher compensation is allocated from the $100 payment.
-      expect(Number(wallet.availableBalance)).toBe(20)
+      // The $100 gross allocation is $80 publisher compensation, $20 retained
+      // platform fee, and no customer refund.
+      expect(Number(compensation.amount)).toBe(80)
+      expect(Number(compensation.platformFeeAmount)).toBe(20)
+      expect(Number(refund.amount)).toBe(0)
+      expect(Number(wallet.availableBalance)).toBe(0)
     } finally {
       await cleanup()
     }

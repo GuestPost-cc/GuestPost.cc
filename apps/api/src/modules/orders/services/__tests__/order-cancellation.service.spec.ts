@@ -304,6 +304,7 @@ describe("OrderCancellationService", () => {
           "Platform-funded compensation for completed publisher delivery work.",
         effectiveOrderStatus: "PUBLISHED",
       },
+      true,
     )
   })
 
@@ -580,6 +581,7 @@ describe("OrderCancellationService", () => {
           "Publisher compensation reflects work represented by the active settlement.",
         effectiveOrderStatus: "ACCEPTED",
       },
+      true,
     )
     expect(prisma.orderCancellationRequest.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({

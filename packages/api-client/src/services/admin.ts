@@ -678,6 +678,10 @@ export interface AdminOrderDetailResponse {
   publisherCompensationPolicy?: {
     required: boolean
     maximumAmount: string
+    platformFeeAmount?: string | null
+    platformFeeBps?: number | null
+    feePolicyVersion?: string | null
+    feePolicyAvailable?: boolean
     currency: string
     effectiveOrderStatus: string
   }
@@ -803,6 +807,10 @@ export interface AdminCancellationRequestResponse
   publisherCompensationPolicy?: {
     required: boolean
     maximumAmount: string
+    platformFeeAmount?: string | null
+    platformFeeBps?: number | null
+    feePolicyVersion?: string | null
+    feePolicyAvailable?: boolean
     currency: string
     effectiveOrderStatus: string
   }

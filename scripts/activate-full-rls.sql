@@ -267,6 +267,30 @@ BEGIN
 END
 $activate$;
 
+-- The repair trigger functions are SECURITY INVOKER while the application
+-- schema is staged without forced RLS. Once all tables are FORCE RLS, their
+-- locked reads must execute as the dedicated NOLOGIN guard. Transfer ownership
+-- in this same transaction so no committed state combines forced RLS with an
+-- invoker-owned repair trigger. CREATE is needed only for ownership transfer.
+DO $financial_repair_guard_function_owners$
+BEGIN
+  GRANT CREATE ON SCHEMA public TO guestpost_financial_repair_guard;
+  ALTER FUNCTION public.guard_reconciliation_repair_proposal() SECURITY DEFINER;
+  ALTER FUNCTION public.guard_reconciliation_repair_proposal()
+    OWNER TO guestpost_financial_repair_guard;
+  ALTER FUNCTION public.guard_reconciliation_repair_approval() SECURITY DEFINER;
+  ALTER FUNCTION public.guard_reconciliation_repair_approval()
+    OWNER TO guestpost_financial_repair_guard;
+  ALTER FUNCTION public.guard_refund_credit_reversal() SECURITY DEFINER;
+  ALTER FUNCTION public.guard_refund_credit_reversal()
+    OWNER TO guestpost_financial_repair_guard;
+  ALTER FUNCTION public.guard_reconciliation_repair_execution() SECURITY DEFINER;
+  ALTER FUNCTION public.guard_reconciliation_repair_execution()
+    OWNER TO guestpost_financial_repair_guard;
+  REVOKE CREATE ON SCHEMA public FROM guestpost_financial_repair_guard;
+END
+$financial_repair_guard_function_owners$;
+
 -- Recheck inside the same transaction. Any mismatch rolls back function
 -- ownership, grants, and every ENABLE/FORCE change together.
 DO $postflight$

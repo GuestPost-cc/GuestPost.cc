@@ -47,6 +47,7 @@ import * as Sentry from "@sentry/node"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { normalizeDomain } from "../../common/domain"
 import { PrismaService } from "../../common/prisma.service"
+import { resolvePublisherCompensationFee } from "../../common/publisher-compensation-fee"
 import {
   hasCompleteListingPolicy,
   isMarketplaceLanguage,
@@ -2198,6 +2199,32 @@ export class AdminService {
       effectiveOrderStatus: effectiveRefundStatus,
       hasSettlement: Boolean(activeSettlement),
     })
+    let compensationFeePolicy = {
+      available: false,
+      amount: null as string | null,
+      maximumCompensation: "0",
+      basisPoints: null as number | null,
+      policyVersion: null as string | null,
+    }
+    if (canViewFinancials && publisherCompensationRequired) {
+      try {
+        const fee = await resolvePublisherCompensationFee(
+          this.prisma,
+          order.amount ?? 0,
+          activeSettlement,
+        )
+        compensationFeePolicy = {
+          available: true,
+          amount: fee.amount.toFixed(2),
+          maximumCompensation: fee.maximumCompensation.toFixed(2),
+          basisPoints: fee.basisPoints,
+          policyVersion: fee.policyVersion,
+        }
+      } catch {
+        // Keep order review available; positive compensation fails closed in
+        // the refund service until exact fee evidence can be established.
+      }
+    }
 
     return {
       id: order.id,
@@ -2223,9 +2250,11 @@ export class AdminService {
       ...(canViewFinancials && {
         publisherCompensationPolicy: {
           required: publisherCompensationRequired,
-          maximumAmount: publisherCompensationRequired
-            ? String(activeSettlement?.publisherAmount ?? order.amount ?? 0)
-            : "0",
+          maximumAmount: compensationFeePolicy.maximumCompensation,
+          platformFeeAmount: compensationFeePolicy.amount,
+          platformFeeBps: compensationFeePolicy.basisPoints,
+          feePolicyVersion: compensationFeePolicy.policyVersion,
+          feePolicyAvailable: compensationFeePolicy.available,
           currency: activeSettlement?.currency ?? order.currency,
           effectiveOrderStatus: effectiveRefundStatus,
         },

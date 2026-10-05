@@ -202,7 +202,7 @@ function CancellationsPageInner() {
           !isExactMoneyAtMost(exactCompensation, policy.maximumAmount))
       ) {
         throw new Error(
-          "Enter an exact publisher compensation amount within the allowed maximum.",
+          "An exact publisher compensation amount within the verified allowed maximum is required.",
         )
       }
       return api.admin.financeApproveCancellation(target.id, {
@@ -546,8 +546,10 @@ function CancellationsPageInner() {
                   Publisher compensation decision required
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Enter the exact gross compensation approved for completed
-                  publication work. Zero is allowed only as an explicit reviewed
+                  Enter the exact amount payable to the publisher after the
+                  platform fee. The fee is retained from the order gross using
+                  the policy snapshot shown below; the customer refund is the
+                  remaining amount. Zero is allowed only as an explicit reviewed
                   decision.
                 </p>
               </div>
@@ -572,11 +574,24 @@ function CancellationsPageInner() {
                   id="cancellation-compensation-help"
                   className="text-xs text-muted-foreground"
                 >
-                  Maximum: {target.publisherCompensationPolicy.maximumAmount}{" "}
-                  {target.publisherCompensationPolicy.currency}. Existing
-                  publisher debt may be repaid from this gross amount first; the
-                  order page records both debt applied and the net balance
-                  credit after the transaction commits.
+                  {target.publisherCompensationPolicy.feePolicyAvailable ? (
+                    <>
+                      Platform fee retained:{" "}
+                      {target.publisherCompensationPolicy.platformFeeAmount}{" "}
+                      {target.publisherCompensationPolicy.currency} (
+                      {target.publisherCompensationPolicy.platformFeeBps != null
+                        ? `${(target.publisherCompensationPolicy.platformFeeBps / 100).toFixed(2)}%`
+                        : "settlement snapshot"}
+                      ). Maximum publisher amount:{" "}
+                      {target.publisherCompensationPolicy.maximumAmount}{" "}
+                      {target.publisherCompensationPolicy.currency}. The
+                      customer receives gross minus this fee and the publisher
+                      amount. Existing publisher debt is netted only from the
+                      publisher share.
+                    </>
+                  ) : (
+                    "No valid versioned fee policy is available, so positive compensation is blocked. A zero-compensation decision remains available when no publisher amount is payable."
+                  )}
                 </p>
               </div>
             </div>

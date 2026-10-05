@@ -297,6 +297,24 @@ An external customer return must ordinarily return funds to eligible original
 funding sources. A generic transfer to an arbitrary destination is not a card
 refund and is not authorized by the wallet balance alone.
 
+An approved internal refund-credit repair is a debit of the customer's
+currently available USD wallet balance for exactly the original erroneous
+credit. Wallet balances are fungible: earlier debits do not independently
+block recovery when current available funds cover the exact reversal. Reserved
+funds never count. Proposal and execution re-read the balance while holding
+the Order and Wallet locks; a shortfall, active dispute exposure, or ambiguous
+provider evidence blocks the repair without creating debt or a negative
+balance.
+
+For a Finance/admin cancellation after publisher work has become compensable,
+the order gross is allocated exactly once: customer wallet refund + publisher
+compensation + retained platform fee = captured order gross. An active
+settlement's immutable fee snapshot is authoritative; without one, the Finance
+decision snapshots the current versioned platform-fee policy. The publisher
+compensation input is the publisher's net share after the fee, and any existing
+publisher debt is netted from that share only. Missing or ambiguous fee evidence
+blocks a positive compensation decision rather than silently waiving the fee.
+
 ## 7. Customer deposits
 
 A wallet credit requires all of:
