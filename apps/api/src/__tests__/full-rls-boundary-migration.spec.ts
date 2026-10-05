@@ -178,11 +178,13 @@ describe("full application RLS boundary migration", () => {
     )
     expect(proposalGuard).not.toContain("'RESERVATION'")
     expect(repairBalanceMigration).toContain(
-      "SECURITY DEFINER is used only when forced RLS requires the dedicated guard",
+      "SECURITY DEFINER is used only when forced RLS",
     )
-    expect(repairBalanceMigration).toContain(
-      "OWNER TO guestpost_financial_repair_guard",
-    )
+    expect(
+      repairBalanceMigration.match(
+        /OWNER TO guestpost_financial_repair_guard/g,
+      ),
+    ).toHaveLength(4)
   })
 
   it("conserves cancellation gross across refund, publisher compensation, and snapshotted platform fee", () => {
