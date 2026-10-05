@@ -1,50 +1,78 @@
 # Coolify staging deployment
 
-This runbook deploys the current GitHub `main` application to a domain selected
-through Coolify variables, using Coolify, a new empty Neon project, internal
-Redis, and the existing Cloudflare R2 integration. Do not treat a successful
-image build as a database or financial release.
+This runbook deploys each independently scaled GuestPost service as its own
+Coolify resource, using a new empty Neon project, private Redis, and Cloudflare
+R2. Do not treat a successful image build as a database or financial release.
 
 ## Coolify source
 
-Create a Docker Compose resource in the existing Coolify project:
+Create separate GitHub App application resources in the existing Coolify
+project and `staging` environment. Select the repository-restricted Coolify
+GitHub App, repository `GuestPost-cc/GuestPost.cc`, and deployment branch
+`codex/coolify-staging-rebuild` until the branch is merged. Use the repository
+root as the base directory/build context for each Dockerfile resource. The
+checked-in `infrastructure/coolify/compose.yaml` remains available for local
+integration and single-resource previews; it is not the staging resource
+layout.
 
-- Repository: this GitHub repository.
-- Branch: `main` after this deployment change is merged; use the deployment
-  branch only for a temporary preview.
-- Base directory: `/` (repository root).
-- Compose file: `infrastructure/coolify/compose.yaml`.
-- Set the required variables from the sections below in Coolify before the
-  first build. Do not commit a `.env` file or paste secrets into build args.
+| Coolify resource | Dockerfile | Build-time configuration | Runtime configuration | Route/port |
+|---|---|---|---|---|
+| `guestpost-staging-redis` | Coolify Redis database resource | `redis:7.2`; persistent `/data` volume; private access | Generated password; copy Coolify's internal Redis URL into app resources; keep on the shared Coolify network | No public route |
+| `guestpost-staging-api` | `apps/api/Dockerfile` | Root context | API runtime DB URL, auth DB URL, Redis URL, auth/queue secrets, issuer identity, R2 settings, domain-derived CORS/auth settings and locked finance flags | `api.${APP_DOMAIN}` → 4000 |
+| `guestpost-staging-website` | `infrastructure/coolify/Dockerfile.web` | `APP_NAME=website` plus all five public URL build args | `PORT=3000`, `NODE_ENV=production` | `${APP_DOMAIN}` → 3000 |
+| `guestpost-staging-portal` | `infrastructure/coolify/Dockerfile.web` | `APP_NAME=portal` plus all five public URL build args | `PORT=3000`, `NODE_ENV=production` | `app.${APP_DOMAIN}` → 3000 |
+| `guestpost-staging-publisher` | `infrastructure/coolify/Dockerfile.web` | `APP_NAME=publisher` plus all five public URL build args | `PORT=3000`, `NODE_ENV=production` | `publisher.${APP_DOMAIN}` → 3000 |
+| `guestpost-staging-admin` | `infrastructure/coolify/Dockerfile.web` | `APP_NAME=admin` plus all five public URL build args | `PORT=3000`, `NODE_ENV=production` | `admin.${APP_DOMAIN}` → 3000 |
+| `guestpost-staging-worker-realtime` | `apps/worker/Dockerfile` | Root context | Worker DB URL, Redis URL, queue signing secret, issuer identity, R2 settings and locked finance flags; `WORKER_MODE=realtime` | No public route; health port 3004 |
+| `guestpost-staging-worker-jobs` | `apps/worker/Dockerfile` | Root context | Same restricted worker runtime variables; override command to `sh -c 'while :; do sleep 3600; done'` | No public route; Coolify scheduled tasks run here |
+
+For each application, select GitHub App source deployment and configure the
+Dockerfile path shown above. Set `APP_DOMAIN=shohan.iam.bd`; derive public
+build args as `https://api.${APP_DOMAIN}`, `https://${APP_DOMAIN}`,
+`https://app.${APP_DOMAIN}`, `https://publisher.${APP_DOMAIN}`, and
+`https://admin.${APP_DOMAIN}`. Mark credentials as secrets. Give every resource
+the same Coolify destination/server so they share the private `coolify`
+network; use the Redis resource's generated internal URL, never a public Redis
+port. Configure each frontend's API URL as a build-time argument because
+Next.js embeds `NEXT_PUBLIC_*` values in the browser bundle.
+
+Deploy Redis first, then the API and realtime worker, then the four frontends.
+Keep `worker-jobs` idle until its schedules and restricted Stripe test key are
+ready. The existing Compose resource is stopped; leave its unsaved form alone
+and do not start it alongside these independent resources.
+
+- Keep staging on the selected `codex/coolify-staging-rebuild` deployment
+  branch until its changes are merged. Do not commit a `.env` file or pass
+  secrets as build args.
 - The host already runs Caddy on public ports 80/443. Coolify's Traefik proxy
   binds only to `127.0.0.1:18080`; host Caddy forwards each configured app
   hostname there. Keep those host bindings; do not claim public ports 80/443
   with Coolify or publish application ports publicly.
-- Set `APP_DOMAIN` to the selected root domain. Compose derives the API,
-  website, portal, publisher, and admin URLs, trusted origins, CORS origins,
-  and auth cookie domain from it. For current staging, set
+- Set `APP_DOMAIN` to the selected root domain. Derive the API, website,
+  portal, publisher, and admin URLs, trusted origins, CORS origins, and auth
+  cookie domain from it. For current staging, set
   `APP_DOMAIN=shohan.iam.bd`.
-- In the Coolify Compose resource, assign these **HTTP** hostnames derived
-  from `APP_DOMAIN` so Traefik routes on its private HTTP entry point:
-  `api.${APP_DOMAIN}` → `api:4000`, `${APP_DOMAIN}` → `website:3000`,
-  `app.${APP_DOMAIN}` → `portal:3000`,
-  `publisher.${APP_DOMAIN}` → `publisher:3000`, and
-  `admin.${APP_DOMAIN}` → `admin:3000`. Host Caddy terminates public HTTPS
+- Assign these **HTTP** hostnames to the corresponding independently deployed
+  application resources and their listening ports so Traefik routes through
+  its private HTTP entry point: `api.${APP_DOMAIN}` → API port 4000,
+  `${APP_DOMAIN}` → website port 3000, `app.${APP_DOMAIN}` → portal port
+  3000, `publisher.${APP_DOMAIN}` → publisher port 3000, and
+  `admin.${APP_DOMAIN}` → admin port 3000. Host Caddy terminates public HTTPS
   and proxies each hostname to Traefik on loopback port 18080.
 - Point DNS for all five names at the Coolify server and configure matching
   Caddy host blocks. Confirm HTTPS certificates are ready before allowing
-  sign-in. The app domain is not hardcoded in Compose; domain-specific DNS and
-  reverse-proxy host blocks remain infrastructure configuration.
+  sign-in. The app domain is supplied through Coolify build/runtime
+  configuration; DNS and Caddy host blocks remain infrastructure settings.
 - The future domain is `guestpost.mvp.bd`. When its DNS is ready, add its five
   Caddy host blocks, update the five Coolify hostnames, then change only
   `APP_DOMAIN` to `guestpost.mvp.bd` and redeploy. Do not serve both unrelated
   root domains as one authenticated deployment: the shared auth cookie is
   scoped to one root domain at a time.
 
-The Compose stack includes Redis with persistence, four web apps, the API, one
-realtime worker, and an idle `worker-jobs` service for Coolify scheduled tasks.
-Neon and Cloudflare R2 remain managed services; the API and workers have no
-database migration command in their startup paths.
+The independent resources are Redis with persistence, four web apps, the API,
+one realtime worker, and an idle `worker-jobs` service for Coolify scheduled
+tasks. Neon and Cloudflare R2 remain managed services; the API and workers
+have no database migration command in their startup paths.
 
 ## New Neon project and database
 
@@ -82,9 +110,9 @@ Use the staged sequence in `docs/RLS_ROLLOUT.md`:
 2. Verify the role topology and each connection's effective identity and
    grants before starting the API or workers.
 3. Configure `API_DATABASE_URL`, `AUTH_DATABASE_URL`, and
-   `WORKER_DATABASE_URL` with their distinct identities. The Compose stack sets
-   `RLS_ENFORCEMENT_ENABLED=true`; deploy only after context-aware runtime
-   access and inert-policy canaries have passed.
+   `WORKER_DATABASE_URL` with their distinct identities. Set
+   `RLS_ENFORCEMENT_ENABLED=true` on API and worker resources; deploy only
+   after context-aware runtime access and inert-policy canaries have passed.
 4. Activate full RLS in its own reviewed transaction after signup, session,
    tenant, publisher, staff, and worker canaries pass. Do not combine
    activation with migration or service startup.
@@ -94,16 +122,17 @@ direct, non-pooled endpoint for migrations and ownership/role operations.
 
 ## Coolify variables
 
-Set these as Coolify runtime variables. Mark secrets as secret. Coolify expands
-the same names during Compose interpolation and build arguments.
+Set the required variables on each relevant Coolify resource. Mark credentials
+as secret. `NEXT_PUBLIC_*` URLs belong in the frontend build arguments; the
+same derived URLs belong in the API runtime variables where indicated.
 
 | Variable | Use |
 |---|---|
-| `APP_DOMAIN` | Root domain for all public app URLs and auth/CORS allowlists; current staging value: `shohan.iam.bd`; future cutover value: `guestpost.mvp.bd` |
+| `APP_DOMAIN` | Root domain used to derive public app URLs and auth/CORS allowlists; current staging value: `shohan.iam.bd`; future cutover value: `guestpost.mvp.bd` |
 | `API_DATABASE_URL` | Neon API runtime identity |
 | `AUTH_DATABASE_URL` | Neon Better Auth identity |
 | `WORKER_DATABASE_URL` | Neon worker identity |
-| `REDIS_PASSWORD` | Random URL-safe password, generated for this staging stack |
+| `REDIS_PASSWORD` | URL-safe password generated and retained by the private Coolify Redis resource |
 | `BETTER_AUTH_SECRET` | Random secret, at least 32 characters |
 | `QUEUE_SIGNING_SECRET` | Separate random secret; do not reuse Better Auth secret |
 | `INVOICE_ISSUER_LEGAL_NAME`, `INVOICE_ISSUER_ADDRESS_LINE_1`, `INVOICE_ISSUER_CITY`, `INVOICE_ISSUER_POSTAL_CODE`, `INVOICE_ISSUER_COUNTRY_CODE`, `INVOICE_SUPPORT_EMAIL` | Reviewed staging issuer identity required at API and worker startup |
@@ -118,7 +147,7 @@ OAuth credentials and sender secrets only when those staging flows are ready.
 ## Worker schedules
 
 After the database and worker identity are ready, add Coolify scheduled tasks on
-the `worker-jobs` container:
+the `guestpost-staging-worker-jobs` resource:
 
 | Command | Cron (UTC) | Timeout |
 |---|---:|---:|

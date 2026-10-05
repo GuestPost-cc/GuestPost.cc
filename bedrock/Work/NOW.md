@@ -18,13 +18,17 @@ The deployment config keeps finance locked and all payout/deposit/Connect/live
 Stripe and financial repair gates off. The Compose file derives all public
 URLs and origin allowlists from the required `APP_DOMAIN`; current staging is
 `shohan.iam.bd`, with `guestpost.mvp.bd` reserved for a later DNS and proxy
-cutover. The Coolify environment is named `staging`; the `guestpost-staging`
-Compose resource uses the repository-restricted GitHub App and branch
-`codex/coolify-staging-rebuild`. Production and preview APP_DOMAIN variables
-are set to `shohan.iam.bd`, and five HTTP service routes are configured. DNS
-checks remain pending. The resource is stopped and has not been deployed. The
-Coolify Traefik proxy is healthy on loopback port 18080 behind host Caddy,
-which retains public ports 80/443.
+cutover. The Coolify environment is named `staging`; the prior
+`guestpost-staging` Compose resource uses the repository-restricted GitHub App
+and branch `codex/coolify-staging-rebuild`. The user clarified they want
+independently managed website, portal, publisher, admin, API, realtime worker,
+scheduled-job worker, and Redis resources. The runbook now documents these
+resources; the Compose file remains for local integration and previews. A
+private persistent Coolify Redis resource `guestpost-staging-redis` has been
+created and started. The prior Compose resource remains stopped with its form
+unsaved; do not save/reset or start it. The Coolify Traefik proxy is healthy on
+loopback port 18080 behind host Caddy, which retains public ports 80/443. DNS
+checks remain pending.
 
 Database provisioning is complete. All 100 checked-in Prisma migrations are
 applied under `guestpost_schema_owner`; the temporary Neon migration login and
@@ -36,10 +40,12 @@ edges beside the seven reviewed application edges; they have `INHERIT FALSE`
 and `SET FALSE` and are not used by app connections. Full RLS remains
 unactivated because its activation
 preflight currently expects no provider-managed owner edges; review that guard
-before any activation. The Compose resource remains stopped. Next: configure
-the staging R2 bucket/readiness object and reviewed invoice issuer identity,
-then provision separately approved runtime credentials. Confirm DNS and host
-Caddy routing before starting services. Enable worker schedules only after
+before any activation. Next: configure the staging R2 bucket/readiness object
+and reviewed invoice issuer identity, then provision runtime credentials and
+run actual login canaries. These values are still missing. Deploy the
+independent application resources from the deployment branch after required
+credentials are stored in Coolify. Confirm DNS and host Caddy routing before
+exposing the applications. Enable worker schedules only after
 the restricted Stripe test key is present. Keep full RLS activation separate
 until its role, canary, and atomic activation sequence in
 `docs/RLS_ROLLOUT.md` passes.
