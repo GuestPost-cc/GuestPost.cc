@@ -102,7 +102,16 @@ BEGIN
   cancellation_reference := refund_found
     AND refund_row."reference" IS NOT NULL
     AND left(refund_row."reference", length('cancellation-request:'))
-      = 'cancellation-request:';
+      = 'cancellation-request:'
+    AND EXISTS (
+      SELECT 1
+      FROM public."OrderCancellationRequest" cancellation
+      WHERE cancellation."id" = substring(
+        refund_row."reference" FROM length('cancellation-request:') + 1
+      )
+        AND cancellation."orderId" = NEW."orderId"
+        AND cancellation."status"::TEXT = 'PENDING_FINANCE'
+    );
   offset_reference := force_cancel_reference OR cancellation_reference;
 
   -- Preserve the historical publisher-allocation cap for refund paths that do
