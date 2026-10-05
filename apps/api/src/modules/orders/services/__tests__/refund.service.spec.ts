@@ -762,7 +762,7 @@ describe("RefundService", () => {
     })
 
     expect(prismaMock.settlement.updateMany).toHaveBeenCalledWith({
-      where: { id: "set-1", version: 0 },
+      where: { id: "set-1", status: "PENDING", version: 0 },
       data: { status: "CANCELLED", version: { increment: 1 } },
     })
     expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
