@@ -822,34 +822,46 @@ verified webhook is quarantined and alerts Finance/Super Admin.
 
 The finance migrations install database triggers that reject legacy dispute
 writers, protect payout evidence and state transitions, make provider inbox
-envelopes append-only, and retire customer-wallet cash-out writes. A
+envelopes append-only, retire customer-wallet cash-out writes, guard funded
+reconciliation repairs, and require a fee snapshot for new publisher
+compensation offsets. In particular, the current-balance and publisher-fee
+migrations are intentionally incompatible with old financial writers. A
 mixed-version deployment is unsupported.
 
 1. Set `STRIPE_DEPOSITS_ENABLED=false` to stop new Checkout sessions while
-   leaving the signed webhook endpoint and Stripe credentials available. Set
-   `FINANCE_RUNTIME_MODE=recovery_only`.
-2. Drain and stop every old API and worker instance. Do not acknowledge
-   dispute or checkout-success redeliveries with the old code during cutover.
-3. Back up the database, then run one `prisma migrate deploy`. Prisma must apply
-   the finance migrations in this canonical order:
-   - `20260729085000_payment_provider_event_quarantine` (the separate enum
-     commit boundary);
+   leaving signed webhook endpoints and provider credentials available. Set
+   `FINANCE_RUNTIME_MODE=recovery_only` and freeze other finance mutations.
+2. Pause automatic rollout. Drain and stop every old API and worker instance;
+   verify no old process can accept financial writes. Do not acknowledge
+   dispute or checkout-success redeliveries with old code during cutover.
+3. Back up the database, then run one `prisma migrate deploy`. Prisma must
+   apply finance migrations in canonical timestamp order, including:
+   - `20260729085000_payment_provider_event_quarantine` (separate enum commit);
    - `20260729090000_payment_dispute_cases`;
-   - `20260729095000_payout_webhook_event_quarantine` (the separate payout
-     inbox enum commit boundary);
+   - `20260729095000_payout_webhook_event_quarantine` (separate enum commit);
    - `20260729100000_payout_completion_evidence`;
    - `20260729110000_retire_customer_wallet_cash_out`;
-   - `20260729120000_provision_finance_aggregates` (backfills only
-     history-free missing publisher balances and organization wallets; aborts
-     if financial history exists without its publisher or organization
-     aggregate).
-   Do not cherry-pick, reorder, or manually mark any of them applied.
-4. Start only the new API and worker image. Confirm the five-minute
-   `payment-dispute-inbox` and `deposit-credit-recovery` maintenance tasks are
-   registered and the hourly reconciliation sweep is healthy.
+   - `20260729120000_provision_finance_aggregates` (history-free aggregate
+     backfills only; aborts when financial history lacks its aggregate);
+   - `20261005120000_reconciliation_repair_current_balance_guard`;
+   - `20261005130000_publisher_compensation_platform_fee`.
+   Do not cherry-pick, reorder, or manually mark migrations applied. If
+   migration fails, keep old services stopped and finance writes frozen;
+   resolve the cause and retry only after verifying the transaction rolled
+   back cleanly.
+4. Deploy the matching API, worker, and Admin UI release. Start only the new
+   API and worker images; verify every old instance is stopped before restoring
+   traffic. Confirm the dispute/deposit maintenance tasks and reconciliation
+   sweep are healthy, and keep finance mutations gated until smoke checks pass.
 5. Redeliver sandbox checkout/dispute events. Run
    `docs/FINANCIAL_INCIDENT_QUERIES.md` and require zero unexplained inbox,
    case, ledger, or deposit-status findings before re-enabling new deposits.
+
+After these guards are installed, the previous application image is not a valid
+rollback target: its compensation writer omits the fee-policy snapshot and its
+repair paths do not enforce the new funded-balance contract. Freeze affected
+finance writes and forward-fix or redeploy the matching release; do not remove
+the guards or rewrite financial evidence to make an old binary work.
 
 ### Required populated-data migration rehearsal
 
