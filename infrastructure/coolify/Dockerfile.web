@@ -1,0 +1,41 @@
+# Build one of the four Next.js applications from the monorepo root.
+FROM node:22-alpine AS builder
+RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
+WORKDIR /repo
+ENV NODE_OPTIONS=--max-old-space-size=2048 \
+    PNPM_VERIFY_DEPS_BEFORE_RUN=false \
+    NEXT_TELEMETRY_DISABLED=1
+
+COPY . .
+ARG APP_NAME
+RUN test -n "$APP_NAME" \
+ && pnpm install --frozen-lockfile --filter "@guestpost/${APP_NAME}..."
+
+ARG DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WEBSITE_URL
+ARG NEXT_PUBLIC_PORTAL_URL
+ARG NEXT_PUBLIC_PUBLISHER_URL
+ARG NEXT_PUBLIC_ADMIN_URL
+ARG NEXT_PUBLIC_SENTRY_DSN
+ENV DATABASE_URL=$DATABASE_URL \
+    NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_WEBSITE_URL=$NEXT_PUBLIC_WEBSITE_URL \
+    NEXT_PUBLIC_PORTAL_URL=$NEXT_PUBLIC_PORTAL_URL \
+    NEXT_PUBLIC_PUBLISHER_URL=$NEXT_PUBLIC_PUBLISHER_URL \
+    NEXT_PUBLIC_ADMIN_URL=$NEXT_PUBLIC_ADMIN_URL \
+    NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+
+RUN test -n "$APP_NAME" \
+ && pnpm --filter "@guestpost/${APP_NAME}..." build
+
+FROM node:22-alpine
+RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
+WORKDIR /repo
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+COPY --chown=node:node --from=builder /repo /repo
+ARG APP_NAME
+ENV APP_NAME=$APP_NAME
+EXPOSE 3000
+USER node
+CMD ["sh", "-c", "cd \"/repo/apps/$APP_NAME\" && ../../node_modules/.bin/next start --hostname 0.0.0.0 --port ${PORT:-3000}"]

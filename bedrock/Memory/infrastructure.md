@@ -7,15 +7,36 @@ updated: 2026-08-15
 
 # Infrastructure
 
+## Coolify staging rebuild (2026-10-05)
+
+The staging target is being rebuilt on Coolify with a new, empty Neon project.
+`infrastructure/coolify/compose.yaml` defines the API, four Next.js frontends,
+internal persistent Redis, the realtime worker, and an idle worker container for
+Coolify scheduled commands; `infrastructure/coolify/Dockerfile.web` builds each
+frontend from the monorepo root. The existing `render.yml` and Northflank worker
+contract remain the prior deployment record until this Coolify stack is
+promoted. See `docs/COOLIFY_STAGING_RUNBOOK.md` for the new release sequence.
+
+The new Neon project `guestpost-staging` is on the Free plan in Singapore,
+PostgreSQL 17, with an empty `guestpost` database. Its project ID is
+`calm-waterfall-71932352`. The app manifest intentionally keeps finance locked,
+disables payout/deposit/Connect/live Stripe and repair gates, and requires
+separate API, Better Auth, worker, and migration database identities. RLS must
+be provisioned and canaried by the documented staged process before runtime
+startup/activation. Remaining setup includes runtime role credentials,
+Coolify Compose resource and domains/DNS, staging R2 readiness, reviewed
+invoice issuer identity, and restricted Stripe test access before scheduled
+worker jobs run.
+
 ## Hosting model (2026-06-14)
 
 Currently **laptop-only** for development. A 2GB VPS attempt at `103.42.5.163` (Ubuntu 24.04, BDIX-class provider) was provisioned + bootstrapped + populated with the full stack on 2026-06-14, then deleted same day — Next dev mode + nest --watch + tsx --watch + Docker (postgres/redis/mailpit) exceeded RAM and the first compiled request hung. The repo was scrubbed of VPS artifacts (`infrastructure/vps/`, `infrastructure/caddy/`, `infrastructure/docker/docker-compose.staging.yml`, per-app Dockerfiles, `scripts/vps-sync.sh`, `.env.vps.example`, README VPS section, plan-file Part 2 — all gone).
 
 Shared dev/testing host is an **open question** (see `bedrock/Work/open-questions.md`): bigger VPS, cloud sandbox (Railway/Fly/Render), or production-build (`next build` once + `next start`) instead of dev mode to cut RAM. The image-based staging path was NOT tried — would be significantly cheaper at runtime.
 
-## Render staging and Northflank worker
+## Legacy Render staging and Northflank worker
 
-`render.yml` defines the active Render staging topology for `guestpost.pro.bd`: one NestJS API and four Next.js web services in the Singapore region, all built from the monorepo root. The worker is intentionally not deployed on Render while the workspace is on free-tier testing; run it locally for queue processing.
+`render.yml` records the previous Render staging topology for `guestpost.pro.bd`: one NestJS API and four Next.js web services in the Singapore region, all built from the monorepo root. The active deployment target is being rebuilt on Coolify as described above; keep this section as historical operational context until any remaining Render service or webhook is explicitly retired. The worker was intentionally not deployed on Render while the workspace was on free-tier testing.
 
 The staging worker is deployed separately on Northflank as `guestpost-worker`
 from the repository's `main` branch. It shares the Render API's staging

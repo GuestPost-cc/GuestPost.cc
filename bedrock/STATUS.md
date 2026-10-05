@@ -7,8 +7,8 @@ real_knowledge_path: /Users/shohan/Desktop/GuestPost/GuestPost.cc/bedrock
 local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
-last_backfill_import: 2026-10-01
-last_project_sync: 2026-09-30T23:08:06Z
+last_backfill_import: 2026-10-05
+last_project_sync: 2026-10-05T05:18:02Z
 last_compaction: 2026-06-11
 last_validation: 2026-08-14T23:11:24Z
 last_validation_result: ok
@@ -29,8 +29,8 @@ last_doctor_result: ok
 ## Activity
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
-- Last backfill/import: `2026-10-01`
-- Last project sync: `2026-09-30T23:08:06Z`
+- Last backfill/import: `2026-10-05`
+- Last project sync: `2026-10-05T05:18:02Z`
 - Last compaction: `2026-06-11`
 - Last validation: `2026-08-14T23:11:24Z` (`ok`)
 - Last doctor: `2026-08-14T23:11:24Z` (`ok`)

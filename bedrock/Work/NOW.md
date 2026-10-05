@@ -6,6 +6,24 @@ updated: 2026-10-05
 
 # Current focus
 
+## Coolify and Neon staging rebuild
+
+The user chose a fresh staging redeploy on Coolify + Neon and confirmed the old
+Neon project was deleted, so do not restore or expect prior data. The current
+GitHub `main` base is `418550dc`; local branch `codex/coolify-staging-rebuild`
+has a Coolify Compose definition, shared Next.js Dockerfile, and staging
+runbook in progress. A new empty Neon project `guestpost-staging` is created
+on the Free plan in Singapore with PostgreSQL 17 (`calm-waterfall-71932352`).
+The deployment config keeps finance locked and all payout/deposit/Connect/live
+Stripe and financial repair gates off.
+
+Next: complete review of Compose and runbook, commit the deployment files, then
+provision the dedicated database role topology/migrations, set Coolify secrets,
+configure staging R2 readiness and issuer identity, map the existing
+`guestpost.pro.bd` hosts, and enable worker schedules after the restricted
+Stripe test key is present. Do not activate full RLS until its role, canary,
+and atomic activation sequence in `docs/RLS_ROLLOUT.md` is complete.
+
 ## Reconciliation repair proposal guard follow-up
 
 The API preview and locked repair service use current unreserved wallet
