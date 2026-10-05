@@ -157,8 +157,10 @@ BEGIN
 END
 $function$;
 
--- Keep the same least-privilege owner contract as the original trigger:
--- SECURITY DEFINER is used only when forced RLS requires the dedicated guard.
+-- Reassert the complete least-privilege owner contract for every financial
+-- repair row-lock trigger. SECURITY DEFINER is used only when forced RLS
+-- requires the dedicated guard role. CREATE is granted only for the ownership
+-- transfer and revoked before this transaction commits.
 DO $repair_guard_owner$
 BEGIN
   IF EXISTS (
@@ -172,9 +174,21 @@ BEGIN
     ALTER FUNCTION public.guard_reconciliation_repair_proposal() SECURITY DEFINER;
     ALTER FUNCTION public.guard_reconciliation_repair_proposal()
       OWNER TO guestpost_financial_repair_guard;
+    ALTER FUNCTION public.guard_reconciliation_repair_approval() SECURITY DEFINER;
+    ALTER FUNCTION public.guard_reconciliation_repair_approval()
+      OWNER TO guestpost_financial_repair_guard;
+    ALTER FUNCTION public.guard_refund_credit_reversal() SECURITY DEFINER;
+    ALTER FUNCTION public.guard_refund_credit_reversal()
+      OWNER TO guestpost_financial_repair_guard;
+    ALTER FUNCTION public.guard_reconciliation_repair_execution() SECURITY DEFINER;
+    ALTER FUNCTION public.guard_reconciliation_repair_execution()
+      OWNER TO guestpost_financial_repair_guard;
     REVOKE CREATE ON SCHEMA public FROM guestpost_financial_repair_guard;
   ELSE
     ALTER FUNCTION public.guard_reconciliation_repair_proposal() SECURITY INVOKER;
+    ALTER FUNCTION public.guard_reconciliation_repair_approval() SECURITY INVOKER;
+    ALTER FUNCTION public.guard_refund_credit_reversal() SECURITY INVOKER;
+    ALTER FUNCTION public.guard_reconciliation_repair_execution() SECURITY INVOKER;
   END IF;
 END
 $repair_guard_owner$;
