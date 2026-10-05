@@ -11,6 +11,8 @@ ALTER TABLE public."PublisherCompensation"
   ADD CONSTRAINT "PublisherCompensation_platformFeePolicy_check" CHECK (
     ("platformFeeBps" IS NULL AND "platformFeePolicyVersion" IS NULL)
     OR (
+      "platformFeeBps" IS NOT NULL
+      AND
       "platformFeeBps" BETWEEN 0 AND 10000
       AND "platformFeePolicyVersion" IS NOT NULL
       AND LENGTH(BTRIM("platformFeePolicyVersion")) BETWEEN 1 AND 128
@@ -51,7 +53,6 @@ BEGIN
     order_value."fulfillmentChannel"::TEXT AS fulfillment_channel,
     website."ownershipType"::TEXT AS ownership_type,
     COALESCE(settlement."publisherId", website."publisherId") AS publisher_id,
-    settlement."id" AS settlement_id,
     settlement."grossAmount" AS settlement_gross,
     settlement."publisherAmount" AS settlement_publisher_amount,
     settlement."platformFee" AS settlement_platform_fee,
@@ -71,6 +72,7 @@ BEGIN
       settlement_value."feePolicyVersion"
     FROM public."Settlement" settlement_value
     WHERE settlement_value."orderId" = order_value."id"
+      AND settlement_value."status"::TEXT <> 'CANCELLED'
     ORDER BY settlement_value."createdAt" DESC, settlement_value."id" DESC
     LIMIT 1
   ) settlement ON TRUE

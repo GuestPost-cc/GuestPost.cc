@@ -576,11 +576,13 @@ function CancellationsPageInner() {
                 >
                   {target.publisherCompensationPolicy.feePolicyAvailable ? (
                     <>
-                      Platform fee retained: {target.publisherCompensationPolicy.platformFeeAmount}{" "}
+                      Platform fee retained:{" "}
+                      {target.publisherCompensationPolicy.platformFeeAmount}{" "}
                       {target.publisherCompensationPolicy.currency} (
                       {target.publisherCompensationPolicy.platformFeeBps != null
                         ? `${(target.publisherCompensationPolicy.platformFeeBps / 100).toFixed(2)}%`
-                        : "settlement snapshot"}). Maximum publisher amount:{" "}
+                        : "settlement snapshot"}
+                      ). Maximum publisher amount:{" "}
                       {target.publisherCompensationPolicy.maximumAmount}{" "}
                       {target.publisherCompensationPolicy.currency}. The
                       customer receives gross minus this fee and the publisher

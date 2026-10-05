@@ -1568,9 +1568,9 @@ export default function OrderDetailPage() {
                 This publisher order crossed publication. Record the exact
                 amount payable to the publisher after the platform fee. The
                 platform fee is retained from the order gross using the policy
-                snapshot below, and the customer refund is the remaining
-                amount. Enter zero only when the reviewed decision is
-                explicitly no compensation.
+                snapshot below, and the customer refund is the remaining amount.
+                Enter zero only when the reviewed decision is explicitly no
+                compensation.
               </AdminNotice>
               <div className="space-y-2">
                 <Label htmlFor="force-cancel-publisher-compensation">
@@ -1592,11 +1592,13 @@ export default function OrderDetailPage() {
                 <p className="text-xs text-muted-foreground">
                   {order.publisherCompensationPolicy?.feePolicyAvailable ? (
                     <>
-                      Platform fee retained: {order.publisherCompensationPolicy.platformFeeAmount}{" "}
+                      Platform fee retained:{" "}
+                      {order.publisherCompensationPolicy.platformFeeAmount}{" "}
                       {order.publisherCompensationPolicy.currency} (
                       {order.publisherCompensationPolicy.platformFeeBps != null
                         ? `${(order.publisherCompensationPolicy.platformFeeBps / 100).toFixed(2)}%`
-                        : "settlement snapshot"}). Maximum publisher amount:{" "}
+                        : "settlement snapshot"}
+                      ). Maximum publisher amount:{" "}
                       {order.publisherCompensationPolicy.maximumAmount}{" "}
                       {order.publisherCompensationPolicy.currency}.
                     </>

@@ -249,8 +249,9 @@ export class RefundService {
     if (amount.greaterThan(maximum)) {
       throw new BadRequestException({
         code: "PUBLISHER_COMPENSATION_AMOUNT_EXCEEDS_CONTRACT",
-        message:
-          "Publisher compensation cannot exceed the publisher's net order allocation after the platform fee",
+        message: offsetPublisherCompensation
+          ? "Publisher compensation cannot exceed the publisher's net order allocation after the platform fee"
+          : "Publisher compensation cannot exceed the authoritative publisher allocation",
       })
     }
 
@@ -421,7 +422,8 @@ export class RefundService {
       `force-cancel:${order.id}:`,
     )
     const offsetReference =
-      forceCancelReference || refund.reference?.startsWith("cancellation-request:")
+      forceCancelReference ||
+      refund.reference?.startsWith("cancellation-request:")
     const compensation = offsetReference
       ? await tx.publisherCompensation.findUnique({
           where: { refundTransactionId: refund.id },
@@ -605,7 +607,9 @@ export class RefundService {
       persisted.platformFeePolicyVersion == null &&
       (new Decimal(refund.amount ?? 0).equals(order.amount ?? 0) ||
         (refund.reference?.startsWith(`force-cancel:${order.id}:`) === true &&
-          new Decimal(refund.amount ?? 0).plus(amount).equals(order.amount ?? 0)))
+          new Decimal(refund.amount ?? 0)
+            .plus(amount)
+            .equals(order.amount ?? 0)))
     if (
       persisted.orderId !== order.id ||
       persisted.refundTransactionId !== refund.id ||
@@ -656,13 +660,14 @@ export class RefundService {
         ? new Decimal(order.amount ?? 0)
             .minus(amount)
             .minus(persisted.platformFeeAmount ?? 0)
-      : new Decimal(order.amount ?? 0)
+        : new Decimal(order.amount ?? 0)
     if (
       (!legacyNoFeeAllocation &&
         (input.offsetPublisherCompensation !==
           (refund.reference?.startsWith(`force-cancel:${order.id}:`) ||
             refund.reference?.startsWith("cancellation-request:")) ||
-          metadata?.compensationOffset !== input.offsetPublisherCompensation)) ||
+          metadata?.compensationOffset !==
+            input.offsetPublisherCompensation)) ||
       !new Decimal(refund.amount ?? 0).equals(expectedRefundAmount)
     ) {
       throw mismatch()
@@ -1209,6 +1214,7 @@ export class RefundService {
       (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
     const isPlatformOrder = channel === "PLATFORM"
     let cancelledSettlementId: string | null = null
+    let settlementToCancel: any | null = null
     let publisherCompensationPlan: ResolvedPublisherCompensation | null = null
 
     if (isPlatformOrder) {
@@ -1219,10 +1225,12 @@ export class RefundService {
         data: { reversedAt: new Date() },
       })
     } else {
-      // Publisher order: cancel settlement + clawback if released
+      // Keep the settlement active until its immutable fee snapshot has been
+      // checked by the compensation evidence trigger below.
       const activeSettlement = await tx.settlement.findFirst({
         where: { orderId: order.id, status: { not: "CANCELLED" } },
       })
+      settlementToCancel = activeSettlement
       publisherCompensationPlan = await this.resolvePublisherCompensation(
         tx,
         order,
@@ -1231,21 +1239,6 @@ export class RefundService {
         publisherCompensation,
         offsetPublisherCompensation,
       )
-      if (activeSettlement && activeSettlement.status !== "RELEASED") {
-        const cancelled = await tx.settlement.updateMany({
-          where: {
-            id: activeSettlement.id,
-            version: activeSettlement.version,
-          },
-          data: { status: "CANCELLED", version: { increment: 1 } },
-        })
-        if (cancelled.count === 0) {
-          throw new ConflictException(
-            "Settlement was modified by another request. Retry.",
-          )
-        }
-      }
-
       // Clawback: settlement already released. The publisher may have
       // withdrawn already — claw back only what is withdrawable and record
       // the remainder as debt, netted against future settlement releases.
@@ -1338,22 +1331,7 @@ export class RefundService {
             currency: USD_CURRENCY,
           })
         }
-
-        const cancelledReleased = await tx.settlement.updateMany({
-          where: {
-            id: activeSettlement.id,
-            status: "RELEASED",
-            version: activeSettlement.version,
-          },
-          data: { status: "CANCELLED", version: { increment: 1 } },
-        })
-        if (cancelledReleased.count === 0) {
-          throw new ConflictException(
-            "Settlement was modified by another request. Retry.",
-          )
-        }
       }
-      cancelledSettlementId = activeSettlement?.id ?? null
     }
 
     // A terminal refund must make the order disappear from every active Ops
@@ -1445,6 +1423,22 @@ export class RefundService {
           publisherCompensationPlan,
         )
       : null
+    if (settlementToCancel) {
+      const cancelled = await tx.settlement.updateMany({
+        where: {
+          id: settlementToCancel.id,
+          status: settlementToCancel.status,
+          version: settlementToCancel.version,
+        },
+        data: { status: "CANCELLED", version: { increment: 1 } },
+      })
+      if (cancelled.count === 0) {
+        throw new ConflictException(
+          "Settlement was modified by another request. Retry.",
+        )
+      }
+      cancelledSettlementId = settlementToCancel.id
+    }
 
     await tx.orderEvent.create({
       data: {

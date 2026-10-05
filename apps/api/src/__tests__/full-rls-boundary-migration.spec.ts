@@ -197,8 +197,13 @@ describe("full application RLS boundary migration", () => {
     expect(compensationFeeMigration).toContain('settings."version"::TEXT')
     expect(compensationFeeMigration).toContain("settlement_fee_policy_version")
     expect(compensationFeeMigration).toContain("AND NOT EXISTS (")
-    expect(compensationFeeMigration).toContain('cancellation."orderId" = NEW."orderId"')
+    expect(compensationFeeMigration).toContain(
+      'cancellation."orderId" = NEW."orderId"',
+    )
     expect(compensationFeeMigration).toContain("'PENDING_FINANCE'")
+    expect(compensationFeeMigration).toContain(
+      "settlement_value.\"status\"::TEXT <> 'CANCELLED'",
+    )
   })
 
   it("uses live authority rows and never grants a staff or worker bypass role", () => {

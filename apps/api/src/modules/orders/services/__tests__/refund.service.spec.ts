@@ -46,9 +46,11 @@ describe("RefundService", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       platformSettings: {
-        findMany: jest.fn().mockResolvedValue([
-          { id: "settings-1", version: 3, platformFeePct: new Decimal(10) },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: "settings-1", version: 3, platformFeePct: new Decimal(10) },
+          ]),
       },
       platformRevenue: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -1041,7 +1043,8 @@ describe("RefundService", () => {
       "PLATFORM",
       {
         amount: "60.00",
-        reason: "Publisher receives the reviewed partial payment for completed work.",
+        reason:
+          "Publisher receives the reviewed partial payment for completed work.",
         effectiveOrderStatus: "PUBLISHED",
       },
       true,
@@ -1073,7 +1076,8 @@ describe("RefundService", () => {
         "PLATFORM",
         {
           amount: "1.00",
-          reason: "Publisher has completed one dollar of reviewed contract work.",
+          reason:
+            "Publisher has completed one dollar of reviewed contract work.",
           effectiveOrderStatus: "PUBLISHED",
         },
         true,

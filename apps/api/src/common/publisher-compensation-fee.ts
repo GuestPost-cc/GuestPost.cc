@@ -25,6 +25,8 @@ export async function resolvePublisherCompensationFee(
     if (
       !new Decimal(settlement.grossAmount).equals(gross) ||
       fee.isNegative() ||
+      fee.greaterThan(gross) ||
+      publisherAmount.isNegative() ||
       !fee.plus(publisherAmount).equals(gross) ||
       !Number.isInteger(basisPoints) ||
       basisPoints < 0 ||

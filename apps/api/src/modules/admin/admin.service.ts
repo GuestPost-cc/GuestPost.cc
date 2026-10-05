@@ -46,8 +46,8 @@ import {
 import * as Sentry from "@sentry/node"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { normalizeDomain } from "../../common/domain"
-import { resolvePublisherCompensationFee } from "../../common/publisher-compensation-fee"
 import { PrismaService } from "../../common/prisma.service"
+import { resolvePublisherCompensationFee } from "../../common/publisher-compensation-fee"
 import {
   hasCompleteListingPolicy,
   isMarketplaceLanguage,
