@@ -93,28 +93,28 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
         compensation,
         refund,
       ] = await Promise.all([
-          prisma.transaction.count({
-            where: { orderId: ctx.order.id, type: "SETTLEMENT_RELEASE" },
-          }),
-          prisma.transaction.count({
-            where: { orderId: ctx.order.id, type: "REFUND" },
-          }),
-          prisma.transaction.count({
-            where: { orderId: ctx.order.id, type: "PUBLISHER_COMPENSATION" },
-          }),
-          prisma.publisherBalance.findUniqueOrThrow({
-            where: { publisherId: ctx.publisher.publisher.id },
-          }),
-          prisma.wallet.findUniqueOrThrow({
-            where: { organizationId: ctx.organization.id },
-          }),
-          prisma.publisherCompensation.findUniqueOrThrow({
-            where: { orderId: ctx.order.id },
-          }),
-          prisma.transaction.findFirstOrThrow({
-            where: { orderId: ctx.order.id, type: "REFUND" },
-          }),
-        ])
+        prisma.transaction.count({
+          where: { orderId: ctx.order.id, type: "SETTLEMENT_RELEASE" },
+        }),
+        prisma.transaction.count({
+          where: { orderId: ctx.order.id, type: "REFUND" },
+        }),
+        prisma.transaction.count({
+          where: { orderId: ctx.order.id, type: "PUBLISHER_COMPENSATION" },
+        }),
+        prisma.publisherBalance.findUniqueOrThrow({
+          where: { publisherId: ctx.publisher.publisher.id },
+        }),
+        prisma.wallet.findUniqueOrThrow({
+          where: { organizationId: ctx.organization.id },
+        }),
+        prisma.publisherCompensation.findUniqueOrThrow({
+          where: { orderId: ctx.order.id },
+        }),
+        prisma.transaction.findFirstOrThrow({
+          where: { orderId: ctx.order.id, type: "REFUND" },
+        }),
+      ])
       expect(releaseCount).toBeLessThanOrEqual(1)
       expect(refundCount).toBe(1)
       expect(compensationCount).toBe(1)
