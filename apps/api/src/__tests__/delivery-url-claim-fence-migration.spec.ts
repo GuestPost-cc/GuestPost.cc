@@ -155,11 +155,17 @@ describe("delivery URL claim fence migration contract", () => {
       "DO $revoke_application_table_privileges$",
     )
     const compatibilityGrant = rlsProvisioningSql.indexOf(
-      "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost_api_group",
+      "DO $grant_application_table_privileges$",
     )
     expect(managedAclCleanup).toBeGreaterThan(-1)
     expect(rlsProvisioningSql).toContain(
       "relation.relname <> '_prisma_migrations'",
+    )
+    expect(rlsProvisioningSql).toContain(
+      "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO guestpost_api_group, guestpost_worker_group",
+    )
+    expect(rlsProvisioningSql).toContain(
+      "GRANT SELECT ON TABLE %I.%I TO guestpost_rls_authorizer",
     )
     expect(rlsProvisioningSql).toContain(
       "REVOKE ALL PRIVILEGES ON TABLE %I.%I FROM PUBLIC, guestpost_api_group",
@@ -224,7 +230,7 @@ describe("delivery URL claim fence migration contract", () => {
       "GRANT USAGE ON SCHEMA public TO guestpost_rls_authorizer",
     )
     expect(rlsProvisioningSql).toContain(
-      "GRANT SELECT ON ALL TABLES IN SCHEMA public TO guestpost_rls_authorizer",
+      "GRANT SELECT ON TABLE %I.%I TO guestpost_rls_authorizer",
     )
     expect(rlsRolloutRunbook).toContain(
       "`guestpost_rls_authorizer` access for every new policy root",

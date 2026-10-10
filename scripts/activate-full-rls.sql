@@ -154,7 +154,26 @@ $preflight$;
 -- for this exact role lets those functions inspect policy roots without RLS
 -- recursion. Runtime identities cannot SET ROLE to it.
 GRANT USAGE ON SCHEMA public, guestpost_rls TO guestpost_rls_authorizer;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO guestpost_rls_authorizer;
+DO $grant_policy_root_access$
+DECLARE
+  relation_row record;
+BEGIN
+  FOR relation_row IN
+    SELECT namespace.nspname, relation.relname
+    FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND relation.relname <> '_prisma_migrations'
+  LOOP
+    EXECUTE format(
+      'GRANT SELECT ON TABLE %I.%I TO guestpost_rls_authorizer',
+      relation_row.nspname,
+      relation_row.relname
+    );
+  END LOOP;
+END
+$grant_policy_root_access$;
 
 DO $function_owners$
 DECLARE

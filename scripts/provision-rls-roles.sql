@@ -276,7 +276,6 @@ GRANT CONNECT ON DATABASE :"database_name" TO guestpost_reporting_runtime;
 
 \if :is_superuser
   ALTER SCHEMA public OWNER TO guestpost_schema_owner;
-  SET ROLE guestpost_schema_owner;
 \else
   DO $temporary_schema_owner_membership$
   BEGIN
@@ -315,11 +314,9 @@ GRANT USAGE ON SCHEMA public TO guestpost_reporting_group;
 -- Prisma owns its migration ledger outside the application RLS boundary.
 -- Leave its ACL with that owner; the schema owner deliberately does not own
 -- _prisma_migrations, so a blanket ON ALL TABLES revoke breaks reruns.
--- In CI, migrations are initially owned by the superuser that created the
--- database. Use that role for this cleanup before returning to the schema owner.
-\if :is_superuser
-RESET ROLE;
-\endif
+-- CI keeps its database superuser for this cleanup because initial migrations
+-- are owned by that role. Neon runs as guestpost_schema_owner, which owns the
+-- application relations.
 DO $revoke_application_table_privileges$
 DECLARE
   relation_row record;
@@ -368,18 +365,38 @@ REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
   guestpost_rls_authorizer,
   guestpost_financial_repair_guard,
   guestpost_financial_repair_staging;
-\if :is_superuser
-SET ROLE guestpost_schema_owner;
-\endif
-
 -- The API and worker need relation-level DML for the reviewed 105-model graph;
 -- FORCE RLS and the command-aware policy matrix decide which rows each
 -- workload may actually read or change. These grants confer no DDL, role,
 -- replication, superuser, or RLS-bypass ability. Default privileges below
 -- remain empty so a future relation fails closed until its ACL, policy root,
--- manifest entry, activation count, and tests are reviewed together.
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost_api_group;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost_worker_group;
+-- manifest entry, activation count, and tests are reviewed together. Keep
+-- Prisma's separate migration ledger outside these application grants.
+DO $grant_application_table_privileges$
+DECLARE
+  relation_row record;
+BEGIN
+  FOR relation_row IN
+    SELECT namespace.nspname, relation.relname
+    FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND relation.relname <> '_prisma_migrations'
+  LOOP
+    EXECUTE format(
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO guestpost_api_group, guestpost_worker_group',
+      relation_row.nspname,
+      relation_row.relname
+    );
+    EXECUTE format(
+      'GRANT SELECT ON TABLE %I.%I TO guestpost_rls_authorizer',
+      relation_row.nspname,
+      relation_row.relname
+    );
+  END LOOP;
+END
+$grant_application_table_privileges$;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_api_group;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_worker_group;
 
@@ -387,7 +404,6 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_worker_group;
 -- ability to read policy roots. This role is NOLOGIN, NOINHERIT, has no
 -- memberships, and receives no mutation privilege.
 GRANT USAGE ON SCHEMA public TO guestpost_rls_authorizer;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO guestpost_rls_authorizer;
 
 -- Preserve the repair guard's object-specific ACLs on a post-migration rerun.
 -- Initial provisioning runs before the repair tables exist, so this block is
