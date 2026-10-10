@@ -105,7 +105,12 @@ jobs:
           fi
 
       - name: Apply migrations to CI database
-        run: pnpm --filter @guestpost/database exec prisma migrate deploy
+        env:
+          PGPASSWORD: guestpost
+        run: |
+          psql -h localhost -U guestpost -d guestpost -v ON_ERROR_STOP=1 \
+            -f scripts/provision-financial-repair-guard-role.sql
+          pnpm --filter @guestpost/database exec prisma migrate deploy
 
       - name: Verify migration state
         run: pnpm --filter @guestpost/database exec prisma migrate status

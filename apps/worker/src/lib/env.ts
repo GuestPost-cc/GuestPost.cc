@@ -24,6 +24,7 @@ export type EmailDeliveryMode = "disabled" | "capture" | "live"
 const EMAIL_DELIVERY_MODES = ["disabled", "capture", "live"] as const
 const EMAIL_RECIPIENT_DOMAIN =
   /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
+const EMAIL_ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** Resolve the configured delivery mode, failing closed in production. */
 export function emailDeliveryModeFromEnv(
@@ -53,13 +54,36 @@ export function emailAllowedRecipientDomainsFromEnv(
   }
 }
 
+/** Parse and normalize exact addresses permitted for external email delivery. */
+export function emailAllowedRecipientsFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): { configured: boolean; recipients: string[]; invalidCount: number } {
+  const raw = env.EMAIL_ALLOWED_RECIPIENTS ?? ""
+  const entries = raw
+    .split(",")
+    .map((address) => address.trim().toLowerCase())
+    .filter(Boolean)
+  const valid = entries.filter((address) => EMAIL_ADDRESS.test(address))
+  return {
+    configured: raw.trim().length > 0,
+    recipients: [...new Set(valid)],
+    invalidCount: entries.length - valid.length,
+  }
+}
+
 /** Return the fail-closed allowlist validation error for an email mode. */
 export function emailRecipientAllowlistIssueFromEnv(
   env: NodeJS.ProcessEnv = process.env,
   mode: EmailDeliveryMode = emailDeliveryModeFromEnv(env),
-): "invalid-or-empty" | "capture-required" | null {
+):
+  | "invalid-or-empty"
+  | "capture-required"
+  | "invalid-recipients"
+  | "exact-recipients-required"
+  | null {
   if (mode === "disabled") return null
   const allowlist = emailAllowedRecipientDomainsFromEnv(env)
+  const recipients = emailAllowedRecipientsFromEnv(env)
   if (
     allowlist.configured &&
     (allowlist.domains.length === 0 || allowlist.invalidCount > 0)
@@ -68,6 +92,19 @@ export function emailRecipientAllowlistIssueFromEnv(
   }
   if (mode === "capture" && allowlist.domains.length === 0) {
     return "capture-required"
+  }
+  if (
+    recipients.configured &&
+    (recipients.recipients.length === 0 || recipients.invalidCount > 0)
+  ) {
+    return "invalid-recipients"
+  }
+  if (
+    mode === "live" &&
+    allowlist.domains.length > 0 &&
+    recipients.recipients.length === 0
+  ) {
+    return "exact-recipients-required"
   }
   return null
 }
@@ -212,6 +249,16 @@ export function validateEnv(): void {
     if (emailAllowlistIssue === "capture-required") {
       logger.error(
         "FATAL: capture email mode requires EMAIL_ALLOWED_RECIPIENT_DOMAINS",
+      )
+      process.exit(1)
+    }
+    if (emailAllowlistIssue === "invalid-recipients") {
+      logger.error("FATAL: EMAIL_ALLOWED_RECIPIENTS contains invalid addresses")
+      process.exit(1)
+    }
+    if (emailAllowlistIssue === "exact-recipients-required") {
+      logger.error(
+        "FATAL: live email delivery with a domain allowlist requires EMAIL_ALLOWED_RECIPIENTS",
       )
       process.exit(1)
     }

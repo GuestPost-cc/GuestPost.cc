@@ -1,0 +1,250 @@
+name: guestpost-staging
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set a URL-safe REDIS_PASSWORD in Coolify}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set a URL-safe REDIS_PASSWORD in Coolify}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      LOG_FORMAT: json
+      DATABASE_URL: ${API_DATABASE_URL:?Set the guestpost_api_runtime Neon URL}
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:?Set the guestpost_auth_runtime Neon URL}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      QUEUE_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set a random secret of at least 32 characters}
+      QUEUE_SIGNING_SECRET: ${QUEUE_SIGNING_SECRET:?Set a distinct random secret}
+      PAYOUT_ENCRYPTION_KEYS: ${PAYOUT_ENCRYPTION_KEYS:?Set the staging payout encryption keyring}
+      PAYOUT_ENCRYPTION_ACTIVE_KEY_ID: ${PAYOUT_ENCRYPTION_ACTIVE_KEY_ID:?Set the staging payout encryption key ID}
+      INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:?Set a distinct staging integrations encryption key}
+      RLS_ENFORCEMENT_ENABLED: "true"
+      FINANCE_RUNTIME_MODE: locked
+      PAYOUT_EXECUTION_ENABLED: "false"
+      STRIPE_DEPOSITS_ENABLED: "false"
+      STRIPE_CONNECT_ENABLED: "false"
+      STRIPE_LIVE_MODE_ENABLED: "false"
+      PAYOUT_LEGACY_METHODS_ENABLED: "false"
+      FINANCIAL_RECONCILIATION_REPAIRS_ENABLED: "false"
+      FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MFA_BYPASS: "false"
+      FINANCIAL_RECONCILIATION_REPAIRS_STAGING_MAKER_CHECKER_BYPASS: "false"
+      INVOICE_DOCUMENT_PREFIX: GP
+      INVOICE_ISSUER_LEGAL_NAME: ${INVOICE_ISSUER_LEGAL_NAME:?Set the staging invoice issuer legal name}
+      INVOICE_ISSUER_ADDRESS_LINE_1: ${INVOICE_ISSUER_ADDRESS_LINE_1:?Set the staging invoice issuer address}
+      INVOICE_ISSUER_CITY: ${INVOICE_ISSUER_CITY:?Set the staging invoice issuer city}
+      INVOICE_ISSUER_POSTAL_CODE: ${INVOICE_ISSUER_POSTAL_CODE:?Set the staging invoice issuer postal code}
+      INVOICE_ISSUER_COUNTRY_CODE: ${INVOICE_ISSUER_COUNTRY_CODE:?Set the staging invoice issuer country code}
+      INVOICE_SUPPORT_EMAIL: ${INVOICE_SUPPORT_EMAIL:?Set the staging support email}
+      TRUSTED_ORIGINS: https://${APP_DOMAIN:?Set the public app root domain},https://app.${APP_DOMAIN:?Set the public app root domain},https://publisher.${APP_DOMAIN:?Set the public app root domain},https://admin.${APP_DOMAIN:?Set the public app root domain}
+      CORS_ORIGIN: https://${APP_DOMAIN:?Set the public app root domain},https://app.${APP_DOMAIN:?Set the public app root domain},https://publisher.${APP_DOMAIN:?Set the public app root domain},https://admin.${APP_DOMAIN:?Set the public app root domain}
+      BETTER_AUTH_URL: https://api.${APP_DOMAIN:?Set the public app root domain}
+      BETTER_AUTH_ALLOWED_HOSTS: api.${APP_DOMAIN:?Set the public app root domain}
+      AUTH_COOKIE_DOMAIN: ${APP_DOMAIN:?Set the public app root domain}
+      OAUTH_STATE_COOKIE_SAMESITE: lax
+      OAUTH_STATE_COOKIE_SECURE: "true"
+      NEXT_PUBLIC_ALLOWED_APP_DOMAINS: ${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_API_URL: https://api.${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_WEBSITE_URL: https://${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_PORTAL_URL: https://app.${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_PUBLISHER_URL: https://publisher.${APP_DOMAIN:?Set the public app root domain}
+      NEXT_PUBLIC_ADMIN_URL: https://admin.${APP_DOMAIN:?Set the public app root domain}
+      OBJECT_STORAGE_PROVIDER: r2
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?Set the Cloudflare R2 account ID}
+      R2_ENDPOINT: ${R2_ENDPOINT:?Set the canonical Cloudflare R2 endpoint}
+      R2_BUCKET: ${R2_BUCKET:?Set the staging R2 bucket}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?Set the staging R2 access key}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?Set the staging R2 secret}
+      SENTRY_ENVIRONMENT: staging
+      PRISMA_POOL_MAX: "10"
+    expose:
+      - "4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  website:
+    build:
+      context: ../..
+      dockerfile: infrastructure/coolify/Dockerfile.web
+      args: &web-build-args
+        APP_NAME: website
+        NEXT_PUBLIC_API_URL: https://api.${APP_DOMAIN:?Set the public app root domain}
+        NEXT_PUBLIC_WEBSITE_URL: https://${APP_DOMAIN:?Set the public app root domain}
+        NEXT_PUBLIC_PORTAL_URL: https://app.${APP_DOMAIN:?Set the public app root domain}
+        NEXT_PUBLIC_PUBLISHER_URL: https://publisher.${APP_DOMAIN:?Set the public app root domain}
+        NEXT_PUBLIC_ADMIN_URL: https://admin.${APP_DOMAIN:?Set the public app root domain}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    expose:
+      - "3000"
+
+  portal:
+    build:
+      context: ../..
+      dockerfile: infrastructure/coolify/Dockerfile.web
+      args:
+        <<: *web-build-args
+        APP_NAME: portal
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    expose:
+      - "3000"
+
+  publisher:
+    build:
+      context: ../..
+      dockerfile: infrastructure/coolify/Dockerfile.web
+      args:
+        <<: *web-build-args
+        APP_NAME: publisher
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    expose:
+      - "3000"
+
+  admin:
+    build:
+      context: ../..
+      dockerfile: infrastructure/coolify/Dockerfile.web
+      args:
+        <<: *web-build-args
+        APP_NAME: admin
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    expose:
+      - "3000"
+
+  worker-realtime:
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      WORKER_MODE: realtime
+      EMAIL_DELIVERY_MODE: disabled
+      DATABASE_URL: ${WORKER_DATABASE_URL:?Set the guestpost_worker_runtime Neon URL}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      QUEUE_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      QUEUE_SIGNING_SECRET: ${QUEUE_SIGNING_SECRET:?Set a distinct random secret}
+      INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:?Set a distinct staging integrations encryption key}
+      RLS_ENFORCEMENT_ENABLED: "true"
+      FINANCE_RUNTIME_MODE: locked
+      PAYOUT_EXECUTION_ENABLED: "false"
+      STRIPE_DEPOSITS_ENABLED: "false"
+      STRIPE_CONNECT_ENABLED: "false"
+      STRIPE_LIVE_MODE_ENABLED: "false"
+      PAYOUT_LEGACY_METHODS_ENABLED: "false"
+      INVOICE_DOCUMENT_PREFIX: GP
+      INVOICE_ISSUER_LEGAL_NAME: ${INVOICE_ISSUER_LEGAL_NAME:?Set the staging invoice issuer legal name}
+      INVOICE_ISSUER_ADDRESS_LINE_1: ${INVOICE_ISSUER_ADDRESS_LINE_1:?Set the staging invoice issuer address}
+      INVOICE_ISSUER_CITY: ${INVOICE_ISSUER_CITY:?Set the staging invoice issuer city}
+      INVOICE_ISSUER_POSTAL_CODE: ${INVOICE_ISSUER_POSTAL_CODE:?Set the staging invoice issuer postal code}
+      INVOICE_ISSUER_COUNTRY_CODE: ${INVOICE_ISSUER_COUNTRY_CODE:?Set the staging invoice issuer country code}
+      INVOICE_SUPPORT_EMAIL: ${INVOICE_SUPPORT_EMAIL:?Set the staging support email}
+      OBJECT_STORAGE_PROVIDER: r2
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?Set the Cloudflare R2 account ID}
+      R2_ENDPOINT: ${R2_ENDPOINT:?Set the canonical Cloudflare R2 endpoint}
+      R2_BUCKET: ${R2_BUCKET:?Set the staging R2 bucket}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?Set the staging R2 access key}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?Set the staging R2 secret}
+      SENTRY_ENVIRONMENT: staging
+      PRISMA_POOL_MAX: "5"
+    expose:
+      - "3004"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3004/health >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker-jobs:
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["sh", "-c", "while :; do sleep 3600; done"]
+    environment:
+      NODE_ENV: production
+      EMAIL_DELIVERY_MODE: disabled
+      EMAIL_ALLOWED_RECIPIENT_DOMAINS: ${EMAIL_ALLOWED_RECIPIENT_DOMAINS:-}
+      EMAIL_ALLOWED_RECIPIENTS: ${EMAIL_ALLOWED_RECIPIENTS:-}
+      DATABASE_URL: ${WORKER_DATABASE_URL:?Set the guestpost_worker_runtime Neon URL}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      QUEUE_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      QUEUE_SIGNING_SECRET: ${QUEUE_SIGNING_SECRET:?Set a distinct random secret}
+      INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:?Set a distinct staging integrations encryption key}
+      RLS_ENFORCEMENT_ENABLED: "true"
+      FINANCE_RUNTIME_MODE: locked
+      PAYOUT_EXECUTION_ENABLED: "false"
+      STRIPE_DEPOSITS_ENABLED: "false"
+      STRIPE_CONNECT_ENABLED: "false"
+      STRIPE_LIVE_MODE_ENABLED: "false"
+      PAYOUT_LEGACY_METHODS_ENABLED: "false"
+      STRIPE_DEPOSIT_RECOVERY_KEY: ${STRIPE_DEPOSIT_RECOVERY_KEY:-}
+      INVOICE_DOCUMENT_PREFIX: GP
+      INVOICE_ISSUER_LEGAL_NAME: ${INVOICE_ISSUER_LEGAL_NAME:?Set the staging invoice issuer legal name}
+      INVOICE_ISSUER_ADDRESS_LINE_1: ${INVOICE_ISSUER_ADDRESS_LINE_1:?Set the staging invoice issuer address}
+      INVOICE_ISSUER_CITY: ${INVOICE_ISSUER_CITY:?Set the staging invoice issuer city}
+      INVOICE_ISSUER_POSTAL_CODE: ${INVOICE_ISSUER_POSTAL_CODE:?Set the staging invoice issuer postal code}
+      INVOICE_ISSUER_COUNTRY_CODE: ${INVOICE_ISSUER_COUNTRY_CODE:?Set the staging invoice issuer country code}
+      INVOICE_SUPPORT_EMAIL: ${INVOICE_SUPPORT_EMAIL:?Set the staging support email}
+      OBJECT_STORAGE_PROVIDER: r2
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?Set the Cloudflare R2 account ID}
+      R2_ENDPOINT: ${R2_ENDPOINT:?Set the canonical Cloudflare R2 endpoint}
+      R2_BUCKET: ${R2_BUCKET:?Set the staging R2 bucket}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?Set the staging R2 access key}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?Set the staging R2 secret}
+      SENTRY_ENVIRONMENT: staging
+      PRISMA_POOL_MAX: "5"
+    healthcheck:
+      disable: true
+
+volumes:
+  redis-data:
