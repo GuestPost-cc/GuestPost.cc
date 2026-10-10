@@ -152,12 +152,18 @@ describe("delivery URL claim fence migration contract", () => {
       "REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC",
     )
     const managedAclCleanup = rlsProvisioningSql.indexOf(
-      "REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM\n  guestpost_api_group",
+      "DO $revoke_application_table_privileges$",
     )
     const compatibilityGrant = rlsProvisioningSql.indexOf(
       "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO guestpost_api_group",
     )
     expect(managedAclCleanup).toBeGreaterThan(-1)
+    expect(rlsProvisioningSql).toContain(
+      "relation.relname <> '_prisma_migrations'",
+    )
+    expect(rlsProvisioningSql).toContain(
+      "REVOKE ALL PRIVILEGES ON TABLE %I.%I FROM PUBLIC, guestpost_api_group",
+    )
     expect(compatibilityGrant).toBeGreaterThan(managedAclCleanup)
     expect(rlsProvisioningSql).toContain(
       "ALTER DEFAULT PRIVILEGES FOR ROLE guestpost_schema_owner IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM\n  guestpost_api_group",
