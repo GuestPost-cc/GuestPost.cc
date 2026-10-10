@@ -7,40 +7,28 @@ updated: 2026-10-05
 
 # Infrastructure
 
-## Coolify staging rebuild (2026-10-05)
+## Coolify staging architecture
 
-The staging target is being rebuilt on Coolify with a new, empty Neon project.
-`infrastructure/coolify/compose.yaml` defines the API, four Next.js frontends,
-internal persistent Redis, the realtime worker, and an idle worker container for
-Coolify scheduled commands; `infrastructure/coolify/Dockerfile.web` builds each
-frontend from the monorepo root. The existing `render.yml` and Northflank worker
-contract remain the prior deployment record until this Coolify stack is
-promoted. See `docs/COOLIFY_STAGING_RUNBOOK.md` for the new release sequence.
+Coolify staging uses separate API, four Next.js frontend, realtime worker,
+scheduled-job worker, and private persistent Redis resources. The API and
+worker images use their app Dockerfiles; all frontend images share
+`infrastructure/coolify/Dockerfile.web`. `infrastructure/coolify/compose.yaml`
+is for local integration and previews. `docs/COOLIFY_STAGING_RUNBOOK.md` is the
+operational source for deployment and release steps. The previous Render and
+Northflank contracts remain historical until those services are explicitly
+retired.
 
-The new Neon project `guestpost-staging` is on the Free plan in Singapore,
-PostgreSQL 17, with a fresh `guestpost` database. Its project ID is
-`calm-waterfall-71932352`. The app manifest intentionally keeps finance locked,
-disables payout/deposit/Connect/live Stripe and repair gates, and requires
-separate API, Better Auth, worker, and migration database identities. RLS must
-be provisioned and canaried by the documented staged process before runtime
-startup/activation. Neon rejects `ALTER ROLE` and blocks `SET ROLE
-neon_superuser`, so the checked-in provisioners validate create-time role
-attributes on Neon. All 100 Prisma migrations are applied under
-`guestpost_schema_owner`; the one-use migrator login and temporary database
-CREATE grant were removed. The final role ACLs are installed, and pre-start
-API/auth/worker/reporting identity canaries pass. Neon retains 13 owner
-admin-only membership edges in addition to the seven application edges; the
-owner edges do not grant inherited or SET ROLE access and are never supplied to
-the app. Full RLS remains unactivated; its activation preflight needs a reviewed
-Neon-aware exception for those provider-managed edges. Coolify now has a
-`staging` environment and an undeployed
-`guestpost-staging` Compose resource sourced through the repository-restricted
-GitHub App. Its production and preview `APP_DOMAIN` values are set to
-`shohan.iam.bd`; the API, website, portal, publisher, and admin routes use
-HTTP to the internal Traefik service ports. The hostnames have not passed DNS
-checks. Remaining setup includes runtime role credentials, staging R2
-readiness, reviewed invoice issuer identity, and restricted Stripe test access
-before scheduled worker jobs run.
+Staging resources deploy from `main` and derive public origins from
+`APP_DOMAIN`. The current root is `shohan.iam.bd`; `guestpost.mvp.bd` is reserved
+for a future DNS and proxy cutover. The host Caddy retains public ports 80/443
+and proxies to Coolify's private Traefik entry point. Neon uses separate API,
+Better Auth, worker, and migration identities. Full RLS activation remains a
+separate guarded operation described in `docs/RLS_ROLLOUT.md`.
+
+Staging keeps live Stripe mode disabled. Stripe test flows and external email
+delivery require restricted credentials and the readiness checks documented
+in the staging runbooks; email tests start in capture mode and external sends
+must be limited to the approved test recipient.
 
 Coolify's Traefik proxy runs on `127.0.0.1:18080` behind the server's existing
 Caddy, which keeps public ports 80/443. The Compose manifest takes one required
@@ -49,6 +37,18 @@ trusted origins from it. Current staging uses `shohan.iam.bd`; future
 `guestpost.mvp.bd` use requires DNS and matching Caddy/Coolify host routing,
 then a redeploy with the new root domain because one auth cookie can cover only
 one root domain at a time. See `docs/COOLIFY_STAGING_RUNBOOK.md`.
+
+## Doppler staging configs (2026-10-10)
+
+The Developer-plan Doppler project `guestpost_staging` is the staging
+environment manager. The `stg` root config contains shared domain and public
+build URLs. Seven branched configs isolate the API, four web builds, realtime
+worker, and jobs worker. Coolify should use a read-only service token scoped to
+each matching config and resolve values with `{{vault.KEY}}`; frontend
+`NEXT_PUBLIC_*` values and `APP_NAME` must be available at build time. The
+config map and outstanding values are tracked in `docs/DOPPLER_STAGING.md`. No
+Coolify integration tokens or provider/application credentials have been
+created. Do not promote staging values to `prd`.
 
 ## Hosting model (2026-06-14)
 

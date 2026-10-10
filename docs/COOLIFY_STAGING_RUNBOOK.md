@@ -3,14 +3,21 @@
 This runbook deploys each independently scaled GuestPost service as its own
 Coolify resource, using a new empty Neon project, private Redis, and Cloudflare
 R2. Do not treat a successful image build as a database or financial release.
+Environment values are managed in Doppler; see
+[`DOPPLER_STAGING.md`](DOPPLER_STAGING.md) for per-resource config names,
+Coolify references, safe defaults, and the remaining credential checklist.
 
 ## Coolify source
 
 Create separate GitHub App application resources in the existing Coolify
-project and `staging` environment. Select the repository-restricted Coolify
-GitHub App, repository `GuestPost-cc/GuestPost.cc`, and deployment branch
-`codex/coolify-staging-rebuild` until the branch is merged. Use the repository
-root as the base directory/build context for each Dockerfile resource. The
+project and `staging` environment on the staging server. Select the
+repository-restricted Coolify GitHub App, repository
+`GuestPost-cc/GuestPost.cc`, and deployment branch `main`. The selected `main`
+revision must contain every configured Dockerfile before a resource can build;
+in particular, `infrastructure/coolify/Dockerfile.web` is not present on the
+current `main` revision and must reach `main` before creating the four web
+resources. Use the repository root as the base directory/build context for
+each Dockerfile resource. The
 checked-in `infrastructure/coolify/compose.yaml` remains available for local
 integration and single-resource previews; it is not the staging resource
 layout.
@@ -18,12 +25,12 @@ layout.
 | Coolify resource | Dockerfile | Build-time configuration | Runtime configuration | Route/port |
 |---|---|---|---|---|
 | `guestpost-staging-redis` | Coolify Redis database resource | `redis:7.2`; persistent `/data` volume; private access | Generated password; copy Coolify's internal Redis URL into app resources; keep on the shared Coolify network | No public route |
-| `guestpost-staging-api` | `apps/api/Dockerfile` | Root context | API runtime DB URL, auth DB URL, Redis URL, auth/queue secrets, issuer identity, R2 settings, domain-derived CORS/auth settings and locked finance flags | `api.${APP_DOMAIN}` → 4000 |
+| `guestpost-staging-api` | `apps/api/Dockerfile` | Root context | API runtime DB URL, auth DB URL, Redis URL, auth/queue secrets, payout and integrations encryption keyrings, issuer identity, R2 settings, domain-derived CORS/auth settings and locked finance flags | `api.${APP_DOMAIN}` → 4000 |
 | `guestpost-staging-website` | `infrastructure/coolify/Dockerfile.web` | `APP_NAME=website` plus all five public URL build args | `PORT=3000`, `NODE_ENV=production` | `${APP_DOMAIN}` → 3000 |
 | `guestpost-staging-portal` | `infrastructure/coolify/Dockerfile.web` | `APP_NAME=portal` plus all five public URL build args | `PORT=3000`, `NODE_ENV=production` | `app.${APP_DOMAIN}` → 3000 |
 | `guestpost-staging-publisher` | `infrastructure/coolify/Dockerfile.web` | `APP_NAME=publisher` plus all five public URL build args | `PORT=3000`, `NODE_ENV=production` | `publisher.${APP_DOMAIN}` → 3000 |
 | `guestpost-staging-admin` | `infrastructure/coolify/Dockerfile.web` | `APP_NAME=admin` plus all five public URL build args | `PORT=3000`, `NODE_ENV=production` | `admin.${APP_DOMAIN}` → 3000 |
-| `guestpost-staging-worker-realtime` | `apps/worker/Dockerfile` | Root context | Worker DB URL, Redis URL, queue signing secret, issuer identity, R2 settings and locked finance flags; `WORKER_MODE=realtime` | No public route; health port 3004 |
+| `guestpost-staging-worker-realtime` | `apps/worker/Dockerfile` | Root context | Worker DB URL, Redis URL, queue signing and integrations encryption secrets, issuer identity, R2 settings and locked finance flags; `WORKER_MODE=realtime` | No public route; health port 3004 |
 | `guestpost-staging-worker-jobs` | `apps/worker/Dockerfile` | Root context | Same restricted worker runtime variables; override command to `sh -c 'while :; do sleep 3600; done'` | No public route; Coolify scheduled tasks run here |
 
 For each application, select GitHub App source deployment and configure the
@@ -41,8 +48,7 @@ Keep `worker-jobs` idle until its schedules and restricted Stripe test key are
 ready. The existing Compose resource is stopped; leave its unsaved form alone
 and do not start it alongside these independent resources.
 
-- Keep staging on the selected `codex/coolify-staging-rebuild` deployment
-  branch until its changes are merged. Do not commit a `.env` file or pass
+- Keep all staging resources on `main`. Do not commit a `.env` file or pass
   secrets as build args.
 - The host already runs Caddy on public ports 80/443. Coolify's Traefik proxy
   binds only to `127.0.0.1:18080`; host Caddy forwards each configured app
@@ -129,9 +135,9 @@ same derived URLs belong in the API runtime variables where indicated.
 | Variable | Use |
 |---|---|
 | `APP_DOMAIN` | Root domain used to derive public app URLs and auth/CORS allowlists; current staging value: `shohan.iam.bd`; future cutover value: `guestpost.mvp.bd` |
-| `API_DATABASE_URL` | Neon API runtime identity |
+| `API_DATABASE_URL` | Compose-only name for the Neon API runtime identity; a separate Coolify API resource receives it as `DATABASE_URL` |
 | `AUTH_DATABASE_URL` | Neon Better Auth identity |
-| `WORKER_DATABASE_URL` | Neon worker identity |
+| `WORKER_DATABASE_URL` | Compose-only name for the Neon worker identity; each separate Coolify worker resource receives it as `DATABASE_URL` |
 | `REDIS_PASSWORD` | URL-safe password generated and retained by the private Coolify Redis resource |
 | `BETTER_AUTH_SECRET` | Random secret, at least 32 characters |
 | `QUEUE_SIGNING_SECRET` | Separate random secret; do not reuse Better Auth secret |
@@ -140,9 +146,12 @@ same derived URLs belong in the API runtime variables where indicated.
 | `NEXT_PUBLIC_SENTRY_DSN` | Optional browser-safe Sentry DSN used by web builds |
 | `STRIPE_DEPOSIT_RECOVERY_KEY` | Optional until scheduled jobs are enabled; then use a distinct test-mode `rk_test_*` key with only required read access |
 
-At initial staging boot, deposits, Connect, live Stripe, payouts, financial
-repair, email delivery, and finance mutations remain disabled or locked. Add
-OAuth credentials and sender secrets only when those staging flows are ready.
+At initial staging boot, deposits, Connect, payouts, financial repair, and
+email delivery remain disabled or locked. The user wants test-mode Stripe
+deposits/Connect/payout flows and a test email path enabled after staging
+readiness checks. Keep `STRIPE_LIVE_MODE_ENABLED=false` at all times. Add the
+restricted Stripe test credentials, webhook secrets, and Resend sender values
+only to Doppler.
 
 ## Worker schedules
 
@@ -174,10 +183,14 @@ values and monitor failed executions.
    ready; then start the frontends and validate each public host, health route,
    sign-in, signup, and cross-surface cookies.
 5. Complete the RLS canary and activation procedure before onboarding test
-   users. Keep `FINANCE_RUNTIME_MODE=locked` and payout/Stripe gates false.
-6. Enable scheduled tasks only after their required runtime and Stripe test
-   variables are present. Keep transactional email disabled until the sender
-   and allowed recipient policy are reviewed.
+   users. Keep finance locked until the Stripe test prerequisites in
+   `STRIPE_STAGING_RUNBOOK.md` pass; then enable only test-mode paths with
+   `STRIPE_LIVE_MODE_ENABLED=false` and payout sends bounded to Stripe test
+   mode.
+6. Enable scheduled tasks only after their runtime and restricted Stripe test
+   variables are present. Start email in `capture` mode with an exact-domain
+   recipient allowlist. Enable external delivery only to the approved test
+   recipient after Resend verifies the sender.
 
 For rollback, disable scheduled tasks, stop worker services, and redeploy the
 last known compatible image. Do not reverse migrations or reuse a runtime

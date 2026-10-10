@@ -1,7 +1,7 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-10-05
+updated: 2026-10-10
 ---
 
 # Current focus
@@ -10,7 +10,7 @@ updated: 2026-10-05
 
 The user chose a fresh staging redeploy on Coolify + Neon and confirmed the old
 Neon project was deleted, so do not restore or expect prior data. The current
-GitHub `main` base is `418550dc`; local branch `codex/coolify-staging-rebuild`
+GitHub `main` is `418550a`; local branch `codex/coolify-staging-rebuild`
 has a committed Coolify Compose definition, shared Next.js Dockerfile, and
 staging runbook. A new empty Neon project `guestpost-staging` is created
 on the Free plan in Singapore with PostgreSQL 17 (`calm-waterfall-71932352`).
@@ -18,17 +18,42 @@ The deployment config keeps finance locked and all payout/deposit/Connect/live
 Stripe and financial repair gates off. The Compose file derives all public
 URLs and origin allowlists from the required `APP_DOMAIN`; current staging is
 `shohan.iam.bd`, with `guestpost.mvp.bd` reserved for a later DNS and proxy
-cutover. The Coolify environment is named `staging`; the prior
-`guestpost-staging` Compose resource uses the repository-restricted GitHub App
-and branch `codex/coolify-staging-rebuild`. The user clarified they want
-independently managed website, portal, publisher, admin, API, realtime worker,
-scheduled-job worker, and Redis resources. The runbook now documents these
-resources; the Compose file remains for local integration and previews. A
+cutover. The Coolify environment is named `staging`; all new independent
+resources must use the repository-restricted GitHub App and branch `main`.
+The current `main` lacks `infrastructure/coolify/Dockerfile.web`, so the four
+frontend resources cannot build until that file reaches `main`. PR #157
+proposes the Coolify Dockerfile and deployment manifest; its required
+`CI / build-and-test` check failed at `Audit production dependencies` before
+the build and tests because of critical `proxy-addr` and high `source-map-js`
+advisories. The PR also needs its reviewed Next.js startup command and runtime
+encryption-key environment fixed. Do not merge it until the required check is
+green and its review threads are resolved. The user wants independently managed
+website, portal, publisher, admin, API, realtime worker, scheduled-job worker,
+and Redis resources. The runbook documents these resources; the Compose file
+remains for local integration and previews. A
 private persistent Coolify Redis resource `guestpost-staging-redis` has been
 created and started. The prior Compose resource remains stopped with its form
 unsaved; do not save/reset or start it. The Coolify Traefik proxy is healthy on
 loopback port 18080 behind host Caddy, which retains public ports 80/443. DNS
 checks remain pending.
+
+The user wants Stripe deposit/Connect/payout tests and transactional-email
+testing in staging. Restrict Stripe to test credentials with live mode disabled,
+and use email capture plus an exact recipient allowlist before external
+delivery. The test rollout still requires its migration, credential, webhook,
+sender, and reconciliation preconditions. The provided mail recipient
+`no-reply@` is incomplete; the user will provide the full address.
+
+Doppler Developer project `guestpost_staging` is now the staging environment
+manager. Its root `stg` holds the current root domain and public URLs; service
+configs `stg_api`, `stg_website`, `stg_portal`, `stg_publisher`, `stg_admin`,
+`stg_worker_realtime`, and `stg_worker_jobs` hold isolated runtime/build
+settings. `docs/DOPPLER_STAGING.md` maps configs to Coolify resources and lists
+the remaining values. No Coolify Doppler integration tokens or application
+credentials have been created. Next: resolve the Redis form's existing
+unsaved state before copying its internal URL, add separate runtime database
+URLs and operator-created app signing secrets, provision the bucket-scoped R2
+S3 key, and create read-only per-config Doppler service tokens for Coolify.
 
 Database provisioning is complete. All 100 checked-in Prisma migrations are
 applied under `guestpost_schema_owner`; the temporary Neon migration login and

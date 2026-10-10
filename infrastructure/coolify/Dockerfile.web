@@ -38,4 +38,4 @@ ARG APP_NAME
 ENV APP_NAME=$APP_NAME
 EXPOSE 3000
 USER node
-CMD ["sh", "-c", "cd \"/repo/apps/$APP_NAME\" && ../../node_modules/.bin/next start --hostname 0.0.0.0 --port ${PORT:-3000}"]
+CMD ["sh", "-c", "cd \"/repo/apps/$APP_NAME\" && pnpm exec next start --hostname 0.0.0.0 --port ${PORT:-3000}"]
