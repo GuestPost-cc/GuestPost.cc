@@ -24,6 +24,9 @@ BEGIN
 END
 $repair_guard_preflight$;
 
+GRANT CREATE ON SCHEMA public TO guestpost_financial_repair_guard;
+SET ROLE guestpost_financial_repair_guard;
+
 CREATE OR REPLACE FUNCTION public.guard_reconciliation_repair_proposal()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -170,7 +173,6 @@ BEGIN
       AND relation.relname = 'ReconciliationCase'
       AND relation.relrowsecurity AND relation.relforcerowsecurity
   ) THEN
-    GRANT CREATE ON SCHEMA public TO guestpost_financial_repair_guard;
     ALTER FUNCTION public.guard_reconciliation_repair_proposal() SECURITY DEFINER;
     ALTER FUNCTION public.guard_reconciliation_repair_proposal()
       OWNER TO guestpost_financial_repair_guard;
@@ -183,7 +185,6 @@ BEGIN
     ALTER FUNCTION public.guard_reconciliation_repair_execution() SECURITY DEFINER;
     ALTER FUNCTION public.guard_reconciliation_repair_execution()
       OWNER TO guestpost_financial_repair_guard;
-    REVOKE CREATE ON SCHEMA public FROM guestpost_financial_repair_guard;
   ELSE
     ALTER FUNCTION public.guard_reconciliation_repair_proposal() SECURITY INVOKER;
     ALTER FUNCTION public.guard_reconciliation_repair_approval() SECURITY INVOKER;
@@ -192,5 +193,8 @@ BEGIN
   END IF;
 END
 $repair_guard_owner$;
+
+RESET ROLE;
+REVOKE CREATE ON SCHEMA public FROM guestpost_financial_repair_guard;
 
 COMMIT;

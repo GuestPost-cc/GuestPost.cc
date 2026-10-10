@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   emailAllowedRecipientDomainsFromEnv,
+  emailAllowedRecipientsFromEnv,
   emailDeliveryModeFromEnv,
   emailRecipientAllowlistIssueFromEnv,
 } from "../src/lib/env"
@@ -67,6 +68,20 @@ test("recipient-domain allowlists normalize and deduplicate exact domains", () =
   )
 })
 
+test("exact recipient allowlists normalize and deduplicate addresses", () => {
+  assert.deepEqual(
+    emailAllowedRecipientsFromEnv({
+      EMAIL_ALLOWED_RECIPIENTS:
+        "Test@Example.com, test@example.com, invalid-address",
+    }),
+    {
+      configured: true,
+      recipients: ["test@example.com"],
+      invalidCount: 1,
+    },
+  )
+})
+
 test("production capture and configured live allowlists fail closed", () => {
   assert.equal(
     emailRecipientAllowlistIssueFromEnv(
@@ -87,6 +102,23 @@ test("production capture and configured live allowlists fail closed", () => {
     "invalid-or-empty",
   )
   assert.equal(emailRecipientAllowlistIssueFromEnv({}, "live"), null)
+  assert.equal(
+    emailRecipientAllowlistIssueFromEnv(
+      {
+        EMAIL_ALLOWED_RECIPIENT_DOMAINS: "example.com",
+        EMAIL_ALLOWED_RECIPIENTS: "test@example.com",
+      },
+      "live",
+    ),
+    null,
+  )
+  assert.equal(
+    emailRecipientAllowlistIssueFromEnv(
+      { EMAIL_ALLOWED_RECIPIENT_DOMAINS: "example.com" },
+      "live",
+    ),
+    "exact-recipients-required",
+  )
   assert.equal(
     emailRecipientAllowlistIssueFromEnv(
       { EMAIL_ALLOWED_RECIPIENT_DOMAINS: "," },

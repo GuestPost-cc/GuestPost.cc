@@ -2,6 +2,14 @@
 -- It is enabled by an administrator-set per-database role setting, never by
 -- cluster-wide role membership or a caller-controlled session GUC.
 
+BEGIN;
+
+-- These trigger functions are owned by the isolated repair guard. Migrations
+-- run as the schema owner, so briefly assume the guard identity to replace
+-- them, then remove its temporary schema CREATE privilege before commit.
+GRANT CREATE ON SCHEMA public TO guestpost_financial_repair_guard;
+SET ROLE guestpost_financial_repair_guard;
+
 CREATE OR REPLACE FUNCTION public.guard_reconciliation_repair_approval()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -119,3 +127,8 @@ BEGIN
   RETURN NEW;
 END
 $function$;
+
+RESET ROLE;
+REVOKE CREATE ON SCHEMA public FROM guestpost_financial_repair_guard;
+
+COMMIT;
