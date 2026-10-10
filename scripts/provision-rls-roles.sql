@@ -310,22 +310,31 @@ GRANT USAGE ON SCHEMA public TO guestpost_auth_group;
 GRANT USAGE ON SCHEMA public TO guestpost_worker_group;
 GRANT USAGE ON SCHEMA public TO guestpost_reporting_group;
 
-REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM PUBLIC;
+-- Prisma owns its migration ledger outside the application RLS boundary.
+-- Leave its ACL with that owner; the schema owner deliberately does not own
+-- _prisma_migrations, so a blanket ON ALL TABLES revoke breaks reruns.
+DO $revoke_application_table_privileges$
+DECLARE
+  relation_row record;
+BEGIN
+  FOR relation_row IN
+    SELECT namespace.nspname, relation.relname
+    FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND relation.relname <> '_prisma_migrations'
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON TABLE %I.%I FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group, guestpost_reporting_group, guestpost_migrator, guestpost_api_runtime, guestpost_auth_runtime, guestpost_worker_runtime, guestpost_reporting_runtime, guestpost_rls_authorizer, guestpost_financial_repair_guard, guestpost_financial_repair_staging',
+      relation_row.nspname,
+      relation_row.relname
+    );
+  END LOOP;
+END
+$revoke_application_table_privileges$;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
-REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM
-  guestpost_api_group,
-  guestpost_auth_group,
-  guestpost_worker_group,
-  guestpost_reporting_group,
-  guestpost_migrator,
-  guestpost_api_runtime,
-  guestpost_auth_runtime,
-  guestpost_worker_runtime,
-  guestpost_reporting_runtime,
-  guestpost_rls_authorizer,
-  guestpost_financial_repair_guard,
-  guestpost_financial_repair_staging;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
   guestpost_api_group,
   guestpost_auth_group,
