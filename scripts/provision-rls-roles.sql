@@ -340,9 +340,6 @@ BEGIN
   END LOOP;
 END
 $revoke_application_table_privileges$;
-\if :is_superuser
-SET ROLE guestpost_schema_owner;
-\endif
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
@@ -371,6 +368,9 @@ REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
   guestpost_rls_authorizer,
   guestpost_financial_repair_guard,
   guestpost_financial_repair_staging;
+\if :is_superuser
+SET ROLE guestpost_schema_owner;
+\endif
 
 -- The API and worker need relation-level DML for the reviewed 105-model graph;
 -- FORCE RLS and the command-aware policy matrix decide which rows each
