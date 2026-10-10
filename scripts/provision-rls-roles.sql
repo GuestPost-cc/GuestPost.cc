@@ -315,6 +315,11 @@ GRANT USAGE ON SCHEMA public TO guestpost_reporting_group;
 -- Prisma owns its migration ledger outside the application RLS boundary.
 -- Leave its ACL with that owner; the schema owner deliberately does not own
 -- _prisma_migrations, so a blanket ON ALL TABLES revoke breaks reruns.
+-- In CI, migrations are initially owned by the superuser that created the
+-- database. Use that role for this cleanup before returning to the schema owner.
+\if :is_superuser
+RESET ROLE;
+\endif
 DO $revoke_application_table_privileges$
 DECLARE
   relation_row record;
@@ -335,6 +340,9 @@ BEGIN
   END LOOP;
 END
 $revoke_application_table_privileges$;
+\if :is_superuser
+SET ROLE guestpost_schema_owner;
+\endif
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
