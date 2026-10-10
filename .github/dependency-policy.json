@@ -38,8 +38,8 @@
     },
     {
       "package": "sharp",
-      "minimumVersion": "0.35.0",
-      "reason": "GHSA-f88m-g3jw-g9cj requires Sharp 0.35.0 or newer."
+      "minimumVersion": "0.35.5",
+      "reason": "GHSA-f88m-g3jw-g9cj and GHSA-wq5f-xc86-pv6w require patched Sharp releases; CI reported 0.35.5 as the patched floor for the current advisory."
     },
     {
       "package": "@hono/node-server",
