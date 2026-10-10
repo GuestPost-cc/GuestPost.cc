@@ -10088,7 +10088,7 @@ snapshots:
       '@sentry/browser': 10.75.3
       '@sentry/conventions': 0.16.0
       '@sentry/core': 10.75.3
-      react: 19.2.8
+      react: 19.3.0
 
   '@sentry/replay-canvas@10.75.3':
     dependencies:
