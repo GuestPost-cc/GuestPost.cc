@@ -25,6 +25,7 @@ import {
 import { runEmailDeliveryTerminalTransaction } from "../lib/email-event-finalization"
 import {
   emailAllowedRecipientDomainsFromEnv,
+  emailAllowedRecipientsFromEnv,
   emailDeliveryModeFromEnv,
 } from "../lib/env"
 import {
@@ -76,9 +77,9 @@ const transporter = nodemailer.createTransport({
   tls: { minVersion: "TLSv1.2" },
 })
 
-// Optional comma-separated recipient-domain allowlist. This is useful in
-// staging/capture environments and is rechecked immediately before delivery.
+// Optional domain and exact-address allowlists, rechecked before delivery.
 const allowedDomains = emailAllowedRecipientDomainsFromEnv().domains
+const allowedRecipients = emailAllowedRecipientsFromEnv().recipients
 
 function recipientDomain(address: string): string | null {
   return address.split("@")[1]?.trim().toLowerCase() ?? null
@@ -94,6 +95,12 @@ function validateRecipient(address: unknown): string | null {
     (!domain || !allowedDomains.includes(domain))
   ) {
     return "Recipient domain is not allowed"
+  }
+  if (
+    allowedRecipients.length > 0 &&
+    !allowedRecipients.includes(address.trim().toLowerCase())
+  ) {
+    return "Recipient address is not allowed"
   }
   return null
 }

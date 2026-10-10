@@ -188,9 +188,10 @@ values and monitor failed executions.
    `STRIPE_LIVE_MODE_ENABLED=false` and payout sends bounded to Stripe test
    mode.
 6. Enable scheduled tasks only after their runtime and restricted Stripe test
-   variables are present. Start email in `capture` mode with an exact-domain
-   recipient allowlist. Enable external delivery only to the approved test
-   recipient after Resend verifies the sender.
+   variables are present. Start email in `capture` mode with the recipient
+   domain and exact-address allowlists. Before enabling `live` delivery, verify
+   the full address in `EMAIL_ALLOWED_RECIPIENTS` and confirm Resend has
+   verified the sender.
 
 For rollback, disable scheduled tasks, stop worker services, and redeploy the
 last known compatible image. Do not reverse migrations or reuse a runtime

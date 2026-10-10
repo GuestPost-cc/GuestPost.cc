@@ -37,9 +37,11 @@ role canaries and rollout steps are complete. Keep the initial finance posture
 locked. Enable Stripe test flows only with restricted test keys,
 `STRIPE_LIVE_MODE_ENABLED=false`, clean finance migrations, and the rollout
 checks in `STRIPE_STAGING_RUNBOOK.md`. Start email in `capture` mode with
-`EMAIL_ALLOWED_RECIPIENT_DOMAINS` set to the exact test recipient's domain;
-enable external delivery only to the approved test recipient after Resend
-verifies the sender.
+`EMAIL_ALLOWED_RECIPIENT_DOMAINS` set to the test recipient's domain and
+`EMAIL_ALLOWED_RECIPIENTS` set to the complete approved address. Live delivery
+with a domain restriction requires the exact-address allowlist, and the worker
+checks it before sending. Enable external delivery only after Resend verifies
+the sender and the approved recipient address has been supplied.
 
 ## Coolify connection
 

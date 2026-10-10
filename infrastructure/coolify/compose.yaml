@@ -213,6 +213,8 @@ services:
     environment:
       NODE_ENV: production
       EMAIL_DELIVERY_MODE: disabled
+      EMAIL_ALLOWED_RECIPIENT_DOMAINS: ${EMAIL_ALLOWED_RECIPIENT_DOMAINS:-}
+      EMAIL_ALLOWED_RECIPIENTS: ${EMAIL_ALLOWED_RECIPIENTS:-}
       DATABASE_URL: ${WORKER_DATABASE_URL:?Set the guestpost_worker_runtime Neon URL}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       QUEUE_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1

@@ -286,7 +286,9 @@ GRANT CONNECT ON DATABASE :"database_name" TO guestpost_reporting_runtime;
     );
   END
   $temporary_schema_owner_membership$;
+  GRANT CREATE ON DATABASE :"database_name" TO guestpost_schema_owner;
   ALTER SCHEMA public OWNER TO guestpost_schema_owner;
+  REVOKE CREATE ON DATABASE :"database_name" FROM guestpost_schema_owner;
   SET ROLE guestpost_schema_owner;
 \endif
 
