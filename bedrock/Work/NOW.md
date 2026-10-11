@@ -9,12 +9,13 @@ updated: 2026-10-11
 ## Coolify and Neon staging rebuild
 
 The user requested a fresh staging deployment from GitHub `main`, clarified that
-wallet deposits should be enabled, and approved one-time use of the Neon owner
-connection for database work. Coolify has seven app resources and private Redis
-configured; Redis is healthy, app routes still return 404, and the services
-have not deployed. Coolify targets `main` at `d5a60a7`; this checkout is on
-`codex/coolify-staging-rebuild` at `b5de0de` with additional local seed,
-migration, RLS, and runbook changes. The user chose to retain route
+wallet deposits should be enabled in Stripe test mode, and approved one-time
+use of the Neon owner connection for provisioning and seed work. Coolify has
+seven app resources and private Redis configured. Redis is running; all seven
+apps are stopped, and their public routes still return 404. The API resource
+targets `main` at `d5a60a7` and deploys on pushes. PR #158 is open at head
+`e07a8ae`; its GitHub `build-and-test` workflow is in progress. This checkout
+is on `codex/coolify-staging-rebuild`. The user chose to retain route
 `www.api.shohan.iam.bd` and preserve DNS records.
 
 Neon `guestpost-staging` (`crimson-lab-17945062`), branch
@@ -25,9 +26,13 @@ previous RLS flags, removed the one-use migrator, and installed the reviewed
 13-role `NOLOGIN` topology. Existing managed roles are `NOLOGIN` and
 `NOBYPASSRLS`. A hidden-input provisioner prepares separate API, auth, realtime
 worker, and jobs worker logins and verifies their effective roles before
-writing a mode-0600 Doppler handoff file. It is waiting for the user to enter
-the direct owner URL in the opened terminal. The owner URL is approved for
-one-time provisioning and seed work only; never store it in Coolify or an app
+writing a mode-0600 Doppler handoff file. Its Neon target is pinned to the
+staging branch endpoint. The latest owner URL was pasted into a regular zsh
+prompt and rejected as a command; rotate that credential before another owner
+connection. The user requested using the owner URL for API/worker runtime, but
+that would bypass RLS and grant role-management access to every app, so runtime
+services must instead use separate restricted logins. The owner URL remains
+one-time provisioning/seed input only; never save it in Coolify or an app
 config.
 
 The seed now has an explicit mode pinned to the staging Neon database and API
@@ -38,8 +43,9 @@ not expose fixture accounts to untrusted testers. Seeding requires a healthy
 deployed API and the one-time direct owner connection.
 
 Doppler has seven service configs and scoped read-only Coolify tokens. The API
-and workers still need verified restricted database mappings; Coolify does not
-yet map those values into containers. The R2 readiness object is present, but
+and workers still need verified restricted database mappings; the API's
+Coolify environment does not contain a `DATABASE_URL` binding. Doppler's
+database values are masked and remain unverified. The R2 readiness object is present, but
 the runtime upload/retrieve/checksum canary has not run. Invoice identity uses
 the explicitly approved dummy address `STAGING ONLY - NOT A REAL ADDRESS` and
 is staging-only. Stripe test credentials, webhook secrets, and restricted
@@ -53,12 +59,14 @@ inert-policy canaries, and application flows pass. Enable Stripe test wallet
 deposits only after those canaries pass; keep
 `STRIPE_LIVE_MODE_ENABLED=false`.
 
-Next: finish checks, publish staging hardening through a reviewed merge to
-`main`, map the restricted URLs from Doppler into Coolify, deploy API before
-the other services, pass database/auth/queue/storage canaries, then run the
-approved seed and bounded stress checks. Verify email only against the three
-approved staging mailboxes, keep payouts idle, and activate RLS only after its
-gates pass.
+Next: rotate the owner credential in Neon, enter the new URL only into the
+hidden provisioner terminal, and provision the four restricted runtime
+logins. Store their URLs in the matching Doppler configs and map them into
+Coolify before merging PR #158, because the API deploys automatically on a
+`main` push. After CI passes and the merge completes, deploy and pass the
+database/auth/queue/storage canaries, then run the approved seed and bounded
+stress checks. Verify email only against the three approved staging mailboxes,
+keep payouts idle, and activate full RLS only after its gates pass.
 
 ## Reconciliation repair proposal guard follow-up
 

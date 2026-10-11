@@ -33,6 +33,9 @@ runtime-login provisioning, or the approved staging seed; never store that
 owner URL in Doppler or Coolify. App services use separate non-owner,
 `NOBYPASSRLS` runtime logins and must pass effective-role and grant canaries
 before startup or full RLS activation.
+The migration, seed, and runtime-login provisioner each pin the endpoint host
+for branch `br-empty-resonance-b5fnktnx`, rejecting other Neon projects and
+branches before privileged writes.
 
 Staging keeps live Stripe mode disabled. Stripe test flows and external email
 delivery require restricted credentials and the readiness checks documented

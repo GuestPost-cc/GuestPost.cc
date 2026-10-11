@@ -12,12 +12,14 @@ updated: 2026-10-11
 direct migration applied all 100 migrations, verified table/sequence ownership
 and seven migration-owned FORCE RLS tables, preserved existing RLS flags,
 removed its temporary migrator, and installed the 13-role `NOLOGIN` topology.
-A hidden-input provisioner now creates four separate non-owner logins and
-checks their effective identities; it is waiting for the user to enter the
-direct owner URL. The owner is approved only for one-time provisioning and
-seed work, never app runtime. Doppler values still need to be pasted into their
-configs and mapped into Coolify. Keep API and workers stopped until grants and
-runtime canaries pass.
+A hidden-input provisioner is pinned to the exact branch endpoint and prepares
+four separate non-owner logins, but it has not run. The latest owner URL was
+pasted into a regular zsh prompt and rejected as a command; rotate that
+credential before another owner connection. Never map `neondb_owner` into an
+app because it bypasses RLS and can create roles. Doppler's masked DB values
+remain unverified, and Coolify has no API `DATABASE_URL` binding. Keep all apps
+stopped until restricted grants, effective identities, and runtime canaries
+pass.
 - **Staging fixture seed is intentionally unsafe outside a controlled staging
 project.** `scripts/seed.ts` now has an explicit, target-pinned staging mode
 approved by the user. It uses fixed fixture passwords, promotes staff roles,
@@ -43,10 +45,11 @@ reused. Keep Stripe execution flags off until runtime and RLS checks pass.
 sending-only key. Both workers have the approved exact addresses and domain
 allowlist. Keep email disabled until the deployed code enforces exact
 recipients, and keep the allowlist narrow during load testing.
-- **The app code is not on the configured deployment source yet.** This
-checkout is on `codex/coolify-staging-rebuild`; Coolify targets `main`
-(`d5a60a7`). Changes need a clean repo gate and reviewed merge before deploy.
-API and app hosts currently return 404.
+- **The app code is not on the configured deployment source yet.** PR #158 is
+open from `codex/coolify-staging-rebuild` at `e07a8ae`; its `build-and-test`
+workflow is running. Coolify targets `main` (`d5a60a7`) and deploys on push, so
+map verified restricted DB URLs before merging. API and app hosts currently
+return 404.
 
 Updated 2026-10-11 for the Coolify/Neon staging rebuild, provider credential
 setup, and constrained email capture. Historical audit Views are snapshots,
