@@ -1,79 +1,64 @@
 ---
 note_type: now
 project: guestpost-platform
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # Current focus
 
 ## Coolify and Neon staging rebuild
 
-The user chose a fresh staging redeploy on Coolify + Neon and confirmed the old
-Neon project was deleted, so do not restore or expect prior data. The current
-GitHub `main` is `418550a`; local branch `codex/coolify-staging-rebuild`
-has a committed Coolify Compose definition, shared Next.js Dockerfile, and
-staging runbook. A new empty Neon project `guestpost-staging` is created
-on the Free plan in Singapore with PostgreSQL 17 (`calm-waterfall-71932352`).
-The deployment config keeps finance locked and all payout/deposit/Connect/live
-Stripe and financial repair gates off. The Compose file derives all public
-URLs and origin allowlists from the required `APP_DOMAIN`; current staging is
-`shohan.iam.bd`, with `guestpost.mvp.bd` reserved for a later DNS and proxy
-cutover. The Coolify environment is named `staging`; all new independent
-resources must use the repository-restricted GitHub App and branch `main`.
-The current `main` lacks `infrastructure/coolify/Dockerfile.web`, so the four
-frontend resources cannot build until that file reaches `main`. PR #157
-proposes the Coolify Dockerfile and deployment manifest; its required
-`CI / build-and-test` check failed at `Audit production dependencies` before
-the build and tests because of critical `proxy-addr` and high `source-map-js`
-advisories. The PR also needs its reviewed Next.js startup command and runtime
-encryption-key environment fixed. Do not merge it until the required check is
-green and its review threads are resolved. The user wants independently managed
-website, portal, publisher, admin, API, realtime worker, scheduled-job worker,
-and Redis resources. The runbook documents these resources; the Compose file
-remains for local integration and previews. A
-private persistent Coolify Redis resource `guestpost-staging-redis` has been
-created and started. The prior Compose resource remains stopped with its form
-unsaved; do not save/reset or start it. The Coolify Traefik proxy is healthy on
-loopback port 18080 behind host Caddy, which retains public ports 80/443. DNS
-checks remain pending.
+The user requested a fresh staging deployment from GitHub `main`, clarified that
+wallet deposits should be enabled, and approved one-time use of the Neon owner
+connection for database work. Coolify has seven app resources and private Redis
+configured; Redis is healthy, app routes still return 404, and the services
+have not deployed. Coolify targets `main` at `d5a60a7`; this checkout is on
+`codex/coolify-staging-rebuild` at `b5de0de` with additional local seed,
+migration, RLS, and runbook changes. The user chose to retain route
+`www.api.shohan.iam.bd` and preserve DNS records.
 
-The user wants Stripe deposit/Connect/payout tests and transactional-email
-testing in staging. Restrict Stripe to test credentials with live mode disabled,
-and use email capture plus an exact recipient allowlist before external
-delivery. The test rollout still requires its migration, credential, webhook,
-sender, and reconciliation preconditions. The provided mail recipient
-`no-reply@` is incomplete; the user will provide the full address.
+Neon `guestpost-staging` (`crimson-lab-17945062`), branch
+`br-empty-resonance-b5fnktnx`, database `neondb`, is PostgreSQL 18 in Ohio. On
+2026-10-11 the direct migration applied all 100 Prisma migrations, verified
+table/sequence ownership and seven migration-owned FORCE RLS tables, preserved
+previous RLS flags, removed the one-use migrator, and installed the reviewed
+13-role `NOLOGIN` topology. Existing managed roles are `NOLOGIN` and
+`NOBYPASSRLS`. A hidden-input provisioner prepares separate API, auth, realtime
+worker, and jobs worker logins and verifies their effective roles before
+writing a mode-0600 Doppler handoff file. It is waiting for the user to enter
+the direct owner URL in the opened terminal. The owner URL is approved for
+one-time provisioning and seed work only; never store it in Coolify or an app
+config.
 
-Doppler Developer project `guestpost_staging` is now the staging environment
-manager. Its root `stg` holds the current root domain and public URLs; service
-configs `stg_api`, `stg_website`, `stg_portal`, `stg_publisher`, `stg_admin`,
-`stg_worker_realtime`, and `stg_worker_jobs` hold isolated runtime/build
-settings. `docs/DOPPLER_STAGING.md` maps configs to Coolify resources and lists
-the remaining values. No Coolify Doppler integration tokens or application
-credentials have been created. Next: resolve the Redis form's existing
-unsaved state before copying its internal URL, add separate runtime database
-URLs and operator-created app signing secrets, provision the bucket-scoped R2
-S3 key, and create read-only per-config Doppler service tokens for Coolify.
+The seed now has an explicit mode pinned to the staging Neon database and API
+origin. It preserves the requested fixtures, including known fixture
+passwords, staff roles, and a synthetic `$5,000` wallet ledger credit. The user
+approved the staging seed as-is. Run only in this staging environment, and do
+not expose fixture accounts to untrusted testers. Seeding requires a healthy
+deployed API and the one-time direct owner connection.
 
-Database provisioning is complete. All 100 checked-in Prisma migrations are
-applied under `guestpost_schema_owner`; the temporary Neon migration login and
-its database CREATE grant were removed. The 13-role ACL topology is in place,
-and API/auth/worker/reporting effective-role and table-grant canaries passed
-through temporary `SET ROLE` sessions that were rolled back; no runtime login
-credentials were created. Neon retains 13 project-owner admin-only membership
-edges beside the seven reviewed application edges; they have `INHERIT FALSE`
-and `SET FALSE` and are not used by app connections. Full RLS remains
-unactivated because its activation
-preflight currently expects no provider-managed owner edges; review that guard
-before any activation. Next: configure the staging R2 bucket/readiness object
-and reviewed invoice issuer identity, then provision runtime credentials and
-run actual login canaries. These values are still missing. Deploy the
-independent application resources from the deployment branch after required
-credentials are stored in Coolify. Confirm DNS and host Caddy routing before
-exposing the applications. Enable worker schedules only after
-the restricted Stripe test key is present. Keep full RLS activation separate
-until its role, canary, and atomic activation sequence in
-`docs/RLS_ROLLOUT.md` passes.
+Doppler has seven service configs and scoped read-only Coolify tokens. The API
+and workers still need verified restricted database mappings; Coolify does not
+yet map those values into containers. The R2 readiness object is present, but
+the runtime upload/retrieve/checksum canary has not run. Invoice identity uses
+the explicitly approved dummy address `STAGING ONLY - NOT A REAL ADDRESS` and
+is staging-only. Stripe test credentials, webhook secrets, and restricted
+Resend settings are configured. Live Stripe and payout execution stay off.
+External email stays disabled until the exact recipient guard is deployed.
+
+RLS activation remains a separate gated operation. Its preflight now allows
+only the exact Neon owner provider edge and schema-owner `SET ROLE` edge. Do
+not set `RLS_ENFORCEMENT_ENABLED=true` until runtime identities, grants,
+inert-policy canaries, and application flows pass. Enable Stripe test wallet
+deposits only after those canaries pass; keep
+`STRIPE_LIVE_MODE_ENABLED=false`.
+
+Next: finish checks, publish staging hardening through a reviewed merge to
+`main`, map the restricted URLs from Doppler into Coolify, deploy API before
+the other services, pass database/auth/queue/storage canaries, then run the
+approved seed and bounded stress checks. Verify email only against the three
+approved staging mailboxes, keep payouts idle, and activate RLS only after its
+gates pass.
 
 ## Reconciliation repair proposal guard follow-up
 

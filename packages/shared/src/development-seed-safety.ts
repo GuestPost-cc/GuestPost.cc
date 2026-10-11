@@ -1,6 +1,8 @@
 const LOOPBACK_SEED_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"])
 export const DEVELOPMENT_SEED_DATABASE_SENTINEL =
   "guestpost-local-development-v1"
+export const STAGING_SEED_CONFIRMATION =
+  "guestpost-staging:br-empty-resonance-b5fnktnx"
 
 export type DevelopmentSeedDatabaseIdentity = {
   databaseName: string
@@ -79,6 +81,71 @@ export function assertDevelopmentSeedSafety(
     throw new Error(
       "Development seed refuses non-local APIs; SEED_API_URL must be plain HTTP on local port 4000",
     )
+  }
+}
+
+/**
+ * The staging fixture is deliberately opt-in and tied to the approved Neon
+ * database and API. The direct owner URL is for this one-off seed process only.
+ */
+export function assertStagingSeedSafety(
+  nodeEnv: string | undefined,
+  databaseUrl: string | undefined,
+  apiUrl: string,
+  confirmation: string | undefined,
+): void {
+  if (nodeEnv !== "production") {
+    throw new Error("Staging seed requires NODE_ENV=production")
+  }
+  if (confirmation !== STAGING_SEED_CONFIRMATION) {
+    throw new Error("Staging seed target confirmation does not match")
+  }
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is required for the staging seed")
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(databaseUrl)
+  } catch {
+    throw new Error("DATABASE_URL must be a valid PostgreSQL URL")
+  }
+  const sslMode = parsed.searchParams.get("sslmode")
+  if (
+    (parsed.protocol !== "postgres:" && parsed.protocol !== "postgresql:") ||
+    !parsed.hostname.endsWith(".us-east-2.aws.neon.tech") ||
+    parsed.hostname.includes("-pooler") ||
+    (parsed.port !== "" && parsed.port !== "5432") ||
+    parsed.pathname !== "/neondb" ||
+    decodeURIComponent(parsed.username) !== "neondb_owner" ||
+    parsed.password === "" ||
+    sslMode !== "require" ||
+    parsed.searchParams.has("host") ||
+    parsed.searchParams.has("hostaddr") ||
+    parsed.searchParams.has("options") ||
+    parsed.hash !== ""
+  ) {
+    throw new Error(
+      "Staging seed requires the direct TLS neondb_owner URL for the approved Neon database",
+    )
+  }
+
+  let parsedApi: URL
+  try {
+    parsedApi = new URL(apiUrl)
+  } catch {
+    throw new Error("SEED_API_URL must be the approved staging API origin")
+  }
+  if (
+    parsedApi.protocol !== "https:" ||
+    parsedApi.hostname !== "api.shohan.iam.bd" ||
+    parsedApi.username !== "" ||
+    parsedApi.password !== "" ||
+    parsedApi.pathname !== "/" ||
+    parsedApi.search !== "" ||
+    parsedApi.hash !== ""
+  ) {
+    throw new Error("Staging seed refuses a non-staging API target")
   }
 }
 

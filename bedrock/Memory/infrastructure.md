@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-10-05
+updated: 2026-10-11
 ---
 
 # Infrastructure
@@ -25,6 +25,15 @@ and proxies to Coolify's private Traefik entry point. Neon uses separate API,
 Better Auth, worker, and migration identities. Full RLS activation remains a
 separate guarded operation described in `docs/RLS_ROLLOUT.md`.
 
+For the current Neon staging branch, `scripts/migrate-neon-direct.sh` is the
+repeatable migration path and `scripts/seed.ts` keeps local development as its
+default. Its explicit staging mode is pinned to the approved Neon branch and
+staging API. A direct `neondb_owner` URL is allowed only for one-time migration,
+runtime-login provisioning, or the approved staging seed; never store that
+owner URL in Doppler or Coolify. App services use separate non-owner,
+`NOBYPASSRLS` runtime logins and must pass effective-role and grant canaries
+before startup or full RLS activation.
+
 Staging keeps live Stripe mode disabled. Stripe test flows and external email
 delivery require restricted credentials and the readiness checks documented
 in the staging runbooks; email tests start in capture mode and external sends
@@ -38,7 +47,7 @@ trusted origins from it. Current staging uses `shohan.iam.bd`; future
 then a redeploy with the new root domain because one auth cookie can cover only
 one root domain at a time. See `docs/COOLIFY_STAGING_RUNBOOK.md`.
 
-## Doppler staging configs (2026-10-10)
+## Doppler staging configs (2026-10-11)
 
 The Developer-plan Doppler project `guestpost_staging` is the staging
 environment manager. The `stg` root config contains shared domain and public
@@ -46,9 +55,18 @@ build URLs. Seven branched configs isolate the API, four web builds, realtime
 worker, and jobs worker. Coolify should use a read-only service token scoped to
 each matching config and resolve values with `{{vault.KEY}}`; frontend
 `NEXT_PUBLIC_*` values and `APP_NAME` must be available at build time. The
-config map and outstanding values are tracked in `docs/DOPPLER_STAGING.md`. No
-Coolify integration tokens or provider/application credentials have been
-created. Do not promote staging values to `prd`.
+config map and outstanding values are tracked in `docs/DOPPLER_STAGING.md`.
+As of 2026-10-11, the seven matching read-only, config-scoped Doppler tokens
+are connected to the seven Coolify applications/workers; keep provider
+credentials in Doppler and do not promote staging values to `prd`.
+
+The staging API config holds a Better Auth secret, a shared queue-signing
+secret, the API-only integration encryption key, and the payout encryption
+keyring. The same queue-signing secret is configured on the realtime and jobs
+workers. Both workers have Resend SMTP settings and exact-address/domain
+allowlists. Delivery is disabled until the deployed code enforces the exact
+addresses; capture mode still sends real email. Keep the approved mailbox
+allowlist narrow during testing.
 
 ## Hosting model (2026-06-14)
 

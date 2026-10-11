@@ -1,9 +1,20 @@
+import { assertStagingSeedSafety } from "../packages/shared/src/development-seed-safety"
+
 type PrismaLike = {
   $transaction<T>(callback: (tx: any) => Promise<T>): Promise<T>
 }
 
 function assertTestFundingAllowed(amount: number) {
-  if (process.env.NODE_ENV === "production") {
+  const stagingLoadTest = process.env.LOAD_TEST_MODE === "staging"
+  if (stagingLoadTest) {
+    assertStagingSeedSafety(
+      "production",
+      process.env.DATABASE_URL,
+      process.env.API_URL ?? "",
+      process.env.SEED_STAGING_CONFIRMATION,
+    )
+  }
+  if (process.env.NODE_ENV === "production" && !stagingLoadTest) {
     throw new Error("Test wallet funding is disabled in production")
   }
   const databaseUrl = process.env.DATABASE_URL
@@ -14,6 +25,7 @@ function assertTestFundingAllowed(amount: number) {
   const localHosts = new Set(["localhost", "127.0.0.1", "::1", "postgres"])
   if (
     !localHosts.has(databaseHost) &&
+    !stagingLoadTest &&
     process.env.ALLOW_REMOTE_TEST_WALLET_FUNDING !== "true"
   ) {
     throw new Error(

@@ -358,6 +358,19 @@ historical audit batches.
 - `docs/ORDER_LIFECYCLE_AND_RECONCILIATION.md` is the durable contract for order creation, both fulfillment channels, role-safe visibility, immutable article provenance, atomic transitions, lifecycle presentation, financial invariants, reconciliation, incident diagnosis, and deployment order.
 - Admin Marketplace list/detail reads are explicit staff projections available to Super Admin, Operations, and read-only Finance. Finance cannot call marketplace mutations; Operations moderation/service actions remain constrained by route guards and assigned platform ownership. Marketplace staff views show publisher basics and source-aware Ahrefs/Moz/OpenPageRank values for publisher and platform inventory while omitting raw provider payloads, credentials, and internal fulfillment settings.
 
+## Direct Neon Migration (`scripts/migrate-neon-direct.sh`)
+
+- Requires `NEON_MIGRATION_REF` to name the exact deployment commit on
+  `origin/main`, and checks local Prisma schema/migrations plus role-provisioner
+  files against it. It accepts only a direct Neon `neondb_owner` URL for
+  database `neondb`, entered at a hidden prompt. It keeps connection passwords
+  in a temporary mode-0600 passfile, provisions a one-use migration login,
+  applies committed Prisma migrations, checks status and object ownership,
+  preserves pre-existing RLS flags, verifies seven migration-owned FORCE RLS
+  tables, removes the temporary login, then installs NOLOGIN runtime ACL roles.
+- Full-application RLS activation remains a separate, canary-gated operation;
+  the migration command does not disable RLS or run the activation script.
+
 ## Seed Script (`scripts/seed.ts`)
 
 - Creates 7 dev users via the API (real password hashing), including an

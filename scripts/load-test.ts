@@ -13,12 +13,30 @@
 import { createHash, randomBytes } from "node:crypto"
 import { runReconciliation } from "@guestpost/shared"
 import { prisma } from "../packages/database/src"
+import { assertStagingSeedSafety } from "../packages/shared/src/development-seed-safety"
 import { fundOrganizationWalletForTest } from "./test-wallet-funding"
 
 const API = process.env.API_URL ?? "http://localhost:4000"
+const MODE = process.env.LOAD_TEST_MODE ?? "development"
+if (MODE === "staging") {
+  assertStagingSeedSafety(
+    process.env.NODE_ENV,
+    process.env.DATABASE_URL,
+    API,
+    process.env.SEED_STAGING_CONFIRMATION,
+  )
+} else if (MODE === "development") {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Load-test provisioning is forbidden in production")
+  }
+} else {
+  throw new Error("LOAD_TEST_MODE must be development or staging")
+}
+
 const H = {
   "Content-Type": "application/json",
-  Origin: "http://localhost:3001",
+  Origin:
+    MODE === "staging" ? "https://app.shohan.iam.bd" : "http://localhost:3001",
 }
 const USERS = Number.parseInt(process.argv[2] ?? "1000", 10)
 const CONCURRENCY = Number.parseInt(process.argv[3] ?? "50", 10)
@@ -105,9 +123,6 @@ async function pool<T>(
 }
 
 async function main() {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Load-test provisioning is forbidden in production")
-  }
   if (!Number.isSafeInteger(USERS) || USERS < 1 || USERS > 10_000) {
     throw new Error("users must be an integer between 1 and 10000")
   }
@@ -118,6 +133,46 @@ async function main() {
   ) {
     throw new Error("concurrency must be an integer between 1 and 500")
   }
+  if (MODE === "staging" && (USERS > 1_000 || CONCURRENCY > 50)) {
+    throw new Error(
+      "Staging load-test bounds are 1000 users and 50 concurrent requests",
+    )
+  }
+
+  if (MODE === "staging") {
+    const identity = (await prisma.$queryRaw`
+      SELECT current_database() AS "databaseName",
+        session_user AS "sessionUser",
+        current_user AS "currentUser",
+        r.rolbypassrls AS "bypassRls"
+      FROM pg_roles r
+      WHERE r.rolname = current_user
+    `) as Array<{
+      databaseName: string
+      sessionUser: string
+      currentUser: string
+      bypassRls: boolean
+    }>
+    if (
+      identity.length !== 1 ||
+      identity[0].databaseName !== "neondb" ||
+      identity[0].sessionUser !== "neondb_owner" ||
+      identity[0].currentUser !== "neondb_owner" ||
+      identity[0].bypassRls !== true
+    ) {
+      throw new Error(
+        "Staging load-test fixture setup requires the one-time direct Neon owner connection",
+      )
+    }
+    const ready = await fetch(`${API}/api/v1/health/ready`)
+    const readiness = await ready.json().catch(() => null)
+    if (!ready.ok || readiness?.status !== "ok") {
+      throw new Error(
+        "Staging API is not ready; no load-test fixtures were written",
+      )
+    }
+  }
+
   console.log(`── Load test: ${USERS} users, ${CONCURRENCY} concurrent`)
   const runId = randomBytes(4).toString("hex")
 
