@@ -495,6 +495,9 @@ BEGIN
 
   EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', assert_function);
   EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', trigger_function);
+  -- PostgreSQL requires the new owner to have CREATE on this schema during
+  -- transfer. The authorizer remains USAGE + SELECT only after this block.
+  EXECUTE 'GRANT CREATE ON SCHEMA public TO guestpost_rls_authorizer';
   EXECUTE format(
     'ALTER FUNCTION %s OWNER TO guestpost_rls_authorizer',
     assert_function
@@ -503,6 +506,7 @@ BEGIN
     'ALTER FUNCTION %s OWNER TO guestpost_rls_authorizer',
     trigger_function
   );
+  EXECUTE 'REVOKE CREATE ON SCHEMA public FROM guestpost_rls_authorizer';
   EXECUTE format(
     'REVOKE ALL ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group',
     assert_function

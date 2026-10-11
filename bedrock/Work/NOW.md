@@ -61,8 +61,8 @@ allocation evidence through an invoker function whose execute permission the
 RLS provisioner revoked. The drafted fix pins a safe search path, makes both
 integrity helpers `SECURITY DEFINER`, and assigns them to the NOLOGIN,
 read-only `guestpost_rls_authorizer`. The provisioner temporarily grants the
-schema owner SET ROLE access to transfer those functions, then removes that
-membership before commit. This preserves the auth runtime's payout-table
+schema owner SET ROLE access and authorizer schema CREATE during transfer,
+then removes both before commit. This preserves the auth runtime's payout-table
 denial and leaves RLS flags unchanged. After these changes reach `main`, run
 `bash scripts/migrate-neon-direct.sh` from a matching checkout, then rerun
 `bash scripts/seed-staging.sh` with the existing mode-0600 credential file.

@@ -65,9 +65,9 @@ runtime intentionally has no payout-table reads, so these two trigger helpers
 must execute as the NOLOGIN, NOBYPASSRLS `guestpost_rls_authorizer`, which has
 SELECT-only access and an explicit RLS policy branch. The reviewed forward
 migration pins their search path and marks them `SECURITY DEFINER`; the role
-provisioner transfers ownership with a temporary schema-owner membership and
-removes it before commit. Do not grant payout-table reads to Better Auth or
-leave either helper executable by PUBLIC.
+provisioner transfers ownership with temporary schema-owner membership and
+schema `CREATE` access, then revokes both before commit. Do not grant
+payout-table reads to Better Auth or leave either helper executable by PUBLIC.
 
 Neon’s pooled endpoint rejects PostgreSQL startup options such as
 `options=-c role=...` (`08P01 unsupported startup parameter`). Keep each login

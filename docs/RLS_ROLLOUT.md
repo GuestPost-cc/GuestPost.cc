@@ -155,10 +155,12 @@ The publisher carry-forward deferred constraint triggers use
 `guestpost_rls_authorizer` for their read-only cross-table integrity check.
 That role receives `SELECT` only and is not a member of any other role. During
 provisioning, `guestpost_schema_owner` gets a temporary `SET ROLE` membership
-so the two trigger functions can be reassigned to the authorizer; the
-provisioner revokes that membership before commit. Better Auth therefore does
-not need direct `Withdrawal` or `WithdrawalAllocation` access to create a
-publisher balance, and runtime roles cannot assume the authorizer identity.
+so the two trigger functions can be reassigned to the authorizer. The
+provisioner also grants `CREATE` on `public` only during that ownership
+transfer, then revokes both temporary privileges before commit. Better Auth
+therefore does not need direct `Withdrawal` or `WithdrawalAllocation` access
+to create a publisher balance, and runtime roles cannot assume the authorizer
+identity.
 The financial-repair migration additionally requires its dedicated `NOLOGIN`,
 `NOINHERIT`, `NOBYPASSRLS` owner role to exist before migrations run; create it
 with `scripts/provision-financial-repair-guard-role.sql`. When
