@@ -98,7 +98,8 @@ const depositSchema = z.object({
     .multipleOf(0.01, "Use no more than two decimal places"),
 })
 
-type DepositForm = z.infer<typeof depositSchema>
+type DepositFormInput = z.input<typeof depositSchema>
+type DepositForm = z.output<typeof depositSchema>
 
 function safeDashboardReturn(value: string | null) {
   if (!value?.startsWith("/dashboard/") || value.startsWith("//")) {
@@ -130,7 +131,7 @@ export default function BillingPage() {
     handleSubmit,
     setValue,
     formState: { errors },
-  } = useForm<DepositForm>({
+  } = useForm<DepositFormInput, unknown, DepositForm>({
     resolver: zodResolver(depositSchema),
     defaultValues: { amount: 0 },
   })
