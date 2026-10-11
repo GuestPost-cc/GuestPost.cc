@@ -143,7 +143,7 @@ rejecting every other extra member, and verifies the schema owner's separate
 | `guestpost_auth_group`, `guestpost_auth_runtime` | Better Auth and account birth-time tables only. |
 | `guestpost_worker_group`, `guestpost_worker_runtime` | Platform job tables only, subject to forced policies. |
 | `guestpost_reporting_group`, `guestpost_reporting_runtime` | Starts with no table access. |
-| `guestpost_rls_authorizer` | `NOLOGIN`, `NOINHERIT`, no membership and no bypass; owns boolean-only `SECURITY DEFINER` policy helpers after activation. |
+| `guestpost_rls_authorizer` | `NOLOGIN`, `NOINHERIT`, no persistent membership and no bypass; owns reviewed `SECURITY DEFINER` policy and constraint-trigger helpers. |
 | `guestpost_financial_repair_guard` | `NOLOGIN`, `NOINHERIT`, no bypass; only `guestpost_schema_owner` may `SET ROLE` to it. Owns repair row-lock triggers and has narrow evidence reads plus column-scoped lock privileges under dedicated RLS policies. Runtime identities are not members. |
 
 Every managed role is `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`,
@@ -151,6 +151,16 @@ Every managed role is `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`,
 transitive membership edges and reconciles database/schema/relation/function
 ACLs in one transaction. It creates no password and leaves credential roles
 `NOLOGIN`; credential activation is a separate approved administrator change.
+The publisher carry-forward deferred constraint triggers use
+`guestpost_rls_authorizer` for their read-only cross-table integrity check.
+That role receives `SELECT` only and is not a member of any other role. During
+provisioning, `guestpost_schema_owner` gets a temporary `SET ROLE` membership
+so the two trigger functions can be reassigned to the authorizer. The
+provisioner also grants `CREATE` on `public` only during that ownership
+transfer, then revokes both temporary privileges before commit. Better Auth
+therefore does not need direct `Withdrawal` or `WithdrawalAllocation` access
+to create a publisher balance, and runtime roles cannot assume the authorizer
+identity.
 The financial-repair migration additionally requires its dedicated `NOLOGIN`,
 `NOINHERIT`, `NOBYPASSRLS` owner role to exist before migrations run; create it
 with `scripts/provision-financial-repair-guard-role.sql`. When

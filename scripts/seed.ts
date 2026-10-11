@@ -3,17 +3,30 @@
  * and a funded customer wallet. Development remains the default mode;
  * staging requires its explicit target confirmation.
  *
- * Auth-sensitive steps go through the real API (better-auth password hashing
- * and role endpoints). The SUPER_ADMIN bootstrap, test funding, and demo
- * content go directly through Prisma — there is intentionally no API path
- * that lets a user self-promote to staff.
+ * Signup and credential ownership checks go through the real API. Staging
+ * password reconciliation uses Better Auth's password hasher in a guarded
+ * owner-level transaction and revokes old sessions. Staff bootstrap, test
+ * funding, and demo content also use Prisma;
+ * there is intentionally no API path that lets a user self-promote to staff.
  *
  * Usage: pnpm seed   (local API must be running on :4000)
  */
 import { randomBytes } from "node:crypto"
-import { chmodSync, lstatSync, readFileSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  lstatSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
+import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import {
+  hashSeedPassword,
+  verifySeedPassword,
+} from "../packages/auth/src/seed-password"
 import {
   assertDevelopmentSeedDatabaseSentinel,
   assertDevelopmentSeedSafety,
@@ -25,6 +38,11 @@ import {
   TERMS_DOCUMENT_TYPE,
 } from "../packages/shared/src/legal"
 import { loadRootEnv } from "./env"
+
+// On dual-stack hosts without a working IPv6 route, Node's default 250ms
+// per-address attempt can expire before trying Neon's reachable IPv4 address.
+// Keep this scoped to the seed process; normal application pools are unchanged.
+setDefaultAutoSelectFamilyAttemptTimeout(1500)
 
 loadRootEnv({
   createDevelopmentFromExample: false,
@@ -77,6 +95,8 @@ const FIXTURE_USERS = [
     password: "FinanceChecker123!",
     name: "Fiona Finance Checker",
     type: "STAFF",
+    // There is no separate FINANCE_CHECKER value in StaffRole. The application
+    // enforces maker/checker separation by requiring distinct user IDs.
     role: "FINANCE",
   },
   {
@@ -109,9 +129,10 @@ const FIXTURE_USERS = [
   },
 ]
 
-function loadOrCreateStagingPasswords(
-  users: typeof FIXTURE_USERS,
-): Record<string, string> {
+function loadOrCreateStagingCredentialState(users: typeof FIXTURE_USERS): {
+  path: string
+  passwords: Record<string, string>
+} {
   const credentialsPath =
     process.env.SEED_STAGING_CREDENTIALS_FILE ??
     join(tmpdir(), "guestpost-staging-fixture-passwords.json")
@@ -133,16 +154,20 @@ function loadOrCreateStagingPasswords(
     credentials = readCredentials()
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-    const generated = Object.fromEntries(
-      users.map((user) => [user.email, randomBytes(32).toString("base64url")]),
+    const fixturePasswords = Object.fromEntries(
+      users.map((user) => [user.email, user.password]),
     ) as Record<string, string>
     try {
-      writeFileSync(credentialsPath, JSON.stringify(generated, null, 2), {
-        encoding: "utf8",
-        flag: "wx",
-        mode: 0o600,
-      })
-      credentials = generated
+      writeFileSync(
+        credentialsPath,
+        JSON.stringify(fixturePasswords, null, 2),
+        {
+          encoding: "utf8",
+          flag: "wx",
+          mode: 0o600,
+        },
+      )
+      credentials = fixturePasswords
     } catch (writeError) {
       if ((writeError as NodeJS.ErrnoException).code !== "EEXIST") {
         throw writeError
@@ -153,35 +178,42 @@ function loadOrCreateStagingPasswords(
 
   for (const user of users) {
     const password = credentials[user.email]
-    if (
-      typeof password !== "string" ||
-      password.length < 32 ||
-      password === user.password
-    ) {
+    if (typeof password !== "string" || password.length < 8) {
       throw new Error(
-        `Staging fixture credentials are incomplete or unsafe for ${user.email}`,
+        `Staging fixture credentials are incomplete for ${user.email}`,
       )
     }
   }
-  if (
-    new Set(users.map((user) => credentials[user.email])).size !== users.length
-  ) {
-    throw new Error("Staging fixture passwords must be unique")
-  }
   console.log(`Staging fixture passwords saved to ${credentialsPath}.`)
-  return credentials
+  return { path: credentialsPath, passwords: credentials }
 }
 
-const STAGING_PASSWORDS =
+const STAGING_CREDENTIAL_STATE =
   SEED_MODE === "staging"
-    ? loadOrCreateStagingPasswords(FIXTURE_USERS)
+    ? loadOrCreateStagingCredentialState(FIXTURE_USERS)
     : undefined
-const USERS = STAGING_PASSWORDS
-  ? FIXTURE_USERS.map((user) => ({
-      ...user,
-      password: STAGING_PASSWORDS[user.email],
-    }))
-  : FIXTURE_USERS
+const USERS = FIXTURE_USERS
+
+function saveStagingPassword(email: string, password: string): void {
+  if (!STAGING_CREDENTIAL_STATE) return
+  const next = {
+    ...STAGING_CREDENTIAL_STATE.passwords,
+    [email]: password,
+  }
+  const tempPath = `${STAGING_CREDENTIAL_STATE.path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`
+  try {
+    writeFileSync(tempPath, JSON.stringify(next, null, 2), {
+      encoding: "utf8",
+      flag: "wx",
+      mode: 0o600,
+    })
+    renameSync(tempPath, STAGING_CREDENTIAL_STATE.path)
+    chmodSync(STAGING_CREDENTIAL_STATE.path, 0o600)
+    STAGING_CREDENTIAL_STATE.passwords[email] = password
+  } finally {
+    rmSync(tempPath, { force: true })
+  }
+}
 
 async function api(
   path: string,
@@ -212,6 +244,32 @@ type VerifiedSession = {
   cookie: string
   origin: string
   userId: string
+}
+
+async function authApi(
+  path: string,
+  options: RequestInit,
+): Promise<ApiResponse> {
+  for (let retry = 0; ; retry += 1) {
+    const response = await api(path, options)
+    if (response.status !== 429) return response
+
+    const retryAfter =
+      response.headers.get("x-retry-after") ??
+      response.headers.get("retry-after")
+    const seconds = /^\d+$/.test(retryAfter ?? "")
+      ? Math.min(Number(retryAfter), 3600)
+      : 60
+    if (retry >= 2) {
+      throw new Error(
+        `Seed auth request ${path} is still rate limited after two cooldown waits; rerun after the API cooldown expires`,
+      )
+    }
+    console.warn(
+      `Seed auth request ${path} was rate limited; retrying in ${seconds + 1} seconds (${retry + 1}/2).`,
+    )
+    await new Promise((resolve) => setTimeout(resolve, (seconds + 1) * 1000))
+  }
 }
 
 const SESSION_COOKIE_NAMES = new Set([
@@ -361,7 +419,19 @@ async function signIn(
   password: string,
   portal: Portal,
 ): Promise<VerifiedSession> {
-  const res = await api("/auth/sign-in/email", {
+  const session = await trySignIn(email, password, portal)
+  if (!session) {
+    throw new Error(`Authentication for ${email} failed (HTTP 401)`)
+  }
+  return session
+}
+
+async function trySignIn(
+  email: string,
+  password: string,
+  portal: Portal,
+): Promise<VerifiedSession | null> {
+  const res = await authApi("/auth/sign-in/email", {
     method: "POST",
     headers: {
       "x-portal-type": portal,
@@ -369,7 +439,253 @@ async function signIn(
     },
     body: JSON.stringify({ email, password, rememberMe: false }),
   })
+  if (res.status === 401) return null
   return verifySession(res, email, portal)
+}
+
+async function ensureStaffFixtureRole(
+  prisma: any,
+  fixture: (typeof FIXTURE_USERS)[number],
+): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { email: fixture.email },
+    select: { id: true },
+  })
+  if (!user) throw new Error(`Missing staff fixture ${fixture.email}`)
+
+  const permissions =
+    fixture.role === "SUPER_ADMIN" || fixture.role === "FINANCE"
+      ? ["FINANCIAL_DATA_DECRYPT"]
+      : []
+
+  await prisma.$transaction(
+    async (tx: any) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "User"
+        WHERE "id" = ${user.id}
+        FOR UPDATE
+      `
+      const current = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { userType: true },
+      })
+      if (
+        !current ||
+        (current.userType !== "CUSTOMER" && current.userType !== "STAFF")
+      ) {
+        throw new Error(
+          `Staff fixture ${fixture.email} changed to an incompatible account type`,
+        )
+      }
+
+      let changed = current.userType !== "STAFF"
+      if (changed) {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { userType: "STAFF" },
+        })
+      }
+
+      const currentMembership = await tx.staffMembership.findUnique({
+        where: { userId: user.id },
+      })
+      const currentPermissions =
+        currentMembership &&
+        Array.isArray(currentMembership.permissions) &&
+        currentMembership.permissions.every(
+          (permission: unknown) => typeof permission === "string",
+        )
+          ? currentMembership.permissions
+          : null
+      const exactPermissions =
+        currentPermissions?.length === permissions.length &&
+        permissions.every((value) => currentPermissions.includes(value))
+
+      if (!currentMembership) {
+        await tx.staffMembership.create({
+          data: {
+            userId: user.id,
+            role: fixture.role as any,
+            permissions,
+          },
+        })
+        changed = true
+      } else if (currentMembership.role !== fixture.role || !exactPermissions) {
+        await tx.staffMembership.update({
+          where: { userId: user.id },
+          data: { role: fixture.role as any, permissions },
+        })
+        changed = true
+      }
+
+      const [verifiedUser, verifiedMembership] = await Promise.all([
+        tx.user.findUnique({
+          where: { id: user.id },
+          select: { userType: true },
+        }),
+        tx.staffMembership.findUnique({
+          where: { userId: user.id },
+          select: { role: true, permissions: true },
+        }),
+      ])
+      const verifiedPermissions = verifiedMembership?.permissions
+      if (
+        verifiedUser?.userType !== "STAFF" ||
+        verifiedMembership?.role !== fixture.role ||
+        !Array.isArray(verifiedPermissions) ||
+        verifiedPermissions.length !== permissions.length ||
+        !permissions.every((permission) =>
+          verifiedPermissions.includes(permission),
+        )
+      ) {
+        throw new Error(
+          `Staff role assignment for ${fixture.email} did not persist exactly`,
+        )
+      }
+
+      if (changed) await tx.session.deleteMany({ where: { userId: user.id } })
+    },
+    { isolationLevel: "Serializable" },
+  )
+}
+
+async function ensureSeedLegalAcceptance(
+  prisma: any,
+  fixture: (typeof FIXTURE_USERS)[number],
+  userId: string,
+): Promise<void> {
+  const expectedAudience = fixture.type === "STAFF" ? "CUSTOMER" : fixture.type
+  const where = {
+    userId_documentType_documentVersion: {
+      userId,
+      documentType: TERMS_DOCUMENT_TYPE,
+      documentVersion: CURRENT_TERMS_VERSION,
+    },
+  }
+  let acceptance = await prisma.legalAcceptance.findUnique({
+    where,
+    select: { audience: true, method: true },
+  })
+  let recovered = false
+
+  if (!acceptance && SEED_MODE === "staging") {
+    // The auth hook persists consent after account provisioning. A failed
+    // publisher provisioning hook can therefore leave this exact fixture
+    // account without its consent row. The staging seed submits
+    // termsAccepted=true and repairs only a missing row after API credential
+    // ownership has been verified; conflicting existing evidence is rejected.
+    acceptance = await prisma.legalAcceptance.upsert({
+      where,
+      create: {
+        userId,
+        documentType: TERMS_DOCUMENT_TYPE,
+        documentVersion: CURRENT_TERMS_VERSION,
+        method: "email",
+        audience: expectedAudience,
+        requestId: "staging-seed-fixture",
+      },
+      update: {},
+      select: { audience: true, method: true },
+    })
+    recovered = true
+  }
+
+  if (
+    acceptance?.audience !== expectedAudience ||
+    acceptance.method !== "email"
+  ) {
+    throw new Error(
+      `Seed identity for ${fixture.email} does not have exact fixture consent evidence`,
+    )
+  }
+  if (recovered) {
+    console.log(`  recovered staging fixture terms record for ${fixture.email}`)
+  }
+}
+
+async function ensureStagingFixturePassword(
+  prisma: any,
+  user: (typeof FIXTURE_USERS)[number],
+  userId: string,
+  portal: Portal,
+  afterOwnershipVerified?: () => Promise<void>,
+): Promise<void> {
+  const state = STAGING_CREDENTIAL_STATE
+  if (!state) throw new Error("Staging fixture credentials are unavailable")
+
+  const savedPassword = state.passwords[user.email]
+  let ownedSession: VerifiedSession | null = null
+  if (savedPassword !== user.password) {
+    ownedSession = await trySignIn(user.email, savedPassword, portal)
+  }
+
+  // A saved credential can be stale if a prior run changed the password but
+  // stopped before persisting the local file. Check the requested fixture
+  // password before reporting an ownership mismatch.
+  const targetSession =
+    ownedSession ?? (await trySignIn(user.email, user.password, portal))
+  if (!targetSession || targetSession.userId !== userId) {
+    throw new Error(
+      `Existing fixture account ${user.email} could not be authenticated as the exact database identity`,
+    )
+  }
+
+  await signOut(targetSession)
+  await afterOwnershipVerified?.()
+  if (user.type === "STAFF") await ensureStaffFixtureRole(prisma, user)
+
+  if (ownedSession) {
+    const account = await prisma.account.findFirst({
+      where: { userId, providerId: "credential" },
+      select: { id: true, password: true },
+    })
+    if (!account?.password) {
+      throw new Error(
+        `Credential account for ${user.email} is missing from the staging database`,
+      )
+    }
+    if (
+      !(await verifySeedPassword({
+        hash: account.password,
+        password: savedPassword,
+      }))
+    ) {
+      throw new Error(
+        `Credential for ${user.email} changed after the API sign-in check`,
+      )
+    }
+    const passwordHash = await hashSeedPassword(user.password)
+    await prisma.$transaction(
+      async (tx: any) => {
+        const updated = await tx.account.updateMany({
+          where: { id: account.id, password: account.password },
+          data: { password: passwordHash },
+        })
+        if (updated.count !== 1) {
+          throw new Error(
+            `Credential for ${user.email} changed during the staging password update`,
+          )
+        }
+        await tx.session.deleteMany({ where: { userId } })
+      },
+      { isolationLevel: "Serializable" },
+    )
+  }
+
+  const verifiedPortal: Portal = user.type === "STAFF" ? "staff" : portal
+  const verifiedTargetSession = await signIn(
+    user.email,
+    user.password,
+    verifiedPortal,
+  )
+  if (verifiedTargetSession.userId !== userId) {
+    throw new Error(
+      `Updated fixture credential for ${user.email} resolved to a different database identity`,
+    )
+  }
+  await signOut(verifiedTargetSession)
+  saveStagingPassword(user.email, user.password)
 }
 
 async function assertLocalApiSeedReadiness(
@@ -458,11 +774,12 @@ async function main() {
       // Phase 7.11 — birth-time provisioning. The databaseHooks in packages/auth
       // inspect x-portal-type to set userType + provision the right entity at
       // signup time. STAFF users are created as CUSTOMER here (no STAFF portal
-      // intent exists by design), then promoted to STAFF via DB in Phase 2 —
-      // their customer org from the after-hook is left as a harmless empty
+      // intent exists by design), then promoted to STAFF via DB immediately
+      // after their signup/ownership check. Their customer org from the hook
+      // is left as a harmless empty
       // workspace (STAFF users have no customer wallet access either way).
       const portal = u.type === "PUBLISHER" ? "publisher" : "customer"
-      const res = await api("/auth/sign-up/email", {
+      const res = await authApi("/auth/sign-up/email", {
         method: "POST",
         headers: {
           "x-portal-type": portal,
@@ -480,6 +797,9 @@ async function main() {
       if (res.ok) {
         const createdSession = await verifySession(res, u.email, portal)
         await signOut(createdSession)
+        await ensureSeedLegalAcceptance(prisma, u, createdSession.userId)
+        saveStagingPassword(u.email, u.password)
+        if (u.type === "STAFF") await ensureStaffFixtureRole(prisma, u)
         console.log(`  created ${u.email}`)
         continue
       }
@@ -520,26 +840,6 @@ async function main() {
         )
       }
 
-      const legalAcceptance = await prisma.legalAcceptance.findUnique({
-        where: {
-          userId_documentType_documentVersion: {
-            userId: existing.id,
-            documentType: TERMS_DOCUMENT_TYPE,
-            documentVersion: CURRENT_TERMS_VERSION,
-          },
-        },
-        select: { audience: true, method: true },
-      })
-      const expectedLegalAudience = u.type === "STAFF" ? "CUSTOMER" : u.type
-      if (
-        legalAcceptance?.audience !== expectedLegalAudience ||
-        legalAcceptance.method !== "email"
-      ) {
-        throw new Error(
-          `Duplicate seed identity for ${u.email} does not have exact fixture consent evidence`,
-        )
-      }
-
       if (isRecoverableStaffPrecursor) {
         const [staffMembership, moneyEvidence, orderEvidence] =
           await Promise.all([
@@ -572,12 +872,22 @@ async function main() {
           : existing.userType === "PUBLISHER"
             ? "publisher"
             : "customer"
-      await withVerifiedSession(
-        u.email,
-        u.password,
-        existingPortal,
-        async () => undefined,
-      )
+      if (SEED_MODE === "staging") {
+        await ensureStagingFixturePassword(
+          prisma,
+          u,
+          existing.id,
+          existingPortal,
+          () => ensureSeedLegalAcceptance(prisma, u, existing.id),
+        )
+      } else {
+        await withVerifiedSession(
+          u.email,
+          u.password,
+          existingPortal,
+          async () => ensureSeedLegalAcceptance(prisma, u, existing.id),
+        )
+      }
       console.log(`  existing ${u.email}`)
     }
 
@@ -594,65 +904,11 @@ async function main() {
       "── Phase 2: staff bootstrap via DB (no self-promotion API exists, by design)",
     )
     for (const u of USERS.filter((x) => x.type === "STAFF")) {
-      const user = await prisma.user.findUnique({ where: { email: u.email } })
-      if (!user) throw new Error(`Missing user ${u.email}`)
+      await ensureStaffFixtureRole(prisma, u)
       const permissions =
         u.role === "SUPER_ADMIN" || u.role === "FINANCE"
           ? ["FINANCIAL_DATA_DECRYPT"]
           : []
-      await prisma.$transaction(
-        async (tx) => {
-          await tx.$queryRaw`
-            SELECT "id"
-            FROM "User"
-            WHERE "id" = ${user.id}
-            FOR UPDATE
-          `
-          const current = await tx.user.findUnique({
-            where: { id: user.id },
-            select: { userType: true },
-          })
-          if (
-            !current ||
-            (current.userType !== "CUSTOMER" && current.userType !== "STAFF")
-          ) {
-            throw new Error(
-              `Staff fixture ${u.email} changed to an incompatible account type`,
-            )
-          }
-          if (current.userType !== "STAFF") {
-            await tx.user.update({
-              where: { id: user.id },
-              data: { userType: "STAFF" },
-            })
-          }
-          const currentMembership = await tx.staffMembership.findUnique({
-            where: { userId: user.id },
-          })
-          const currentPermissions =
-            currentMembership &&
-            Array.isArray(currentMembership.permissions) &&
-            currentMembership.permissions.every(
-              (permission) => typeof permission === "string",
-            )
-              ? currentMembership.permissions
-              : null
-          const exactPermissions =
-            currentPermissions?.length === permissions.length &&
-            permissions.every((value) => currentPermissions.includes(value))
-          if (!currentMembership) {
-            await tx.staffMembership.create({
-              data: { userId: user.id, role: u.role as any, permissions },
-            })
-          } else if (currentMembership.role !== u.role || !exactPermissions) {
-            await tx.staffMembership.update({
-              where: { userId: user.id },
-              data: { role: u.role as any, permissions },
-            })
-          }
-        },
-        { isolationLevel: "Serializable" },
-      )
       console.log(
         `  ${u.email} -> ${u.role}${permissions.length ? " +FINANCIAL_DATA_DECRYPT" : ""}`,
       )
@@ -672,9 +928,11 @@ async function main() {
     }
 
     console.log("── Phase 3: verify customer/publisher roles via admin API")
+    const admin = USERS.find((user) => user.role === "SUPER_ADMIN")
+    if (!admin) throw new Error("Seed Super Admin is missing")
     const allUsers: any[] = await withVerifiedSession(
-      "admin@guestpost.local",
-      "Admin123!",
+      admin.email,
+      admin.password,
       "staff",
       async (adminSession) => {
         const users: any[] = []
@@ -734,9 +992,11 @@ async function main() {
     )
 
     console.log("── Phase 4: organizations + member invite")
+    const client = USERS.find((user) => user.role === "OWNER")
+    if (!client) throw new Error("Seed customer owner is missing")
     const clientOrgId = await withVerifiedSession(
-      "client@guestpost.local",
-      "Client123!",
+      client.email,
+      client.password,
       "customer",
       async (clientSession) => {
         const orgsRes = await api(

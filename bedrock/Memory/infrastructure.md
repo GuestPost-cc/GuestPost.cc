@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
 # Infrastructure
@@ -33,9 +33,48 @@ runtime-login provisioning, or the approved staging seed; never store that
 owner URL in Doppler or Coolify. App services use separate non-owner,
 `NOBYPASSRLS` runtime logins and must pass effective-role and grant canaries
 before startup or full RLS activation.
+On the user's dual-stack Mac, Node's default 250ms address-family connection
+attempt timed out before trying Neon's reachable IPv4 endpoint because IPv6 had
+no route. The guarded seed process sets a 1500ms address-family timeout before
+opening Prisma; this workaround is scoped to the one-off seed and does not
+change application pool settings.
 The migration, seed, and runtime-login provisioner each pin the endpoint host
 for branch `br-empty-resonance-b5fnktnx`, rejecting other Neon projects and
 branches before privileged writes.
+Staging seed fixture credentials follow the per-account values in
+`FIXTURE_USERS`. The mode-0600 local credential file tracks the current value;
+on reruns, existing fixture accounts prove credential ownership through API
+sign-in, then use Better Auth's official password hasher in a guarded
+owner-level transaction that revokes sessions. The file advances only after
+the target password is verified by sign-in. Staff role reconciliation happens
+as soon as each staff fixture is authenticated, so later signup failures do not
+leave earlier staff accounts without their seed roles.
+The fixture role map is: admin `SUPER_ADMIN`; finance and finance-checker are
+distinct users with `FINANCE`; staff `OPERATIONS`; publisher
+`PUBLISHER_OWNER`; client organization `OWNER`; and member organization
+`MEMBER`. There is no `FINANCE_CHECKER` enum; payout maker/checker separation
+uses distinct user IDs.
+If a failed staging signup leaves a fixture without its current terms row, the
+seed records a clearly tagged fixture acceptance only after API sign-in proves
+the exact account. Existing conflicting consent evidence remains an error.
+
+Publisher fixture assignment creates `PublisherBalance`, whose deferred
+carry-forward constraint trigger reads `Withdrawal` and
+`WithdrawalAllocation` to verify the end-of-transaction invariant. The auth
+runtime intentionally has no payout-table reads, so these two trigger helpers
+must execute as the NOLOGIN, NOBYPASSRLS `guestpost_rls_authorizer`, which has
+SELECT-only access and an explicit RLS policy branch. The reviewed forward
+migration pins their search path and marks them `SECURITY DEFINER`; the role
+provisioner transfers ownership with temporary schema-owner membership and
+schema `CREATE` access, then revokes both before commit. Do not grant
+payout-table reads to Better Auth or leave either helper executable by PUBLIC.
+
+Neon’s pooled endpoint rejects PostgreSQL startup options such as
+`options=-c role=...` (`08P01 unsupported startup parameter`). Keep each login
+`NOINHERIT`, but grant only its matching runtime role with `INHERIT TRUE`,
+`SET TRUE`, and `ADMIN FALSE`; verify the effective grant and public-schema
+usage before starting the service. This preserves the role boundary without
+placing unsupported startup options in pooled URLs.
 
 Staging keeps live Stripe mode disabled. Stripe test flows and external email
 delivery require restricted credentials and the readiness checks documented
@@ -331,6 +370,13 @@ Neon, Upstash, Render, R2, Resend, Google, or Sentry deployment credentials.
 - `pnpm seed` — local-only known-password/demo-data fixture; refuses remote or
   indirect API/database targets, missing database sentinel, and
   non-development/test modes
+- `bash scripts/seed-staging.sh` — guarded, interactive staging fixture seed;
+  reads the direct Neon URL without echo and stores the current fixture
+  credentials in a mode-0600 local file. Staging uses the per-account pattern
+  in `scripts/seed.ts`; reruns use Better Auth's hasher to update existing
+  accounts and persist each new value after sign-in verification. Auth calls honor the API's
+  `X-Retry-After` cooldown (up to two retries), so a partial run can resume
+  with the same credential file without weakening staging limits.
 
 ## Prisma 7 + adapter-pg (Phase 7.13, 2026-06-21)
 

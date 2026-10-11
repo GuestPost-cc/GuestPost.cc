@@ -283,6 +283,11 @@ GRANT CONNECT ON DATABASE :"database_name" TO guestpost_reporting_runtime;
       'GRANT guestpost_schema_owner TO %I WITH INHERIT FALSE, SET TRUE',
       current_user
     );
+    -- Function ownership transfer requires SET ROLE to the new owner. Add
+    -- this edge only while the provisioner assigns audited definer helpers;
+    -- it is removed before commit so the authorizer has no memberships.
+    GRANT guestpost_rls_authorizer TO guestpost_schema_owner
+      WITH INHERIT FALSE, SET TRUE;
   END
   $temporary_schema_owner_membership$;
   GRANT CREATE ON DATABASE :"database_name" TO guestpost_schema_owner;
@@ -467,6 +472,61 @@ BEGIN
 END
 $delivery_fence_grant$;
 
+-- Deferred publisher carry-forward constraint triggers run in a read-only,
+-- non-login RLS authorizer context. Auth can create PublisherBalance rows but
+-- deliberately cannot read payout tables directly; the trigger still needs
+-- the cross-table view required to verify the invariant.
+DO $publisher_carry_forward_guard$
+DECLARE
+  assert_function regprocedure := to_regprocedure(
+    'public."assert_publisher_carry_forward_integrity"(text)'
+  );
+  trigger_function regprocedure := to_regprocedure(
+    'public."require_publisher_carry_forward_integrity"()'
+  );
+  secured_functions integer;
+BEGIN
+  IF assert_function IS NULL AND trigger_function IS NULL THEN
+    RETURN;
+  END IF;
+  IF assert_function IS NULL OR trigger_function IS NULL THEN
+    RAISE EXCEPTION 'Publisher carry-forward trigger functions are incomplete';
+  END IF;
+
+  EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', assert_function);
+  EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', trigger_function);
+  -- PostgreSQL requires the new owner to have CREATE on this schema during
+  -- transfer. The authorizer remains USAGE + SELECT only after this block.
+  EXECUTE 'GRANT CREATE ON SCHEMA public TO guestpost_rls_authorizer';
+  EXECUTE format(
+    'ALTER FUNCTION %s OWNER TO guestpost_rls_authorizer',
+    assert_function
+  );
+  EXECUTE format(
+    'ALTER FUNCTION %s OWNER TO guestpost_rls_authorizer',
+    trigger_function
+  );
+  EXECUTE 'REVOKE CREATE ON SCHEMA public FROM guestpost_rls_authorizer';
+  EXECUTE format(
+    'REVOKE ALL ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group',
+    assert_function
+  );
+  EXECUTE format(
+    'REVOKE ALL ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group',
+    trigger_function
+  );
+
+  SELECT count(*) INTO secured_functions
+  FROM pg_proc AS procedure
+  WHERE procedure.oid IN (assert_function, trigger_function)
+    AND procedure.prosecdef
+    AND pg_get_userbyid(procedure.proowner) = 'guestpost_rls_authorizer';
+  IF secured_functions <> 2 THEN
+    RAISE EXCEPTION 'Publisher carry-forward guards are not owned by the read-only authorizer';
+  END IF;
+END
+$publisher_carry_forward_guard$;
+
 -- Reporting starts fail-closed: connect + schema usage but no table, sequence,
 -- or function privileges. Add an approved view/query grant per report.
 
@@ -520,6 +580,7 @@ RESET ROLE;
   DO $remove_temporary_schema_owner_membership$
   BEGIN
     EXECUTE format('REVOKE guestpost_schema_owner FROM %I', session_user);
+    REVOKE guestpost_rls_authorizer FROM guestpost_schema_owner;
   END
   $remove_temporary_schema_owner_membership$;
 \endif
