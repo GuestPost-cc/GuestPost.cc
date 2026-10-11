@@ -94,7 +94,10 @@ one-use migration login was removed. The script also installed the 13-role
 provisioning remain separate gates. Use the actual `neondb` connection path
 for migration and runtime URLs unless an operator deliberately provisions a
 separate database. Runtime identities must be `NOBYPASSRLS`, non-owner, and
-have no DDL. Keep the migration URL outside all reusable runtime services.
+have no DDL. The migration and staging-seed guards pin the direct owner URL to
+the endpoint assigned to this exact branch, so a URL from another Neon project
+or branch is rejected before a database write. Keep the migration URL outside
+all reusable runtime services.
 Create the isolated identities described in `docs/RLS_ROLLOUT.md` and
 `docs/PRODUCTION_RUNBOOK.md`: schema owner/migrator, API runtime, auth runtime,
 worker runtime, reporting runtime, RLS authorizer, and the financial repair
@@ -168,8 +171,8 @@ The default `scripts/seed.ts` mode remains restricted to a local loopback API
 and sentinel-marked Compose database. The explicit staging mode targets only
 `https://api.shohan.iam.bd` and a direct TLS `neondb_owner` URL for `neondb` in
 the `guestpost-staging` Neon branch. It runs a staging API/Redis readiness
-check before writes. The owner URL is only for this one-off seed process; it
-must never be saved in Doppler or Coolify. Run it from a protected local
+check before writes. The owner URL is only for one-time provisioning and this
+seed process; it must never be saved in Doppler or Coolify. Run it from a protected local
 terminal with hidden input for the direct URL:
 
 ```sh

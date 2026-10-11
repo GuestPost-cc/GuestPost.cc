@@ -3,6 +3,8 @@ export const DEVELOPMENT_SEED_DATABASE_SENTINEL =
   "guestpost-local-development-v1"
 export const STAGING_SEED_CONFIRMATION =
   "guestpost-staging:br-empty-resonance-b5fnktnx"
+export const STAGING_NEON_DATABASE_HOST =
+  "ep-damp-boat-b5j0h24a.c-7.us-east-2.aws.neon.tech"
 
 export type DevelopmentSeedDatabaseIdentity = {
   databaseName: string
@@ -113,8 +115,7 @@ export function assertStagingSeedSafety(
   const sslMode = parsed.searchParams.get("sslmode")
   if (
     (parsed.protocol !== "postgres:" && parsed.protocol !== "postgresql:") ||
-    !parsed.hostname.endsWith(".us-east-2.aws.neon.tech") ||
-    parsed.hostname.includes("-pooler") ||
+    parsed.hostname !== STAGING_NEON_DATABASE_HOST ||
     (parsed.port !== "" && parsed.port !== "5432") ||
     parsed.pathname !== "/neondb" ||
     decodeURIComponent(parsed.username) !== "neondb_owner" ||

@@ -54,19 +54,20 @@ printf '\n'
 
 CONNECTION_INFO=$(NEON_ADMIN_URL="$NEON_ADMIN_URL" PASSFILE="$PASSFILE" node -e '
 const fs = require("node:fs");
+const expectedHost = "ep-damp-boat-b5j0h24a.c-7.us-east-2.aws.neon.tech";
 try {
   const u = new URL(process.env.NEON_ADMIN_URL);
   const database = decodeURIComponent(u.pathname.replace(/^\//, ""));
   const username = decodeURIComponent(u.username);
   const password = decodeURIComponent(u.password);
-  if (!["postgres:", "postgresql:"].includes(u.protocol) || !u.hostname.endsWith(".neon.tech") || u.hostname.includes("-pooler") || database !== "neondb" || username !== "neondb_owner" || !password || /[\r\n\t]/.test(password)) process.exit(2);
+  if (!["postgres:", "postgresql:"].includes(u.protocol) || u.hostname !== expectedHost || u.hostname.includes("-pooler") || database !== "neondb" || username !== "neondb_owner" || !password || /[\r\n\t]/.test(password)) process.exit(2);
   const escape = value => value.replaceAll("\\", "\\\\").replaceAll(":", "\\:");
   fs.writeFileSync(process.env.PASSFILE, `${escape(u.hostname)}:${u.port || "5432"}:${escape(database)}:${escape(username)}:${escape(password)}\n`, { mode: 0o600 });
   process.stdout.write(`${u.hostname}\t${u.port || "5432"}`);
 } catch {
   process.exit(2);
 }') || {
-  printf 'Use a valid direct Neon URL for neondb_owner on database neondb. A pooled or non-Neon URL is rejected; no SQL was run.\n' >&2
+  printf 'Use the direct neondb_owner URL for the pinned guestpost-staging branch and database neondb. Other branches and pooled endpoints are rejected; no SQL was run.\n' >&2
   exit 1
 }
 IFS=$'\t' read -r PGHOST PGPORT <<< "$CONNECTION_INFO"

@@ -4,6 +4,7 @@ import {
   assertStagingSeedSafety,
   DEVELOPMENT_SEED_DATABASE_SENTINEL,
   isDevelopmentSeedApiRequestAllowed,
+  STAGING_NEON_DATABASE_HOST,
   STAGING_SEED_CONFIRMATION,
 } from "../development-seed-safety"
 
@@ -115,7 +116,7 @@ describe("development seed safety boundary", () => {
     expect(() =>
       assertStagingSeedSafety(
         "production",
-        "postgresql://neondb_owner:secret@ep-example.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
+        `postgresql://neondb_owner:secret@${STAGING_NEON_DATABASE_HOST}/neondb?sslmode=require&channel_binding=require`,
         "https://api.shohan.iam.bd",
         STAGING_SEED_CONFIRMATION,
       ),
@@ -125,7 +126,7 @@ describe("development seed safety boundary", () => {
   it.each([
     [
       "development",
-      "postgresql://neondb_owner:secret@ep-example.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
+      `postgresql://neondb_owner:secret@${STAGING_NEON_DATABASE_HOST}/neondb?sslmode=require&channel_binding=require`,
       "https://api.shohan.iam.bd",
       STAGING_SEED_CONFIRMATION,
     ],
@@ -143,13 +144,19 @@ describe("development seed safety boundary", () => {
     ],
     [
       "production",
-      "postgresql://neondb_owner:secret@ep-example.us-east-2.aws.neon.tech/neondb?sslmode=require",
+      "postgresql://neondb_owner:secret@ep-other.us-east-2.aws.neon.tech/neondb?sslmode=require",
+      "https://api.shohan.iam.bd",
+      STAGING_SEED_CONFIRMATION,
+    ],
+    [
+      "production",
+      `postgresql://neondb_owner:secret@${STAGING_NEON_DATABASE_HOST}/neondb?sslmode=require`,
       "https://api.example.com",
       STAGING_SEED_CONFIRMATION,
     ],
     [
       "production",
-      "postgresql://neondb_owner:secret@ep-example.us-east-2.aws.neon.tech/neondb?sslmode=require",
+      "postgresql://neondb_owner:secret@ep-other.us-east-2.aws.neon.tech/neondb?sslmode=require",
       "https://api.shohan.iam.bd",
       "wrong-target",
     ],
