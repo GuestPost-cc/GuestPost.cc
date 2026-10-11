@@ -8,21 +8,22 @@ updated: 2026-10-11
 
 ## Current staging deployment blockers
 
-- **Neon runtime identities are provisioned; canaries remain pending.** On 2026-10-11 the
-direct migration applied all 100 migrations, verified table/sequence ownership
-and seven migration-owned FORCE RLS tables, preserved existing RLS flags,
-removed its temporary migrator, and installed the 13-role `NOLOGIN` topology.
-Four separate logins were created and catalog-verified; all are non-owner,
-`NOBYPASSRLS`, non-superuser, non-inheriting, and have only their intended
-runtime membership. Their pooled URLs are stored in Doppler and mapped to the
-API and both workers. Verify actual connection/effective identity and grants
-before enabling full application RLS. Never map `neondb_owner` into an app.
+- **Neon runtime identities are provisioned; canaries remain pending.** On
+  2026-10-11 the direct migration applied all 100 migrations, verified
+  table/sequence ownership and seven migration-owned FORCE RLS tables,
+  preserved existing RLS flags, removed its temporary migrator, and installed
+  the 13-role `NOLOGIN` topology. Four separate logins were created and
+  catalog-verified; all are non-owner, `NOBYPASSRLS`, non-superuser,
+  non-inheriting, and have only their intended runtime membership. Their pooled
+  URLs are stored in Doppler and mapped to the API and both workers. Verify
+  actual connection/effective identity and grants before enabling full
+  application RLS. Never map `neondb_owner` into an app.
 - **Staging fixture seed is for controlled staging only.** `scripts/seed.ts`
-has an explicit target-pinned staging mode. It preserves fixture identities,
-staff roles, and a synthetic `$5,000` wallet credit; it generates unique
-random passwords in a mode-0600 local file. Run only against the approved Neon
-branch after the API is healthy; do not expose fixture accounts to untrusted
-testers. The credit is a seed ledger entry, not a Stripe payment.
+  has an explicit target-pinned staging mode. It preserves fixture identities,
+  staff roles, and a synthetic `$5,000` wallet credit; it generates unique
+  random passwords in a mode-0600 local file. Run only against the approved
+  Neon branch after the API is healthy; do not expose fixture accounts to
+  untrusted testers. The credit is a seed ledger entry, not a Stripe payment.
 - **Full RLS activation still requires runtime canaries.** Its preflight permits
 only Neon's exact owner provider membership (`ADMIN TRUE`, `INHERIT FALSE`,
 `SET FALSE`) and the schema owner's exact `SET ROLE` edge. Keep
@@ -42,11 +43,11 @@ reused. Keep Stripe execution flags off until runtime and RLS checks pass.
 sending-only key. Both workers have the approved exact addresses and domain
 allowlist. Keep email disabled until the deployed code enforces exact
 recipients, and keep the allowlist narrow during load testing.
-- **PR #158 review fixes are local and need a green CI run.** The PR is open at
-`f916d55d1fc486d5d1d4dc6a613265d8c0a16cb9`; seven CodeRabbit findings are
-fixed in the checkout but not pushed yet. Coolify targets `main` (`d5a60a7`)
-and deploys on push. The API and workers have restricted database/Redis
-references; app health and public routes still require deployment verification.
+- **PR #158 needs a green CI run before merge.** The seven review fixes were
+  pushed in commit `bbea239`; workflow run 38113628220 is in progress. Coolify
+  targets `main` (`d5a60a7`) and deploys on push. The API and workers have
+  restricted database/Redis references; app health and public routes still
+  require deployment verification.
 
 Updated 2026-10-11 for the Coolify/Neon staging rebuild, restricted runtime
 credentials, and constrained email capture. Historical audit Views are snapshots,

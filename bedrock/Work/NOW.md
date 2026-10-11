@@ -16,8 +16,8 @@ private Redis configured. Redis is running. The API and both workers now map
 separate pooled login URLs from `stg_api`, `stg_worker_realtime`, and
 `stg_worker_jobs`; the website, portal, publisher, and admin remain to be
 deployed. The API resource targets `main` at `d5a60a7` and deploys on pushes.
-PR #158 is open at `f916d55d1fc486d5d1d4dc6a613265d8c0a16cb9`; seven review
-findings are fixed locally but not yet pushed, and CI must run on the new head.
+PR #158 is open at `bbea239b7bda98223244484186ca537cdec65df0`; seven review
+findings are fixed and pushed. GitHub CI run 38113628220 is in progress.
 This checkout is on `codex/coolify-staging-rebuild`. The user chose to retain
 route `www.api.shohan.iam.bd` and preserve DNS records.
 
@@ -57,9 +57,8 @@ inert-policy canaries, and application flows pass. Enable Stripe test wallet
 deposits only after those canaries pass; keep
 `STRIPE_LIVE_MODE_ENABLED=false`.
 
-Next: update PR #158's body with current rollout status, commit and push the
-review fixes, wait for successful CI, then merge. Deploy API and workers before
-web resources; pass database/auth/queue/storage canaries, then run the approved
+Next: merge PR #158 after CI passes. Deploy API and workers before web
+resources; pass database/auth/queue/storage canaries, then run the approved
 seed with its generated credentials file and bounded stress checks. Verify
 email only against the three approved staging mailboxes, keep payouts idle,
 and activate full RLS only after its gates pass.
