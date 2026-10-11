@@ -507,14 +507,9 @@ BEGIN
     trigger_function
   );
   EXECUTE 'REVOKE CREATE ON SCHEMA public FROM guestpost_rls_authorizer';
-  EXECUTE format(
-    'REVOKE ALL ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group',
-    assert_function
-  );
-  EXECUTE format(
-    'REVOKE ALL ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group',
-    trigger_function
-  );
+  -- PUBLIC and runtime function grants were revoked above while the schema
+  -- owner still owned these functions. Do not repeat those REVOKEs after
+  -- transfer: only the authorizer owner can alter its function ACLs.
 
   SELECT count(*) INTO secured_functions
   FROM pg_proc AS procedure
