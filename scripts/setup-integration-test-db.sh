@@ -22,7 +22,7 @@ if docker inspect gp-postgres >/dev/null 2>&1; then
   psql_db() {
     local database="$1"
     shift
-    docker exec -e "PGPASSWORD=${PG_PASS}" gp-postgres \
+    docker exec -i -e "PGPASSWORD=${PG_PASS}" gp-postgres \
       psql -X -U "${PG_USER}" -d "${database}" "$@"
   }
 else
@@ -37,7 +37,7 @@ fi
 
 echo "==> Provisioning migration-owned financial repair roles"
 psql_db postgres -v ON_ERROR_STOP=1 \
-  -f scripts/provision-financial-repair-guard-role.sql
+  -f - < scripts/provision-financial-repair-guard-role.sql
 
 echo "==> Creating template database: ${TEMPLATE_DB}"
 

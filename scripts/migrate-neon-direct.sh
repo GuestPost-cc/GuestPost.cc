@@ -73,11 +73,11 @@ try {
 IFS=$'\t' read -r PGHOST PGPORT <<< "$CONNECTION_INFO"
 
 psql_admin() {
-  env PGPASSFILE="$PASSFILE" PGHOST="$PGHOST" PGPORT="$PGPORT" PGUSER=neondb_owner PGDATABASE=neondb PGSSLMODE=require PGCONNECT_TIMEOUT=10 "$PSQL_BIN" -X "$@"
+  env PGPASSFILE="$PASSFILE" PGHOST="$PGHOST" PGPORT="$PGPORT" PGUSER=neondb_owner PGDATABASE=neondb PGSSLMODE=verify-full PGCONNECT_TIMEOUT=10 "$PSQL_BIN" -X "$@"
 }
 
 psql_migrator() {
-  env PGPASSFILE="$PASSFILE" PGHOST="$PGHOST" PGPORT="$PGPORT" PGUSER=guestpost_migrator_login PGDATABASE=neondb PGSSLMODE=require PGCONNECT_TIMEOUT=10 PGOPTIONS='-c role=guestpost_schema_owner' "$PSQL_BIN" -X "$@"
+  env PGPASSFILE="$PASSFILE" PGHOST="$PGHOST" PGPORT="$PGPORT" PGUSER=guestpost_migrator_login PGDATABASE=neondb PGSSLMODE=verify-full PGCONNECT_TIMEOUT=10 PGOPTIONS='-c role=guestpost_schema_owner' "$PSQL_BIN" -X "$@"
 }
 
 ADMIN_IDENTITY=$(psql_admin -Atc "SELECT current_user || '|' || current_database()")
@@ -115,7 +115,7 @@ psql_admin -v ON_ERROR_STOP=1 -f "$TEMP_SQL"
 rm -f "$TEMP_SQL"
 TEMP_SQL=""
 
-MIGRATOR_URL=$(NEON_ADMIN_URL="$NEON_ADMIN_URL" MIGRATOR_PASSWORD="$MIGRATOR_PASSWORD" node -e 'const u=new URL(process.env.NEON_ADMIN_URL); u.username="guestpost_migrator_login"; u.password=process.env.MIGRATOR_PASSWORD; u.searchParams.set("sslmode","require"); u.searchParams.set("options","-c role=guestpost_schema_owner"); process.stdout.write(u.toString());')
+MIGRATOR_URL=$(NEON_ADMIN_URL="$NEON_ADMIN_URL" MIGRATOR_PASSWORD="$MIGRATOR_PASSWORD" node -e 'const u=new URL(process.env.NEON_ADMIN_URL); u.username="guestpost_migrator_login"; u.password=process.env.MIGRATOR_PASSWORD; u.searchParams.set("sslmode","verify-full"); u.searchParams.set("options","-c role=guestpost_schema_owner"); process.stdout.write(u.toString());')
 MIGRATOR_IDENTITY=$(psql_migrator -Atc "SELECT session_user || '|' || current_user || '|' || current_database()")
 if [[ "$MIGRATOR_IDENTITY" != 'guestpost_migrator_login|guestpost_schema_owner|neondb' ]]; then
   printf 'Migration identity did not match the reviewed schema owner; migrations were not run.\n' >&2

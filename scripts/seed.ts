@@ -10,6 +10,10 @@
  *
  * Usage: pnpm seed   (local API must be running on :4000)
  */
+import { randomBytes } from "node:crypto"
+import { chmodSync, lstatSync, readFileSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import {
   assertDevelopmentSeedDatabaseSentinel,
   assertDevelopmentSeedSafety,
@@ -53,7 +57,7 @@ const headers: Record<string, string> = {
       : "http://localhost:3001",
 }
 
-const USERS = [
+const FIXTURE_USERS = [
   {
     email: "admin@guestpost.local",
     password: "Admin123!",
@@ -104,6 +108,80 @@ const USERS = [
     role: "MEMBER",
   },
 ]
+
+function loadOrCreateStagingPasswords(
+  users: typeof FIXTURE_USERS,
+): Record<string, string> {
+  const credentialsPath =
+    process.env.SEED_STAGING_CREDENTIALS_FILE ??
+    join(tmpdir(), "guestpost-staging-fixture-passwords.json")
+
+  const readCredentials = () => {
+    const stat = lstatSync(credentialsPath)
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new Error("Staging fixture credentials path must be a regular file")
+    }
+    chmodSync(credentialsPath, 0o600)
+    return JSON.parse(readFileSync(credentialsPath, "utf8")) as Record<
+      string,
+      string
+    >
+  }
+
+  let credentials: Record<string, string>
+  try {
+    credentials = readCredentials()
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    const generated = Object.fromEntries(
+      users.map((user) => [user.email, randomBytes(32).toString("base64url")]),
+    ) as Record<string, string>
+    try {
+      writeFileSync(credentialsPath, JSON.stringify(generated, null, 2), {
+        encoding: "utf8",
+        flag: "wx",
+        mode: 0o600,
+      })
+      credentials = generated
+    } catch (writeError) {
+      if ((writeError as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw writeError
+      }
+      credentials = readCredentials()
+    }
+  }
+
+  for (const user of users) {
+    const password = credentials[user.email]
+    if (
+      typeof password !== "string" ||
+      password.length < 32 ||
+      password === user.password
+    ) {
+      throw new Error(
+        `Staging fixture credentials are incomplete or unsafe for ${user.email}`,
+      )
+    }
+  }
+  if (
+    new Set(users.map((user) => credentials[user.email])).size !== users.length
+  ) {
+    throw new Error("Staging fixture passwords must be unique")
+  }
+  console.log(`Staging fixture passwords saved to ${credentialsPath}.`)
+  return credentials
+}
+
+const STAGING_PASSWORDS =
+  SEED_MODE === "staging"
+    ? loadOrCreateStagingPasswords(FIXTURE_USERS)
+    : undefined
+const USERS = STAGING_PASSWORDS
+  ? FIXTURE_USERS.map((user) => ({
+      ...user,
+      password: STAGING_PASSWORDS[user.email],
+    }))
+  : FIXTURE_USERS
 
 async function api(
   path: string,

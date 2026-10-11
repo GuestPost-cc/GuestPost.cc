@@ -156,7 +156,7 @@ describe("development seed safety boundary", () => {
     ],
     [
       "production",
-      "postgresql://neondb_owner:secret@ep-other.us-east-2.aws.neon.tech/neondb?sslmode=require",
+      `postgresql://neondb_owner:secret@${STAGING_NEON_DATABASE_HOST}/neondb?sslmode=require`,
       "https://api.shohan.iam.bd",
       "wrong-target",
     ],

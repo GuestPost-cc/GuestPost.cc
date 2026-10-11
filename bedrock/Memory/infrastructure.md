@@ -59,9 +59,8 @@ worker, and jobs worker. Coolify should use a read-only service token scoped to
 each matching config and resolve values with `{{vault.KEY}}`; frontend
 `NEXT_PUBLIC_*` values and `APP_NAME` must be available at build time. The
 config map and outstanding values are tracked in `docs/DOPPLER_STAGING.md`.
-As of 2026-10-11, the seven matching read-only, config-scoped Doppler tokens
-are connected to the seven Coolify applications/workers; keep provider
-credentials in Doppler and do not promote staging values to `prd`.
+Keep provider credentials in Doppler and do not promote staging values to
+`prd`.
 
 The staging API config holds a Better Auth secret, a shared queue-signing
 secret, the API-only integration encryption key, and the payout encryption

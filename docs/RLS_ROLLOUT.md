@@ -131,11 +131,10 @@ with `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`. `neondb_owner` itself has
 `BYPASSRLS` and `CREATEROLE`; it is the administrative Neon connection and
 must never be used by an app. The application roles have only
 their seven reviewed functional edges; the provider edges cannot be inherited
-or set by app roles. The current `activate-full-rls.sql` preflight rejects the
-provider edge to the repair guard. Its reviewed preflight exception accepts
-only the exact `neondb_owner` edge with those three flags, continues rejecting
-every other extra member, and verifies the schema owner's separate `SET TRUE`
-edge. Do not relax membership checks broadly.
+or set by app roles. The reviewed `activate-full-rls.sql` preflight accepts
+only the exact `neondb_owner` provider edge with those three flags, continues
+rejecting every other extra member, and verifies the schema owner's separate
+`SET TRUE` edge. Do not relax membership checks broadly.
 
 | Roles | Purpose |
 | --- | --- |

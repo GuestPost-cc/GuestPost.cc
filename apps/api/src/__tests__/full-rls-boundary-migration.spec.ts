@@ -122,9 +122,9 @@ describe("full application RLS boundary migration", () => {
 
   it("allows only Neon's non-inheritable, non-settable owner edge to the repair guard", () => {
     expect(activation).toContain("member.rolname = 'neondb_owner'")
-    expect(activation).toContain("membership.admin_option")
-    expect(activation).toContain("membership.inherit_option")
-    expect(activation).toContain("membership.set_option")
+    expect(activation).toMatch(
+      /member\.rolname = 'neondb_owner'[\s\S]*?AND membership\.admin_option\s+AND NOT membership\.inherit_option\s+AND NOT membership\.set_option/,
+    )
     expect(activation).toContain(
       "repair guard must be SET ROLE-accessible to guestpost_schema_owner",
     )

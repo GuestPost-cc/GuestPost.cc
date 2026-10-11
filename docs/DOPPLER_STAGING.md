@@ -42,12 +42,10 @@ sends real messages through SMTP, so keep the approved allowlists narrow.
 
 ## Coolify connection
 
-Coolify currently targets `main` at `d5a60a7`, whose worker does not enforce
-`EMAIL_ALLOWED_RECIPIENTS`; it checks only the recipient domain. Keep email
-delivery disabled for that image. Enable capture only after the exact-address
-guard is included in the deployed commit and verified. The local
-`codex/coolify-staging-rebuild` branch contains that guard and the staging
-Docker/RLS setup, but it has not been merged to `main`.
+Keep email delivery disabled until the deployed worker enforces
+`EMAIL_ALLOWED_RECIPIENTS` as exact addresses. The guard is included in PR
+#158; enable restricted capture only after that revision is deployed and
+verified. Capture mode sends real mail through SMTP.
 
 Coolify supports Doppler as a secret manager. Create a read-only Doppler
 service token for each config in that table, then add the tokens under
@@ -66,28 +64,27 @@ service tokens for Coolify. If an AI tool later needs access, give it a separate
 read-only token scoped to the staging config it needs; never reuse a Coolify
 integration token or grant access to the Production config.
 
-On 2026-10-11, Coolify showed the scoped Doppler tokens attached to the API,
-realtime worker, and jobs worker, but their environment-variable lists had no
-`DATABASE_URL`, `AUTH_DATABASE_URL`, `REDIS_URL`, or `QUEUE_REDIS_URL` mappings.
-Attaching the token alone does not inject config values. Add the required
-`{{vault.KEY}}` references on each matching resource, with database URLs
-scoped to their specific runtime roles, then confirm each is marked runtime
-and save. Keep frontend public URLs marked build-time. Do not map a
-`neondb_owner` or migration connection into a service.
+On 2026-10-11, the Coolify API now maps runtime-only `{{vault.KEY}}` references
+for `DATABASE_URL`, `AUTH_DATABASE_URL`, `REDIS_URL`, and `QUEUE_REDIS_URL`.
+Both workers map `DATABASE_URL`, `REDIS_URL`, and `QUEUE_REDIS_URL` as
+runtime-only references. API/auth/worker database URLs use separate
+least-privilege logins. Do not map a `neondb_owner` or migration connection
+into a service.
 
 ## Values still required
 
-On 2026-10-11, the masked Doppler pages showed populated entries for
-`DATABASE_URL` and `AUTH_DATABASE_URL` in `stg_api`, and for both
-`REDIS_URL` and `QUEUE_REDIS_URL` in `stg_api`, `stg_worker_realtime`, and
-`stg_worker_jobs`. `DATABASE_URL` is also now present in both worker configs.
-The values remain masked, so their URLs, database paths, runtime roles, and
-successful connectivity have not been verified. The current Neon Console view
+On 2026-10-11, four unique pooled Neon login URLs were saved to the matching
+Doppler configs: API, Better Auth, realtime worker, and jobs worker. The
+runtime login attributes and one intended membership per login were verified
+in Neon's catalog, and the URLs are mapped to their Coolify resources. Doppler
+values remain masked; actual pooled login and application connectivity
+canaries are still pending. The current Neon Console view
 is project `guestpost-staging` (`crimson-lab-17945062`), branch
 `production` (`br-empty-resonance-b5fnktnx`), PostgreSQL 18 in AWS US East 2
-(Ohio), database `neondb`. The 100-migration schema is now present there. Do
-not deploy these database URLs until distinct least-privilege runtime logins
-are provisioned and each URL passes a login/effective-role/grant canary.
+(Ohio), database `neondb`. The 100-migration schema is present there. Start the
+API and workers with these restricted URLs to run the connection and
+effective-role canaries. Keep full RLS activation gated until grants and
+context-aware application flows pass.
 
 - App secrets are saved: `stg_api` has `BETTER_AUTH_SECRET`,
   `QUEUE_SIGNING_SECRET`, the payout encryption keyring and active ID, and
@@ -127,18 +124,15 @@ one-use migration login, and installed the reviewed 13-role `NOLOGIN` ACL
 topology. The Neon Console now shows the migrated application schema. The
 owner URL that was previously echoed has been rotated, according to the user.
 
-The app is not ready to start yet: the Doppler database values are masked and
-their endpoint, database, effective runtime role, `NOBYPASSRLS` status, grants,
-and successful login have not been proven. A hidden-input provisioner is
-prepared to create separate least-privilege API, auth, realtime-worker, and
-jobs-worker logins and verify each effective role before writing a mode-0600
-handoff file. Use the direct owner URL only for that one-time operation; never
-use it in an app config. The reviewed RLS activation preflight accepts only
-Neon's exact non-inheritable/non-settable owner provider edge and the intended
-schema-owner `SET ROLE` edge. Keep `RLS_ENFORCEMENT_ENABLED=false` until the
-session identity, grants, and context-aware application canaries pass. Do not
-start API or workers until the runtime identity, R2, and service-specific
-configuration checks pass.
+The apps remain stopped pending merge and deployment. Four separate
+least-privilege logins have been provisioned and catalog-verified; their URLs
+are in Doppler and Coolify. Actual connection/effective-role canaries, service
+health, and R2 upload/retrieve checks still need to run. The direct owner URL
+is for one-time seed or database administration only; never place it in an app
+config. The reviewed RLS activation preflight accepts only Neon's exact
+non-inheritable/non-settable owner provider edge and the intended schema-owner
+`SET ROLE` edge. Keep `RLS_ENFORCEMENT_ENABLED=false` until session identity,
+grants, and context-aware application canaries pass.
 
 Use distinct Neon runtime logins for API, Better Auth, and worker. Never put the
 schema-owner or one-use migration URL in an application config. Use the

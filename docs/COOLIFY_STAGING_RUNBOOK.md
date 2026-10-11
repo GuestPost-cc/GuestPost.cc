@@ -188,11 +188,13 @@ terminal with hidden input for the direct URL:
 The staging seed intentionally reuses the existing local fixture identities,
 staff roles, marketplace catalog, and synthetic `$5,000` wallet ledger deposit.
 Those fixture passwords are unsuitable for accounts exposed to untrusted
-testers; use the staging environment only for this approved internal stress
-test and disable or rotate fixture accounts before broader access. The
-synthetic ledger entry is not a Stripe transaction. Keep payouts and Stripe
-live mode disabled while seeding; real wallet deposits use Stripe test mode
-after runtime and RLS canaries pass.
+testers. Staging mode generates unique random passwords and saves them in a
+mode-0600 JSON file in the local temporary directory. Preserve that file for
+repeat seed runs and fixture sign-in; set `SEED_STAGING_CREDENTIALS_FILE` to a
+protected durable path if needed. Do not copy those credentials into logs or
+share them with untrusted testers. The synthetic ledger entry is not a Stripe
+transaction. Keep payouts and Stripe live mode disabled while seeding; real
+wallet deposits use Stripe test mode after runtime and RLS canaries pass.
 
 After the API is healthy and RLS canaries pass, the existing bounded load
 harness can exercise wallet-backed order checkout against staging. Its staging
