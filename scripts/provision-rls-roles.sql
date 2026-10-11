@@ -413,7 +413,7 @@ BEGIN
       AND procedure.proowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
   LOOP
     EXECUTE format(
-      'REVOKE ALL PRIVILEGES ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group, guestpost_reporting_group, guestpost_migrator, guestpost_api_runtime, guestpost_auth_runtime, guestpost_worker_runtime, guestpost_reporting_runtime, guestpost_rls_authorizer, guestpost_financial_repair_guard, guestpost_financial_repair_staging',
+      'REVOKE ALL PRIVILEGES ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group, guestpost_reporting_group, guestpost_migrator, guestpost_api_runtime, guestpost_auth_runtime, guestpost_worker_runtime, guestpost_reporting_runtime, guestpost_financial_repair_guard, guestpost_financial_repair_staging',
       function_row.signature
     );
   END LOOP;
@@ -421,6 +421,25 @@ END
 $revoke_rls_authorizer_function_privileges$;
 SET ROLE guestpost_schema_owner;
 \endif
+
+-- Reservation-release triggers are SECURITY INVOKER and call this assertion
+-- from inside their trigger body. Grant only the API/worker/repair callers,
+-- plus Neon's administrative seed identity when present; the assertion does
+-- not bypass RLS or expose data beyond the caller's existing table grants.
+DO $reservation_release_assertion_grants$
+BEGIN
+  IF to_regprocedure('public."assert_reservation_release_integrity"(text)') IS NOT NULL THEN
+    GRANT EXECUTE ON FUNCTION public."assert_reservation_release_integrity"(text)
+      TO guestpost_api_group, guestpost_worker_group,
+         guestpost_financial_repair_guard;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'neondb_owner') THEN
+      GRANT EXECUTE ON FUNCTION public."assert_reservation_release_integrity"(text)
+        TO neondb_owner;
+    END IF;
+  END IF;
+END
+$reservation_release_assertion_grants$;
+
 -- The API and worker need relation-level DML for the reviewed 105-model graph;
 -- FORCE RLS and the command-aware policy matrix decide which rows each
 -- workload may actually read or change. These grants confer no DDL, role,
