@@ -97,8 +97,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@hookform/resolvers':
-        specifier: ^3.0.0
-        version: 3.10.0(react-hook-form@7.88.0(react@19.3.0))
+        specifier: ^5.4.0
+        version: 5.4.0(react-hook-form@7.88.0(react@19.3.0))
       '@sentry/nextjs':
         specifier: 10.75.3
         version: 10.75.3(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(next@16.3.8(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(@types/node@26.1.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(webpack@5.106.2(esbuild@0.28.1)(postcss@8.5.23))
@@ -309,8 +309,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@hookform/resolvers':
-        specifier: ^3.0.0
-        version: 3.10.0(react-hook-form@7.88.0(react@19.3.0))
+        specifier: ^5.4.0
+        version: 5.4.0(react-hook-form@7.88.0(react@19.3.0))
       '@sentry/nextjs':
         specifier: 10.75.3
         version: 10.75.3(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(next@16.3.8(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(@types/node@26.1.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(webpack@5.106.2(esbuild@0.28.1)(postcss@8.5.23))
@@ -830,6 +830,9 @@ importers:
       tailwind-merge:
         specifier: ^2.6.0
         version: 2.6.1
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.1
@@ -1648,11 +1651,6 @@ packages:
     engines: {node: '>=20'}
     peerDependencies:
       hono: 4.13.7
-
-  '@hookform/resolvers@3.10.0':
-    resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
-    peerDependencies:
-      react-hook-form: ^7.0.0
 
   '@hookform/resolvers@5.4.0':
     resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
@@ -8291,10 +8289,6 @@ snapshots:
     dependencies:
       hono: 4.13.7
 
-  '@hookform/resolvers@3.10.0(react-hook-form@7.88.0(react@19.3.0))':
-    dependencies:
-      react-hook-form: 7.88.0(react@19.3.0)
-
   '@hookform/resolvers@5.4.0(react-hook-form@7.88.0(react@19.3.0))':
     dependencies:
       '@standard-schema/utils': 0.3.0
@@ -10272,6 +10266,7 @@ snapshots:
       dom-accessibility-api: 0.5.16
       lz-string: 1.5.0
       picocolors: 1.1.1
+      pretty-format: 27.5.1
 
   '@testing-library/jest-dom@6.9.1':
     dependencies:
