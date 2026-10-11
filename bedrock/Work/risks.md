@@ -1,28 +1,70 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-09-08
+updated: 2026-10-11
 ---
 
 # Risks
 
-Updated 2026-08-23 for PR #105's marketplace trust-boundary work on top of the
-merged confirmed-fraud/support release and the controlled Neon cutover/worker-
-fleet containment. Historical audit Views are snapshots, not current status;
-`Work/backlog.md` is the canonical open-work register and this file is the
-canonical launch-risk register.
+## Current staging deployment blockers
+
+- **Neon runtime identities are provisioned; canaries remain pending.** On
+  2026-10-11 the direct migration applied all 100 migrations, verified
+  table/sequence ownership and seven migration-owned FORCE RLS tables,
+  preserved existing RLS flags, removed its temporary migrator, and installed
+  the 13-role `NOLOGIN` topology. Four separate logins were created and
+  catalog-verified; all are non-owner, `NOBYPASSRLS`, non-superuser,
+  non-inheriting, and have only their intended runtime membership. Their pooled
+  URLs are stored in Doppler and mapped to the API and both workers. Verify
+  actual connection/effective identity and grants before enabling full
+  application RLS. Never map `neondb_owner` into an app.
+- **Staging fixture seed is for controlled staging only.** `scripts/seed.ts`
+  has an explicit target-pinned staging mode. It preserves fixture identities,
+  staff roles, and a synthetic `$5,000` wallet credit; it generates unique
+  random passwords in a mode-0600 local file. Run only against the approved
+  Neon branch after the API is healthy; do not expose fixture accounts to
+  untrusted testers. The credit is a seed ledger entry, not a Stripe payment.
+- **Full RLS activation still requires runtime canaries.** Its preflight permits
+only Neon's exact owner provider membership (`ADMIN TRUE`, `INHERIT FALSE`,
+`SET FALSE`) and the schema owner's exact `SET ROLE` edge. Keep
+`RLS_ENFORCEMENT_ENABLED` false until non-owner runtime identity, grants,
+inert-policy, and application canaries pass.
+- **The issuer identity is an explicit staging placeholder, and runtime
+canaries remain incomplete.** App auth, shared queue signing, integration
+encryption, and payout keyring secrets are saved in the intended Doppler
+configs. Invoice configs use `STAGING ONLY - NOT A REAL ADDRESS`; keep invoice
+tests in staging. The R2 readiness object exists, but a runtime
+upload/retrieve/checksum canary has not run.
+- **Previously exposed Stripe test keys need rotation review.** A browser
+accessibility snapshot included secret text. Fresh restricted test credentials
+and three separate webhook secrets are now in Doppler; the older keys were not
+reused. Keep Stripe execution flags off until runtime and RLS checks pass.
+- **SMTP capture mode can deliver real email.** Resend uses a replacement
+sending-only key. Both workers have the approved exact addresses and domain
+allowlist. Keep email disabled until the deployed code enforces exact
+recipients, and keep the allowlist narrow during load testing.
+- **PR #158 needs a green CI run before merge.** The seven review fixes were
+  pushed in commit `bbea239`; workflow run 38113628220 is in progress. Coolify
+  targets `main` (`d5a60a7`) and deploys on push. The API and workers have
+  restricted database/Redis references; app health and public routes still
+  require deployment verification.
+
+Updated 2026-10-11 for the Coolify/Neon staging rebuild, restricted runtime
+credentials, and constrained email capture. Historical audit Views are snapshots,
+not current status; `Work/backlog.md` is the canonical open-work register and
+this file is the canonical launch-risk register.
 
 ## Current production-hold risk
 
-- **Row-level security is deliberately partial.** `ApiKey` has forced RLS and
-  a real two-tenant, non-owner-role CRUD test, but the other 98 Prisma models
-  have not yet received RLS policies. Existing API guards and ownership checks
-  remain required; neither a green RLS test nor custom transaction settings
-  makes a stolen runtime database credential safe. Before any environment role
-  cutover, inventory table/function access, validate Better Auth's pre-user
-  queries and worker/staff flows, transfer ownership under a controlled
-  migration role, then roll out each table family with explicit policies and
-  no `BYPASSRLS` or role-wide exemption. See `docs/RLS_ROLLOUT.md`.
+- **Row-level security is deliberately staged.** `ApiKey` has forced RLS and a
+  real two-tenant, non-owner-role CRUD test. Explicit policies for the other 98
+  Prisma models are installed but remain inert until the guarded activation
+  transaction. Existing API guards and ownership checks remain required;
+  neither a green RLS test nor custom transaction settings makes a stolen
+  runtime database credential safe. Before activation, validate Better Auth's
+  pre-user queries and worker/staff flows with non-owner, no-bypass runtime
+  identities and verify the exact ownership/grant inventory. See
+  `docs/RLS_ROLLOUT.md`.
 
 - **The marketplace moderation migrations are applied in the authorized Neon
   staging database, but neither is deployed to production.** Migration

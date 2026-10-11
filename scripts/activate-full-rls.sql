@@ -118,15 +118,31 @@ BEGIN
     JOIN pg_roles granted ON granted.oid = membership.roleid
     JOIN pg_roles member ON member.oid = membership.member
     WHERE granted.rolname = 'guestpost_financial_repair_guard'
-      AND member.rolname <> 'guestpost_schema_owner'
+      AND NOT (
+        (
+          member.rolname = 'guestpost_schema_owner'
+          AND NOT membership.admin_option
+          AND NOT membership.inherit_option
+          AND membership.set_option
+        )
+        OR (
+          member.rolname = 'neondb_owner'
+          AND membership.admin_option
+          AND NOT membership.inherit_option
+          AND NOT membership.set_option
+        )
+      )
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_auth_members membership
     JOIN pg_roles granted ON granted.oid = membership.roleid
     JOIN pg_roles member ON member.oid = membership.member
     WHERE granted.rolname = 'guestpost_financial_repair_guard'
       AND member.rolname = 'guestpost_schema_owner'
+      AND NOT membership.admin_option
+      AND NOT membership.inherit_option
+      AND membership.set_option
   ) THEN
-    RAISE EXCEPTION 'repair guard must be SET ROLE-accessible only to guestpost_schema_owner';
+    RAISE EXCEPTION 'repair guard must be SET ROLE-accessible to guestpost_schema_owner; only the exact Neon owner provider edge is allowed';
   END IF;
 
   IF (SELECT count(*) FROM pg_roles WHERE rolname LIKE 'guestpost_%') < 11 THEN

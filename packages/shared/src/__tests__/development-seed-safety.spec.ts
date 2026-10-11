@@ -1,8 +1,11 @@
 import {
   assertDevelopmentSeedDatabaseSentinel,
   assertDevelopmentSeedSafety,
+  assertStagingSeedSafety,
   DEVELOPMENT_SEED_DATABASE_SENTINEL,
   isDevelopmentSeedApiRequestAllowed,
+  STAGING_NEON_DATABASE_HOST,
+  STAGING_SEED_CONFIRMATION,
 } from "../development-seed-safety"
 
 describe("development seed safety boundary", () => {
@@ -107,6 +110,60 @@ describe("development seed safety boundary", () => {
         apiUrl,
       ),
     ).toThrow("refuses non-local APIs")
+  })
+
+  it("allows the explicitly confirmed Neon staging seed target", () => {
+    expect(() =>
+      assertStagingSeedSafety(
+        "production",
+        `postgresql://neondb_owner:secret@${STAGING_NEON_DATABASE_HOST}/neondb?sslmode=require&channel_binding=require`,
+        "https://api.shohan.iam.bd",
+        STAGING_SEED_CONFIRMATION,
+      ),
+    ).not.toThrow()
+  })
+
+  it.each([
+    [
+      "development",
+      `postgresql://neondb_owner:secret@${STAGING_NEON_DATABASE_HOST}/neondb?sslmode=require&channel_binding=require`,
+      "https://api.shohan.iam.bd",
+      STAGING_SEED_CONFIRMATION,
+    ],
+    [
+      "production",
+      "postgresql://neondb_owner:secret@ep-example-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require",
+      "https://api.shohan.iam.bd",
+      STAGING_SEED_CONFIRMATION,
+    ],
+    [
+      "production",
+      "postgresql://neondb_owner:secret@db.example.com/neondb?sslmode=require",
+      "https://api.shohan.iam.bd",
+      STAGING_SEED_CONFIRMATION,
+    ],
+    [
+      "production",
+      "postgresql://neondb_owner:secret@ep-other.us-east-2.aws.neon.tech/neondb?sslmode=require",
+      "https://api.shohan.iam.bd",
+      STAGING_SEED_CONFIRMATION,
+    ],
+    [
+      "production",
+      `postgresql://neondb_owner:secret@${STAGING_NEON_DATABASE_HOST}/neondb?sslmode=require`,
+      "https://api.example.com",
+      STAGING_SEED_CONFIRMATION,
+    ],
+    [
+      "production",
+      `postgresql://neondb_owner:secret@${STAGING_NEON_DATABASE_HOST}/neondb?sslmode=require`,
+      "https://api.shohan.iam.bd",
+      "wrong-target",
+    ],
+  ])("rejects staging seed target %s %s %s", (nodeEnv, databaseUrl, apiUrl, confirmation) => {
+    expect(() =>
+      assertStagingSeedSafety(nodeEnv, databaseUrl, apiUrl, confirmation),
+    ).toThrow()
   })
 
   it("requires the exact local database sentinel", async () => {

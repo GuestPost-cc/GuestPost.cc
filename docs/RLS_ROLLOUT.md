@@ -125,13 +125,16 @@ On Neon, use the disposable `guestpost_migrator_login` from
 `options=-c role=guestpost_schema_owner`; drop it with
 `scripts/cleanup-neon-migration-login.sql` after confirming all objects are
 owned by the schema owner. This exception creates no reusable runtime login.
-Neon also retains one creator membership per SQL-created role for
-`guestpost_owner`, with `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`, even
-after the role recipe runs. The app roles still have only the seven reviewed
-application edges; the 13 creator edges are not inherited or settable by an
-app role. The current `activate-full-rls.sql` preflight rejects the creator
-edge to the repair guard, so full RLS activation on Neon needs a separately
-reviewed provider-aware preflight change before that stage is attempted.
+The 2026-10-11 read-only catalog audit on Neon confirmed that every SQL-created
+managed role also has a provider-created membership edge from `neondb_owner`
+with `ADMIN TRUE`, `INHERIT FALSE`, and `SET FALSE`. `neondb_owner` itself has
+`BYPASSRLS` and `CREATEROLE`; it is the administrative Neon connection and
+must never be used by an app. The application roles have only
+their seven reviewed functional edges; the provider edges cannot be inherited
+or set by app roles. The reviewed `activate-full-rls.sql` preflight accepts
+only the exact `neondb_owner` provider edge with those three flags, continues
+rejecting every other extra member, and verifies the schema owner's separate
+`SET TRUE` edge. Do not relax membership checks broadly.
 
 | Roles | Purpose |
 | --- | --- |

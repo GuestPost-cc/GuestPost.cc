@@ -1,6 +1,7 @@
 /**
- * Full development seed: users, roles, publisher inventory, marketplace
- * listings, and a funded customer wallet.
+ * Full fixture seed: users, roles, publisher inventory, marketplace listings,
+ * and a funded customer wallet. Development remains the default mode;
+ * staging requires its explicit target confirmation.
  *
  * Auth-sensitive steps go through the real API (better-auth password hashing
  * and role endpoints). The SUPER_ADMIN bootstrap, test funding, and demo
@@ -9,9 +10,14 @@
  *
  * Usage: pnpm seed   (local API must be running on :4000)
  */
+import { randomBytes } from "node:crypto"
+import { chmodSync, lstatSync, readFileSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import {
   assertDevelopmentSeedDatabaseSentinel,
   assertDevelopmentSeedSafety,
+  assertStagingSeedSafety,
   type DevelopmentSeedDatabaseIdentity,
 } from "../packages/shared/src/development-seed-safety"
 import {
@@ -25,14 +31,33 @@ loadRootEnv({
   required: ["NODE_ENV", "DATABASE_URL"],
 })
 const API = process.env.SEED_API_URL ?? "http://localhost:4000"
-assertDevelopmentSeedSafety(process.env.NODE_ENV, process.env.DATABASE_URL, API)
+const SEED_MODE = process.env.SEED_MODE ?? "development"
+if (SEED_MODE === "staging") {
+  assertStagingSeedSafety(
+    process.env.NODE_ENV,
+    process.env.DATABASE_URL,
+    API,
+    process.env.SEED_STAGING_CONFIRMATION,
+  )
+} else if (SEED_MODE === "development") {
+  assertDevelopmentSeedSafety(
+    process.env.NODE_ENV,
+    process.env.DATABASE_URL,
+    API,
+  )
+} else {
+  throw new Error("SEED_MODE must be development or staging")
+}
 
 const headers: Record<string, string> = {
   "Content-Type": "application/json",
-  Origin: "http://localhost:3001",
+  Origin:
+    SEED_MODE === "staging"
+      ? "https://app.shohan.iam.bd"
+      : "http://localhost:3001",
 }
 
-const USERS = [
+const FIXTURE_USERS = [
   {
     email: "admin@guestpost.local",
     password: "Admin123!",
@@ -84,6 +109,80 @@ const USERS = [
   },
 ]
 
+function loadOrCreateStagingPasswords(
+  users: typeof FIXTURE_USERS,
+): Record<string, string> {
+  const credentialsPath =
+    process.env.SEED_STAGING_CREDENTIALS_FILE ??
+    join(tmpdir(), "guestpost-staging-fixture-passwords.json")
+
+  const readCredentials = () => {
+    const stat = lstatSync(credentialsPath)
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new Error("Staging fixture credentials path must be a regular file")
+    }
+    chmodSync(credentialsPath, 0o600)
+    return JSON.parse(readFileSync(credentialsPath, "utf8")) as Record<
+      string,
+      string
+    >
+  }
+
+  let credentials: Record<string, string>
+  try {
+    credentials = readCredentials()
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    const generated = Object.fromEntries(
+      users.map((user) => [user.email, randomBytes(32).toString("base64url")]),
+    ) as Record<string, string>
+    try {
+      writeFileSync(credentialsPath, JSON.stringify(generated, null, 2), {
+        encoding: "utf8",
+        flag: "wx",
+        mode: 0o600,
+      })
+      credentials = generated
+    } catch (writeError) {
+      if ((writeError as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw writeError
+      }
+      credentials = readCredentials()
+    }
+  }
+
+  for (const user of users) {
+    const password = credentials[user.email]
+    if (
+      typeof password !== "string" ||
+      password.length < 32 ||
+      password === user.password
+    ) {
+      throw new Error(
+        `Staging fixture credentials are incomplete or unsafe for ${user.email}`,
+      )
+    }
+  }
+  if (
+    new Set(users.map((user) => credentials[user.email])).size !== users.length
+  ) {
+    throw new Error("Staging fixture passwords must be unique")
+  }
+  console.log(`Staging fixture passwords saved to ${credentialsPath}.`)
+  return credentials
+}
+
+const STAGING_PASSWORDS =
+  SEED_MODE === "staging"
+    ? loadOrCreateStagingPasswords(FIXTURE_USERS)
+    : undefined
+const USERS = STAGING_PASSWORDS
+  ? FIXTURE_USERS.map((user) => ({
+      ...user,
+      password: STAGING_PASSWORDS[user.email],
+    }))
+  : FIXTURE_USERS
+
 async function api(
   path: string,
   options: RequestInit = {},
@@ -123,6 +222,11 @@ const SESSION_COOKIE_NAMES = new Set([
 ])
 
 function portalOrigin(portal: Portal): string {
+  if (SEED_MODE === "staging") {
+    if (portal === "staff") return "https://admin.shohan.iam.bd"
+    if (portal === "publisher") return "https://publisher.shohan.iam.bd"
+    return "https://app.shohan.iam.bd"
+  }
   if (portal === "staff") return "http://localhost:3003"
   if (portal === "publisher") return "http://localhost:3002"
   return "http://localhost:3001"
@@ -294,6 +398,42 @@ async function assertLocalApiSeedReadiness(
   }
 }
 
+async function assertStagingDatabase(prisma: any): Promise<void> {
+  const rows = (await prisma.$queryRaw`
+    SELECT current_database() AS "databaseName",
+      session_user AS "sessionUser",
+      current_user AS "currentUser",
+      r.rolbypassrls AS "bypassRls"
+    FROM pg_roles r
+    WHERE r.rolname = current_user
+  `) as Array<{
+    databaseName: string
+    sessionUser: string
+    currentUser: string
+    bypassRls: boolean
+  }>
+  if (
+    rows.length !== 1 ||
+    rows[0].databaseName !== "neondb" ||
+    rows[0].sessionUser !== "neondb_owner" ||
+    rows[0].currentUser !== "neondb_owner" ||
+    rows[0].bypassRls !== true
+  ) {
+    throw new Error(
+      "Staging seed requires the direct Neon owner connection for this one-off operation",
+    )
+  }
+}
+
+async function assertStagingApiSeedReadiness(): Promise<void> {
+  const res = await api("/health/ready")
+  if (!res.ok || res.body?.status !== "ok") {
+    throw new Error(
+      "Staging API is not ready; verify its database and Redis dependencies",
+    )
+  }
+}
+
 async function main() {
   const [database, seedFunding, seedCatalog] = await Promise.all([
     import("../packages/database/src"),
@@ -305,8 +445,14 @@ async function main() {
   const { ensureDevelopmentSeedPublisherCatalog } = seedCatalog
 
   try {
-    const databaseIdentity = await assertDevelopmentSeedDatabaseSentinel(prisma)
-    await assertLocalApiSeedReadiness(databaseIdentity)
+    if (SEED_MODE === "staging") {
+      await assertStagingDatabase(prisma)
+      await assertStagingApiSeedReadiness()
+    } else {
+      const databaseIdentity =
+        await assertDevelopmentSeedDatabaseSentinel(prisma)
+      await assertLocalApiSeedReadiness(databaseIdentity)
+    }
     console.log("── Phase 1: users via API (real password hashing)")
     for (const u of USERS) {
       // Phase 7.11 — birth-time provisioning. The databaseHooks in packages/auth
@@ -320,10 +466,7 @@ async function main() {
         method: "POST",
         headers: {
           "x-portal-type": portal,
-          Origin:
-            portal === "publisher"
-              ? "http://localhost:3002"
-              : "http://localhost:3001",
+          Origin: portalOrigin(portal),
         },
         body: JSON.stringify({
           email: u.email,
@@ -714,9 +857,7 @@ async function main() {
       },
     )
 
-    console.log(
-      "── Phase 5: fund customer wallet with canonical local seed evidence",
-    )
+    console.log("── Phase 5: fund customer wallet with canonical seed evidence")
     const custUser = await prisma.user.findUnique({
       where: { email: "client@guestpost.local" },
     })
@@ -810,7 +951,7 @@ async function main() {
       )
     }
 
-    console.log("\nSeed complete. Local fixture users:")
+    console.log("\nSeed complete. Fixture users:")
     for (const u of USERS) console.log(`  ${u.email.padEnd(32)} ${u.role}`)
     console.log("  Password values are intentionally not written to logs.")
   } finally {

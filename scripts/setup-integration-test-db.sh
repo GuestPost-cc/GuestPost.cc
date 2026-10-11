@@ -17,21 +17,36 @@ PG_USER="${PG_USER:-guestpost}"
 PG_PASS="${PG_PASS:-guestpost}"
 TEMPLATE_DB="guestpost_test_template"
 
-# Detect psql command — prefer docker exec if the gp-postgres container is running
 if docker inspect gp-postgres >/dev/null 2>&1; then
-  PSQL="docker exec gp-postgres psql -U ${PG_USER} -d postgres -c"
   echo "==> Using docker exec gp-postgres"
+  psql_db() {
+    local database="$1"
+    shift
+    docker exec -i -e "PGPASSWORD=${PG_PASS}" gp-postgres \
+      psql -X -U "${PG_USER}" -d "${database}" "$@"
+  }
 else
-  PSQL="psql -h ${PG_HOST} -p ${PG_PORT} -U ${PG_USER} -d postgres -c"
   echo "==> Using direct psql to ${PG_HOST}:${PG_PORT}"
+  psql_db() {
+    local database="$1"
+    shift
+    PGPASSWORD="${PG_PASS}" psql -X -h "${PG_HOST}" -p "${PG_PORT}" \
+      -U "${PG_USER}" -d "${database}" "$@"
+  }
 fi
+
+echo "==> Provisioning migration-owned financial repair roles"
+psql_db postgres -v ON_ERROR_STOP=1 \
+  -f - < scripts/provision-financial-repair-guard-role.sql
 
 echo "==> Creating template database: ${TEMPLATE_DB}"
 
 # Drop if exists (for idempotency)
-PGPASSWORD="${PG_PASS}" ${PSQL} "DROP DATABASE IF EXISTS \"${TEMPLATE_DB}\" WITH (FORCE)" 2>/dev/null || true
+psql_db postgres -v ON_ERROR_STOP=1 \
+  -c "DROP DATABASE IF EXISTS \"${TEMPLATE_DB}\" WITH (FORCE)" 2>/dev/null || true
 
-PGPASSWORD="${PG_PASS}" ${PSQL} "CREATE DATABASE \"${TEMPLATE_DB}\""
+psql_db postgres -v ON_ERROR_STOP=1 \
+  -c "CREATE DATABASE \"${TEMPLATE_DB}\""
 
 TEMPLATE_URL="postgresql://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${TEMPLATE_DB}"
 
