@@ -25,6 +25,16 @@ if [[ -z "$PSQL_BIN" || ! -x "$PSQL_BIN" ]]; then
   printf 'psql is unavailable; install PostgreSQL client tools or set PSQL_BIN.\n' >&2
   exit 1
 fi
+PSQL_VERSION_OUTPUT=$("$PSQL_BIN" --version)
+PSQL_MAJOR=$(sed -E 's/.*\) ([0-9]+)(\..*)?$/\1/' <<< "$PSQL_VERSION_OUTPUT")
+if ! [[ "$PSQL_MAJOR" =~ ^[0-9]+$ ]]; then
+  printf 'Could not determine the psql client version from: %s\n' "$PSQL_VERSION_OUTPUT" >&2
+  exit 1
+fi
+if [[ "${PGSSLROOTCERT:-system}" == 'system' ]] && (( PSQL_MAJOR < 16 )); then
+  printf 'PGSSLROOTCERT=system requires PostgreSQL client 16 or newer; upgrade psql or set PGSSLROOTCERT to a trusted CA bundle path.\n' >&2
+  exit 1
+fi
 if ! command -v node >/dev/null 2>&1; then
   printf 'node is unavailable; add Node.js to PATH before running this script.\n' >&2
   exit 1
