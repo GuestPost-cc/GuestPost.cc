@@ -315,6 +315,7 @@ GRANT USAGE ON SCHEMA public TO guestpost_api_group;
 GRANT USAGE ON SCHEMA public TO guestpost_auth_group;
 GRANT USAGE ON SCHEMA public TO guestpost_worker_group;
 GRANT USAGE ON SCHEMA public TO guestpost_reporting_group;
+GRANT USAGE ON SCHEMA public TO guestpost_rls_authorizer;
 
 -- Prisma owns its migration ledger outside the application RLS boundary.
 -- Leave its ACL with that owner; the schema owner deliberately does not own
@@ -343,7 +344,6 @@ BEGIN
 END
 $revoke_application_table_privileges$;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
-REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
   guestpost_api_group,
   guestpost_auth_group,
@@ -357,19 +357,70 @@ REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM
   guestpost_rls_authorizer,
   guestpost_financial_repair_guard,
   guestpost_financial_repair_staging;
-REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM
-  guestpost_api_group,
-  guestpost_auth_group,
-  guestpost_worker_group,
-  guestpost_reporting_group,
-  guestpost_migrator,
-  guestpost_api_runtime,
-  guestpost_auth_runtime,
-  guestpost_worker_runtime,
-  guestpost_reporting_runtime,
-  guestpost_rls_authorizer,
-  guestpost_financial_repair_guard,
-  guestpost_financial_repair_staging;
+-- Function ownership is split between the schema owner and the restricted
+-- RLS authorizer after the first successful pass. Revoke ACLs while acting as
+-- each owner so reruns remain valid after SECURITY DEFINER helper transfer.
+\if :is_superuser
+DO $revoke_public_function_privileges$
+DECLARE
+  function_row record;
+BEGIN
+  FOR function_row IN
+    SELECT procedure.oid::regprocedure AS signature
+    FROM pg_proc AS procedure
+    JOIN pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+    WHERE namespace.nspname = 'public'
+      AND procedure.prokind <> 'p'
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group, guestpost_reporting_group, guestpost_migrator, guestpost_api_runtime, guestpost_auth_runtime, guestpost_worker_runtime, guestpost_reporting_runtime, guestpost_rls_authorizer, guestpost_financial_repair_guard, guestpost_financial_repair_staging',
+      function_row.signature
+    );
+  END LOOP;
+END
+$revoke_public_function_privileges$;
+\else
+DO $revoke_schema_owner_function_privileges$
+DECLARE
+  function_row record;
+BEGIN
+  FOR function_row IN
+    SELECT procedure.oid::regprocedure AS signature
+    FROM pg_proc AS procedure
+    JOIN pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+    WHERE namespace.nspname = 'public'
+      AND procedure.prokind <> 'p'
+      AND procedure.proowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group, guestpost_reporting_group, guestpost_migrator, guestpost_api_runtime, guestpost_auth_runtime, guestpost_worker_runtime, guestpost_reporting_runtime, guestpost_rls_authorizer, guestpost_financial_repair_guard, guestpost_financial_repair_staging',
+      function_row.signature
+    );
+  END LOOP;
+END
+$revoke_schema_owner_function_privileges$;
+SET ROLE guestpost_rls_authorizer;
+DO $revoke_rls_authorizer_function_privileges$
+DECLARE
+  function_row record;
+BEGIN
+  FOR function_row IN
+    SELECT procedure.oid::regprocedure AS signature
+    FROM pg_proc AS procedure
+    JOIN pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+    WHERE namespace.nspname = 'public'
+      AND procedure.prokind <> 'p'
+      AND procedure.proowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group, guestpost_reporting_group, guestpost_migrator, guestpost_api_runtime, guestpost_auth_runtime, guestpost_worker_runtime, guestpost_reporting_runtime, guestpost_rls_authorizer, guestpost_financial_repair_guard, guestpost_financial_repair_staging',
+      function_row.signature
+    );
+  END LOOP;
+END
+$revoke_rls_authorizer_function_privileges$;
+SET ROLE guestpost_schema_owner;
+\endif
 -- The API and worker need relation-level DML for the reviewed 105-model graph;
 -- FORCE RLS and the command-aware policy matrix decide which rows each
 -- workload may actually read or change. These grants confer no DDL, role,
@@ -404,11 +455,6 @@ END
 $grant_application_table_privileges$;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_api_group;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO guestpost_worker_group;
-
--- A post-activation rerun must preserve the SECURITY DEFINER authorizer's
--- ability to read policy roots. This role is NOLOGIN, NOINHERIT, has no
--- memberships, and receives no mutation privilege.
-GRANT USAGE ON SCHEMA public TO guestpost_rls_authorizer;
 
 -- Preserve the repair guard's object-specific ACLs on a post-migration rerun.
 -- Initial provisioning runs before the repair tables exist, so this block is
@@ -485,6 +531,8 @@ DECLARE
     'public."require_publisher_carry_forward_integrity"()'
   );
   secured_functions integer;
+  assert_owner text;
+  trigger_owner text;
 BEGIN
   IF assert_function IS NULL AND trigger_function IS NULL THEN
     RETURN;
@@ -493,23 +541,32 @@ BEGIN
     RAISE EXCEPTION 'Publisher carry-forward trigger functions are incomplete';
   END IF;
 
-  EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', assert_function);
-  EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', trigger_function);
-  -- PostgreSQL requires the new owner to have CREATE on this schema during
-  -- transfer. The authorizer remains USAGE + SELECT only after this block.
-  EXECUTE 'GRANT CREATE ON SCHEMA public TO guestpost_rls_authorizer';
-  EXECUTE format(
-    'ALTER FUNCTION %s OWNER TO guestpost_rls_authorizer',
-    assert_function
-  );
-  EXECUTE format(
-    'ALTER FUNCTION %s OWNER TO guestpost_rls_authorizer',
-    trigger_function
-  );
-  EXECUTE 'REVOKE CREATE ON SCHEMA public FROM guestpost_rls_authorizer';
-  -- PUBLIC and runtime function grants were revoked above while the schema
-  -- owner still owned these functions. Do not repeat those REVOKEs after
-  -- transfer: only the authorizer owner can alter its function ACLs.
+  SELECT pg_get_userbyid(procedure.proowner) INTO assert_owner
+  FROM pg_proc AS procedure WHERE procedure.oid = assert_function;
+  SELECT pg_get_userbyid(procedure.proowner) INTO trigger_owner
+  FROM pg_proc AS procedure WHERE procedure.oid = trigger_function;
+
+  IF assert_owner = 'guestpost_schema_owner'
+      AND trigger_owner = 'guestpost_schema_owner' THEN
+    EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', assert_function);
+    EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', trigger_function);
+    -- PostgreSQL requires the new owner to have CREATE on this schema during
+    -- transfer. The authorizer remains USAGE + SELECT only after this block.
+    EXECUTE 'GRANT CREATE ON SCHEMA public TO guestpost_rls_authorizer';
+    EXECUTE format(
+      'ALTER FUNCTION %s OWNER TO guestpost_rls_authorizer',
+      assert_function
+    );
+    EXECUTE format(
+      'ALTER FUNCTION %s OWNER TO guestpost_rls_authorizer',
+      trigger_function
+    );
+    EXECUTE 'REVOKE CREATE ON SCHEMA public FROM guestpost_rls_authorizer';
+  ELSIF assert_owner <> 'guestpost_rls_authorizer'
+      OR trigger_owner <> 'guestpost_rls_authorizer' THEN
+    RAISE EXCEPTION 'Publisher carry-forward guards have unexpected owners (%, %)',
+      assert_owner, trigger_owner;
+  END IF;
 
   SELECT count(*) INTO secured_functions
   FROM pg_proc AS procedure
