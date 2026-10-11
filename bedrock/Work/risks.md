@@ -1,7 +1,7 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-10-11
+updated: 2026-10-12
 ---
 
 # Risks
@@ -13,17 +13,22 @@ updated: 2026-10-11
   table/sequence ownership and seven migration-owned FORCE RLS tables,
   preserved existing RLS flags, removed its temporary migrator, and installed
   the 13-role `NOLOGIN` topology. Four separate logins were created and
-  catalog-verified; all are non-owner, `NOBYPASSRLS`, non-superuser,
-  non-inheriting, and have only their intended runtime membership. Their pooled
-  URLs are stored in Doppler and mapped to the API and both workers. Verify
-  actual connection/effective identity and grants before enabling full
-  application RLS. Never map `neondb_owner` into an app.
+  catalog-verified. Each is non-owner, `NOBYPASSRLS`, non-superuser, and
+  `NOINHERIT`, with only its matching runtime membership (`INHERIT TRUE`,
+  `SET TRUE`, `ADMIN FALSE`). Runtime roles remain `NOLOGIN` and `NOBYPASSRLS`.
+  Neon’s pooler rejects `options=-c role=...`; keep pooled URLs free of that
+  startup option. Verify real application flows and grants before enabling
+  full application RLS. Never map `neondb_owner` into an app.
 - **Staging fixture seed is for controlled staging only.** `scripts/seed.ts`
   has an explicit target-pinned staging mode. It preserves fixture identities,
-  staff roles, and a synthetic `$5,000` wallet credit; it generates unique
-  random passwords in a mode-0600 local file. Run only against the approved
-  Neon branch after the API is healthy; do not expose fixture accounts to
-  untrusted testers. The credit is a seed ledger entry, not a Stripe payment.
+  staff roles, and a synthetic `$5,000` wallet credit. At the user's direction,
+  fixture accounts use the simple per-account passwords in `FIXTURE_USERS`;
+  existing accounts prove credential ownership through API sign-in, then update
+  with Better Auth's password hasher in a guarded owner-level transaction that
+  revokes sessions. The saved mode-0600 file advances only after new-password
+  sign-in. Run only against the approved Neon branch after the API is healthy;
+  do not expose fixture accounts to untrusted testers. The credit is a seed
+  ledger entry, not a Stripe payment.
 - **Full RLS activation still requires runtime canaries.** Its preflight permits
 only Neon's exact owner provider membership (`ADMIN TRUE`, `INHERIT FALSE`,
 `SET FALSE`) and the schema owner's exact `SET ROLE` edge. Keep
@@ -43,13 +48,35 @@ reused. Keep Stripe execution flags off until runtime and RLS checks pass.
 sending-only key. Both workers have the approved exact addresses and domain
 allowlist. Keep email disabled until the deployed code enforces exact
 recipients, and keep the allowlist narrow during load testing.
-- **PR #158 needs a green CI run before merge.** The seven review fixes were
-  pushed in commit `bbea239`; workflow run 38113628220 is in progress. Coolify
-  targets `main` (`d5a60a7`) and deploys on push. The API and workers have
-  restricted database/Redis references; app health and public routes still
-  require deployment verification.
+- **Realtime login URL remains exposed.** The user requested deploying the
+  realtime worker with its current saved settings despite the unrotated login.
+  The R2 variables are present through the realtime Coolify Doppler
+  integration. Coolify now reports Running; startup logs confirmed Neon/Redis
+  connections, R2 readiness, and four realtime lanes. Rotate the Neon login and
+  update its pooled Doppler URL promptly. The Docker build warned that the R2
+  key ID and secret were passed through ARG/ENV; move them to runtime-only
+  secret handling and rotate those keys. Website,
+  portal, publisher, admin, and API deployments on commit `e684141` succeeded;
+  all four frontend routes returned HTTP 200, and API readiness returned HTTP
+  200 with database and Redis `ok`.
+- **Staging seed is blocked on publisher trigger permissions.** Neon has 100
+  applied migrations. The latest seed run authenticated all seven fixture
+  accounts and verified each portal, then the publisher role endpoint returned
+  HTTP 500. Coolify logs show SQLSTATE 42501 on
+  `assert_publisher_carry_forward_integrity`: Better Auth can create its
+  publisher balance, but the deferred integrity trigger's invoker function
+  cannot read the payout evidence under the restricted auth grants. Migration
+  101 and a provisioner update are drafted: both trigger helpers become
+  `SECURITY DEFINER`, owned by the NOLOGIN read-only RLS authorizer with a
+  pinned search path; the provisioner removes its temporary ownership-transfer
+  membership before commit. This keeps payout reads out of the auth role and
+  does not disable RLS. The changes are not yet on `main` or applied to Neon.
+  After merge, run `scripts/migrate-neon-direct.sh`, then rerun
+  `scripts/seed-staging.sh` and verify publisher/customer roles. The seed also
+  uses the requested account-specific fixture defaults and bounded auth
+  cooldown retries.
 
-Updated 2026-10-11 for the Coolify/Neon staging rebuild, restricted runtime
+Updated 2026-10-12 for the Coolify/Neon staging rebuild, restricted runtime
 credentials, and constrained email capture. Historical audit Views are snapshots,
 not current status; `Work/backlog.md` is the canonical open-work register and
 this file is the canonical launch-risk register.

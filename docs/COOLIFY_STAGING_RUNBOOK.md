@@ -113,9 +113,14 @@ references. The Doppler values therefore are not yet reaching those
 containers. Add references only after creating the runtime login credentials
 and proving each effective role; do not map the existing owner/migration URL.
 Use separate logins for API, Better Auth, realtime worker, and jobs worker.
-Each login must be `NOBYPASSRLS`, `NOINHERIT`, and allowed to `SET ROLE` only to
-its matching `NOLOGIN` runtime identity. Verify the effective role through the
-same pooled connection format that will be stored in Doppler.
+Each login must be `NOBYPASSRLS`, `NOINHERIT`, and a member of only its matching
+`NOLOGIN`, `NOBYPASSRLS` runtime identity. Grant that one membership with
+`INHERIT TRUE`, `SET TRUE`, and `ADMIN FALSE`, then verify the login inherits
+the runtime grants, has `USAGE` on `public`, and still cannot bypass RLS. Keep
+`DATABASE_URL` pooled and free of PostgreSQL startup options: Neon’s pooler
+rejects `options=-c role=...` with `08P01 unsupported startup parameter`.
+Verify the effective membership and schema grants in Neon before deploying
+each runtime. Never grant a runtime login owner, DDL, or `BYPASSRLS` access.
 
 Neon does not provide a PostgreSQL superuser to the project owner and rejects
 `ALTER ROLE`. The checked-in provisioners therefore validate role attributes
@@ -172,29 +177,35 @@ and sentinel-marked Compose database. The explicit staging mode targets only
 `https://api.shohan.iam.bd` and a direct TLS `neondb_owner` URL for `neondb` in
 the `guestpost-staging` Neon branch. It runs a staging API/Redis readiness
 check before writes. The owner URL is only for one-time provisioning and this
-seed process; it must never be saved in Doppler or Coolify. Run it from a protected local
-terminal with hidden input for the direct URL:
+seed process; it must never be saved in Doppler or Coolify. Run the wrapper
+from a protected local terminal; it prompts for the direct URL without echoing
+it and pins the API and branch confirmation:
 
 ```sh
-(
-  read -rs "DATABASE_URL?Direct Neon neondb_owner URL for guestpost-staging: "
-  export DATABASE_URL NODE_ENV=production SEED_MODE=staging
-  export SEED_API_URL=https://api.shohan.iam.bd
-  export SEED_STAGING_CONFIRMATION=guestpost-staging:br-empty-resonance-b5fnktnx
-  pnpm seed
-)
+bash scripts/seed-staging.sh
 ```
 
-The staging seed intentionally reuses the existing local fixture identities,
-staff roles, marketplace catalog, and synthetic `$5,000` wallet ledger deposit.
-Those fixture passwords are unsuitable for accounts exposed to untrusted
-testers. Staging mode generates unique random passwords and saves them in a
-mode-0600 JSON file in the local temporary directory. Preserve that file for
-repeat seed runs and fixture sign-in; set `SEED_STAGING_CREDENTIALS_FILE` to a
-protected durable path if needed. Do not copy those credentials into logs or
-share them with untrusted testers. The synthetic ledger entry is not a Stripe
-transaction. Keep payouts and Stripe live mode disabled while seeding; real
-wallet deposits use Stripe test mode after runtime and RLS canaries pass.
+Before prompting for the URL, the wrapper checks `pnpm`, Corepack's pinned
+pnpm 11.5.1, or the user's login zsh. This handles macOS Terminal sessions
+where invoking the script with `bash` does not inherit the interactive shell's
+package-manager PATH. If none is available, it exits before requesting the
+database URL.
+
+The staging seed reuses the fixture identities, staff roles, marketplace
+catalog, and synthetic `$5,000` wallet ledger deposit. It applies the fixed
+fixture password pattern declared in `scripts/seed.ts` and stores each
+account's currently verified password in a mode-0600 JSON file in the local
+temporary directory. Preserve that file for repeat runs and sign-in; set
+`SEED_STAGING_CREDENTIALS_FILE` to a protected durable path if needed. These
+predictable passwords are only for the controlled staging fixtures; do not
+expose those accounts to untrusted testers or copy credentials into logs. The
+seed assigns the publisher role through the authenticated Admin API. The
+database role provisioner runs the deferred carry-forward integrity triggers
+through the NOLOGIN, read-only RLS authorizer so Better Auth can create its
+limited account records without receiving payout-table access. The synthetic
+ledger entry is not a Stripe transaction. Keep payouts and Stripe live mode
+disabled while seeding; real wallet deposits use Stripe test mode after runtime
+and RLS canaries pass.
 
 After the API is healthy and RLS canaries pass, the existing bounded load
 harness can exercise wallet-backed order checkout against staging. Its staging
