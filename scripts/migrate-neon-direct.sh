@@ -6,6 +6,7 @@ umask 077
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 NEON_MIGRATION_REF="${NEON_MIGRATION_REF:-}"
 PSQL_BIN="${PSQL_BIN:-$(command -v psql || true)}"
+PRISMA_BIN="${PRISMA_BIN:-$ROOT/packages/database/node_modules/.bin/prisma}"
 if [[ -z "$PSQL_BIN" ]]; then
   for candidate in /opt/homebrew/opt/libpq/bin/psql /usr/local/opt/libpq/bin/psql; do
     [[ ! -x "$candidate" ]] || { PSQL_BIN="$candidate"; break; }
@@ -22,6 +23,14 @@ trap '[[ -z "$TEMP_SQL" ]] || rm -f "$TEMP_SQL"; [[ -z "$RLS_SNAPSHOT_FILE" ]] |
 
 if [[ -z "$PSQL_BIN" || ! -x "$PSQL_BIN" ]]; then
   printf 'psql is unavailable; install PostgreSQL client tools or set PSQL_BIN.\n' >&2
+  exit 1
+fi
+if ! command -v node >/dev/null 2>&1; then
+  printf 'node is unavailable; add Node.js to PATH before running this script.\n' >&2
+  exit 1
+fi
+if [[ ! -x "$PRISMA_BIN" ]]; then
+  printf 'Prisma CLI is unavailable at %s; install workspace dependencies or set PRISMA_BIN.\n' "$PRISMA_BIN" >&2
   exit 1
 fi
 
@@ -73,11 +82,11 @@ try {
 IFS=$'\t' read -r PGHOST PGPORT <<< "$CONNECTION_INFO"
 
 psql_admin() {
-  env PGPASSFILE="$PASSFILE" PGHOST="$PGHOST" PGPORT="$PGPORT" PGUSER=neondb_owner PGDATABASE=neondb PGSSLMODE=verify-full PGCONNECT_TIMEOUT=10 "$PSQL_BIN" -X "$@"
+  env PGPASSFILE="$PASSFILE" PGHOST="$PGHOST" PGPORT="$PGPORT" PGUSER=neondb_owner PGDATABASE=neondb PGSSLMODE=verify-full PGSSLROOTCERT="${PGSSLROOTCERT:-system}" PGCONNECT_TIMEOUT=10 "$PSQL_BIN" -X "$@"
 }
 
 psql_migrator() {
-  env PGPASSFILE="$PASSFILE" PGHOST="$PGHOST" PGPORT="$PGPORT" PGUSER=guestpost_migrator_login PGDATABASE=neondb PGSSLMODE=verify-full PGCONNECT_TIMEOUT=10 PGOPTIONS='-c role=guestpost_schema_owner' "$PSQL_BIN" -X "$@"
+  env PGPASSFILE="$PASSFILE" PGHOST="$PGHOST" PGPORT="$PGPORT" PGUSER=guestpost_migrator_login PGDATABASE=neondb PGSSLMODE=verify-full PGSSLROOTCERT="${PGSSLROOTCERT:-system}" PGCONNECT_TIMEOUT=10 PGOPTIONS='-c role=guestpost_schema_owner' "$PSQL_BIN" -X "$@"
 }
 
 ADMIN_IDENTITY=$(psql_admin -Atc "SELECT current_user || '|' || current_database()")
@@ -126,9 +135,14 @@ printf 'Verified one-use migration identity: %s.\n' "$MIGRATOR_IDENTITY"
 RLS_SNAPSHOT_FILE=$(mktemp "$TMP_BASE/guestpost-neon-rls-before.XXXXXX")
 psql_admin -AtF '|' -c "SELECT relation.oid, relation.relrowsecurity::text, relation.relforcerowsecurity::text FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace WHERE namespace.nspname = 'public' AND relation.relkind IN ('r', 'p') AND (relation.relrowsecurity OR relation.relforcerowsecurity) ORDER BY relation.oid" > "$RLS_SNAPSHOT_FILE"
 
+# Run the workspace-installed Prisma CLI from its package directory. This
+# avoids depending on pnpm being present in a non-interactive shell's PATH.
 # Prisma status exits nonzero when unapplied migrations exist, so deploy first.
-DIRECT_DATABASE_URL="$MIGRATOR_URL" pnpm db:migrations:deploy
-DIRECT_DATABASE_URL="$MIGRATOR_URL" pnpm db:migrations:status
+(
+  cd "$ROOT/packages/database"
+  DIRECT_DATABASE_URL="$MIGRATOR_URL" "$PRISMA_BIN" migrate deploy
+  DIRECT_DATABASE_URL="$MIGRATOR_URL" "$PRISMA_BIN" migrate status
+)
 
 while IFS='|' read -r relation_oid rls_before force_before; do
   [[ -z "$relation_oid" ]] && continue
@@ -139,12 +153,36 @@ while IFS='|' read -r relation_oid rls_before force_before; do
   fi
 done < "$RLS_SNAPSHOT_FILE"
 
-RLS_GUARD_COUNT=$(psql_admin -Atc "SELECT count(*) FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace WHERE namespace.nspname = 'public' AND relation.relkind IN ('r', 'p') AND relation.relname IN ('ApiKey', 'ReconciliationCase', 'ReconciliationScan', 'ReconciliationCaseSnapshot', 'ReconciliationRepairProposal', 'ReconciliationRepairApproval', 'ReconciliationRepairExecution') AND relation.relrowsecurity AND relation.relforcerowsecurity")
-if [[ "$RLS_GUARD_COUNT" != '7' ]]; then
-  printf 'Expected all 7 migration-owned FORCE RLS tables to remain enabled; found %s.\n' "$RLS_GUARD_COUNT" >&2
+RLS_TABLE_COUNT=$(psql_admin -Atc "SELECT count(*) FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace WHERE namespace.nspname = 'public' AND relation.relkind IN ('r', 'p') AND relation.relname IN ('ApiKey', 'Order', 'ReconciliationCase', 'ReconciliationScan', 'ReconciliationCaseSnapshot', 'ReconciliationRepairProposal', 'ReconciliationRepairApproval', 'ReconciliationRepairExecution')")
+API_KEY_RLS_STATE=$(psql_admin -Atc "SELECT relrowsecurity::text || '|' || relforcerowsecurity::text FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace WHERE namespace.nspname = 'public' AND relation.relname = 'ApiKey' AND relation.relkind IN ('r', 'p')")
+ORDER_RLS_STATE=$(psql_admin -Atc "SELECT relrowsecurity::text || '|' || relforcerowsecurity::text FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace WHERE namespace.nspname = 'public' AND relation.relname = 'Order' AND relation.relkind IN ('r', 'p')")
+if [[ "$RLS_TABLE_COUNT" != '8' || "$API_KEY_RLS_STATE" != 'true|true' ]]; then
+  printf 'Expected the eight staged RLS tables and forced ApiKey RLS; table count=%s, ApiKey=%s.\n' "$RLS_TABLE_COUNT" "$API_KEY_RLS_STATE" >&2
   exit 1
 fi
-printf 'Verified existing RLS state and all 7 migration-owned FORCE RLS tables. Full application RLS activation remains a separate canary-gated operation.\n'
+case "$ORDER_RLS_STATE" in
+  true\|true)
+    RLS_GUARD_COUNT=$(psql_admin -Atc "SELECT count(*) FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace WHERE namespace.nspname = 'public' AND relation.relkind IN ('r', 'p') AND relation.relname IN ('ApiKey', 'ReconciliationCase', 'ReconciliationScan', 'ReconciliationCaseSnapshot', 'ReconciliationRepairProposal', 'ReconciliationRepairApproval', 'ReconciliationRepairExecution') AND relation.relrowsecurity AND relation.relforcerowsecurity")
+    if [[ "$RLS_GUARD_COUNT" != '7' ]]; then
+      printf 'Order has forced RLS, so all 7 dependent tables must also have it; found %s.\n' "$RLS_GUARD_COUNT" >&2
+      exit 1
+    fi
+    printf 'Verified forced RLS on ApiKey and all 6 reconciliation tables gated by Order.\n'
+    ;;
+  false\|false)
+    RECONCILIATION_RLS_COUNT=$(psql_admin -Atc "SELECT count(*) FROM pg_class relation JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace WHERE namespace.nspname = 'public' AND relation.relkind IN ('r', 'p') AND relation.relname IN ('ReconciliationCase', 'ReconciliationScan', 'ReconciliationCaseSnapshot', 'ReconciliationRepairProposal', 'ReconciliationRepairApproval', 'ReconciliationRepairExecution') AND (relation.relrowsecurity OR relation.relforcerowsecurity)")
+    if [[ "$RECONCILIATION_RLS_COUNT" != '0' ]]; then
+      printf 'Order RLS is not activated, but %s reconciliation tables have partial RLS state.\n' "$RECONCILIATION_RLS_COUNT" >&2
+      exit 1
+    fi
+    printf 'Verified forced ApiKey RLS; the six reconciliation tables remain inert behind the Order RLS canary gate.\n'
+    ;;
+  *)
+    printf 'Order RLS state is partial or missing (%s); stopping for review.\n' "$ORDER_RLS_STATE" >&2
+    exit 1
+    ;;
+esac
+printf 'Existing RLS flags are preserved. Full application RLS activation remains a separate canary-gated operation.\n'
 
 BAD_TABLE_OWNERS=$(psql_migrator -Atc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f') AND c.relname <> '_prisma_migrations' AND pg_get_userbyid(c.relowner) <> 'guestpost_schema_owner'")
 BAD_SEQUENCE_OWNERS=$(psql_migrator -Atc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='S' AND pg_get_userbyid(c.relowner) <> 'guestpost_schema_owner'")
