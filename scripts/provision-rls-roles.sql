@@ -419,6 +419,7 @@ BEGIN
   END LOOP;
 END
 $revoke_rls_authorizer_function_privileges$;
+SET ROLE guestpost_schema_owner;
 -- The schema ACL reset removed this role's USAGE. Restore it before SET ROLE
 -- so it can resolve the public functions it owns while revoking their ACLs.
 GRANT USAGE ON SCHEMA public TO guestpost_financial_repair_guard;
