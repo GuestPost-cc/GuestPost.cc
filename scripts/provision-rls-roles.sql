@@ -552,6 +552,7 @@ DECLARE
   secured_functions integer;
   assert_owner text;
   trigger_owner text;
+  current_user_is_superuser boolean;
 BEGIN
   IF assert_function IS NULL AND trigger_function IS NULL THEN
     RETURN;
@@ -564,9 +565,18 @@ BEGIN
   FROM pg_proc AS procedure WHERE procedure.oid = assert_function;
   SELECT pg_get_userbyid(procedure.proowner) INTO trigger_owner
   FROM pg_proc AS procedure WHERE procedure.oid = trigger_function;
+  SELECT role.rolsuper INTO current_user_is_superuser
+  FROM pg_roles AS role WHERE role.rolname = current_user;
 
-  IF assert_owner = 'guestpost_schema_owner'
-      AND trigger_owner = 'guestpost_schema_owner' THEN
+  -- CI creates the fresh schema with its bootstrap superuser before the
+  -- reviewed schema-owner role exists. Permit that exact bootstrap owner to
+  -- transfer these two reviewed functions; Neon remains strict and must
+  -- arrive with both functions owned by guestpost_schema_owner.
+  IF (assert_owner = 'guestpost_schema_owner'
+      AND trigger_owner = 'guestpost_schema_owner')
+      OR (current_user_is_superuser
+      AND assert_owner = current_user
+      AND trigger_owner = current_user) THEN
     EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', assert_function);
     EXECUTE format('ALTER FUNCTION %s SECURITY DEFINER', trigger_function);
     -- PostgreSQL requires the new owner to have CREATE on this schema during
