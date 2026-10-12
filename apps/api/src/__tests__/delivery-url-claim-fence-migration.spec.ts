@@ -148,8 +148,14 @@ describe("delivery URL claim fence migration contract", () => {
     expect(rlsProvisioningSql).toMatch(
       /GRANT EXECUTE ON FUNCTION public\."acquire_delivery_url_claim_fence"\(text\)\s+TO guestpost_api_group, guestpost_worker_group/,
     )
-    expect(rlsProvisioningSql).toContain(
+    expect(rlsProvisioningSql).not.toContain(
       "REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC",
+    )
+    expect(rlsProvisioningSql).toMatch(
+      /DO \$revoke_schema_owner_function_privileges\$[\s\S]*procedure\.proowner = \(SELECT oid FROM pg_roles WHERE rolname = current_user\)[\s\S]*REVOKE ALL PRIVILEGES ON FUNCTION %s FROM PUBLIC/,
+    )
+    expect(rlsProvisioningSql).toMatch(
+      /SET ROLE guestpost_rls_authorizer;[\s\S]*DO \$revoke_rls_authorizer_function_privileges\$[\s\S]*procedure\.proowner = \(SELECT oid FROM pg_roles WHERE rolname = current_user\)[\s\S]*REVOKE ALL PRIVILEGES ON FUNCTION %s FROM PUBLIC/,
     )
     const managedAclCleanup = rlsProvisioningSql.indexOf(
       "DO $revoke_application_table_privileges$",
