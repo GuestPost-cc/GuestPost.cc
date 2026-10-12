@@ -419,6 +419,26 @@ BEGIN
   END LOOP;
 END
 $revoke_rls_authorizer_function_privileges$;
+SET ROLE guestpost_financial_repair_guard;
+DO $revoke_financial_repair_guard_function_privileges$
+DECLARE
+  function_row record;
+BEGIN
+  FOR function_row IN
+    SELECT procedure.oid::regprocedure AS signature
+    FROM pg_proc AS procedure
+    JOIN pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+    WHERE namespace.nspname = 'public'
+      AND procedure.prokind <> 'p'
+      AND procedure.proowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON FUNCTION %s FROM PUBLIC, guestpost_api_group, guestpost_auth_group, guestpost_worker_group, guestpost_reporting_group, guestpost_migrator, guestpost_api_runtime, guestpost_auth_runtime, guestpost_worker_runtime, guestpost_reporting_runtime, guestpost_rls_authorizer, guestpost_financial_repair_staging',
+      function_row.signature
+    );
+  END LOOP;
+END
+$revoke_financial_repair_guard_function_privileges$;
 SET ROLE guestpost_schema_owner;
 \endif
 
@@ -438,7 +458,10 @@ BEGIN
     AND procedure.prokind <> 'p'
     AND procedure.proowner NOT IN (
       SELECT oid FROM pg_roles
-      WHERE rolname IN ('guestpost_schema_owner', 'guestpost_rls_authorizer')
+      WHERE rolname IN (
+        'guestpost_schema_owner', 'guestpost_rls_authorizer',
+        'guestpost_financial_repair_guard'
+      )
     )
     AND EXISTS (
       SELECT 1
