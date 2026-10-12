@@ -218,6 +218,7 @@ SELECT pg_temp.assert_true(
   has_column_privilege('guestpost_financial_repair_guard', 'public."Order"', 'version', 'UPDATE')
   AND NOT has_column_privilege('guestpost_financial_repair_guard', 'public."Order"', 'status', 'UPDATE')
   AND NOT has_column_privilege('guestpost_financial_repair_guard', 'public."Wallet"', 'availableBalance', 'UPDATE')
+  AND has_schema_privilege('guestpost_financial_repair_guard', 'public', 'USAGE')
   AND NOT has_schema_privilege('guestpost_financial_repair_guard', 'public', 'CREATE'),
   'repair guard update rights must remain column-scoped to lock-only columns'
 );
