@@ -157,14 +157,12 @@ describe("delivery URL claim fence migration contract", () => {
     expect(rlsProvisioningSql).toMatch(
       /SET ROLE guestpost_rls_authorizer;[\s\S]*DO \$revoke_rls_authorizer_function_privileges\$[\s\S]*procedure\.proowner = \(SELECT oid FROM pg_roles WHERE rolname = current_user\)[\s\S]*REVOKE ALL PRIVILEGES ON FUNCTION %s FROM PUBLIC/,
     )
-    expect(rlsProvisioningSql).toContain(
-      "current_user_is_superuser boolean;",
-    )
-    expect(rlsProvisioningSql).toContain(
-      "OR (current_user_is_superuser",
-    )
+    expect(rlsProvisioningSql).toContain("current_user_is_superuser boolean;")
+    expect(rlsProvisioningSql).toContain("OR (current_user_is_superuser")
     expect(rlsProvisioningSql).toContain("AND assert_owner = current_user")
-    expect(rlsProvisioningSql).toContain("AND trigger_owner = current_user) THEN")
+    expect(rlsProvisioningSql).toContain(
+      "AND trigger_owner = current_user) THEN",
+    )
     const managedAclCleanup = rlsProvisioningSql.indexOf(
       "DO $revoke_application_table_privileges$",
     )
