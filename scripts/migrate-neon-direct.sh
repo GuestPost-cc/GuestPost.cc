@@ -26,7 +26,7 @@ if [[ -z "$PSQL_BIN" || ! -x "$PSQL_BIN" ]]; then
   exit 1
 fi
 PSQL_VERSION_OUTPUT=$("$PSQL_BIN" --version)
-PSQL_MAJOR=$(sed -E 's/.*\) ([0-9]+)(\..*)?$/\1/' <<< "$PSQL_VERSION_OUTPUT")
+PSQL_MAJOR=$(sed -nE 's/^psql \(PostgreSQL\) ([0-9]+).*/\1/p' <<< "$PSQL_VERSION_OUTPUT")
 if ! [[ "$PSQL_MAJOR" =~ ^[0-9]+$ ]]; then
   printf 'Could not determine the psql client version from: %s\n' "$PSQL_VERSION_OUTPUT" >&2
   exit 1
