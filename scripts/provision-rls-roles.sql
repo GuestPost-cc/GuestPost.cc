@@ -422,6 +422,42 @@ $revoke_rls_authorizer_function_privileges$;
 SET ROLE guestpost_schema_owner;
 \endif
 
+-- Unknown owners cannot be safely ACL-reconciled by the restricted Neon
+-- migrator. Fail closed if any unmanaged public function still grants PUBLIC
+-- EXECUTE, treating a NULL proacl as PostgreSQL's built-in default ACL.
+DO $assert_unmanaged_public_function_acl$
+DECLARE
+  unmanaged_function text;
+BEGIN
+  SELECT procedure.oid::regprocedure::text
+      || ' (owner ' || pg_get_userbyid(procedure.proowner) || ')'
+    INTO unmanaged_function
+  FROM pg_proc AS procedure
+  JOIN pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+  WHERE namespace.nspname = 'public'
+    AND procedure.prokind <> 'p'
+    AND procedure.proowner NOT IN (
+      SELECT oid FROM pg_roles
+      WHERE rolname IN ('guestpost_schema_owner', 'guestpost_rls_authorizer')
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM aclexplode(
+        COALESCE(procedure.proacl, acldefault('f', procedure.proowner))
+      ) AS function_acl
+      WHERE function_acl.grantee = 0
+        AND function_acl.privilege_type = 'EXECUTE'
+    )
+  LIMIT 1;
+
+  IF unmanaged_function IS NOT NULL THEN
+    RAISE EXCEPTION
+      'Public-schema function % retains PUBLIC EXECUTE outside managed owner roles',
+      unmanaged_function;
+  END IF;
+END
+$assert_unmanaged_public_function_acl$;
+
 -- Reservation-release triggers are SECURITY INVOKER and call this assertion
 -- from inside their trigger body. Grant only the API/worker/repair callers,
 -- plus Neon's administrative seed identity when present; the assertion does
