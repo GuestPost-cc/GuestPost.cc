@@ -32,6 +32,6 @@
     "@aws-sdk/s3-request-presigner": "^3.1137.0",
     "cheerio": "^1.2.0",
     "undici": "^7.29.1",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   }
 }
